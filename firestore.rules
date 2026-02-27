@@ -1,0 +1,23 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Allow anyone to read public spots
+    match /spots/{spotId} {
+      allow read: if true;
+      // Allow authenticated users to create spots
+      allow create: if request.auth != null;
+      // Allow spot owners to update their own spots
+      allow update: if request.auth != null && resource.data.created_by == request.auth.token.email;
+      // Allow spot owners to delete their own spots
+      allow delete: if request.auth != null && resource.data.created_by == request.auth.token.email;
+    }
+    
+    // Allow authenticated users to read and create ratings
+    match /ratings/{ratingId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+    }
+  }
+}

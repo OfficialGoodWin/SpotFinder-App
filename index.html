@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="https://base44.com/logo_v2.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="manifest" href="/manifest.json" />
+    <title>SpotFinder</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+      import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-analytics.js";
+      const firebaseConfig = {
+        apiKey: "AIzaSyC9NPoHYPstR8L-FN-Yxd86IMFsRH1rMNw",
+        authDomain: "tdzjesuj.firebaseapp.com",
+        projectId: "tdzjesuj",
+        storageBucket: "tdzjesuj.firebasestorage.app",
+        messagingSenderId: "450933598203",
+        appId: "1:450933598203:web:1dbd06dc825a8bc1d1cd5e",
+        measurementId: "G-5D33YJG66F"
+      };
+       const app = initializeApp(firebaseConfig);
+       const analytics = getAnalytics(app);
+    </script>
+  </body>
+</html>
