@@ -27,7 +27,7 @@ const TURN_ICONS = {
   default: ArrowUp,
 };
 
-export default function NavigationPanel({ from, to, toLabel, onClose, onRouteReady, userPosition }) {
+export default function NavigationPanel({ from, to, toLabel, onClose, onRouteReady, userPosition: propUserPosition }) {
   const [routeType, setRouteType] = useState('car_fast');
   const [route, setRoute] = useState(null);
   const [steps, setSteps] = useState([]);
@@ -35,7 +35,37 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
   const [muted, setMuted] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [userPosition, setUserPosition] = useState(propUserPosition || null);
   const lastSpokenStep = useRef(-1);
+
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      console.error("Geolocation is not supported by your browser");
+      return;
+    }
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        setUserPosition({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+      },
+      (error) => {
+        console.warn(`ERROR(${error.code}): ${error.message}`);
+        if (error.code === error.PERMISSION_DENIED) {
+          alert("Please allow location access in Safari settings to use navigation.");
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
 
   useEffect(() => {
     if (from && to) fetchRoute();
