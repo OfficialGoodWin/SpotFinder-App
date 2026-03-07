@@ -6,15 +6,22 @@
 // 4. Enable Firestore Database
 // 5. Copy your config from Project Settings > General > Your apps
 
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
 export const firebaseConfig = {
-  apiKey: "AIzaSyC9NPoHYPstR8L-FN-Yxd86IMFsRH1rMNw",
-  authDomain: "tdzjesuj.firebaseapp.com", // Replace with your auth domain, e.g.,
-  projectId: "tdzjesuj",
-  storageBucket: "tdzjesuj.firebasestorage.app",
-  messagingSenderId: "450933598203",
-  appId: "1:450933598203:web:1dbd06dc825a8bc1d1cd5e",
+  apiKey: "AIzaSyCJfu6SSuKJoDtLSJvNz491a8YtWznCDMk",
+  authDomain: "spotfinderapp-cdc7b.firebaseapp.com",
+  projectId: "spotfinderapp-cdc7b",
+  storageBucket: "spotfinderapp-cdc7b.firebasestorage.app",
+  messagingSenderId: "179466659021",
+  appId: "1:179466659021:web:f93b90b96948a264d23584"
 };
 
+// Initialize Firebase
 // Note: For Google Sign-In, you'll also need to configure:
 // 1. Go to Authentication > Sign-in method > Google > Enable
 // 2. Set up authorized domains in Firebase Console

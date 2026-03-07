@@ -144,14 +144,15 @@ export const deleteSpot = async (spotId) => {
   await deleteDoc(spotRef);
 };
 
-export const rateSpot = async (spotId, rating) => {
+export const rateSpot = async (spotId, rating, additionalData = {}) => {
   const { db } = getFirebaseServices();
   const ratingsRef = collection(db, RATINGS_COLLECTION);
   
   await addDoc(ratingsRef, {
     spot_id: spotId,
     rating: rating,
-    created_date: new Date().toISOString()
+    created_date: new Date().toISOString(),
+    ...additionalData
   });
 };
 
@@ -162,6 +163,21 @@ export const updateSpotRating = async (spotId, newRating, newCount) => {
     rating: newRating,
     rating_count: newCount
   });
+};
+
+export const getSpotRatings = async (spotId) => {
+  const { db } = getFirebaseServices();
+  const ratingsRef = collection(db, RATINGS_COLLECTION);
+  const q = query(
+    ratingsRef,
+    where('spot_id', '==', spotId)
+  );
+  
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  }));
 };
 
 // Export base44-compatible API (for backward compatibility)

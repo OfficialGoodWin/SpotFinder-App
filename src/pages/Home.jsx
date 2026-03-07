@@ -18,13 +18,11 @@ import MySpotsPanel from '../components/spots/MySpotsPanel';
 
 // Note: Leaflet marker icons are fixed via src/lib/leaflet-fix.js
 
-const MAPY_API_KEY = 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
-
 const TILE_URLS = {
-  basic: `https://api.mapy.com/v1/maptiles/basic/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
-  outdoor: `https://api.mapy.com/v1/maptiles/outdoor/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
-  aerial: `https://api.mapy.com/v1/maptiles/aerial/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
-  winter: `https://api.mapy.com/v1/maptiles/winter/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
+  basic: `https://api.mapy.com/v1/maptiles/basic/256/{z}/{x}/{y}?apikey=${import.meta.env.VITE_MAPY_API_KEY}`,
+  outdoor: `https://api.mapy.com/v1/maptiles/outdoor/256/{z}/{x}/{y}?apikey=${import.meta.env.VITE_MAPY_API_KEY}`,
+  aerial: `https://api.mapy.com/v1/maptiles/aerial/256/{z}/{x}/{y}?apikey=${import.meta.env.VITE_MAPY_API_KEY}`,
+  winter: `https://api.mapy.com/v1/maptiles/winter/256/{z}/{x}/{y}?apikey=${import.meta.env.VITE_MAPY_API_KEY}`,
 };
 
 // Map controller component
@@ -64,6 +62,10 @@ export default function Home() {
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState('');
+  const [deleteSpotId, setDeleteSpotId] = useState(null);
+  const [routePolyline, setRoutePolyline] = useState(null);
+  const [routeSteps, setRouteSteps] = useState(null);
+  const [turnMarkers, setTurnMarkers] = useState(null);
   const mapRef = useRef(null);
 
   // Load spots
@@ -74,24 +76,248 @@ export default function Home() {
   // Track if we've centered to user location once
   const hasCenteredToUser = useRef(false);
 
-  // Watch user location
+  // Draw route polyline on map with turn indicators
   useEffect(() => {
-    if (!navigator.geolocation) return;
-    const wid = navigator.geolocation.watchPosition(
+    if (!mapRef.current) return;
+
+    // Remove existing route layer if any
+    mapRef.current.eachLayer((layer) => {
+      if (layer.options && (layer.options.routeLayer || layer.options.turnMarker)) {
+        mapRef.current.removeLayer(layer);
+      }
+    });
+
+    if (routePolyline && routePolyline.length > 0) {
+      const polyline = L.polyline(routePolyline, {
+        color: '#3b82f6',
+        weight: 5,
+        opacity: 0.8,
+        routeLayer: true
+      });
+      polyline.addTo(mapRef.current);
+
+      // Add turn indicators along the route
+      // Use exact turnMarker coordinates if available, otherwise calculate from routeSteps
+      if (turnMarkers && turnMarkers.length > 0) {
+        turnMarkers.forEach((marker) => {
+          const turnIcons = {
+            'turn-left': '↙',
+            'turn-right': '↘',
+            'slight-left': '↖',
+            'slight-right': '↗',
+            'turn-sharp-left': '↙',
+            'turn-sharp-right': '↘',
+            'uturn': '↻',
+            'straight': '↑',
+            'depart': '→',
+            'roundabout': '⭕',
+            'default': '•'
+          };
+
+          const iconChar = turnIcons[marker.type] || turnIcons['default'];
+
+          // Determine color: yellow for roundabouts, green for depart, red for regular turns
+          let fillColor = '#ef4444'; // default red for turns
+          if (marker.isRoundabout) fillColor = '#fbbf24'; // yellow
+          else if (marker.type === 'depart') fillColor = '#10b981'; // green
+
+          const circleMarker = L.circleMarker([marker.lat, marker.lng], {
+            radius: 12,
+            fillColor,
+            color: 'white',
+            weight: 2,
+            opacity: 0.9,
+            fillOpacity: 0.85,
+            turnMarker: true
+          });
+
+          // Add label with turn icon
+          const label = L.tooltip({
+            permanent: true,
+            direction: 'center',
+            className: 'turn-indicator',
+            offset: [0, 0]
+          });
+          label.setContent(`<span style="font-weight: bold; color: white; font-size: 14px;">${iconChar}</span>`);
+          circleMarker.bindTooltip(label);
+
+          // Add popup with turn info
+          circleMarker.bindPopup(`
+            <div style="font-size: 12px;">
+              <strong>${marker.instruction}</strong>
+            </div>
+          `);
+
+          circleMarker.addTo(mapRef.current);
+        });
+      } else if (routeSteps && routeSteps.length > 0) {
+        // Fallback: calculate turn positions from route steps
+        routeSteps.forEach((step, idx) => {
+          // Skip arrival (last step)
+          if (step.type === 'arrive') return;
+
+          // Find the coordinate closest to the turn distance
+          let turnCoord = null;
+          const routeLength = routePolyline.length;
+
+          // Calculate what percentage along the route this turn is
+          let distanceCovered = 0;
+          for (let i = 0; i < routeLength - 1; i++) {
+            const segmentStart = routePolyline[i];
+            const segmentEnd = routePolyline[i + 1];
+            const segmentDist = Math.sqrt(
+              Math.pow(segmentEnd[0] - segmentStart[0], 2) +
+              Math.pow(segmentEnd[1] - segmentStart[1], 2)
+            ) * 111000; // rough conversion to meters
+
+            if (distanceCovered + segmentDist >= step.distance) {
+              // This segment contains the turn
+              const ratio = (step.distance - distanceCovered) / segmentDist;
+              turnCoord = [
+                segmentStart[0] + (segmentEnd[0] - segmentStart[0]) * ratio,
+                segmentStart[1] + (segmentEnd[1] - segmentStart[1]) * ratio
+              ];
+              break;
+            }
+            distanceCovered += segmentDist;
+          }
+
+          if (turnCoord) {
+            // Create a marker for the turn
+            const turnIcons = {
+              'turn-left': '↙',
+              'turn-right': '↘',
+              'slight-left': '↖',
+              'slight-right': '↗',
+              'turn-sharp-left': '↙',
+              'turn-sharp-right': '↘',
+              'uturn': '↻',
+              'straight': '↑',
+              'depart': '→',
+              'roundabout': '⭕',
+              'default': '•'
+            };
+
+            const iconChar = turnIcons[step.type] || turnIcons['default'];
+
+            // Determine color
+            let fillColor = '#ef4444'; // default red for turns
+            if (step.type === 'roundabout') fillColor = '#fbbf24'; // yellow
+            else if (step.type === 'depart') fillColor = '#10b981'; // green
+
+            const marker = L.circleMarker(turnCoord, {
+              radius: 12,
+              fillColor,
+              color: 'white',
+              weight: 2,
+              opacity: 0.9,
+              fillOpacity: 0.85,
+              turnMarker: true
+            });
+
+            // Add label with turn icon
+            const label = L.tooltip({
+              permanent: true,
+              direction: 'center',
+              className: 'turn-indicator',
+              offset: [0, 0]
+            });
+            label.setContent(`<span style="font-weight: bold; color: white; font-size: 14px;">${iconChar}</span>`);
+            marker.bindTooltip(label);
+
+            // Add popup with turn info
+            marker.bindPopup(`
+              <div style="font-size: 12px;">
+                <strong>${step.instruction}</strong><br/>
+                <small>${Math.round(step.distance)}m</small>
+              </div>
+            `);
+
+            marker.addTo(mapRef.current);
+          }
+        });
+      }
+
+      mapRef.current.fitBounds(polyline.getBounds(), { padding: [50, 50] });
+    }
+  }, [routePolyline, routeSteps, turnMarkers]);
+
+  // Watch user location
+  const requestLocationPermission = useCallback(async () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser');
+      return;
+    }
+
+    // Check permission status first using the Permissions API
+    const checkPermission = async () => {
+      if (navigator.permissions && navigator.permissions.query) {
+        try {
+          const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
+          return permissionStatus.state; // 'granted', 'denied', or 'prompt'
+        } catch (e) {
+          // Permissions API not supported, will use legacy method
+          console.log('Permissions API not supported, using legacy method');
+        }
+      }
+      return null; // Fallback to legacy method
+    };
+
+    const permissionState = await checkPermission();
+
+    // If permission was previously denied, show helpful message
+    if (permissionState === 'denied') {
+      alert('Location access was denied. Please enable it in your device settings:\n\n' +
+            '• iOS: Settings > Privacy & Security > Location Services > Safari/Websites\n' +
+            '• Android: Settings > Location > Chrome > Permissions\n\n' +
+            'Or tap the 🔒/📋 icon in your browser address bar to change permissions.');
+      return;
+    }
+
+    // Request location - this will trigger the permission prompt if state is 'prompt' or null
+    navigator.geolocation.getCurrentPosition(
       (pos) => {
         const newPos = [pos.coords.latitude, pos.coords.longitude];
         setUserPos(newPos);
         setUserAccuracy(pos.coords.accuracy);
         
-        // Auto-center map to user location on first position
+        // Auto-center map to user location
         if (!hasCenteredToUser.current) {
           hasCenteredToUser.current = true;
           setFlyTo(newPos);
         }
+        
+        // Start watching after getting initial position
+        const wid = navigator.geolocation.watchPosition(
+          (p) => {
+            setUserPos([p.coords.latitude, p.coords.longitude]);
+            setUserAccuracy(p.coords.accuracy);
+          },
+          (err) => console.warn('Watch error:', err.message),
+          { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
+        );
       },
-      null, { enableHighAccuracy: true }
+      (error) => {
+        console.warn('Geolocation error:', error.code, error.message);
+        
+        let errorMessage = '';
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = 'Location permission denied. Please tap the 🔒/📋 icon in your browser address bar to allow location access, or enable it in your device settings.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = 'Location information is unavailable. Please check if GPS is enabled on your device.';
+            break;
+          case error.TIMEOUT:
+            errorMessage = 'Location request timed out. Please try again.';
+            break;
+          default:
+            errorMessage = 'Unable to get location. Please try again.';
+        }
+        alert(errorMessage);
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
     );
-    return () => navigator.geolocation.clearWatch(wid);
   }, []);
 
   const handleMapClick = useCallback((latlng) => {
@@ -166,7 +392,7 @@ export default function Home() {
           className="absolute inset-0 z-[999] flex items-center justify-center pointer-events-none"
           style={{ cursor: 'crosshair' }}
         >
-          <div className="bg-blue-600 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-lg animate-pulse top-20 absolute">
+          <div className="bg-green-600 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-lg animate-pulse top-20 absolute">
             Tap on the map to place spot
           </div>
         </div>
@@ -182,8 +408,8 @@ export default function Home() {
       >
         <TileLayer
           url={TILE_URLS[mapLayer]}
-          attribution='&copy; <a href="https://mapy.com">Mapy.cz</a>'
-          maxZoom={20}
+          attribution='&copy; <a href="https://api.mapy.com/copyright" target="_blank">Seznam.cz a.s. a další</a>'
+          maxZoom={19}
         />
         <MapController flyTo={flyTo} setMapRef={(m) => { mapRef.current = m; }} />
         <MapClickHandler addMode={addMode} onMapClick={handleMapClick} />
@@ -216,7 +442,13 @@ export default function Home() {
 
       {/* Center on user location */}
       <button
-        onClick={() => userPos && setFlyTo([...userPos])}
+        onClick={() => {
+          if (userPos) {
+            setFlyTo([...userPos]);
+          } else {
+            requestLocationPermission();
+          }
+        }}
         className="absolute bottom-32 right-4 z-[1000] w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center border border-gray-200 active:scale-95 transition-transform"
       >
         <Crosshair className="w-5 h-5 text-gray-700" />
@@ -244,7 +476,7 @@ export default function Home() {
                 {user.photoURL ? (
                   <img src={user.photoURL} alt="" className="w-full h-full object-cover" />
                 ) : (
-                  <span className="text-lg font-bold text-blue-500">{user.displayName?.[0] || user.email?.[0] || '?'}</span>
+                <span className="text-lg font-bold text-green-600">{user.displayName?.[0] || user.email?.[0] || '?'}</span>
                 )}
               </div>
               <span className="text-xs font-medium">Account</span>
@@ -290,17 +522,13 @@ export default function Home() {
           </button>
         )}
 
-        {/* Add Spot FAB */}
+        {/* Add Spot FAB - works without account */}
         <button
           onClick={() => {
-            if (!user) {
-              setShowAuth(true);
-              return;
-            }
             setAddMode(a => !a);
           }}
           className={`w-16 h-16 rounded-full shadow-2xl flex items-center justify-center transition-all active:scale-95
-            ${addMode ? 'bg-red-500 rotate-45 shadow-red-200' : 'bg-blue-500 shadow-blue-200'}`}
+            ${addMode ? 'bg-red-500 rotate-45 shadow-red-200' : 'bg-green-500 shadow-green-200'}`}
         >
           <Plus className="w-8 h-8 text-white" />
         </button>
@@ -333,18 +561,18 @@ export default function Home() {
           onClose={() => setSelectedSpot(null)}
           onNavigate={handleNavigate}
           onEdit={() => { /* TODO: edit */ }}
-          onDelete={() => handleDeleteSpot(selectedSpot)}
+          onDelete={() => setDeleteSpotId(selectedSpot.id)}
         />
       )}
 
-      {navTarget && userPos && (
+      {navTarget && (
         <NavigationPanel
           from={{ lat: userPos[0], lng: userPos[1] }}
           to={{ lat: navTarget.lat, lng: navTarget.lng }}
           toLabel={navTarget.label}
-          onClose={() => setNavTarget(null)}
-          onRouteReady={() => {}}
-          userPosition={userPos}
+          onClose={() => { setNavTarget(null); setRoutePolyline(null); setRouteSteps(null); setTurnMarkers(null); }}
+          onRouteReady={(route) => { setRoutePolyline(route.routeGeometry); setRouteSteps(route.steps); setTurnMarkers(route.turnMarkers); }}
+          userPosition={{ lat: userPos[0], lng: userPos[1] }}
         />
       )}
 
@@ -396,6 +624,44 @@ export default function Home() {
                 onClick={handleDeleteAccount}
                 disabled={deleteInput !== 'DELETE'}
                 className="flex-1 py-3 rounded-2xl bg-red-500 text-white font-semibold text-sm hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Spot Confirmation Modal */}
+      {deleteSpotId && (
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">Delete Spot</h3>
+            </div>
+            
+            <p className="text-gray-600 text-sm mb-4">
+              Are you sure you want to delete this spot? This action cannot be undone.
+            </p>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteSpotId(null)}
+                className="flex-1 py-3 rounded-2xl border-2 border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  await deleteSpot(deleteSpotId);
+                  setSpots(prev => prev.filter(s => s.id !== deleteSpotId));
+                  setSelectedSpot(null);
+                  setDeleteSpotId(null);
+                }}
+                className="flex-1 py-3 rounded-2xl bg-red-500 text-white font-semibold text-sm hover:bg-red-600"
               >
                 Delete
               </button>
