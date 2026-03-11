@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MapContainer, TileLayer, useMapEvents, useMap } from 'react-leaflet';
-import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Plus, User, MapPin, List, Navigation2, Crosshair, LogOut, Trash2 } from 'lucide-react';
+import { Plus, User, Settings, Crosshair, LogOut, Trash2, List } from 'lucide-react';
 import { getPublicSpots, createSpot, deleteSpot } from '@/api/firebaseClient';
 import { useAuth } from '@/lib/AuthContext';
 
@@ -13,8 +12,10 @@ import SearchBar from '../components/map/SearchBar';
 import AddSpotModal from '../components/spots/AddSpotModal';
 import SpotDetailModal from '../components/spots/SpotDetailModal';
 import NavigationPanel from '../components/navigation/NavigationPanel';
+import RouteOverlay from '../components/navigation/RouteOverlay';
 import AuthModal from '../components/auth/AuthModal';
 import MySpotsPanel from '../components/spots/MySpotsPanel';
+import SettingsModal from '../components/SettingsModal';
 
 // Note: Leaflet marker icons are fixed via src/lib/leaflet-fix.js
 
@@ -63,8 +64,12 @@ export default function Home() {
   const [showNearbySpots, setShowNearbySpots] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [navRouteData, setNavRouteData] = useState({ coordinates: [], turns: [], currentStep: 0 });
   const [deleteInput, setDeleteInput] = useState('');
   const mapRef = useRef(null);
+
+  console.log('[Home] Component mounted');
 
   // Load spots
   useEffect(() => {
@@ -73,12 +78,29 @@ export default function Home() {
 
   // Track if we've centered to user location once
   const hasCenteredToUser = useRef(false);
+  const geolocationTimeoutRef = useRef(null);
 
   // Watch user location
   useEffect(() => {
     if (!navigator.geolocation) return;
+
+    // Set timeout to allow app to work without geolocation (e.g., if permission denied on mobile)
+    geolocationTimeoutRef.current = setTimeout(() => {
+      console.warn('Geolocation timeout - proceeding without location');
+      if (!hasCenteredToUser.current) {
+        hasCenteredToUser.current = true;
+        // Use default Prague location
+        setFlyTo([50.0755, 14.4378]);
+      }
+    }, 5000); // 5 second timeout
+
     const wid = navigator.geolocation.watchPosition(
       (pos) => {
+        // Clear timeout on successful location
+        if (geolocationTimeoutRef.current) {
+          clearTimeout(geolocationTimeoutRef.current);
+          geolocationTimeoutRef.current = null;
+        }
         const newPos = [pos.coords.latitude, pos.coords.longitude];
         setUserPos(newPos);
         setUserAccuracy(pos.coords.accuracy);
@@ -89,9 +111,27 @@ export default function Home() {
           setFlyTo(newPos);
         }
       },
-      null, { enableHighAccuracy: true }
+      (error) => {
+        // Handle geolocation errors
+        console.warn('Geolocation error:', error.message);
+        if (geolocationTimeoutRef.current) {
+          clearTimeout(geolocationTimeoutRef.current);
+          geolocationTimeoutRef.current = null;
+        }
+        // Continue without location if permission denied or unavailable
+        if (!hasCenteredToUser.current) {
+          hasCenteredToUser.current = true;
+          setFlyTo([50.0755, 14.4378]); // Default to Prague
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
-    return () => navigator.geolocation.clearWatch(wid);
+    return () => {
+      navigator.geolocation.clearWatch(wid);
+      if (geolocationTimeoutRef.current) {
+        clearTimeout(geolocationTimeoutRef.current);
+      }
+    };
   }, []);
 
   const handleMapClick = useCallback((latlng) => {
@@ -199,6 +239,15 @@ export default function Home() {
             onClick={() => setSelectedSpot(spot)}
           />
         ))}
+
+        {/* Route overlay during navigation */}
+        {navTarget && navRouteData.coordinates.length > 0 && (
+          <RouteOverlay
+            routeCoordinates={navRouteData.coordinates}
+            turnMarkers={navRouteData.turns}
+            currentStep={navRouteData.currentStep}
+          />
+        )}
       </MapContainer>
 
       {/* Search bar */}
@@ -305,15 +354,15 @@ export default function Home() {
           <Plus className="w-8 h-8 text-white" />
         </button>
 
-        {/* Spots list button */}
+        {/* Spots list button -> Settings button */}
         <button
-          onClick={() => user ? setShowMySpots(true) : setShowAuth(true)}
+          onClick={() => setShowSettings(true)}
           className="flex flex-col items-center gap-1 text-gray-600 active:scale-95 transition-transform"
         >
           <div className="w-10 h-10 bg-gray-100 rounded-2xl flex items-center justify-center">
-            <List className="w-5 h-5 text-gray-500" />
+            <Settings className="w-5 h-5 text-gray-500" />
           </div>
-          <span className="text-xs font-medium">List</span>
+          <span className="text-xs font-medium">Settings</span>
         </button>
       </div>
 
@@ -344,6 +393,7 @@ export default function Home() {
           toLabel={navTarget.label}
           onClose={() => setNavTarget(null)}
           onRouteReady={() => {}}
+          onRouteData={(data) => setNavRouteData(data)}
           userPosition={userPos}
         />
       )}
@@ -356,6 +406,10 @@ export default function Home() {
           onClose={() => setShowMySpots(false)}
           onFlyTo={(pos) => setFlyTo(pos)}
         />
+      )}
+
+      {showSettings && (
+        <SettingsModal onClose={() => setShowSettings(false)} />
       )}
 
       {/* Delete Account Confirmation Modal */}

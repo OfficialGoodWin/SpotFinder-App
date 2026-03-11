@@ -12,5 +12,18 @@ export default defineConfig({
   },
   plugins: [
     react(),
-  ]
+  ],
+  build: {
+    target: ['es2015', 'edge88', 'firefox87', 'chrome87', 'safari14'],
+  },
+  server: {
+    host: '0.0.0.0',
+    proxy: {
+      '/ors-api': {
+        target: 'https://api.openrouteservice.org/v2',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/ors-api/, ''),
+      }
+    }
+  }
 })

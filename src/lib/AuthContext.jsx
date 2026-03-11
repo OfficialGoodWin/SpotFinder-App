@@ -15,27 +15,38 @@ export const AuthProvider = ({ children }) => {
     // Set up Firebase auth state listener
     checkAppState();
     
-    // Listen for auth state changes
-    const { auth } = getFirebaseServices();
-    const unsubscribe = onAuthChange((firebaseUser) => {
-      if (firebaseUser) {
-        setUser({
-          email: firebaseUser.email,
-          id: firebaseUser.uid,
-          displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0],
-          photoURL: firebaseUser.photoURL
-        });
-        setIsAuthenticated(true);
-      } else {
-        setUser(null);
-        setIsAuthenticated(false);
-      }
-      setIsLoadingAuth(false);
-    });
+    try {
+      // Listen for auth state changes
+      const { auth } = getFirebaseServices();
+      const unsubscribe = onAuthChange((firebaseUser) => {
+        try {
+          if (firebaseUser) {
+            const displayName = firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'User');
+            setUser({
+              email: firebaseUser.email,
+              id: firebaseUser.uid,
+              displayName: displayName,
+              photoURL: firebaseUser.photoURL
+            });
+            setIsAuthenticated(true);
+          } else {
+            setUser(null);
+            setIsAuthenticated(false);
+          }
+        } catch (err) {
+          console.error('Error in auth state callback:', err);
+          setIsAuthenticated(false);
+        }
+        setIsLoadingAuth(false);
+      });
 
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
+      return () => {
+        if (unsubscribe) unsubscribe();
+      };
+    } catch (err) {
+      console.error('Firebase initialization error:', err);
+      setIsLoadingAuth(false);
+    }
   }, []);
 
   const checkAppState = async () => {
