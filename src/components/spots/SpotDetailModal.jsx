@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Navigation, MapPin, Car, Utensils, TreePine, Edit2, Trash2 } from 'lucide-react';
+import { X, Navigation, Star, MapPin, Car, Utensils, TreePine, Edit2, Trash2 } from 'lucide-react';
 import StarRating from './StarRating';
 import { rateSpot, updateSpotRating } from '@/api/firebaseClient';
 
