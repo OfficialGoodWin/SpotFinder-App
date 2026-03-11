@@ -13,6 +13,9 @@ export default defineConfig({
   plugins: [
     react(),
   ],
+  build: {
+    target: ['es2015', 'edge88', 'firefox87', 'chrome87', 'safari14'],
+  },
   server: {
     host: '0.0.0.0',
     proxy: {
