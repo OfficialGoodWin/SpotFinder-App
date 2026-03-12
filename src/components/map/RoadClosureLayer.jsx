@@ -95,6 +95,7 @@ export default function RoadClosureLayer({ apiKey, enabled }) {
         key={props.id || `${lat}-${lng}`}
         position={[lat, lng]}
         icon={closed ? NO_ENTRY_ICON : JAM_ICON}
+        zIndexOffset={2000}
       >
         <Popup>
           <div style={{ minWidth: 160, fontSize: 13 }}>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { X, Moon, Info, Send } from 'lucide-react';
+import { X, Moon, Info, Send, HelpCircle, ExternalLink } from 'lucide-react';
 import { useTheme } from '@/lib/ThemeContext';
-
+ 
 export default function SettingsModal({ onClose }) {
   const { isDark, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('settings');
@@ -9,13 +9,13 @@ export default function SettingsModal({ onClose }) {
   const [feedbackEmail, setFeedbackEmail] = useState('');
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
-
+ 
   const handleSendFeedback = async () => {
     if (!feedbackText.trim()) {
       alert('Please enter your feedback');
       return;
     }
-
+ 
     setFeedbackLoading(true);
     try {
       // Try using mailto as fallback
@@ -45,7 +45,7 @@ export default function SettingsModal({ onClose }) {
           })
         }).catch(() => ({ ok: true })); // Assume success for offline
       });
-
+ 
       // Consider it sent even if it fails (for offline usage)
       setFeedbackSent(true);
       setFeedbackText('');
@@ -62,7 +62,7 @@ export default function SettingsModal({ onClose }) {
       setFeedbackLoading(false);
     }
   };
-
+ 
   return (
     <div className="fixed inset-0 z-[2000] flex items-end pointer-events-none">
       <div 
@@ -80,7 +80,7 @@ export default function SettingsModal({ onClose }) {
             <X className="w-5 h-5" />
           </button>
         </div>
-
+ 
         {/* Tabs */}
         <div className="flex gap-2 mb-6 border-b border-border">
           <button
@@ -113,8 +113,18 @@ export default function SettingsModal({ onClose }) {
           >
             Feedback
           </button>
+          <button
+            onClick={() => setActiveTab('help')}
+            className={`px-4 py-3 font-semibold border-b-2 transition-colors ${
+              activeTab === 'help'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Help
+          </button>
         </div>
-
+ 
         {/* Settings Tab */}
         {activeTab === 'settings' && (
           <div className="space-y-4">
@@ -141,13 +151,13 @@ export default function SettingsModal({ onClose }) {
                 />
               </button>
             </div>
-
+ 
             <p className="text-sm text-muted-foreground text-center mt-6">
               Preference saved automatically
             </p>
           </div>
         )}
-
+ 
         {/* About Tab */}
         {activeTab === 'about' && (
           <div className="space-y-4">
@@ -171,7 +181,49 @@ export default function SettingsModal({ onClose }) {
             </div>
           </div>
         )}
-
+ 
+        {/* Help & FAQ Tab */}
+        {activeTab === 'help' && (
+          <div className="space-y-4">
+            <div className="p-4 bg-muted rounded-2xl">
+              <h3 className="font-bold text-lg mb-3 flex items-center gap-2">
+                <HelpCircle className="w-5 h-5 text-primary" />
+                Help & FAQ
+              </h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Find answers to common questions, guides, and tips for using Spotfinder.
+              </p>
+              <a
+                href="https://spotfinder-app.vercel.app/faq"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between w-full p-4 bg-primary text-primary-foreground rounded-xl font-semibold hover:opacity-90 transition-opacity"
+              >
+                <span>Open FAQ Page</span>
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            </div>
+ 
+            <div className="space-y-2">
+              {[
+                { q: 'How do I add a spot?', a: 'Tap the green + button, then tap any location on the map.' },
+                { q: 'How do I navigate to a spot?', a: 'Tap a spot marker, then press the Navigate button in the popup.' },
+                { q: 'What are the spot types?', a: 'Parking 🅿️, Food 🍽️, and Toilet 🚽 — more types coming soon.' },
+                { q: 'How do I switch map style?', a: 'Use the layers button (top-right corner of the map).' },
+                { q: 'Is my data private?', a: 'Spots you create are public. Your account info is stored securely via Firebase.' },
+              ].map(({ q, a }) => (
+                <details key={q} className="bg-muted rounded-xl overflow-hidden group">
+                  <summary className="px-4 py-3 text-sm font-semibold cursor-pointer list-none flex items-center justify-between">
+                    {q}
+                    <span className="text-muted-foreground group-open:rotate-180 transition-transform">▾</span>
+                  </summary>
+                  <p className="px-4 pb-3 text-sm text-muted-foreground">{a}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        )}
+ 
         {/* Feedback Tab */}
         {activeTab === 'feedback' && (
           <div className="space-y-4">
@@ -181,7 +233,7 @@ export default function SettingsModal({ onClose }) {
                 <p className="font-semibold">Thank you! Feedback sent successfully.</p>
               </div>
             )}
-
+ 
             <div className="space-y-3">
               <label className="block text-sm font-medium">
                 Your Email (optional)
@@ -194,7 +246,7 @@ export default function SettingsModal({ onClose }) {
                 className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
-
+ 
             <div className="space-y-3">
               <label className="block text-sm font-medium">
                 Your Feedback
@@ -207,7 +259,7 @@ export default function SettingsModal({ onClose }) {
                 className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
               />
             </div>
-
+ 
             <button
               onClick={handleSendFeedback}
               disabled={feedbackLoading}
@@ -225,7 +277,7 @@ export default function SettingsModal({ onClose }) {
                 </>
               )}
             </button>
-
+ 
             <p className="text-xs text-muted-foreground text-center">
               Your feedback helps us improve Spotfinder
             </p>
@@ -235,3 +287,4 @@ export default function SettingsModal({ onClose }) {
     </div>
   );
 }
+ 
