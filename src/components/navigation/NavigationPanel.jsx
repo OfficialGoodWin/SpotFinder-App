@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Car, Bike, PersonStanding, Volume2, VolumeX, ArrowLeft, ArrowRight, ArrowUp, CircleArrowRight } from 'lucide-react';
-import { getDirectionsRoute, transformStepsToTurns } from '@/api/openrouteServiceClient';
+import { getGraphHopperRoute } from '@/api/graphhopperService';
+import { transformStepsToTurns } from '@/api/openrouteServiceClient';
+
 import { API_CONFIG } from '@/api/apiConfig';
 
 const ROUTE_TYPES = [
@@ -206,7 +208,8 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
     console.log('Fetching route with ORS:', { from, to, profile });
     
     try {
-      const result = await getDirectionsRoute(from, to, profile);
+    const result = await getGraphHopperRoute(from, to, profile);
+
       console.log('ORS Route result:', result);
       
       if (!result || !result.geometry || result.geometry.length === 0) {
