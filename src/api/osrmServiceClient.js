@@ -15,7 +15,7 @@ export async function getOSRMRoute(from, to, profile = 'driving') {
   };
   const osrmProfile = osrmProfiles[profile] || 'driving';
   const url = `${BASE_URL}/${osrmProfile}/${coordinates}?overview=full&steps=true&geometries=polyline&annotations=true`;
-
+  
   try {
     const response = await fetch(url);
     if (!response.ok) {
@@ -36,13 +36,34 @@ function normalizeOSRMResponse(osrmResponse) {
   if (!route) throw new Error('No routes found');
 
   const geometry = decodePolyline(route.geometry);
-
+  
+  // Raw steps with full OSRM data
+  const rawSteps = extractStepsFromRoute(route);
+  
   return {
     geometry,
-    distance: route.distance || 0,
-    duration: route.duration || 0,
-    steps: extractStepsFromRoute(route)
+    distance: route.distance,
+    duration: route.duration,
+    steps: rawSteps
   };
+}
+
+function extractStepsFromRoute(route) {
+  const steps = route.legs[0].steps.map(step => ({
+    instruction: step.maneuver.instruction,
+    distance: step.distance,
+    modifier: step.maneuver.modifier,
+    bearing: step.maneuver.bearing_after || 0,
+    lat: step.maneuver.location[1],
+    lng: step.maneuver.location[0],
+    name: step.name || '',
+    ref: step.ref || '',               // road number, e.g. "D5"
+    destinations: step.destinations || '', // destination sign, e.g. "Praha"
+    exits: step.exits || '',            // exit number if applicable
+    intersections: step.intersections   // needed for lane guidance
+  })).filter(step => step.distance > 5);
+
+  return steps;
 }
 
 function decodePolyline(encoded) {
@@ -81,16 +102,3 @@ function mapOSRMModifier(modifier) {
   return map[modifier] || 'straight';
 }
 
-function extractStepsFromRoute(route) {
-  const steps = route.legs[0].steps.map(step => ({
-    instruction: step.maneuver.instruction,
-    distance: step.distance,
-    modifier: step.maneuver.modifier,
-    bearing: step.maneuver.bearing_after || 0,
-    lat: step.maneuver.location[1],
-    lng: step.maneuver.location[0],
-    name: step.name || ''
-  })).filter(step => step.distance > 5);
-
-  return steps;
-}
