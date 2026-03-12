@@ -2,10 +2,6 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "devCommand": "npm run dev",
-  "env": {
-    "VITE_MAPY_API_KEY": "@mapy_api_key",
-    "VITE_ORS_API_KEY": "@ors_api_key"
-  },
   "headers": [
     {
       "source": "/manifest.json",
