@@ -88,7 +88,11 @@ function mapOSRMModifier(modifier) {
     'slight right': 'turn-right',
     'right': 'turn-right',
     'sharp right': 'turn-right',
-    'u-turn': 'u-turn'
+    'u-turn': 'u-turn',
+    'roundabout left': 'enter roundabout',
+    'roundabout right': 'enter roundabout',
+    'exit roundabout': 'exit roundabout',
+    'use lane': 'straight'
   };
   return map[modifier] || 'straight';
 }

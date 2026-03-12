@@ -115,14 +115,11 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
   useEffect(() => {
     if (!userPosition || steps.length === 0 || !isNavigating) return;
     
-    for (let i = 0; i < steps.length; i++) {
+    for (let i = 6; i < steps.length; i++) { // Start from current+1
       const step = steps[i];
-      const dist = Math.hypot(
-        (step.lat || to.lat) - userPosition[0],
-        (step.lng || to.lng) - userPosition[1]
-      ) * 111000;
+      const dist = haversineDistance(userPosition, [step.lat || to.lat, step.lng || to.lng]);
       
-      if (dist < 50 && i !== lastSpokenStep.current) {
+      if (dist < 75 && i !== lastSpokenStep.current) {
         lastSpokenStep.current = i;
         setCurrentStep(i);
         speakStep(step, true);
@@ -130,6 +127,20 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
       }
     }
   }, [userPosition, steps, isNavigating]);
+
+  function haversineDistance([lat1, lng1], [lat2, lng2]) {
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = lat1 * Math.PI/180;
+    const φ2 = lat2 * Math.PI/180;
+    const Δφ = (lat2-lat1) * Math.PI/180;
+    const Δλ = (lng2-lng1) * Math.PI/180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
 
   useEffect(() => {
     if (userPosition && route && routeCoordinates.length > 0) {
