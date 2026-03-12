@@ -248,36 +248,35 @@ function extractStepsFromRoute(route) {
  * @private
  */
 function normalizeStepType(type) {
-  // ORS can return either numeric types OR string types depending on processing
-  // Map sharp turns to simple left/right to avoid confusing navigation
-  
-  // Handle string types first (from pre-processed steps)
-  if (typeof type === 'string') {
-    const stringMap = {
-      'turn-sharp-left': 'turn-left',
-      'turn-sharp-right': 'turn-right'
-    };
-    return stringMap[type] || type;
-  }
-  
-  // Handle numeric types (from raw ORS API)
-  const numericMap = {
-    0: 'turn-left',      // turn left
-    1: 'turn-right',     // turn right
-    2: 'turn-left',      // sharp-left mapped to simple left
-    3: 'turn-right',     // sharp-right mapped to simple right
-    4: 'straight',
-    5: 'enter roundabout',
-    6: 'exit roundabout',
-    7: 'u-turn',
-    8: 'u-turn',
-    10: 'arrive',        // arrive
-    11: 'depart',        // head towards
-    12: 'slight-left',   // keep left
-    13: 'slight-right'   // keep right
-  };
+// Handle string types first (from pre-processed steps)
+if (typeof type === 'string') {
+const stringMap = {
+'turn-sharp-left': 'turn-left',
+'turn-sharp-right': 'turn-right',
+'slight-left': 'turn-left', // Force slight turns to use standard turn icons
+'slight-right': 'turn-right'
+};
+return stringMap[type] || type;
+}
 
-  return numericMap[type] || 'straight';
+// Handle numeric types (from raw ORS API)
+const numericMap = {
+0: 'turn-left',
+1: 'turn-right',
+2: 'turn-left',
+3: 'turn-right',
+4: 'straight',
+5: 'enter roundabout',
+6: 'exit roundabout',
+7: 'u-turn',
+8: 'u-turn',
+10: 'arrive',
+11: 'depart',
+12: 'turn-left', // Changed from 'slight-left'
+13: 'turn-right' // Changed from 'slight-right'
+};
+
+return numericMap[type] || 'straight';
 }
 
 /**
@@ -309,7 +308,7 @@ export function transformStepsToTurns(steps) {
     const s = steps[i];
     if (
       s &&
-      ['straight', 'slight-left', 'slight-right'].includes(s.type) &&
+      ['straight', 'turn-left', 'turn-right'].includes(s.type)
       (s.distance || 0) < 100 &&
       i + 1 < steps.length
     ) {
