@@ -43,12 +43,7 @@ export async function getDirectionsRoute(from, to, profile) {
   const body = {
     coordinates,
     instructions: true,
-    geometry: true,
-    maneuvers: true,
-    preference: 'fastest',
-    units: 'km',
-    roundabouts: 1,
-    suppress_warnings: true
+    geometry: true
   };
 
   try {
