@@ -14,7 +14,22 @@ export const API_CONFIG = {
       'foot_fast': 'foot-hiking'
     }
   },
+  OSRM: {
+    BASE_URL: 'https://router.project-osrm.org/route/v1',
+    PROFILE_MAP: {
+      'car_fast': 'driving',
+      'bike': 'cycling',
+      'pedestrian': 'foot'
+    }
+  },
   TILES: {
     OSM: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+  }
+};
+
+export const API_CONFIG = {
+  // ... other configs
+  OSRM: {
+    BASE_URL: 'https://router.project-osrm.org/route/v1'
   }
 };
