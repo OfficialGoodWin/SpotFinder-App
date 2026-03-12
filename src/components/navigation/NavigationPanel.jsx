@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Car, Bike, PersonStanding, Volume2, VolumeX, ArrowLeft, ArrowRight, ArrowUp, CircleArrowRight } from 'lucide-react';
 import { getOSRMRoute } from '@/api/osrmServiceClient';
-// Removed import from openrouteServiceClient – now using OSRM native conversion
-
-import { API_CONFIG } from '@/api/apiConfig';
 
 const ROUTE_TYPES = [
   { id: 'car_fast', label: 'Drive', icon: Car, profile: 'driving-car' },
@@ -75,35 +72,54 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
     return map[modifier] || 'straight';
   };
 
-  // ---------- Helper: Convert OSRM steps to turns & markers ----------
+  // ---------- Helper: Convert OSRM steps to turns & markers (with instruction fallback) ----------
   const convertOSRMStepsToTurns = (osrmSteps) => {
     const turns = [];
     const markers = [];
 
     osrmSteps.forEach((step, index) => {
       const type = mapOSRMModifier(step.modifier);
+      
+      // Ensure instruction is never undefined
+      let instruction = step.instruction;
+      if (!instruction) {
+        // Generate a default based on modifier or type
+        if (step.modifier) {
+          instruction = `Turn ${step.modifier.replace('-', ' ')}`;
+        } else if (type === 'straight') {
+          instruction = 'Continue straight';
+        } else {
+          instruction = 'Proceed';
+        }
+      }
+
       turns.push({
-        instruction: step.instruction,
+        instruction,
         distance: step.distance,
-        type: type,
+        type,
         lat: step.lat,
         lng: step.lng,
       });
       markers.push({
         lat: step.lat,
         lng: step.lng,
-        type: type,
-        instruction: step.instruction,
+        type,
+        instruction,
       });
     });
 
     // Mark first as 'depart', last as 'arrive'
     if (turns.length > 0) {
       turns[0].type = 'depart';
+      turns[0].instruction = turns[0].instruction || 'Depart';
       markers[0].type = 'depart';
+      markers[0].instruction = turns[0].instruction;
+
       const lastIdx = turns.length - 1;
       turns[lastIdx].type = 'arrive';
+      turns[lastIdx].instruction = turns[lastIdx].instruction || 'Arrive at destination';
       markers[lastIdx].type = 'arrive';
+      markers[lastIdx].instruction = turns[lastIdx].instruction;
     }
 
     return { turns, turnMarkers: markers };
@@ -111,7 +127,6 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
 
   // ---------- Hooks ----------
   useEffect(() => {
-    // Cleanup on unmount
     return () => {
       if (routeDebounceTimer.current) {
         clearTimeout(routeDebounceTimer.current);
@@ -122,7 +137,6 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
   useEffect(() => {
     if (!from || !to) return;
     
-    // Check if coordinates have actually changed (not just object reference)
     if (routeLocked) {
       console.log('Route locked - skipping refetch');
       return;
@@ -133,10 +147,8 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
       return;
     }
     
-    // Show loading immediately while debouncing
     setLoading(true);
     
-    // Debounce route fetching to avoid rate limiting
     if (routeDebounceTimer.current) {
       clearTimeout(routeDebounceTimer.current);
     }
@@ -145,7 +157,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
       lastFetchedCoords.current = currentCoords;
       fetchRoute();
       setSelectedRouteIdx(0);
-    }, 500); // 500ms debounce to prevent rapid API calls
+    }, 500);
     
     return () => {
       if (routeDebounceTimer.current) {
@@ -155,7 +167,6 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
   }, [from, to]);
 
   useEffect(() => {
-    // Notify parent of route data and current user position for map display
     if (onRouteData) {
       onRouteData({
         coordinates: routeCoordinates,
@@ -169,7 +180,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
   useEffect(() => {
     if (!userPosition || steps.length === 0 || !isNavigating) return;
     
-    for (let i = 6; i < steps.length; i++) { // Start from current+1
+    for (let i = 6; i < steps.length; i++) {
       const step = steps[i];
       const dist = haversineDistance(userPosition, [step.lat || to.lat, step.lng || to.lng]);
       
@@ -183,7 +194,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
   }, [userPosition, steps, isNavigating]);
 
   function haversineDistance([lat1, lng1], [lat2, lng2]) {
-    const R = 6371e3; // Earth's radius in meters
+    const R = 6371e3;
     const φ1 = lat1 * Math.PI/180;
     const φ2 = lat2 * Math.PI/180;
     const Δφ = (lat2-lat1) * Math.PI/180;
@@ -214,7 +225,6 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
     }
   }, [userPosition, to, routeCoordinates]);
 
-  // ---------- Update route display (modified to use OSRM converter) ----------
   const updateRouteDisplay = (routes, routeIdx) => {
     const selectedRoute = routes[routeIdx];
     if (!selectedRoute) {
@@ -233,7 +243,6 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
     let markers = [];
     
     if (selectedRoute.steps && selectedRoute.steps.length > 0) {
-      // Use OSRM converter instead of transformStepsToTurns
       const result = convertOSRMStepsToTurns(selectedRoute.steps);
       navTurns = result.turns || [];
       markers = result.turnMarkers || [];
@@ -265,7 +274,6 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
     setLoading(false);
   };
 
-  // ---------- Fetch route ----------
   const fetchRoute = async () => {
     setLoading(true);
     setIsNavigating(false);
@@ -295,9 +303,6 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
         }];
       }
 
-      // If we're driving and ORS ended a short distance away from the
-      // actual target (common when the spot is off-road), tack on a final
-      // "walk to destination" step instead of continually re‑requesting.
       if (profile === 'driving-car' && result.steps.length > 0) {
         const lastStep = result.steps[result.steps.length - 1];
         if (lastStep.lat != null && lastStep.lng != null) {
@@ -324,7 +329,6 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
       if (onRouteReady) onRouteReady(result);
     } catch (err) {
       console.error('Route fetch error:', err.message);
-      // If driving failed and we were trying to drive, fall back to walking
       if (routeType === 'car_fast') {
         try {
           console.log('Attempting walking fallback since car route failed');
@@ -419,7 +423,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
   const step = steps[currentStep];
   const TurnIcon = step ? (TURN_ICONS[step.type] || TURN_ICONS.default) : ArrowUp;
 
-  // Pre-navigation screen - show route overview
+  // Pre-navigation screen
   if (!isNavigating) {
     return (
       <div className="fixed inset-x-0 bottom-0 z-[1500] pointer-events-none">
