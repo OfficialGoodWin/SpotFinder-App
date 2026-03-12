@@ -48,6 +48,8 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
   const [turnMarkers, setTurnMarkers] = useState([]);
   const [allRoutes, setAllRoutes] = useState([]);
   const [selectedRouteIdx, setSelectedRouteIdx] = useState(0);
+  const [routeLocked, setRouteLocked] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const lastSpokenStep = useRef(-1);
   const routeDebounceTimer = useRef(null);
   const lastFetchedCoords = useRef(null);
@@ -65,6 +67,10 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
     if (!from || !to) return;
     
     // Check if coordinates have actually changed (not just object reference)
+    if (routeLocked) {
+      console.log('Route locked - skipping refetch');
+      return;
+    }
     const currentCoords = JSON.stringify({ from, to });
     if (lastFetchedCoords.current === currentCoords) {
       console.log('Same coordinates, skipping fetch');
@@ -227,14 +233,15 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
           const dy = (to.lat - lastStep.lat) * 111000;
           const dx = (to.lng - lastStep.lng) * 111000 * Math.cos((to.lat * Math.PI) / 180);
           const gap = Math.hypot(dx, dy);
-          if (gap > 20) {
+      if (gap > 50) {
             result.steps.push({
-              instruction: 'Destination off‑road – walk the remaining distance',
+              instruction: 'Destination off-road – walk the remaining distance',
               distance: gap,
-              type: 'depart',
+              type: 'pedestrian',
               lat: to.lat,
               lng: to.lng
             });
+            setRouteLocked(true);
           }
         }
       }
@@ -251,12 +258,11 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
         try {
           console.log('Attempting walking fallback since car route failed');
           const walk = await getDirectionsRoute(from, to, 'foot-hiking');
-          // create a note for the user
           walk.steps = walk.steps || [];
           walk.steps.unshift({
-            instruction: 'Destination appears off‑road – continue on foot from here',
+            instruction: 'Destination off-road – switching to walking mode',
             distance: 0,
-            type: 'depart',
+            type: 'pedestrian',
             lat: to.lat,
             lng: to.lng
           });
@@ -264,11 +270,19 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
           setAllRoutes(routes);
           updateRouteDisplay(routes, 0);
           if (onRouteReady) onRouteReady(walk);
+          setRouteLocked(true);
           setLoading(false);
           return;
         } catch (walkErr) {
           console.error('Walking fallback also failed:', walkErr.message);
         }
+      }
+      if (retryCount < 3) {
+        setRetryCount(prev => prev + 1);
+        setTimeout(fetchRoute, 2000);
+      } else {
+        setRouteType('pedestrian');
+        setRouteLocked(true);
       }
       setLoading(false);
     }
@@ -338,11 +352,11 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
   if (!isNavigating) {
     return (
       <div className="fixed inset-x-0 bottom-0 z-[1500] pointer-events-none">
-        <div className="bg-white rounded-t-3xl shadow-2xl px-4 pt-4 pb-6 pointer-events-auto mx-3 mb-3">
+<div className="bg-background rounded-t-3xl shadow-2xl px-4 pt-4 pb-6 pointer-events-auto mx-3 mb-3">
           <div className="flex items-center justify-between mb-4">
             <div className="flex-1">
-              <p className="text-sm text-gray-500 font-medium">Navigating to</p>
-              <p className="font-bold text-gray-900 text-lg truncate">{toLabel}</p>
+          <p className="text-sm text-muted-foreground font-medium">Navigating to</p>
+              <p className="font-bold text-foreground text-lg truncate">{toLabel}</p>
             </div>
             <button onClick={onClose} className="p-2 rounded-full bg-gray-100 ml-3">
               <X className="w-5 h-5 text-gray-600" />
@@ -351,8 +365,8 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
           
           {loading ? (
             <div className="py-8 text-center">
-              <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-              <p className="text-gray-500">Calculating route...</p>
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+              <p className="text-muted-foreground">Calculating route...</p>
             </div>
           ) : steps.length > 0 ? (
             <>
@@ -367,8 +381,8 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
                       }}
                       className={`flex-shrink-0 px-3 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap
                         ${selectedRouteIdx === idx 
-                          ? 'bg-blue-500 text-white shadow-md' 
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                          ? 'bg-primary text-primary-foreground shadow-md' 
+                          : 'bg-muted text-muted-foreground hover:bg-accent'}`}
                     >
                       Route {idx + 1}: {formatDist(r.distance)} • {formatTime(r.duration)}
                     </button>
@@ -378,17 +392,17 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
               
               <div className="flex items-center justify-center gap-8 mb-4 py-3 bg-gray-50 rounded-xl">
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-2xl font-bold text-foreground">
                     {formatDist(route?.properties?.distance || 0)}
                   </p>
-                  <p className="text-xs text-gray-500">Distance</p>
+                  <p className="text-xs text-muted-foreground">Distance</p>
                 </div>
                 <div className="w-px h-10 bg-gray-300"></div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-gray-900">
+                <p className="text-2xl font-bold text-foreground">
                     {formatTime(route?.properties?.duration || 0)}
                   </p>
-                  <p className="text-xs text-gray-500">Duration</p>
+                  <p className="text-xs text-muted-foreground">Duration</p>
                 </div>
               </div>
               
@@ -400,7 +414,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
                       key={rt.id}
                       onClick={() => setRouteType(rt.id)}
                       className={`flex-1 py-2 rounded-xl flex flex-col items-center gap-0.5 transition-colors text-xs font-semibold
-                        ${routeType === rt.id ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                        ${routeType === rt.id ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'}`}
                     >
                       <Icon className="w-4 h-4" />
                       {rt.label}
@@ -420,10 +434,10 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
           ) : (
             <p className="text-center text-gray-400 py-4">
               No route found
-              <button 
-                onClick={fetchRoute} 
-                className="block mx-auto mt-2 text-blue-500 text-sm underline"
-              >
+                <button 
+                  onClick={fetchRoute} 
+                  className="block mx-auto mt-2 text-primary text-sm underline"
+                >
                 Try again
               </button>
             </p>
@@ -437,9 +451,9 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
   return (
     <div className="fixed inset-x-0 bottom-0 z-[1500] pointer-events-none">
       {step && (
-        <div className="mx-3 mb-2 bg-blue-600 text-white rounded-2xl shadow-2xl px-4 py-3 flex items-center gap-4 pointer-events-auto">
-          <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center flex-shrink-0">
-            <TurnIcon className="w-7 h-7 text-white" />
+        <div className="mx-3 mb-2 bg-primary text-primary-foreground rounded-2xl shadow-2xl px-4 py-3 flex items-center gap-4 pointer-events-auto">
+          <div className="w-12 h-12 bg-primary/90 rounded-xl flex items-center justify-center flex-shrink-0">
+            <TurnIcon className="w-7 h-7 text-primary-foreground" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-bold text-base leading-tight truncate">{step.instruction}</p>
@@ -454,19 +468,19 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
         </div>
       )}
       
-      <div className="bg-white rounded-t-3xl shadow-2xl px-4 pt-4 pb-8 pointer-events-auto">
+      <div className="bg-card rounded-t-3xl shadow-2xl px-4 pt-4 pb-8 pointer-events-auto">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <p className="text-sm text-gray-500 font-medium">Navigating to</p>
-            <p className="font-bold text-gray-900 truncate max-w-[200px]">{toLabel}</p>
+            <p className="text-sm text-muted-foreground font-medium">Navigating to</p>
+<p className="font-bold text-foreground truncate max-w-[200px]">{toLabel}</p>
           </div>
           <div className="flex items-center gap-3">
             {route && (
               <div className="text-right">
-                <p className="font-bold text-gray-900 text-sm">
+                <p className="font-bold text-foreground text-sm">
                   {formatDist(route.properties?.distance || 0)}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted-foreground">
                   {formatTime(route.properties?.duration || 0)}
                 </p>
               </div>
@@ -486,7 +500,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
             >
               ← Prev
             </button>
-            <span className="text-xs text-gray-500">
+<span className="text-xs text-muted-foreground">
               {currentStep + 1} / {steps.length}
             </span>
             <button
@@ -501,7 +515,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
         
         {steps.length <= 1 && (
           <div className="text-center py-2">
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-muted-foreground">
               {steps.length === 1 ? 'Single step route' : 'No detailed steps available'}
             </p>
           </div>

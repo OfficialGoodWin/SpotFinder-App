@@ -45,9 +45,10 @@ export async function getDirectionsRoute(from, to, profile) {
     instructions: true,
     geometry: true,
     maneuvers: true,
-    // Add parameters to prefer simpler, more direct routing
-    preference: 'recommended',
-    // Suppress complex intersection descriptions that cause confusing turn sequences
+    preference: 'balanced',
+    units: 'km',
+    elevations: false,
+    roundabouts: 1,
     suppress_warnings: true
   };
 
@@ -314,10 +315,10 @@ export function transformStepsToTurns(steps) {
   const merged = [];
   for (let i = 0; i < steps.length; i++) {
     const s = steps[i];
-    if (
+      if (
       s &&
       s.type === 'straight' &&
-      (s.distance || 0) < 50 &&
+      (s.distance || 0) < 100 &&
       i + 1 < steps.length
     ) {
       const nxt = steps[i + 1];

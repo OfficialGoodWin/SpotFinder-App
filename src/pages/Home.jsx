@@ -281,7 +281,7 @@ export default function Home() {
       </button>
 
       {/* Bottom bar */}
-      <div className="absolute bottom-0 inset-x-0 z-[1000] flex items-center justify-between px-5 py-4 pb-8 bg-white/90 backdrop-blur-md border-t border-gray-200">
+      <div className="absolute bottom-0 inset-x-0 z-[1000] flex items-center justify-between px-5 py-4 pb-8 bg-background/90 backdrop-blur-md border-t border">
         {/* Profile / Auth - shows Account or Sign In */}
         {isAuthenticated && user ? (
           <div className="relative">
@@ -289,7 +289,7 @@ export default function Home() {
               onClick={() => setShowAccountMenu(!showAccountMenu)}
               className="flex flex-col items-center gap-1 text-gray-600 active:scale-95 transition-transform"
             >
-              <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden">
+              <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center overflow-hidden">
                 {user.photoURL ? (
                   <img src={user.photoURL} alt="" className="w-full h-full object-cover" />
                 ) : (

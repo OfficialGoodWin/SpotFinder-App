@@ -21,8 +21,8 @@ export default function RouteOverlay({ routeCoordinates, turnMarkers, currentSte
     const iconHtml = `
       <div class="flex items-center justify-center w-8 h-8 rounded-full ${
         isCurrentStep 
-          ? 'bg-blue-500 shadow-lg ring-2 ring-blue-300' 
-          : 'bg-blue-400'
+          ? 'bg-primary shadow-lg ring-2 ring-primary/50' 
+          : 'bg-primary/80'
       } text-xl font-bold transition-all duration-200 border-2 border-white">
         ${getArrowSVG()}
       </div>

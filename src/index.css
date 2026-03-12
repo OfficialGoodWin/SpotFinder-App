@@ -95,6 +95,10 @@
   .dark .bg-gray-100 { background-color: rgb(var(--popover) / var(--tw-bg-opacity)) !important; }
   .dark .bg-gray-200 { background-color: rgb(var(--border) / var(--tw-bg-opacity)) !important; }
   .dark .bg-gray-300 { background-color: rgb(var(--ring) / var(--tw-bg-opacity)) !important; }
+  .dark .shadow-lg { box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); }
+  .dark .shadow-2xl { box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25); }
+  .dark .shadow-red-200 { box-shadow: 0 4px 6px -1px #fecaca; }
+  .dark .shadow-blue-200 { box-shadow: 0 4px 6px -1px #dbeafe; }
   .dark .text-gray-900, .dark .text-gray-800 { color: rgb(var(--foreground) / var(--tw-text-opacity)) !important; }
   .dark .text-gray-700, .dark .text-gray-600, .dark .text-gray-500, .dark .text-gray-400 { color: rgb(var(--muted-foreground) / var(--tw-text-opacity)) !important; }
   .dark .border-gray-200 { border-color: rgb(var(--border) / var(--tw-border-opacity)) !important; }
