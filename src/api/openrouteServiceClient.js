@@ -32,7 +32,7 @@ export async function getDirectionsRoute(from, to, profile = 'driving-car') {
         preference: 'fastest',
         // REVISED OPTIONS STRUCTURE
         options: {
-          avoid_features: [\"unpavedroads\"], 
+          avoid_features: ['unpavedroads'], 
           continue_straight: true 
         }
       })
