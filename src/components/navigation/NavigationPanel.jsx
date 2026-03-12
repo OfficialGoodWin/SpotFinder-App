@@ -260,7 +260,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
       if (routeType === 'car_fast') {
         try {
           console.log('Attempting walking fallback since car route failed');
-          const walk = await getDirectionsRoute(from, to, 'foot-hiking');
+      const walk = await getGraphHopperRoute(from, to, 'cycling-regular');
           walk.steps = walk.steps || [];
           walk.steps.unshift({
             instruction: 'Destination off-road – switching to walking mode',

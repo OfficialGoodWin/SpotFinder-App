@@ -17,7 +17,7 @@ export async function getGraphHopperRoute(from, to, profile = 'car') {
   url.searchParams.set('key', GRAPH_HOPPER_KEY);
   url.searchParams.set('point', `${from.lat},${from.lng}`);
   url.searchParams.set('point', `${to.lat},${to.lng}`);
-  url.searchParams.set('vehicle', profile);
+  url.searchParams.set('vehicle', mapGraphHopperProfile(profile));
   url.searchParams.set('calculate_edges', 'true');
   url.searchParams.set('details', 'instructions,street_name');
   url.searchParams.set('format', 'json');
@@ -70,6 +70,15 @@ function decodePolyline(encoded) {
   return coordinates;
 }
 
+function mapGraphHopperProfile(profile) {
+  const map = {
+    'driving-car': 'car',
+    'cycling-regular': 'bike',
+    'foot-hiking': 'foot'
+  };
+  return map[profile] || 'car';
+}
+
 function extractStepsFromPath(path) {
   const steps = [];
   const instructions = path.instructions || [];
@@ -79,8 +88,8 @@ function extractStepsFromPath(path) {
       instruction: instr.text || 'Continue',
       distance: instr.distance || 0,
       type: 'straight', // GraphHopper doesn't have detailed turn types, map later
-      lat: instr.latitude,
-      lng: instr.longitude,
+      lat: instr.lat || instr.latitude,
+      lng: instr.lon || instr.longitude,
       name: instr.name || ''
     });
   });
