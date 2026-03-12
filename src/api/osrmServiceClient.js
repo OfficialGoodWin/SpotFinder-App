@@ -9,8 +9,14 @@ const BASE_URL = 'https://router.project-osrm.org/route/v1';
 
 export async function getOSRMRoute(from, to, profile = 'driving') {
   const coordinates = `${from.lng},${from.lat};${to.lng},${to.lat}`;
-  const osrmProfile = profile.replace('-', '/');
+  const osrmProfiles = {
+    'driving-car': 'driving',
+    'cycling-regular': 'cycling',
+    'foot-hiking': 'foot'
+  };
+  const osrmProfile = osrmProfiles[profile] || 'driving';
   const url = `${BASE_URL}/${osrmProfile}/${coordinates}?overview=full&steps=true&geometries=polyline&annotations=true`;
+
   
   try {
     const response = await fetch(url);
