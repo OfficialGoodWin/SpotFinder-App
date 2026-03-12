@@ -237,17 +237,37 @@ function buildDepartInstruction(step, roadLabel, destLabel) {
 }
 
 /**
- * Combines a road's name and ref into a single display label.
- * Highways (ref-only or no meaningful name) show the ref.
- * Named roads show name first, with ref in parentheses if different.
+ * Strips European route codes (E50, E49, E461 …) from a ref string,
+ * keeping only national highway codes (D1, D5, R6, A1 …).
  *
  * Examples:
- *   ref="D5 E50", name=""            → "D5 E50"
- *   ref="D5",     name="Strakonická" → "Strakonická (D5)"
+ *   "D5 E50"     → "D5"
+ *   "D1 E65 E67" → "D1"
+ *   "E50"        → ""    (pure E-road with no national code → suppressed)
+ *   "D6"         → "D6"
+ */
+function filterRef(ref) {
+  if (!ref) return '';
+  return ref
+    .split(/[\s;,/]+/)
+    .map(p => p.trim())
+    .filter(p => p && !/^E\d+$/i.test(p))  // drop anything that is just "E" + digits
+    .join(' ')
+    .trim();
+}
+
+/**
+ * Combines a road's name and filtered ref into a single display label.
+ * European route codes (E50, E49 …) are always stripped from the ref.
+ *
+ * Examples:
+ *   ref="D5 E50", name=""            → "D5"
+ *   ref="D5 E50", name="Strakonická" → "Strakonická (D5)"
  *   ref="",       name="Plzeňská"    → "Plzeňská"
+ *   ref="D6",     name=""            → "D6"
  */
 function buildRoadLabel(name, ref) {
-  const cleanRef  = (ref  || '').trim();
+  const cleanRef  = filterRef(ref);
   const cleanName = (name || '').trim();
 
   if (!cleanRef && !cleanName) return '';
