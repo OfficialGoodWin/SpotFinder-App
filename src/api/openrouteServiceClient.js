@@ -185,8 +185,8 @@ function normalizeDirectionsResponse(orsResponse) {
   const distance = summary.distance || 0;
   const duration = summary.duration || 0;
 
-  // Extract steps/instructions
-  const steps = extractStepsFromRoute(route);
+  // Extract steps/instructions, passing geometry for coordinate lookup
+  const steps = extractStepsFromRoute(route, geometry);
 
   return {
     geometry,
@@ -200,7 +200,7 @@ function normalizeDirectionsResponse(orsResponse) {
  * Extract turn-by-turn instructions from ORS route
  * @private
  */
-function extractStepsFromRoute(route) {
+function extractStepsFromRoute(route, geometry = []) {
   const steps = [];
 
   if (!route.segments || !Array.isArray(route.segments)) {
@@ -225,12 +225,21 @@ function extractStepsFromRoute(route) {
       
       cumulativeDistance += (step.distance || 0);
 
+      // Use way_points to resolve coordinates from geometry array
+      let lat, lng;
+      if (step.way_points && step.way_points.length > 1 && geometry.length > 0) {
+        const coordIndex = step.way_points[1]; // End point of this step
+        if (coordIndex < geometry.length) {
+          [lat, lng] = geometry[coordIndex];
+        }
+      }
+
       steps.push({
         instruction: step.instruction || 'Continue',
         distance: step.distance || 0,
         type: normalizeStepType(step.type),
-        lat: step.maneuver?.location?.[1],
-        lng: step.maneuver?.location?.[0],
+        lat: lat,
+        lng: lng,
         name: step.name || '',
         exit_number: step.exit_number,
         bearing_before: step.maneuver?.bearing_before,
