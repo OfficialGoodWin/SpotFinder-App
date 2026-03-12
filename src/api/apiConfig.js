@@ -27,9 +27,4 @@ export const API_CONFIG = {
   }
 };
 
-export const API_CONFIG = {
-  // ... other configs
-  OSRM: {
-    BASE_URL: 'https://router.project-osrm.org/route/v1'
-  }
-};
+
