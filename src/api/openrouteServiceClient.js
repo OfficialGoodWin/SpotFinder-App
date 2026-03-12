@@ -1,7 +1,10 @@
 /**
- * OpenRouteService Integration Client
- * CLEAN VERSION: Fixed by removing all unsupported API parameters (continue_straight/avoid_features).
- * SHORTCUT FIX: Implemented via frontend road-name comparison logic.
+ * OpenRouteService Integration Client - ULTIMATE FIX
+ * Combined Fixes: 
+ * 1. API Safety (No 400/2003/2012 errors)
+ * 2. Deep Lookahead (Sandwich detection up to 4 segments)
+ * 3. Angle Suppression (Removes slight 'Keep' noise at slip roads)
+ * 4. Junction Compression (Merges rapid-fire turns into one single movement)
  */
 
 import { API_CONFIG } from './apiConfig.js';
@@ -31,9 +34,8 @@ export async function getDirectionsRoute(from, to, profile = 'driving-car') {
         instructions: true,
         geometry: true,
         preference: 'fastest',
-        // Note: Removed 'options' block entirely. ORS frequently updates 
-        // which sub-parameters are allowed, leading to 400/500 errors.
         units: 'm'
+        // Note: No 'options' block included to ensure compatibility across all ORS versions
       })
     });
 
@@ -92,78 +94,76 @@ function normalizeDirectionsResponse(orsResponse) {
 }
 
 function normalizeStepType(type) {
-  // Mapping Keep Left (12) and Keep Right (13) to straight to avoid junction icons
   const map = { 
     0: 'turn-left', 1: 'turn-right', 2: 'turn-left', 3: 'turn-right', 
-    12: 'straight', 13: 'straight', 
-    11: 'depart', 10: 'arrive' 
+    12: 'straight', 13: 'straight', 11: 'depart', 10: 'arrive' 
   };
   return map[type] || 'straight';
 }
 
-/**
- * FIXED INTERSECTION LOGIC - VERSION 5.0 (The Deep-Path Fix)
- * This version looks up to 4 steps ahead to find if the route returns 
- * to the original road, effectively deleting any \"bypass\" instructions.
- */
 export function transformStepsToTurns(steps) {
   if (!steps || steps.length === 0) return { turns: [], turnMarkers: [] };
 
   const turns = [];
   const turnMarkers = [];
   
-  // 1. PASS 1: Recursive Lookahead for Road Continuation
-  const filteredSteps = [];
+  // PASS 1: DEEP LOOKAHEAD (SANDWICH KILLER)
+  // This removes any detour that eventually returns to the original road name
+  const deepFiltered = [];
   for (let i = 0; i < steps.length; i++) {
     const curr = { ...steps[i] };
-    const prev = filteredSteps[filteredSteps.length - 1];
+    const prev = deepFiltered[deepFiltered.length - 1];
     
     if (prev && prev.name !== '') {
       const pName = prev.name.toLowerCase();
-      let foundContinuation = false;
+      let detourFound = false;
 
-      // Look ahead up to 4 segments to see if we get back on the same road
-      // This catches: Main Road -> Slip Road -> Connector -> Main Road
+      // Search up to 4 segments ahead for the main road's return
       for (let j = 1; j <= 4; j++) {
-        const futureStep = steps[i + j];
-        if (!futureStep) break;
+        const future = steps[i + j];
+        if (!future) break;
+        const fName = (future.name || '').toLowerCase();
 
-        const fName = (futureStep.name || '').toLowerCase();
-        
-        // If we find the original road name again within a short distance
         if (fName === pName || fName.includes(pName) || pName.includes(fName)) {
-          // Calculate total distance of the \"shortcut\"
-          let detourDistance = 0;
-          for (let k = 0; k <= j; k++) detourDistance += (steps[i + k]?.distance || 0);
-
-          if (detourDistance < 600) {
-            prev.distance += detourDistance;
-            i += j; // Skip all intermediate shortcut steps
-            foundContinuation = true;
+          let totalDetour = 0;
+          for (let k = 0; k <= j; k++) totalDetour += (steps[i + k]?.distance || 0);
+          
+          if (totalDetour < 650) { // Large buffer for rural intersections
+            prev.distance += totalDetour;
+            i += j; 
+            detourFound = true;
             break;
           }
         }
       }
-      if (foundContinuation) continue;
+      if (detourFound) continue;
     }
-    filteredSteps.push(curr);
+    deepFiltered.push(curr);
   }
 
-  // 2. PASS 2: Proximity & Text Cleaning
+  // PASS 2: JUNCTION COMPRESSION & NOISE REDUCTION
+  // Merges rapid-fire turns (<150m) and suppresses "Slight/Keep" instructions
   const cleanSteps = [];
-  for (let i = 0; i < filteredSteps.length; i++) {
-    let current = filteredSteps[i];
-    const next = filteredSteps[i + 1];
+  for (let i = 0; i < deepFiltered.length; i++) {
+    const current = deepFiltered[i];
+    const next = deepFiltered[i + 1];
+    const instr = (current.instruction || '').toLowerCase();
 
-    // Merge maneuvers within 150m (common for multi-part intersection turns)
-    if (next && current.distance < 150 && next.type !== 'arrive') {
-      next.distance += current.distance;
+    // Kill "Keep" or "Slight" noise at intersections
+    if (current.distance < 200 && (instr.includes('keep') || instr.includes('slight'))) {
+      if (next) next.distance += current.distance;
       continue;
+    }
+
+    // Merge multiple turns at the same junction
+    if (next && current.distance < 150 && next.type !== 'straight' && next.type !== 'arrive') {
+      next.distance += current.distance;
+      continue; 
     }
     cleanSteps.push(current);
   }
 
-  // 3. PASS 3: Final Turn Generation
+  // PASS 3: FINAL TURN GENERATION
   const first = cleanSteps[0];
   turns.push({
     instruction: `Drive on ${first.name || 'route'}`,
@@ -175,9 +175,9 @@ export function transformStepsToTurns(steps) {
     const step = cleanSteps[i];
     if (step.type === 'straight' || step.type === 'depart' || step.type === 'arrive') continue;
 
-    // Hard-filter instructions that aren't real turns
-    const instr = step.instruction.toLowerCase();
-    if (instr.includes('keep') || instr.includes('continue') || instr.includes('straight')) continue;
+    // Last-line safety: ignore non-essential instructions
+    const lowerInstr = step.instruction.toLowerCase();
+    if (lowerInstr.includes('keep') || lowerInstr.includes('continue')) continue;
 
     const nextStep = cleanSteps[i + 1];
     turns.push({
