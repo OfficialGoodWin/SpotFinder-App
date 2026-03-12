@@ -37,9 +37,9 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate }) {
 
   return (
     <div className="absolute top-4 left-4 right-16 z-[1000]">
-      <div className={`bg-white rounded-2xl shadow-lg border transition-all ${focused ? 'border-blue-400 shadow-blue-100' : 'border-gray-200'}`}>
+      <div className={`bg-white dark:bg-card rounded-2xl shadow-lg border transition-all ${focused ? 'border-blue-400 shadow-blue-100 dark:border-blue-500' : 'border-gray-200 dark:border-border'}`}>
         <div className="flex items-center px-3 gap-2">
-          <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          <Search className="w-4 h-4 text-gray-400 dark:text-muted-foreground dark:text-muted-foreground flex-shrink-0" />
           <input
             ref={inputRef}
             value={query}
@@ -47,28 +47,28 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate }) {
             onFocus={() => setFocused(true)}
             onBlur={() => setTimeout(() => setFocused(false), 150)}
             placeholder="Search places..."
-            className="flex-1 py-3 text-sm outline-none bg-transparent text-gray-800 placeholder-gray-400"
+            className="flex-1 py-3 text-sm outline-none bg-transparent text-gray-800 dark:text-foreground placeholder-gray-400 dark:placeholder-muted-foreground"
           />
           {query && (
             <button onClick={() => { setQuery(''); setResults([]); }} className="p-1">
-              <X className="w-4 h-4 text-gray-400" />
+              <X className="w-4 h-4 text-gray-400 dark:text-muted-foreground" />
             </button>
           )}
         </div>
 
         {results.length > 0 && (
-          <div className="border-t border-gray-100 max-h-64 overflow-y-auto rounded-b-2xl">
+          <div className="border-t border-gray-100 dark:border-border max-h-64 overflow-y-auto rounded-b-2xl">
             {results.map((item, i) => {
               const pos = item.position || (item.regionalStructure?.[0]);
               const hasPosition = !!pos;
               return (
-                <div key={i} className="flex items-center hover:bg-gray-50 transition-colors">
+                <div key={i} className="flex items-center hover:bg-gray-50 dark:hover:bg-accent transition-colors">
                   <button
                     onMouseDown={() => handleSelect(item)}
                     className="flex-1 text-left px-4 py-2.5"
                   >
-                    <p className="text-sm font-medium text-gray-800 truncate">{item.name || item.label}</p>
-                    <p className="text-xs text-gray-400 truncate">
+                    <p className="text-sm font-medium text-gray-800 dark:text-foreground truncate">{item.name || item.label}</p>
+                    <p className="text-xs text-gray-400 dark:text-muted-foreground truncate">
                       {item.location || item.regionalStructure?.map(r => r.name).join(', ')}
                     </p>
                   </button>
@@ -89,7 +89,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate }) {
             })}
           </div>
         )}
-        {loading && query && <div className="px-4 py-2 text-xs text-gray-400 border-t border-gray-100">Searching...</div>}
+        {loading && query && <div className="px-4 py-2 text-xs text-gray-400 dark:text-muted-foreground border-t border-gray-100 dark:border-border">Searching...</div>}
       </div>
     </div>
   );

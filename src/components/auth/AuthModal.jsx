@@ -75,11 +75,11 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
 
   return (
     <div className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-6 sm:p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+      <div className="bg-white dark:bg-card w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-6 sm:p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto">
         {/* Close button */}
         <button 
           onClick={onClose} 
-          className="absolute top-4 right-4 w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors flex items-center justify-center"
+          className="absolute top-4 right-4 w-10 h-10 rounded-full bg-gray-100 dark:bg-accent hover:bg-gray-200 dark:hover:bg-border transition-colors flex items-center justify-center"
           aria-label="Close"
         >
           <X className="w-5 h-5 text-gray-600" />
@@ -93,10 +93,10 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-foreground">
             {tab === 'login' ? 'Welcome Back!' : 'Create Account'}
           </h2>
-          <p className="text-gray-500 mt-2">
+          <p className="text-gray-500 dark:text-muted-foreground mt-2">
             {tab === 'login' 
               ? 'Sign in to save spots and track your discoveries' 
               : 'Join SpotFinder to save and rate your favorite spots'}
@@ -107,7 +107,7 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
         <button
           onClick={handleGoogleLogin}
           disabled={loading}
-          className="w-full py-3.5 px-4 bg-white border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold rounded-2xl transition-all flex items-center justify-center gap-3 mb-4 disabled:opacity-50"
+          className="w-full py-3.5 px-4 bg-white dark:bg-accent border-2 border-gray-200 dark:border-border hover:border-gray-300 dark:hover:border-border hover:bg-gray-50 dark:hover:bg-border text-gray-700 dark:text-foreground font-semibold rounded-2xl transition-all flex items-center justify-center gap-3 mb-4 disabled:opacity-50"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -121,7 +121,7 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
         {/* Divider */}
         <div className="flex items-center gap-4 my-6">
           <div className="flex-1 h-px bg-gray-200"></div>
-          <span className="text-gray-400 text-sm">or</span>
+          <span className="text-gray-400 dark:text-muted-foreground text-sm">or</span>
           <div className="flex-1 h-px bg-gray-200"></div>
         </div>
 
@@ -129,7 +129,7 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
         <form onSubmit={handleSubmit} className="space-y-4">
           {tab === 'register' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Name</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-foreground mb-1.5">Name</label>
               <div className="relative">
                 <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
@@ -137,14 +137,14 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Your name"
-                  className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  className="w-full pl-12 pr-4 py-3.5 bg-gray-50 dark:bg-background border border-gray-200 dark:border-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 dark:text-foreground placeholder:text-gray-400 dark:placeholder:text-muted-foreground"
                 />
               </div>
             </div>
           )}
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-foreground mb-1.5">Email</label>
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
@@ -153,13 +153,13 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 required
-                className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="w-full pl-12 pr-4 py-3.5 bg-gray-50 dark:bg-background border border-gray-200 dark:border-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 dark:text-foreground placeholder:text-gray-400 dark:placeholder:text-muted-foreground"
               />
             </div>
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-foreground mb-1.5">Password</label>
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
@@ -169,7 +169,7 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
                 placeholder="••••••••"
                 required
                 minLength={6}
-                className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="w-full pl-12 pr-4 py-3.5 bg-gray-50 dark:bg-background border border-gray-200 dark:border-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 dark:text-foreground placeholder:text-gray-400 dark:placeholder:text-muted-foreground"
               />
             </div>
           </div>
@@ -216,7 +216,7 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
         {/* Continue as guest */}
         <button
           onClick={onClose}
-          className="w-full mt-4 py-3 text-gray-500 font-medium hover:bg-gray-50 transition-colors rounded-2xl"
+          className="w-full mt-4 py-3 text-gray-500 dark:text-muted-foreground font-medium hover:bg-gray-50 dark:hover:bg-accent transition-colors rounded-2xl"
         >
           Continue as Guest
         </button>

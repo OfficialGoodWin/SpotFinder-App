@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import { Plus, User, Settings, Crosshair, LogOut, Trash2, List } from 'lucide-react';
 import { getPublicSpots, createSpot, deleteSpot } from '@/api/firebaseClient';
 import { useAuth } from '@/lib/AuthContext';
+import { useTheme } from '@/lib/ThemeContext';
 
 import SpotMarker from '../components/map/SpotMarker';
 import UserLocationMarker from '../components/map/UserLocationMarker';
@@ -22,11 +23,16 @@ import SettingsModal from '../components/SettingsModal';
 const MAPY_API_KEY = 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
 
 const TILE_URLS = {
-  basic: `https://api.mapy.com/v1/maptiles/basic/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
+  basic:   `https://api.mapy.com/v1/maptiles/basic/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
   outdoor: `https://api.mapy.com/v1/maptiles/outdoor/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
-  aerial: `https://api.mapy.com/v1/maptiles/aerial/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
-  winter: `https://api.mapy.com/v1/maptiles/winter/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
+  aerial:  `https://api.mapy.com/v1/maptiles/aerial/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
+  winter:  `https://api.mapy.com/v1/maptiles/winter/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
+  // roads-focused tile — shows road names & numbers prominently
+  traffic: `https://api.mapy.com/v1/maptiles/basic/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
 };
+
+// Layers where the dark CSS filter should NOT be applied (aerial looks wrong inverted)
+const NO_DARK_FILTER_LAYERS = new Set(['aerial']);
 
 // Map controller component
 function MapController({ flyTo, setMapRef }) {
@@ -50,8 +56,11 @@ function MapClickHandler({ addMode, onMapClick }) {
 
 export default function Home() {
   const { user, logout, isAuthenticated } = useAuth();
+  const { isDark } = useTheme();
   const [spots, setSpots] = useState([]);
   const [mapLayer, setMapLayer] = useState('basic');
+  // Apply dark CSS filter when dark mode is on, except for aerial/satellite
+  const mapDarkMode = isDark && !NO_DARK_FILTER_LAYERS.has(mapLayer);
   const [userPos, setUserPos] = useState(null);
   const [userAccuracy, setUserAccuracy] = useState(null);
   const [addMode, setAddMode] = useState(false);
@@ -199,7 +208,7 @@ export default function Home() {
     : { lat: 50.0755, lng: 14.4378 };
 
   return (
-    <div className="relative w-full h-full" style={{ touchAction: addMode ? 'none' : undefined }}>
+    <div className={`relative w-full h-full${mapDarkMode ? ' map-dark' : ''}`} style={{ touchAction: addMode ? 'none' : undefined }}>
       {/* Cursor overlay in add mode */}
       {addMode && (
         <div
@@ -266,7 +275,7 @@ export default function Home() {
       {/* Center on user location */}
       <button
         onClick={() => userPos && setFlyTo([...userPos])}
-        className="absolute bottom-32 right-4 z-[1000] w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center border border-gray-200 active:scale-95 transition-transform"
+        className="absolute bottom-32 right-4 z-[1000] w-11 h-11 bg-white dark:bg-card rounded-full shadow-lg flex items-center justify-center border border-gray-200 dark:border-border active:scale-95 transition-transform"
       >
         <Crosshair className="w-5 h-5 text-gray-700" />
       </button>
@@ -274,7 +283,7 @@ export default function Home() {
       {/* Nearby spots button */}
       <button
         onClick={showNearby}
-        className="absolute bottom-48 right-4 z-[1000] w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center border border-gray-200 active:scale-95 transition-transform"
+        className="absolute bottom-48 right-4 z-[1000] w-11 h-11 bg-white dark:bg-card rounded-full shadow-lg flex items-center justify-center border border-gray-200 dark:border-border active:scale-95 transition-transform"
         title="Show nearest spot"
       >
         <span className="text-xl leading-none">🚗🌲</span>
@@ -301,7 +310,7 @@ export default function Home() {
 
             {/* Account dropdown menu */}
             {showAccountMenu && (
-              <div className="absolute bottom-full left-0 mb-2 w-40 bg-white rounded-2xl shadow-xl border border-gray-200 py-2">
+              <div className="absolute bottom-full left-0 mb-2 w-40 bg-white dark:bg-card rounded-2xl shadow-xl border border-gray-200 dark:border-border py-2">
                 <button
                   onClick={() => { setShowMySpots(true); setShowAccountMenu(false); }}
                   className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
@@ -415,19 +424,19 @@ export default function Home() {
       {/* Delete Account Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+          <div className="bg-white dark:bg-card w-full max-w-sm rounded-3xl p-6 shadow-2xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
                 <Trash2 className="w-5 h-5 text-red-600" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900">Delete Account</h3>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-foreground">Delete Account</h3>
             </div>
             
-            <p className="text-gray-600 text-sm mb-4">
+            <p className="text-gray-600 dark:text-muted-foreground text-sm mb-4">
               This action cannot be undone. All your data will be permanently deleted.
             </p>
             
-            <p className="text-gray-500 text-xs mb-4">
+            <p className="text-gray-500 dark:text-muted-foreground text-xs mb-4">
               Type <span className="font-mono font-bold text-red-600">DELETE</span> to confirm:
             </p>
             
@@ -436,13 +445,13 @@ export default function Home() {
               value={deleteInput}
               onChange={(e) => setDeleteInput(e.target.value)}
               placeholder="Type DELETE"
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-red-300 text-sm mb-4"
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-border bg-white dark:bg-background text-gray-900 dark:text-foreground focus:outline-none focus:ring-2 focus:ring-red-300 text-sm mb-4"
             />
             
             <div className="flex gap-3">
               <button
                 onClick={() => { setShowDeleteConfirm(false); setDeleteInput(''); }}
-                className="flex-1 py-3 rounded-2xl border-2 border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50"
+                className="flex-1 py-3 rounded-2xl border-2 border-gray-200 dark:border-border text-gray-600 dark:text-foreground font-semibold text-sm hover:bg-gray-50 dark:hover:bg-accent"
               >
                 Cancel
               </button>
