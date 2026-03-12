@@ -239,11 +239,9 @@ function buildDepartInstruction(step, roadLabel, destLabel) {
 /**
  * Strips European route codes (E50, E49, E461 …) from a ref string,
  * keeping only national highway codes (D1, D5, R6, A1 …).
- *
- * Examples:
  *   "D5 E50"     → "D5"
  *   "D1 E65 E67" → "D1"
- *   "E50"        → ""    (pure E-road with no national code → suppressed)
+ *   "E50"        → ""
  *   "D6"         → "D6"
  */
 function filterRef(ref) {
@@ -251,31 +249,44 @@ function filterRef(ref) {
   return ref
     .split(/[\s;,/]+/)
     .map(p => p.trim())
-    .filter(p => p && !/^E\d+$/i.test(p))  // drop anything that is just "E" + digits
+    .filter(p => p && !/^E\d+$/i.test(p))
     .join(' ')
     .trim();
 }
 
 /**
- * Combines a road's name and filtered ref into a single display label.
- * European route codes (E50, E49 …) are always stripped from the ref.
- *
- * Examples:
+ * Sanitises a raw OSM road name:
+ *   Real name ("Plzeňská")          → returned as-is
+ *   Short numeric 1-3 digits ("15", "586") -> "Road 586"  (minor/regional road number)
+ *   Long numeric 4+ digits ("10274") -> ""  (internal OSM ID, suppress entirely)
+ */
+function cleanName(name) {
+  const s = (name || '').trim();
+  if (!s) return '';
+  if (/^\d+$/.test(s)) return s.length <= 3 ? `Road ${s}` : '';
+  return s;
+}
+
+/**
+ * Combines a sanitised road name and filtered ref into a single display label.
  *   ref="D5 E50", name=""            → "D5"
  *   ref="D5 E50", name="Strakonická" → "Strakonická (D5)"
  *   ref="",       name="Plzeňská"    → "Plzeňská"
  *   ref="D6",     name=""            → "D6"
+ *   ref="",       name="586"         → "Road 586"
+ *   ref="",       name="10274"       → ""  (suppressed)
+ *   ref="D5",     name="10274"       → "D5"
  */
 function buildRoadLabel(name, ref) {
   const cleanRef  = filterRef(ref);
-  const cleanName = (name || '').trim();
+  const sanitised = cleanName(name);
 
-  if (!cleanRef && !cleanName) return '';
-  if (!cleanName)              return cleanRef;
-  if (!cleanRef)               return cleanName;
-  if (cleanName === cleanRef)  return cleanRef;
+  if (!cleanRef && !sanitised) return '';
+  if (!sanitised)              return cleanRef;
+  if (!cleanRef)               return sanitised;
+  if (sanitised === cleanRef)  return cleanRef;
 
-  return `${cleanName} (${cleanRef})`;
+  return `${sanitised} (${cleanRef})`;
 }
 
 /**
