@@ -19,7 +19,7 @@ import SettingsModal from '../components/SettingsModal';
 
 // Note: Leaflet marker icons are fixed via src/lib/leaflet-fix.js
 
-const MAPY_API_KEY = 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
+const MAPY_API_KEY = import.meta.env.VITE_MAPY_API_KEY || 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
 
 const TILE_URLS = {
   basic: `https://api.mapy.com/v1/maptiles/basic/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
