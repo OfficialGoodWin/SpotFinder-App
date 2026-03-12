@@ -1,6 +1,6 @@
 /**
  * OpenRouteService Integration Client
- * Fixed API request structure to resolve the 400 error.
+ * Fixed 'unpaved_roads' parameter and added maneuver metadata for better filtering.
  */
 
 import { API_CONFIG } from './apiConfig.js';
@@ -30,16 +30,17 @@ export async function getDirectionsRoute(from, to, profile = 'driving-car') {
         instructions: true,
         geometry: true,
         preference: 'fastest',
-        // REVISED OPTIONS STRUCTURE
         options: {
-          avoid_features: ['unpavedroads'], 
+          // FIX: Changed 'unpavedroads' to 'unpaved_roads'
+          avoid_features: ['unpaved_roads'], 
           continue_straight: true 
-        }
+        },
+        // Requesting maneuvers provides better data for filtering junction noise
+        maneuvers: true 
       })
     });
 
     if (!response.ok) {
-      // Log the exact error from the server to pinpoint the issue
       const errorData = await response.json();
       console.error('Detailed ORS Error:', errorData);
       throw new Error(`ORS API error: ${errorData.error?.message || response.statusText}`);
@@ -91,44 +92,35 @@ function normalizeDirectionsResponse(orsResponse) {
   };
 }
 
-/**
- * Maps ORS codes. Note: 12 and 13 (Keep Left/Right) are now 'straight' 
- * to avoid unnecessary icons on highways.
- */
 function normalizeStepType(type) {
   const map = { 
     0: 'turn-left', 1: 'turn-right', 2: 'turn-left', 3: 'turn-right', 
-    12: 'straight', // Changed to straight to hide \"Keep Left\" noise
-    13: 'straight', // Changed to straight to hide \"Keep Right\" noise
+    12: 'straight', // Keep Left -> straight
+    13: 'straight', // Keep Right -> straight
     11: 'depart', 10: 'arrive' 
   };
   return map[type] || 'straight';
 }
 
-/**
- * Enhanced transformation to fix Intersection Shortcut issues
- */
 export function transformStepsToTurns(steps) {
   if (!steps || steps.length === 0) return { turns: [], turnMarkers: [] };
 
   const turns = [];
   const turnMarkers = [];
   
-  // 1. Semantic Merging & Name Filtering
   const cleanSteps = [];
   for (let i = 0; i < steps.length; i++) {
     let current = { ...steps[i] };
     const prev = cleanSteps[cleanSteps.length - 1];
     
-    // FILTER: If we are \"turning\" onto a road with the exact same name, it's noise.
-    // This happens at slip-roads that lead back to the same highway.
-    if (prev && current.name && prev.name === current.name && current.distance < 200) {
+    // Filtering road name duplicates to catch slip-road shortcuts
+    if (prev && current.name && prev.name === current.name && current.distance < 250) {
         prev.distance += current.distance;
         continue;
     }
 
-    // FILTER: Ignore extremely short turns (<80m) that occur immediately after another turn.
-    if (i < steps.length - 1 && current.distance < 80) {
+    // Merging rapid-fire maneuvers (noise)
+    if (i < steps.length - 1 && current.distance < 100) {
       const next = steps[i + 1];
       if (next.type !== 'straight' && next.type !== 'arrive') {
         next.distance += current.distance;
@@ -138,7 +130,6 @@ export function transformStepsToTurns(steps) {
     cleanSteps.push(current);
   }
 
-  // 2. Build instructions
   const first = cleanSteps[0];
   turns.push({
     instruction: `Drive on ${first.name || 'current road'}`,
@@ -148,14 +139,11 @@ export function transformStepsToTurns(steps) {
 
   for (let i = 0; i < cleanSteps.length; i++) {
     const step = cleanSteps[i];
-    
-    // Skip all 'straight' types (including the Keep Left/Right noise we remapped)
     if (step.type === 'straight' || step.type === 'depart' || step.type === 'arrive') continue;
 
-    // Check instruction text for \"Keep\" or \"Continue\" - if found, treat as straight.
-    if (step.instruction.toLowerCase().includes('keep') || step.instruction.toLowerCase().includes('continue')) {
-        continue;
-    }
+    // Filter out \"Keep\" instructions that ORS often sends at forks
+    const lowerInstr = step.instruction.toLowerCase();
+    if (lowerInstr.includes('keep') || lowerInstr.includes('continue')) continue;
 
     const nextStep = cleanSteps[i + 1];
     turns.push({
