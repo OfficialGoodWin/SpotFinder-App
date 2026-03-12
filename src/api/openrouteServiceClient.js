@@ -1,40 +1,32 @@
 /**
  * OpenRouteService Integration Client
  * Handles all ORS API calls and data transformations
+ * * IMPORTANT: To prevent the \"walking\" look (straight lines cutting corners), 
+ * your map component MUST use the 'geometry' field to draw the blue line, 
+ * not the 'turnMarkers'.
  */
 
 import { API_CONFIG } from './apiConfig.js';
 
 const { BASE_URL, API_KEY, PROFILE_MAP } = API_CONFIG.ORS;
 
-// Use proxy in development to avoid CORS issues
 const USE_PROXY = import.meta.env.DEV;
-const PROXY_PREFIX = '/ors-api';
 
 /**
  * Get directions route from one point to another
- * @param {Object} from - Start coordinates {lat, lng}
- * @param {Object} to - End coordinates {lat, lng}
- * @param {string} profile - Route profile (driving-car, cycling-regular, foot-hiking)
  * @returns {Promise<Object>} - {geometry, distance, duration, steps}
  */
-export async function getDirectionsRoute(from, to, profile) {
+export async function getDirectionsRoute(from, to, profile = 'driving-car') {
   if (!API_KEY) {
     throw new Error('ORS API key not configured. Set VITE_ORS_API_KEY in .env');
   }
 
-  const coordinates = [
-    [from.lng, from.lat],
-    [to.lng, to.lat]
-  ];
+  const coordinates = [[from.lng, from.lat], [to.lng, to.lat]];
 
-  // Use proxy in development to avoid CORS
   let url;
   if (USE_PROXY) {
-    // In dev, use relative URL for proxy
     url = new URL(`${window.location.origin}/ors-api/directions/${profile}`);
   } else {
-    // In production, use full API URL
     url = new URL(`${BASE_URL}/directions/${profile}`);
   }
   url.searchParams.set('api_key', API_KEY);
@@ -54,17 +46,11 @@ export async function getDirectionsRoute(from, to, profile) {
     });
 
     if (!response.ok) {
-      const contentType = response.headers.get('content-type');
-      let errorMsg = response.statusText;
-      if (contentType?.includes('application/json')) {
-        const error = await response.json();
-        errorMsg = error.error?.message || error.message || response.statusText;
-      }
-      throw new Error(`ORS API error (${response.status}): ${errorMsg}`);
+      const error = await response.json();
+      throw new Error(`ORS API error: ${error.error?.message || response.statusText}`);
     }
 
     const data = await response.json();
-    console.log('ORS Response:', data);
     return normalizeDirectionsResponse(data);
   } catch (err) {
     console.error('ORS Directions API error:', err);
@@ -73,46 +59,7 @@ export async function getDirectionsRoute(from, to, profile) {
 }
 
 /**
- * Search for places using ORS Geocoding API
- * @param {string} query - Search query
- * @param {Object} proximity - Optional {lat, lng} for location bias
- * @returns {Promise<Array>} - Array of {name, lat, lng}
- */
-export async function searchPlaces(query, proximity) {
-  if (!API_KEY) {
-    throw new Error('ORS API key not configured. Set VITE_ORS_API_KEY in .env');
-  }
-
-  // Use proxy in development to avoid CORS
-  const geocodeBaseUrl = USE_PROXY ? '' : BASE_URL;
-  const url = new URL(`${geocodeBaseUrl}/ors-api/geocode/search`);
-  url.searchParams.set('api_key', API_KEY);
-  url.searchParams.set('text', query);
-  url.searchParams.set('lang', 'en');
-
-  // Add proximity bias if provided
-  if (proximity && proximity.lat && proximity.lng) {
-    url.searchParams.set('proximity', `${proximity.lng},${proximity.lat}`);
-  }
-
-  try {
-    const response = await fetch(url.toString());
-
-    if (!response.ok) {
-      throw new Error(`ORS Geocode API error: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return normalizeGeocodeResults(data);
-  } catch (err) {
-    console.error('ORS Geocoding API error:', err);
-    throw err;
-  }
-}
-
-/**
  * Decode polyline string to coordinates
- * @private
  */
 function decodePolyline(encoded) {
   const precision = 5;
@@ -121,293 +68,152 @@ function decodePolyline(encoded) {
   const coordinates = [];
 
   while (index < encoded.length) {
-    let result = 0;
-    let shift = 0;
-    let byte;
-
-    // Decode latitude
+    let result = 0, shift = 0, byte;
     do {
       byte = encoded.charCodeAt(index++) - 63;
       result |= (byte & 0x1f) << shift;
       shift += 5;
     } while (byte >= 0x20);
-
     const dlat = (result & 1) ? ~(result >> 1) : (result >> 1);
     lat += dlat;
 
-    result = 0;
-    shift = 0;
-
-    // Decode longitude
+    result = 0; shift = 0;
     do {
       byte = encoded.charCodeAt(index++) - 63;
       result |= (byte & 0x1f) << shift;
       shift += 5;
     } while (byte >= 0x20);
-
     const dlng = (result & 1) ? ~(result >> 1) : (result >> 1);
     lng += dlng;
 
     coordinates.push([lat / factor, lng / factor]);
   }
-
   return coordinates;
 }
 
-/**
- * Normalize ORS Directions API response to app format
- * @private
- */
 function normalizeDirectionsResponse(orsResponse) {
-  if (!orsResponse.routes || !orsResponse.routes.length) {
-    throw new Error('No routes found');
-  }
+  if (!orsResponse.routes || !orsResponse.routes.length) throw new Error('No routes found');
 
   const route = orsResponse.routes[0];
-
-  // Handle geometry - it's usually an encoded polyline string
   let geometry = [];
+  
+  // High-resolution geometry for smooth road-following lines
   if (route.geometry) {
     if (typeof route.geometry === 'string') {
-      // Encoded polyline format
       geometry = decodePolyline(route.geometry);
-    } else if (Array.isArray(route.geometry)) {
-      // Direct array format [lat, lng]
-      geometry = route.geometry;
     } else if (route.geometry.coordinates) {
-      // GeoJSON format [lng, lat]
       geometry = route.geometry.coordinates.map(coord => [coord[1], coord[0]]);
     }
   }
 
-  // Extract distance and duration
-  const summary = route.summary || {};
-  const distance = summary.distance || 0;
-  const duration = summary.duration || 0;
-
-  // Extract steps/instructions
-  const steps = extractStepsFromRoute(route);
-
   return {
     geometry,
-    distance,
-    duration,
-    steps
+    distance: route.summary?.distance || 0,
+    duration: route.summary?.duration || 0,
+    steps: extractStepsFromRoute(route)
   };
 }
 
-/**
- * Extract turn-by-turn instructions from ORS route
- * @private
- */
 function extractStepsFromRoute(route) {
   const steps = [];
+  if (!route.segments) return steps;
 
-  if (!route.segments || !Array.isArray(route.segments)) {
-    console.warn('No segments array found in route');
-    return steps;
-  }
-
-  console.log('Route segments:', route.segments);
-
-  let cumulativeDistance = 0;
-
-  route.segments.forEach((segment, segIdx) => {
-    if (!segment.steps || !Array.isArray(segment.steps)) {
-      console.warn(`No steps found in segment ${segIdx}`);
-      return;
-    }
-
-    console.log(`Segment ${segIdx} has ${segment.steps.length} steps`);
-
-    segment.steps.forEach(step => {
-      if (!step) return;
-      
-      cumulativeDistance += (step.distance || 0);
-
+  route.segments.forEach(segment => {
+    segment.steps?.forEach(step => {
       steps.push({
         instruction: step.instruction || 'Continue',
         distance: step.distance || 0,
         type: normalizeStepType(step.type),
         lat: step.maneuver?.location?.[1],
         lng: step.maneuver?.location?.[0],
-        name: step.name || '',
-        exit_number: step.exit_number,
-        bearing_before: step.maneuver?.bearing_before,
-        bearing_after: step.maneuver?.bearing_after
+        name: step.name || ''
       });
     });
   });
-
-  console.log('Extracted', steps.length, 'total steps');
   return steps;
 }
 
 /**
- * Normalize ORS step type to app format
- * @private
+ * Fixes \"Straight Arrow\" issues by mapping slight turns to standard turn icons
  */
 function normalizeStepType(type) {
-// Handle string types first (from pre-processed steps)
-if (typeof type === 'string') {
-const stringMap = {
-'turn-sharp-left': 'turn-left',
-'turn-sharp-right': 'turn-right',
-'slight-left': 'turn-left', // Force slight turns to use standard turn icons
-'slight-right': 'turn-right'
-};
-return stringMap[type] || type;
-}
+  if (typeof type === 'string') {
+    const stringMap = {
+      'turn-sharp-left': 'turn-left',
+      'turn-sharp-right': 'turn-right',
+      'slight-left': 'turn-left', 
+      'slight-right': 'turn-right'
+    };
+    return stringMap[type] || type;
+  }
 
-// Handle numeric types (from raw ORS API)
-const numericMap = {
-0: 'turn-left',
-1: 'turn-right',
-2: 'turn-left',
-3: 'turn-right',
-4: 'straight',
-5: 'enter roundabout',
-6: 'exit roundabout',
-7: 'u-turn',
-8: 'u-turn',
-10: 'arrive',
-11: 'depart',
-12: 'turn-left', // Changed from 'slight-left'
-13: 'turn-right' // Changed from 'slight-right'
-};
-
-return numericMap[type] || 'straight';
+  const numericMap = {
+    0: 'turn-left', 1: 'turn-right', 2: 'turn-left', 3: 'turn-right',
+    4: 'straight', 5: 'enter roundabout', 6: 'exit roundabout',
+    7: 'u-turn', 8: 'u-turn', 10: 'arrive', 11: 'depart',
+    12: 'turn-left', // Mapped from slight-left
+    13: 'turn-right' // Mapped from slight-right
+  };
+  return numericMap[type] || 'straight';
 }
 
 /**
- * Transform ORS steps into turn markers for map display
- * @public
+ * Transforms steps into clean navigation instructions
  */
 export function transformStepsToTurns(steps) {
   const turns = [];
   const turnMarkers = [];
   
-  // Handle empty or invalid steps
-  if (!steps || !Array.isArray(steps) || steps.length === 0) {
-    // Return minimal navigation even with no steps
-    turns.push({
-      instruction: 'Arrive at destination',
-      distance: 0,
-      type: 'arrive'
-    });
-    return { turns, turnMarkers };
-  }
+  if (!steps || steps.length === 0) return { turns, turnMarkers };
 
-  // ---------------------------------------------------------------------------
-  // Pre-process step list to clean up odd cases reported by the user:
-  //  * ORS sometimes returns a tiny "straight" or "slight" segment followed by a 
-  //    sharp-right/left at intersections with turn lanes. Collapse them.
-  // ---------------------------------------------------------------------------
+  // Segment Merging Logic: Collapses tiny segments often found at highway exits
   const merged = [];
   for (let i = 0; i < steps.length; i++) {
     const s = steps[i];
-    if (
-      s &&
-      ['straight', 'turn-left', 'turn-right'].includes(s.type)
-      (s.distance || 0) < 100 &&
-      i + 1 < steps.length
-    ) {
+    if (s && (s.distance || 0) < 50 && i + 1 < steps.length) {
       const nxt = steps[i + 1];
-      // Match any turn type: turn-left, turn-right, turn-sharp-left, turn-sharp-right, etc.
-      if (nxt && (nxt.type.startsWith('turn-') || nxt.type.includes('left') || nxt.type.includes('right'))) {
-        // merge into next step
+      if (nxt && (nxt.type.includes('left') || nxt.type.includes('right'))) {
         nxt.distance = (nxt.distance || 0) + (s.distance || 0);
-        // convert sharp turns into normal ones since we've merged
-        if (nxt.type === 'turn-sharp-right') nxt.type = 'turn-right';
-        if (nxt.type === 'turn-sharp-left') nxt.type = 'turn-left';
-        console.log(`Merged tiny ${s.type} (${s.distance}m) with ${nxt.type}`);
-        continue; // drop this tiny segment
+        continue; 
       }
     }
     merged.push(s);
   }
   steps = merged;
 
-  let distanceFromStart = 0;
-
-  // Add initial depart instruction
+  // FIX: Updated \"Walking\" language to Driving language
   const firstStep = steps[0];
+  const roadName = firstStep.name ? ` onto ${firstStep.name}` : '';
   turns.push({
-    instruction: `Head towards your route`,
-    distance: Math.round((firstStep.distance || 0) / 1),
+    instruction: `Head north${roadName}`,
+    distance: Math.round(firstStep.distance || 0),
     type: 'depart'
   });
 
-  // Process each step
-  let hasAnyTurns = false;
   steps.forEach((step, idx) => {
-    if (!step) return;
-    
-    // Skip straight segments
-    if (step.type === 'straight' || step.type === 'depart') {
-      distanceFromStart += (step.distance || 0);
-      return;
-    }
+    if (step.type === 'straight' || step.type === 'depart') return;
 
-    hasAnyTurns = true;
-    
-    // Add turn instruction
     const nextStep = steps[idx + 1];
-    const nextStepDistance = nextStep ? (nextStep.distance || 0) : 0;
-
     const instruction = step.instruction || `${step.type} turn`;
 
     turns.push({
       instruction,
-      distance: Math.round(nextStepDistance / 1),
+      distance: Math.round(nextStep?.distance || 0),
       type: step.type
     });
 
-    // Add turn marker for map
     if (step.lat !== undefined && step.lng !== undefined) {
       turnMarkers.push({
         lat: step.lat,
         lng: step.lng,
         type: step.type,
-        instruction,
-        isRoundabout: step.type === 'roundabout'
+        instruction
       });
     }
-
-    distanceFromStart += (step.distance || 0);
   });
 
-  // Add arrival instruction
-  turns.push({
-    instruction: 'Arrive at destination',
-    distance: 0,
-    type: 'arrive'
-  });
+  turns.push({ instruction: 'Arrive at destination', distance: 0, type: 'arrive' });
 
   return { turns, turnMarkers };
 }
 
-/**
- * Normalize ORS Geocoding results
- * @private
- */
-function normalizeGeocodeResults(orsResponse) {
-  if (!orsResponse.features || !Array.isArray(orsResponse.features)) {
-    return [];
-  }
-
-  return orsResponse.features.map(feature => {
-    const coords = feature.geometry?.coordinates || [0, 0];
-    return {
-      name: feature.properties?.name || feature.properties?.label || 'Unknown',
-      label: feature.properties?.label || feature.properties?.name || 'Unknown',
-      location: feature.properties?.locality || '',
-      lat: coords[1],
-      lng: coords[0],
-      position: {
-        lat: coords[1],
-        lon: coords[0]
-      }
-    };
-  });
-}

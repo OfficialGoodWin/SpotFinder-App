@@ -1,1 +1,1 @@
-- [x] Edit src/api/openrouteServiceClient.js: Replace normalizeStepType function with provided implementation
+# Task: Integrate optimized openrouteServiceClient.js with normalizeStepType&#10;&#10;- [x] Replace src/api/openrouteServiceClient.js with optimized version&#10;- [x] Verify normalizeStepType included (slight turns → standard turns)&#10;- [x] Task complete
