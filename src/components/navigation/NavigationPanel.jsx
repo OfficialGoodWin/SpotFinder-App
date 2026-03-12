@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Car, Bike, PersonStanding, Volume2, VolumeX, ArrowLeft, ArrowRight, ArrowUp, CircleArrowRight } from 'lucide-react';
-import { getGraphHopperRoute } from '@/api/graphhopperService';
+import { getOSRMRoute } from '@/api/osrmServiceClient';
 import { transformStepsToTurns } from '@/api/openrouteServiceClient';
 
 import { API_CONFIG } from '@/api/apiConfig';
@@ -208,7 +208,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
     console.log('Fetching route with ORS:', { from, to, profile });
     
     try {
-    const result = await getGraphHopperRoute(from, to, profile);
+    const result = await getOSRMRoute(from, to, profile.replace('-', '/'));
 
       console.log('ORS Route result:', result);
       
@@ -260,7 +260,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
       if (routeType === 'car_fast') {
         try {
           console.log('Attempting walking fallback since car route failed');
-      const walk = await getGraphHopperRoute(from, to, 'cycling-regular');
+      const walk = await getOSRMRoute(from, to, 'foot-walking');
           walk.steps = walk.steps || [];
           walk.steps.unshift({
             instruction: 'Destination off-road – switching to walking mode',
