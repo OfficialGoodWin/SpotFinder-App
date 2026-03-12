@@ -66,15 +66,34 @@ function decodePolyline(encoded) {
   return coordinates;
 }
 
+function mapOSRMModifier(modifier) {
+  const map = {
+    'sharp left': 'turn-left',
+    'left': 'turn-left',
+    'slight left': 'turn-left',
+    'straight': 'straight',
+    'slight right': 'turn-right',
+    'right': 'turn-right',
+    'sharp right': 'turn-right',
+    'u-turn': 'u-turn',
+    'roundabout left': 'enter roundabout',
+    'roundabout right': 'enter roundabout',
+    'exit roundabout': 'exit roundabout',
+    'use lane': 'straight'
+  };
+  return map[modifier] || 'straight';
+}
+
 function extractStepsFromRoute(route) {
   const steps = route.legs[0].steps.map(step => ({
-    instruction: step.maneuver.instruction || step.name || 'Continue',
+    instruction: step.maneuver.instruction,
     distance: step.distance,
-    type: mapOSRMModifier(step.maneuver.modifier),
+    modifier: step.maneuver.modifier,
+    bearing: step.maneuver.bearing_after || 0,
     lat: step.maneuver.location[1],
     lng: step.maneuver.location[0],
     name: step.name || ''
-  })).filter(step => step.distance > 0); // Filter 0m steps
+  })).filter(step => step.distance > 5); // Filter tiny steps
 
   return steps;
 }
