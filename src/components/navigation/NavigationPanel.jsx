@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Car, Bike, PersonStanding, Volume2, VolumeX, ArrowLeft, ArrowRight, ArrowUp, CircleArrowRight } from 'lucide-react';
 import { getOSRMRoute } from '@/api/osrmServiceClient';
-import { transformStepsToTurns } from '@/api/openrouteServiceClient';
+// Removed import from openrouteServiceClient – now using OSRM native conversion
 
 import { API_CONFIG } from '@/api/apiConfig';
 
@@ -56,6 +56,60 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
   const routeDebounceTimer = useRef(null);
   const lastFetchedCoords = useRef(null);
 
+  // ---------- Helper: Map OSRM modifier to turn type ----------
+  const mapOSRMModifier = (modifier) => {
+    const map = {
+      'sharp left': 'turn-left',
+      'left': 'turn-left',
+      'slight left': 'turn-left',
+      'straight': 'straight',
+      'slight right': 'turn-right',
+      'right': 'turn-right',
+      'sharp right': 'turn-right',
+      'u-turn': 'u-turn',
+      'roundabout left': 'enter roundabout',
+      'roundabout right': 'enter roundabout',
+      'exit roundabout': 'exit roundabout',
+      'use lane': 'straight'
+    };
+    return map[modifier] || 'straight';
+  };
+
+  // ---------- Helper: Convert OSRM steps to turns & markers ----------
+  const convertOSRMStepsToTurns = (osrmSteps) => {
+    const turns = [];
+    const markers = [];
+
+    osrmSteps.forEach((step, index) => {
+      const type = mapOSRMModifier(step.modifier);
+      turns.push({
+        instruction: step.instruction,
+        distance: step.distance,
+        type: type,
+        lat: step.lat,
+        lng: step.lng,
+      });
+      markers.push({
+        lat: step.lat,
+        lng: step.lng,
+        type: type,
+        instruction: step.instruction,
+      });
+    });
+
+    // Mark first as 'depart', last as 'arrive'
+    if (turns.length > 0) {
+      turns[0].type = 'depart';
+      markers[0].type = 'depart';
+      const lastIdx = turns.length - 1;
+      turns[lastIdx].type = 'arrive';
+      markers[lastIdx].type = 'arrive';
+    }
+
+    return { turns, turnMarkers: markers };
+  };
+
+  // ---------- Hooks ----------
   useEffect(() => {
     // Cleanup on unmount
     return () => {
@@ -160,6 +214,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
     }
   }, [userPosition, to, routeCoordinates]);
 
+  // ---------- Update route display (modified to use OSRM converter) ----------
   const updateRouteDisplay = (routes, routeIdx) => {
     const selectedRoute = routes[routeIdx];
     if (!selectedRoute) {
@@ -178,10 +233,11 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
     let markers = [];
     
     if (selectedRoute.steps && selectedRoute.steps.length > 0) {
-      const result = transformStepsToTurns(selectedRoute.steps);
+      // Use OSRM converter instead of transformStepsToTurns
+      const result = convertOSRMStepsToTurns(selectedRoute.steps);
       navTurns = result.turns || [];
       markers = result.turnMarkers || [];
-      console.log('Transformed to', navTurns.length, 'turns');
+      console.log('Transformed OSRM steps to', navTurns.length, 'turns');
     } else {
       console.warn('Route has no steps, creating default');
       navTurns = [
@@ -209,6 +265,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
     setLoading(false);
   };
 
+  // ---------- Fetch route ----------
   const fetchRoute = async () => {
     setLoading(true);
     setIsNavigating(false);
@@ -219,7 +276,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
     console.log('Fetching route with ORS:', { from, to, profile });
     
     try {
-    const result = await getOSRMRoute(from, to, profile.replace('-', '/'));
+      const result = await getOSRMRoute(from, to, profile.replace('-', '/'));
 
       console.log('ORS Route result:', result);
       
@@ -247,7 +304,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
           const dy = (to.lat - lastStep.lat) * 111000;
           const dx = (to.lng - lastStep.lng) * 111000 * Math.cos((to.lat * Math.PI) / 180);
           const gap = Math.hypot(dx, dy);
-      if (gap > 50) {
+          if (gap > 50) {
             result.steps.push({
               instruction: 'Destination off-road – walk the remaining distance',
               distance: gap,
@@ -271,7 +328,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
       if (routeType === 'car_fast') {
         try {
           console.log('Attempting walking fallback since car route failed');
-      const walk = await getOSRMRoute(from, to, 'foot-walking');
+          const walk = await getOSRMRoute(from, to, 'foot-walking');
           walk.steps = walk.steps || [];
           walk.steps.unshift({
             instruction: 'Destination off-road – switching to walking mode',
@@ -366,10 +423,10 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
   if (!isNavigating) {
     return (
       <div className="fixed inset-x-0 bottom-0 z-[1500] pointer-events-none">
-<div className="bg-background rounded-t-3xl shadow-2xl px-4 pt-4 pb-6 pointer-events-auto mx-3 mb-3">
+        <div className="bg-background rounded-t-3xl shadow-2xl px-4 pt-4 pb-6 pointer-events-auto mx-3 mb-3">
           <div className="flex items-center justify-between mb-4">
             <div className="flex-1">
-          <p className="text-sm text-muted-foreground font-medium">Navigating to</p>
+              <p className="text-sm text-muted-foreground font-medium">Navigating to</p>
               <p className="font-bold text-foreground text-lg truncate">{toLabel}</p>
             </div>
             <button onClick={onClose} className="p-2 rounded-full bg-gray-100 ml-3">
@@ -413,7 +470,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
                 </div>
                 <div className="w-px h-10 bg-gray-300"></div>
                 <div className="text-center">
-                <p className="text-2xl font-bold text-foreground">
+                  <p className="text-2xl font-bold text-foreground">
                     {formatTime(route?.properties?.duration || 0)}
                   </p>
                   <p className="text-xs text-muted-foreground">Duration</p>
@@ -448,10 +505,10 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
           ) : (
             <p className="text-center text-gray-400 py-4">
               No route found
-                <button 
-                  onClick={fetchRoute} 
-                  className="block mx-auto mt-2 text-primary text-sm underline"
-                >
+              <button 
+                onClick={fetchRoute} 
+                className="block mx-auto mt-2 text-primary text-sm underline"
+              >
                 Try again
               </button>
             </p>
@@ -486,7 +543,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
         <div className="flex items-center justify-between mb-3">
           <div>
             <p className="text-sm text-muted-foreground font-medium">Navigating to</p>
-<p className="font-bold text-foreground truncate max-w-[200px]">{toLabel}</p>
+            <p className="font-bold text-foreground truncate max-w-[200px]">{toLabel}</p>
           </div>
           <div className="flex items-center gap-3">
             {route && (
@@ -514,7 +571,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
             >
               ← Prev
             </button>
-<span className="text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               {currentStep + 1} / {steps.length}
             </span>
             <button
@@ -538,4 +595,3 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
     </div>
   );
 }
-

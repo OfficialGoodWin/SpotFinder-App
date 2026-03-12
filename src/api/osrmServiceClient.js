@@ -17,7 +17,6 @@ export async function getOSRMRoute(from, to, profile = 'driving') {
   const osrmProfile = osrmProfiles[profile] || 'driving';
   const url = `${BASE_URL}/${osrmProfile}/${coordinates}?overview=full&steps=true&geometries=polyline&annotations=true`;
 
-  
   try {
     const response = await fetch(url);
     if (!response.ok) {
@@ -66,24 +65,6 @@ function decodePolyline(encoded) {
   return coordinates;
 }
 
-function mapOSRMModifier(modifier) {
-  const map = {
-    'sharp left': 'turn-left',
-    'left': 'turn-left',
-    'slight left': 'turn-left',
-    'straight': 'straight',
-    'slight right': 'turn-right',
-    'right': 'turn-right',
-    'sharp right': 'turn-right',
-    'u-turn': 'u-turn',
-    'roundabout left': 'enter roundabout',
-    'roundabout right': 'enter roundabout',
-    'exit roundabout': 'exit roundabout',
-    'use lane': 'straight'
-  };
-  return map[modifier] || 'straight';
-}
-
 function extractStepsFromRoute(route) {
   const steps = route.legs[0].steps.map(step => ({
     instruction: step.maneuver.instruction,
@@ -98,6 +79,7 @@ function extractStepsFromRoute(route) {
   return steps;
 }
 
+// Only one definition of mapOSRMModifier remains
 function mapOSRMModifier(modifier) {
   const map = {
     'sharp left': 'turn-left',
@@ -115,4 +97,3 @@ function mapOSRMModifier(modifier) {
   };
   return map[modifier] || 'straight';
 }
-
