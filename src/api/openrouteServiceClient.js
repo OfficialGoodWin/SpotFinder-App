@@ -1,6 +1,7 @@
 /**
  * OpenRouteService Integration Client
- * Fixed API parameter errors and implemented aggressive shortcut filtering.
+ * CLEAN VERSION: Fixed by removing all unsupported API parameters (continue_straight/avoid_features).
+ * SHORTCUT FIX: Implemented via frontend road-name comparison logic.
  */
 
 import { API_CONFIG } from './apiConfig.js';
@@ -30,13 +31,9 @@ export async function getDirectionsRoute(from, to, profile = 'driving-car') {
         instructions: true,
         geometry: true,
         preference: 'fastest',
-        options: {
-          // FIX: Removed 'avoid_features' to prevent 2003 error
-          // continue_straight forces the route to stay on the primary road
-          continue_straight: true
-        },
-        // Requesting maneuvers provides high-detail data for junction filtering
-        maneuvers: true 
+        // Note: Removed 'options' block entirely. ORS frequently updates 
+        // which sub-parameters are allowed, leading to 400/500 errors.
+        units: 'm'
       })
     });
 
@@ -72,7 +69,9 @@ function decodePolyline(encoded) {
 }
 
 function normalizeDirectionsResponse(orsResponse) {
+  if (!orsResponse.routes || !orsResponse.routes.length) throw new Error('No routes found');
   const route = orsResponse.routes[0];
+  
   let geometry = typeof route.geometry === 'string' 
     ? decodePolyline(route.geometry) 
     : route.geometry.coordinates.map(c => [c[1], c[0]]);
@@ -92,40 +91,41 @@ function normalizeDirectionsResponse(orsResponse) {
   };
 }
 
-/**
- * Maps ORS codes. Types 12 (Keep Left) and 13 (Keep Right) are mapped to 
- * 'straight' to eliminate icon clutter at highway forks.
- */
 function normalizeStepType(type) {
+  // Mapping Keep Left (12) and Keep Right (13) to straight to avoid junction icons
   const map = { 
     0: 'turn-left', 1: 'turn-right', 2: 'turn-left', 3: 'turn-right', 
-    12: 'straight', 
-    13: 'straight', 
+    12: 'straight', 13: 'straight', 
     11: 'depart', 10: 'arrive' 
   };
   return map[type] || 'straight';
 }
 
+/**
+ * FIXED INTERSECTION LOGIC
+ * Since the API doesn't support continue_straight, we merge steps 
+ * that have the same road name to hide the \"detour\" instructions.
+ */
 export function transformStepsToTurns(steps) {
   if (!steps || steps.length === 0) return { turns: [], turnMarkers: [] };
 
   const turns = [];
   const turnMarkers = [];
-  
-  // 1. Semantic Filter: Merge steps if they are on the same road
   const cleanSteps = [];
+
   for (let i = 0; i < steps.length; i++) {
     let current = { ...steps[i] };
     const prev = cleanSteps[cleanSteps.length - 1];
     
-    // If name is the same, it's a \"fake\" turn or shortcut noise; merge it
-    if (prev && current.name && prev.name === current.name && current.distance < 300) {
+    // DETOUR FIX: If you are already on \"Main St\" and the next step tells you 
+    // to turn onto \"Main St\", it's a slip-road shortcut. We ignore it.
+    if (prev && current.name && prev.name !== '' && prev.name === current.name) {
         prev.distance += current.distance;
         continue;
     }
 
-    // Merge rapid-fire maneuvers under 100m to reduce junction noise
-    if (i < steps.length - 1 && current.distance < 100) {
+    // NOISE FIX: Merge very short maneuvers (<70m) into the next major step
+    if (i < steps.length - 1 && current.distance < 70) {
       const next = steps[i + 1];
       if (next.type !== 'straight' && next.type !== 'arrive') {
         next.distance += current.distance;
@@ -135,7 +135,7 @@ export function transformStepsToTurns(steps) {
     cleanSteps.push(current);
   }
 
-  // 2. Departure Instruction
+  // Set Departure
   const first = cleanSteps[0];
   turns.push({
     instruction: `Drive on ${first.name || 'route'}`,
@@ -143,12 +143,12 @@ export function transformStepsToTurns(steps) {
     type: 'depart'
   });
 
-  // 3. Final maneuver list
+  // Process Clean Maneuvers
   for (let i = 0; i < cleanSteps.length; i++) {
     const step = cleanSteps[i];
     if (step.type === 'straight' || step.type === 'depart' || step.type === 'arrive') continue;
 
-    // Filter \"Keep\" instructions that cause icons in the middle of roads
+    // Filter \"Keep\" instructions which often appear at gentle road forks
     const lowerInstr = step.instruction.toLowerCase();
     if (lowerInstr.includes('keep') || lowerInstr.includes('continue')) continue;
 
