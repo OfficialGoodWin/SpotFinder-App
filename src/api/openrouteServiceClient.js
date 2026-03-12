@@ -106,6 +106,10 @@ function normalizeStepType(type) {
  * Since the API doesn't support continue_straight, we merge steps 
  * that have the same road name to hide the \"detour\" instructions.
  */
+/**
+ * FIXED INTERSECTION LOGIC - VERSION 2.0
+ * Targeted fix for slip-road shortcuts and junction noise.
+ */
 export function transformStepsToTurns(steps) {
   if (!steps || steps.length === 0) return { turns: [], turnMarkers: [] };
 
@@ -113,29 +117,42 @@ export function transformStepsToTurns(steps) {
   const turnMarkers = [];
   const cleanSteps = [];
 
+  // 1. ADVANCED SLIP-ROAD FILTERING
   for (let i = 0; i < steps.length; i++) {
     let current = { ...steps[i] };
     const prev = cleanSteps[cleanSteps.length - 1];
-    
-    // DETOUR FIX: If you are already on \"Main St\" and the next step tells you 
-    // to turn onto \"Main St\", it's a slip-road shortcut. We ignore it.
-    if (prev && current.name && prev.name !== '' && prev.name === current.name) {
-        prev.distance += current.distance;
-        continue;
+    const next = steps[i + 1];
+
+    // FIX A: Same-Road Detour (The \"Shortcut\" issue)
+    // If we're on 'Road A', the instruction is a turn, but the next step is also 'Road A'
+    // and the detour is short (< 350m), it's a slip-road shortcut.
+    if (prev && next && prev.name === next.name && prev.name !== '' && current.distance < 350) {
+      prev.distance += current.distance;
+      continue; // Skip this turn entirely
     }
 
-    // NOISE FIX: Merge very short maneuvers (<70m) into the next major step
-    if (i < steps.length - 1 && current.distance < 70) {
-      const next = steps[i + 1];
-      if (next.type !== 'straight' && next.type !== 'arrive') {
-        next.distance += current.distance;
-        continue; 
+    // FIX B: Fuzzy Name Match
+    // Sometimes ORS adds ' (Route 605)' to one name but not the other.
+    if (prev && current.name && prev.name !== '') {
+      const pName = prev.name.toLowerCase();
+      const cName = current.name.toLowerCase();
+      if (pName.includes(cName) || cName.includes(pName)) {
+         prev.distance += current.distance;
+         continue;
       }
     }
+
+    // FIX C: Proximity Noise
+    // Merge maneuvers that happen within 100m of each other.
+    if (next && current.distance < 100 && next.type !== 'arrive') {
+      next.distance += current.distance;
+      continue;
+    }
+
     cleanSteps.push(current);
   }
 
-  // Set Departure
+  // 2. BUILD FINAL INSTRUCTIONS
   const first = cleanSteps[0];
   turns.push({
     instruction: `Drive on ${first.name || 'route'}`,
@@ -143,12 +160,13 @@ export function transformStepsToTurns(steps) {
     type: 'depart'
   });
 
-  // Process Clean Maneuvers
   for (let i = 0; i < cleanSteps.length; i++) {
     const step = cleanSteps[i];
+    
+    // Ignore meta-types and instructions that don't represent a real turn
     if (step.type === 'straight' || step.type === 'depart' || step.type === 'arrive') continue;
-
-    // Filter \"Keep\" instructions which often appear at gentle road forks
+    
+    // Final text-based safety check for \"Keep\" instructions
     const lowerInstr = step.instruction.toLowerCase();
     if (lowerInstr.includes('keep') || lowerInstr.includes('continue')) continue;
 
