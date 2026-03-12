@@ -27,7 +27,7 @@ const MAPY_API_KEY = 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
 // ── TomTom API key for real-time traffic overlay ────────────────────────────
 // Sign up free at https://developer.tomtom.com — 2,500 req/day on free tier.
 // Paste your key below; traffic overlay is silently disabled without it.
-const TOMTOM_API_KEY = 'pJihafJsZIUIzkTGF32ps6KPNJmg6K9u';
+const TOMTOM_API_KEY = import.meta.env.VITE_TOMTOM_API_KEY || '';
  
 // ── Base tile URLs ────────────────────────────────────────────────────────────
 // Light tiles (default)
@@ -53,16 +53,28 @@ const DARK_TILES = {
 // Overlaid on top of ANY base layer when mapLayer === 'traffic'
 // Green = free flow  |  Yellow = slow  |  Red = heavy congestion
 const TRAFFIC_OVERLAY_URL = TOMTOM_API_KEY
-  ? `https://api.tomtom.com/traffic/map/4/tile/flow/absolute/{z}/{x}/{y}.png?tileSize=256&key=${TOMTOM_API_KEY}`
+  ? `https://api.tomtom.com/traffic/map/4/tile/flow/absolute/{z}/{x}/{y}.png?tileSize=512&key=${TOMTOM_API_KEY}`
   : null;
  
 // Map controller component
-function MapController({ flyTo, setMapRef }) {
+function MapController({ flyTo, fitBoundsData, zoomToArea, setMapRef }) {
   const map = useMap();
   useEffect(() => { setMapRef(map); }, [map]);
   useEffect(() => {
     if (flyTo) map.flyTo(flyTo, 15, { duration: 1 });
   }, [flyTo]);
+  useEffect(() => {
+    if (fitBoundsData && fitBoundsData.length >= 2) {
+      map.fitBounds(fitBoundsData, { padding: [60, 60], animate: true, duration: 1.2 });
+    }
+  }, [fitBoundsData]);
+  useEffect(() => {
+    if (zoomToArea) {
+      // Zoom to current position at ~40km radius visible (zoom 9)
+      if (zoomToArea.center) map.flyTo(zoomToArea.center, 9, { duration: 1.2 });
+      else map.setZoom(9);
+    }
+  }, [zoomToArea]);
   return null;
 }
  
@@ -101,6 +113,8 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   const [navRouteData, setNavRouteData] = useState({ coordinates: [], turns: [], currentStep: 0 });
   const [showSpots, setShowSpots] = useState(false);
+  const [fitBoundsData, setFitBoundsData] = useState(null);
+  const [zoomToArea, setZoomToArea] = useState(null);
   const [deleteInput, setDeleteInput] = useState('');
   const mapRef = useRef(null);
  
@@ -271,7 +285,8 @@ export default function Home() {
           <TileLayer
             key="traffic-overlay"
             url={TRAFFIC_OVERLAY_URL}
-            opacity={0.6}
+            tileSize={256}
+            opacity={0.55}
             maxZoom={20}
             zIndex={200}
           />
@@ -282,7 +297,7 @@ export default function Home() {
           enabled={mapLayer === 'traffic'}
         />
  
-        <MapController flyTo={flyTo} setMapRef={(m) => { mapRef.current = m; }} />
+        <MapController flyTo={flyTo} fitBoundsData={fitBoundsData} zoomToArea={zoomToArea} setMapRef={(m) => { mapRef.current = m; }} />
         <MapClickHandler addMode={addMode} onMapClick={handleMapClick} />
  
         {/* User location */}
@@ -317,12 +332,17 @@ export default function Home() {
         }}
       />
  
-      {/* Spots toggle + nearby dropdown */}
+      {/* Spots toggle — sits between search bar and layer switcher */}
       <SpotsPanel
         spots={spots}
         userPos={userPos}
         showSpots={showSpots}
         onToggleSpots={() => setShowSpots(v => !v)}
+        onZoomToArea={() => {
+          const center = userPos ? { lat: userPos[0], lng: userPos[1] } : null;
+          setZoomToArea({ center, ts: Date.now() });
+          setTimeout(() => setZoomToArea(null), 200);
+        }}
         onFlyTo={(pos) => { setFlyTo(pos); setTimeout(() => setFlyTo(null), 1000); }}
         onNavigate={(spot) => {
           if (!userPos) return alert('Location not available yet');
@@ -353,10 +373,10 @@ export default function Home() {
               if (!user) { setShowAuth(true); return; }
               setAddMode(a => !a);
             }}
-            className={`w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-all active:scale-95
+            className={`w-16 h-16 rounded-full shadow-2xl flex items-center justify-center transition-all active:scale-95
               ${addMode ? 'bg-red-500 rotate-45 shadow-red-300' : 'bg-green-500 shadow-green-300'}`}
           >
-            <Plus className="w-7 h-7 text-white" />
+            <Plus className="w-8 h-8 text-white" />
           </button>
         </div>
  
@@ -461,7 +481,14 @@ export default function Home() {
           toLabel={navTarget.label}
           onClose={() => setNavTarget(null)}
           onRouteReady={() => {}}
-          onRouteData={(data) => setNavRouteData(data)}
+          onRouteData={(data) => {
+            setNavRouteData(data);
+            // Fit map to show full route
+            if (data.coordinates && data.coordinates.length >= 2) {
+              setFitBoundsData([...data.coordinates]);
+              setTimeout(() => setFitBoundsData(null), 300);
+            }
+          }}
           userPosition={userPos}
         />
       )}
@@ -536,3 +563,4 @@ export default function Home() {
     </div>
   );
 }
+ 

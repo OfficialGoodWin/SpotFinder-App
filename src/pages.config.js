@@ -27,6 +27,7 @@
  * Example with Layout (wraps all pages):
  *
  *   import Home from './pages/Home';
+import FAQ from './pages/FAQ';
  *   import Settings from './pages/Settings';
  *   import __Layout from './Layout.jsx';
  *
@@ -48,13 +49,15 @@
  * The mainPage value must match a key in the PAGES object exactly.
  */
 import Home from './pages/Home';
+import FAQ from './pages/FAQ';
 import __Layout from './Layout.jsx';
-
-
+ 
+ 
 export const PAGES = {
     "Home": Home,
+    "FAQ": FAQ,
 }
-
+ 
 export const pagesConfig = {
     mainPage: "Home",
     Pages: PAGES,

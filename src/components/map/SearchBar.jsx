@@ -36,7 +36,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate }) {
   };
 
   return (
-    <div className="absolute top-4 left-4 right-16 z-[1000]">
+    <div className="absolute top-4 left-4 z-[1000]" style={{ right: '8.5rem' }}>
       <div className={`bg-white dark:bg-card rounded-2xl shadow-lg border transition-all ${focused ? 'border-blue-400 shadow-blue-100 dark:border-blue-500' : 'border-gray-200 dark:border-border'}`}>
         <div className="flex items-center px-3 gap-2">
           <Search className="w-4 h-4 text-gray-400 dark:text-muted-foreground dark:text-muted-foreground flex-shrink-0" />
