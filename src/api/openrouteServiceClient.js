@@ -1,6 +1,6 @@
 /**
  * OpenRouteService Integration Client
- * Fixed 'unpaved_roads' parameter and added maneuver metadata for better filtering.
+ * Fixed API parameter errors and implemented aggressive shortcut filtering.
  */
 
 import { API_CONFIG } from './apiConfig.js';
@@ -31,11 +31,11 @@ export async function getDirectionsRoute(from, to, profile = 'driving-car') {
         geometry: true,
         preference: 'fastest',
         options: {
-          // FIX: Changed 'unpavedroads' to 'unpaved_roads'
-          avoid_features: ['unpaved_roads'], 
-          continue_straight: true 
+          // FIX: Removed 'avoid_features' to prevent 2003 error
+          // continue_straight forces the route to stay on the primary road
+          continue_straight: true
         },
-        // Requesting maneuvers provides better data for filtering junction noise
+        // Requesting maneuvers provides high-detail data for junction filtering
         maneuvers: true 
       })
     });
@@ -92,11 +92,15 @@ function normalizeDirectionsResponse(orsResponse) {
   };
 }
 
+/**
+ * Maps ORS codes. Types 12 (Keep Left) and 13 (Keep Right) are mapped to 
+ * 'straight' to eliminate icon clutter at highway forks.
+ */
 function normalizeStepType(type) {
   const map = { 
     0: 'turn-left', 1: 'turn-right', 2: 'turn-left', 3: 'turn-right', 
-    12: 'straight', // Keep Left -> straight
-    13: 'straight', // Keep Right -> straight
+    12: 'straight', 
+    13: 'straight', 
     11: 'depart', 10: 'arrive' 
   };
   return map[type] || 'straight';
@@ -108,18 +112,19 @@ export function transformStepsToTurns(steps) {
   const turns = [];
   const turnMarkers = [];
   
+  // 1. Semantic Filter: Merge steps if they are on the same road
   const cleanSteps = [];
   for (let i = 0; i < steps.length; i++) {
     let current = { ...steps[i] };
     const prev = cleanSteps[cleanSteps.length - 1];
     
-    // Filtering road name duplicates to catch slip-road shortcuts
-    if (prev && current.name && prev.name === current.name && current.distance < 250) {
+    // If name is the same, it's a \"fake\" turn or shortcut noise; merge it
+    if (prev && current.name && prev.name === current.name && current.distance < 300) {
         prev.distance += current.distance;
         continue;
     }
 
-    // Merging rapid-fire maneuvers (noise)
+    // Merge rapid-fire maneuvers under 100m to reduce junction noise
     if (i < steps.length - 1 && current.distance < 100) {
       const next = steps[i + 1];
       if (next.type !== 'straight' && next.type !== 'arrive') {
@@ -130,18 +135,20 @@ export function transformStepsToTurns(steps) {
     cleanSteps.push(current);
   }
 
+  // 2. Departure Instruction
   const first = cleanSteps[0];
   turns.push({
-    instruction: `Drive on ${first.name || 'current road'}`,
+    instruction: `Drive on ${first.name || 'route'}`,
     distance: Math.round(first.distance),
     type: 'depart'
   });
 
+  // 3. Final maneuver list
   for (let i = 0; i < cleanSteps.length; i++) {
     const step = cleanSteps[i];
     if (step.type === 'straight' || step.type === 'depart' || step.type === 'arrive') continue;
 
-    // Filter out \"Keep\" instructions that ORS often sends at forks
+    // Filter \"Keep\" instructions that cause icons in the middle of roads
     const lowerInstr = step.instruction.toLowerCase();
     if (lowerInstr.includes('keep') || lowerInstr.includes('continue')) continue;
 
