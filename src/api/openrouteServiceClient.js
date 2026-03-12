@@ -102,57 +102,61 @@ function normalizeStepType(type) {
 }
 
 /**
- * FIXED INTERSECTION LOGIC
- * Since the API doesn't support continue_straight, we merge steps 
- * that have the same road name to hide the \"detour\" instructions.
- */
-/**
- * FIXED INTERSECTION LOGIC - VERSION 2.0
- * Targeted fix for slip-road shortcuts and junction noise.
+ * FIXED INTERSECTION LOGIC - VERSION 3.0 (The Sandwich Fix)
+ * Specifically handles slip roads and intersections where the road name 
+ * might be missing or slightly different on the connector.
  */
 export function transformStepsToTurns(steps) {
   if (!steps || steps.length === 0) return { turns: [], turnMarkers: [] };
 
   const turns = [];
   const turnMarkers = [];
-  const cleanSteps = [];
-
-  // 1. ADVANCED SLIP-ROAD FILTERING
+  
+  // 1. PRE-FILTER: Remove \"Sandwiched\" Slip Roads
+  // We look at 3 steps at a time: Prev -> Current -> Next
+  const filteredSteps = [];
   for (let i = 0; i < steps.length; i++) {
-    let current = { ...steps[i] };
-    const prev = cleanSteps[cleanSteps.length - 1];
+    const prev = filteredSteps[filteredSteps.length - 1];
+    const curr = steps[i];
     const next = steps[i + 1];
 
-    // FIX A: Same-Road Detour (The \"Shortcut\" issue)
-    // If we're on 'Road A', the instruction is a turn, but the next step is also 'Road A'
-    // and the detour is short (< 350m), it's a slip-road shortcut.
-    if (prev && next && prev.name === next.name && prev.name !== '' && current.distance < 350) {
-      prev.distance += current.distance;
-      continue; // Skip this turn entirely
-    }
+    if (prev && next && curr.distance < 400) {
+      const pName = (prev.name || '').trim().toLowerCase();
+      const nName = (next.name || '').trim().toLowerCase();
+      const cName = (curr.name || '').trim().toLowerCase();
 
-    // FIX B: Fuzzy Name Match
-    // Sometimes ORS adds ' (Route 605)' to one name but not the other.
-    if (prev && current.name && prev.name !== '') {
-      const pName = prev.name.toLowerCase();
-      const cName = current.name.toLowerCase();
-      if (pName.includes(cName) || cName.includes(pName)) {
-         prev.distance += current.distance;
-         continue;
+      // THE SANDWICH RULE:
+      // If we are on \"Road A\", turn onto \"Unnamed/Turning Channel\", 
+      // and immediately end up back on \"Road A\", it's a slip road.
+      const isReturnToSameRoad = pName !== '' && pName === nName;
+      
+      // THE FUZZY RULE:
+      // If the current \"turn\" name is actually just a subset of the road we're on
+      const isFuzzyMatch = cName !== '' && (pName.includes(cName) || cName.includes(pName));
+
+      if (isReturnToSameRoad || isFuzzyMatch) {
+        // Absorb the distance into the previous step and skip this \"turn\"
+        prev.distance += curr.distance;
+        continue;
       }
     }
+    filteredSteps.push({ ...curr });
+  }
 
-    // FIX C: Proximity Noise
-    // Merge maneuvers that happen within 100m of each other.
+  // 2. SECOND PASS: Merge rapid-fire noise (turns within 100m)
+  const cleanSteps = [];
+  for (let i = 0; i < filteredSteps.length; i++) {
+    let current = filteredSteps[i];
+    const next = filteredSteps[i + 1];
+
     if (next && current.distance < 100 && next.type !== 'arrive') {
       next.distance += current.distance;
       continue;
     }
-
     cleanSteps.push(current);
   }
 
-  // 2. BUILD FINAL INSTRUCTIONS
+  // 3. GENERATE INSTRUCTIONS
   const first = cleanSteps[0];
   turns.push({
     instruction: `Drive on ${first.name || 'route'}`,
@@ -162,11 +166,9 @@ export function transformStepsToTurns(steps) {
 
   for (let i = 0; i < cleanSteps.length; i++) {
     const step = cleanSteps[i];
-    
-    // Ignore meta-types and instructions that don't represent a real turn
     if (step.type === 'straight' || step.type === 'depart' || step.type === 'arrive') continue;
-    
-    // Final text-based safety check for \"Keep\" instructions
+
+    // Filter \"Keep\" instructions which are just fork-guidance, not real turns
     const lowerInstr = step.instruction.toLowerCase();
     if (lowerInstr.includes('keep') || lowerInstr.includes('continue')) continue;
 
