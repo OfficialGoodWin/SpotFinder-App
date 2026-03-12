@@ -102,9 +102,9 @@ function normalizeStepType(type) {
 }
 
 /**
- * FIXED INTERSECTION LOGIC - VERSION 3.0 (The Sandwich Fix)
- * Specifically handles slip roads and intersections where the road name 
- * might be missing or slightly different on the connector.
+ * FIXED INTERSECTION LOGIC - VERSION 5.0 (The Deep-Path Fix)
+ * This version looks up to 4 steps ahead to find if the route returns 
+ * to the original road, effectively deleting any \"bypass\" instructions.
  */
 export function transformStepsToTurns(steps) {
   if (!steps || steps.length === 0) return { turns: [], turnMarkers: [] };
@@ -112,51 +112,58 @@ export function transformStepsToTurns(steps) {
   const turns = [];
   const turnMarkers = [];
   
-  // 1. PRE-FILTER: Remove \"Sandwiched\" Slip Roads
-  // We look at 3 steps at a time: Prev -> Current -> Next
+  // 1. PASS 1: Recursive Lookahead for Road Continuation
   const filteredSteps = [];
   for (let i = 0; i < steps.length; i++) {
+    const curr = { ...steps[i] };
     const prev = filteredSteps[filteredSteps.length - 1];
-    const curr = steps[i];
-    const next = steps[i + 1];
+    
+    if (prev && prev.name !== '') {
+      const pName = prev.name.toLowerCase();
+      let foundContinuation = false;
 
-    if (prev && next && curr.distance < 400) {
-      const pName = (prev.name || '').trim().toLowerCase();
-      const nName = (next.name || '').trim().toLowerCase();
-      const cName = (curr.name || '').trim().toLowerCase();
+      // Look ahead up to 4 segments to see if we get back on the same road
+      // This catches: Main Road -> Slip Road -> Connector -> Main Road
+      for (let j = 1; j <= 4; j++) {
+        const futureStep = steps[i + j];
+        if (!futureStep) break;
 
-      // THE SANDWICH RULE:
-      // If we are on \"Road A\", turn onto \"Unnamed/Turning Channel\", 
-      // and immediately end up back on \"Road A\", it's a slip road.
-      const isReturnToSameRoad = pName !== '' && pName === nName;
-      
-      // THE FUZZY RULE:
-      // If the current \"turn\" name is actually just a subset of the road we're on
-      const isFuzzyMatch = cName !== '' && (pName.includes(cName) || cName.includes(pName));
+        const fName = (futureStep.name || '').toLowerCase();
+        
+        // If we find the original road name again within a short distance
+        if (fName === pName || fName.includes(pName) || pName.includes(fName)) {
+          // Calculate total distance of the \"shortcut\"
+          let detourDistance = 0;
+          for (let k = 0; k <= j; k++) detourDistance += (steps[i + k]?.distance || 0);
 
-      if (isReturnToSameRoad || isFuzzyMatch) {
-        // Absorb the distance into the previous step and skip this \"turn\"
-        prev.distance += curr.distance;
-        continue;
+          if (detourDistance < 600) {
+            prev.distance += detourDistance;
+            i += j; // Skip all intermediate shortcut steps
+            foundContinuation = true;
+            break;
+          }
+        }
       }
+      if (foundContinuation) continue;
     }
-    filteredSteps.push({ ...curr });
+    filteredSteps.push(curr);
   }
 
-  // 2. SECOND PASS: Merge rapid-fire noise (turns within 100m)
+  // 2. PASS 2: Proximity & Text Cleaning
   const cleanSteps = [];
   for (let i = 0; i < filteredSteps.length; i++) {
     let current = filteredSteps[i];
     const next = filteredSteps[i + 1];
 
-    if (next && current.distance < 100 && next.type !== 'arrive') {
+    // Merge maneuvers within 150m (common for multi-part intersection turns)
+    if (next && current.distance < 150 && next.type !== 'arrive') {
       next.distance += current.distance;
       continue;
     }
     cleanSteps.push(current);
   }
 
-  // 3. GENERATE INSTRUCTIONS
+  // 3. PASS 3: Final Turn Generation
   const first = cleanSteps[0];
   turns.push({
     instruction: `Drive on ${first.name || 'route'}`,
@@ -168,9 +175,9 @@ export function transformStepsToTurns(steps) {
     const step = cleanSteps[i];
     if (step.type === 'straight' || step.type === 'depart' || step.type === 'arrive') continue;
 
-    // Filter \"Keep\" instructions which are just fork-guidance, not real turns
-    const lowerInstr = step.instruction.toLowerCase();
-    if (lowerInstr.includes('keep') || lowerInstr.includes('continue')) continue;
+    // Hard-filter instructions that aren't real turns
+    const instr = step.instruction.toLowerCase();
+    if (instr.includes('keep') || instr.includes('continue') || instr.includes('straight')) continue;
 
     const nextStep = cleanSteps[i + 1];
     turns.push({
