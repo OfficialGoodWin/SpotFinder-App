@@ -250,11 +250,15 @@ function extractStepsFromRoute(route) {
  */
 function normalizeStepType(type) {
   // ORS uses numeric types, map them to readable types
+  // NOTE: previous versions treated 2/3 as "sharp" turns which resulted
+  // in confusing instructions (go straight then sharp right).  We default
+  // to the simpler left/right mapping and rely on later logic to merge
+  // tiny straight segments with a following turn if needed.
   const typeMap = {
     0: 'turn-left',      // turn left
     1: 'turn-right',     // turn right
-    2: 'turn-sharp-left',
-    3: 'turn-sharp-right',
+    2: 'turn-left',      // sharp-left mapped to simple left
+    3: 'turn-right',     // sharp-right mapped to simple right
     4: 'straight',
     5: 'enter roundabout',
     6: 'exit roundabout',
@@ -287,6 +291,36 @@ export function transformStepsToTurns(steps) {
     });
     return { turns, turnMarkers };
   }
+
+  // ---------------------------------------------------------------------------
+  // Pre-process step list to clean up odd cases reported by the user:
+  //  * ORS sometimes returns a tiny "straight" segment followed by a sharp-
+  //    right/left at intersections with turn lanes.  The UI would show "go
+  //    straight" then "turn sharply right" even though the driver merely
+  //    needed to turn right.  Collapse those two steps into a single turn.
+  // ---------------------------------------------------------------------------
+  const merged = [];
+  for (let i = 0; i < steps.length; i++) {
+    const s = steps[i];
+    if (
+      s &&
+      s.type === 'straight' &&
+      (s.distance || 0) < 20 &&
+      i + 1 < steps.length
+    ) {
+      const nxt = steps[i + 1];
+      if (nxt && /right|left/.test(nxt.type) && nxt.type.startsWith('turn-')) {
+        // merge into next step
+        nxt.distance = (nxt.distance || 0) + (s.distance || 0);
+        // convert sharp turns into normal ones since we've merged
+        if (nxt.type === 'turn-sharp-right') nxt.type = 'turn-right';
+        if (nxt.type === 'turn-sharp-left') nxt.type = 'turn-left';
+        continue; // drop this tiny straight segment
+      }
+    }
+    merged.push(s);
+  }
+  steps = merged;
 
   let distanceFromStart = 0;
 

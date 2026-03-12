@@ -217,6 +217,27 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
           lng: to.lng
         }];
       }
+
+      // If we're driving and ORS ended a short distance away from the
+      // actual target (common when the spot is off-road), tack on a final
+      // "walk to destination" step instead of continually re‑requesting.
+      if (profile === 'driving-car' && result.steps.length > 0) {
+        const lastStep = result.steps[result.steps.length - 1];
+        if (lastStep.lat != null && lastStep.lng != null) {
+          const dy = (to.lat - lastStep.lat) * 111000;
+          const dx = (to.lng - lastStep.lng) * 111000 * Math.cos((to.lat * Math.PI) / 180);
+          const gap = Math.hypot(dx, dy);
+          if (gap > 20) {
+            result.steps.push({
+              instruction: 'Destination off‑road – walk the remaining distance',
+              distance: gap,
+              type: 'depart',
+              lat: to.lat,
+              lng: to.lng
+            });
+          }
+        }
+      }
       
       const routes = [result];
       setAllRoutes(routes);
@@ -225,6 +246,30 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
       if (onRouteReady) onRouteReady(result);
     } catch (err) {
       console.error('Route fetch error:', err.message);
+      // If driving failed and we were trying to drive, fall back to walking
+      if (routeType === 'car_fast') {
+        try {
+          console.log('Attempting walking fallback since car route failed');
+          const walk = await getDirectionsRoute(from, to, 'foot-hiking');
+          // create a note for the user
+          walk.steps = walk.steps || [];
+          walk.steps.unshift({
+            instruction: 'Destination appears off‑road – continue on foot from here',
+            distance: 0,
+            type: 'depart',
+            lat: to.lat,
+            lng: to.lng
+          });
+          const routes = [walk];
+          setAllRoutes(routes);
+          updateRouteDisplay(routes, 0);
+          if (onRouteReady) onRouteReady(walk);
+          setLoading(false);
+          return;
+        } catch (walkErr) {
+          console.error('Walking fallback also failed:', walkErr.message);
+        }
+      }
       setLoading(false);
     }
   };

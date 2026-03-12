@@ -19,3 +19,10 @@ When clicking a spot and pressing "Navigate Here", it shows "No turns found" ini
 
 ### Status: ✅ COMPLETED - Should no longer hit rate limits
 
+## Improvements applied after March 2026 feedback
+
+* **Off‑road destinations:** if ORS can't drive all the way, the panel now adds a walking step instead of spinning forever or retrying repeatedly.  A driving failure also falls back to a foot route automatically.
+* **Turn instructions cleaned up:** tiny straight segments before a turn are merged and numeric "sharp" types remapped to normal left/right, which avoids the "go straight then sharp right" instructions on intersections with dedicated turn lanes.
+* **Dark mode enhancements:** global utility overrides were added so that every `bg-white`, `bg-gray-*`, `text-gray-*` etc use the dark‑themed CSS variable equivalents, making dark mode look correct on all existing components without needing to edit every file individually.
+
+

@@ -86,3 +86,17 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ensure some common utility classes automatically adapt to dark mode
+   by falling back to the CSS variable colours defined above */
+@layer utilities {
+  .dark .bg-white { background-color: rgb(var(--card) / var(--tw-bg-opacity)) !important; }
+  .dark .bg-gray-50 { background-color: rgb(var(--muted) / var(--tw-bg-opacity)) !important; }
+  .dark .bg-gray-100 { background-color: rgb(var(--popover) / var(--tw-bg-opacity)) !important; }
+  .dark .bg-gray-200 { background-color: rgb(var(--border) / var(--tw-bg-opacity)) !important; }
+  .dark .bg-gray-300 { background-color: rgb(var(--ring) / var(--tw-bg-opacity)) !important; }
+  .dark .text-gray-900, .dark .text-gray-800 { color: rgb(var(--foreground) / var(--tw-text-opacity)) !important; }
+  .dark .text-gray-700, .dark .text-gray-600, .dark .text-gray-500, .dark .text-gray-400 { color: rgb(var(--muted-foreground) / var(--tw-text-opacity)) !important; }
+  .dark .border-gray-200 { border-color: rgb(var(--border) / var(--tw-border-opacity)) !important; }
+  .dark .border-gray-300 { border-color: rgb(var(--ring) / var(--tw-border-opacity)) !important; }
+}
