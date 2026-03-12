@@ -249,12 +249,20 @@ function extractStepsFromRoute(route) {
  * @private
  */
 function normalizeStepType(type) {
-  // ORS uses numeric types, map them to readable types
-  // NOTE: previous versions treated 2/3 as "sharp" turns which resulted
-  // in confusing instructions (go straight then sharp right).  We default
-  // to the simpler left/right mapping and rely on later logic to merge
-  // tiny straight segments with a following turn if needed.
-  const typeMap = {
+  // ORS can return either numeric types OR string types depending on processing
+  // Map sharp turns to simple left/right to avoid confusing navigation
+  
+  // Handle string types first (from pre-processed steps)
+  if (typeof type === 'string') {
+    const stringMap = {
+      'turn-sharp-left': 'turn-left',
+      'turn-sharp-right': 'turn-right'
+    };
+    return stringMap[type] || type;
+  }
+  
+  // Handle numeric types (from raw ORS API)
+  const numericMap = {
     0: 'turn-left',      // turn left
     1: 'turn-right',     // turn right
     2: 'turn-left',      // sharp-left mapped to simple left
@@ -270,7 +278,7 @@ function normalizeStepType(type) {
     13: 'slight-right'   // keep right
   };
 
-  return typeMap[type] || 'straight';
+  return numericMap[type] || 'straight';
 }
 
 /**
