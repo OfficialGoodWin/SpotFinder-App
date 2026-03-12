@@ -2,7 +2,6 @@
  * OSRM (Open Source Routing Machine) Client
  * Stable, fast routing service. No API key needed.
  * Usage: const routeData = await getOSRMRoute(from, to, profile);
- * Compatible with existing transformStepsToTurns.
  */
 
 const BASE_URL = 'https://router.project-osrm.org/route/v1';
@@ -36,7 +35,6 @@ function normalizeOSRMResponse(osrmResponse) {
   const route = osrmResponse.routes[0];
   if (!route) throw new Error('No routes found');
 
-  // Decode polyline geometry
   const geometry = decodePolyline(route.geometry);
 
   return {
@@ -65,21 +63,6 @@ function decodePolyline(encoded) {
   return coordinates;
 }
 
-function extractStepsFromRoute(route) {
-  const steps = route.legs[0].steps.map(step => ({
-    instruction: step.maneuver.instruction,
-    distance: step.distance,
-    modifier: step.maneuver.modifier,
-    bearing: step.maneuver.bearing_after || 0,
-    lat: step.maneuver.location[1],
-    lng: step.maneuver.location[0],
-    name: step.name || ''
-  })).filter(step => step.distance > 5); // Filter tiny steps
-
-  return steps;
-}
-
-// Only one definition of mapOSRMModifier remains
 function mapOSRMModifier(modifier) {
   const map = {
     'sharp left': 'turn-left',
@@ -96,4 +79,18 @@ function mapOSRMModifier(modifier) {
     'use lane': 'straight'
   };
   return map[modifier] || 'straight';
+}
+
+function extractStepsFromRoute(route) {
+  const steps = route.legs[0].steps.map(step => ({
+    instruction: step.maneuver.instruction,
+    distance: step.distance,
+    modifier: step.maneuver.modifier,
+    bearing: step.maneuver.bearing_after || 0,
+    lat: step.maneuver.location[1],
+    lng: step.maneuver.location[0],
+    name: step.name || ''
+  })).filter(step => step.distance > 5);
+
+  return steps;
 }
