@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Car, Bike, PersonStanding, Volume2, VolumeX, ArrowLeft, ArrowRight, ArrowUp, CircleArrowRight } from 'lucide-react';
-import { getOSRMRoute } from '@/api/osrmServiceClient';
+import { getOSRMRoute, mapOSRMModifier } from '@/api/osrmServiceClient';
 
 const ROUTE_TYPES = [
   { id: 'car_fast', label: 'Drive', icon: Car, profile: 'driving-car' },
@@ -53,45 +53,21 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
   const routeDebounceTimer = useRef(null);
   const lastFetchedCoords = useRef(null);
 
-  // ---------- Helper: Map OSRM modifier to turn type ----------
-  const mapOSRMModifier = (modifier) => {
-    const map = {
-      'sharp left': 'turn-left',
-      'left': 'turn-left',
-      'slight left': 'turn-left',
-      'straight': 'straight',
-      'slight right': 'turn-right',
-      'right': 'turn-right',
-      'sharp right': 'turn-right',
-      'u-turn': 'u-turn',
-      'roundabout left': 'enter roundabout',
-      'roundabout right': 'enter roundabout',
-      'exit roundabout': 'exit roundabout',
-      'use lane': 'straight'
-    };
-    return map[modifier] || 'straight';
-  };
-
-  // ---------- Helper: Convert OSRM steps to turns & markers (with instruction fallback) ----------
+  // ---------- Helper: Convert OSRM steps to turns & markers ----------
+  // Steps now come pre-processed from osrmServiceClient with:
+  //   step.instruction  – rich text ("Turn right onto D5 E50 direction Praha")
+  //   step.modifier     – OSRM modifier string ("right", "sharp left", …)
+  //   step.maneuverType – OSRM maneuver type ("turn", "roundabout", …)
   const convertOSRMStepsToTurns = (osrmSteps) => {
     const turns = [];
     const markers = [];
 
     osrmSteps.forEach((step, index) => {
+      // Use the shared helper (imported from osrmServiceClient)
       const type = mapOSRMModifier(step.modifier);
-      
-      // Ensure instruction is never undefined
-      let instruction = step.instruction;
-      if (!instruction) {
-        // Generate a default based on modifier or type
-        if (step.modifier) {
-          instruction = `Turn ${step.modifier.replace('-', ' ')}`;
-        } else if (type === 'straight') {
-          instruction = 'Continue straight';
-        } else {
-          instruction = 'Proceed';
-        }
-      }
+
+      // instruction is already built by the client; provide a safe fallback
+      const instruction = step.instruction || 'Continue ahead';
 
       turns.push({
         instruction,
