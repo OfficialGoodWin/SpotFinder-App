@@ -185,8 +185,8 @@ function normalizeDirectionsResponse(orsResponse) {
   const distance = summary.distance || 0;
   const duration = summary.duration || 0;
 
-  // Extract steps/instructions, passing geometry for coordinate lookup
-  const steps = extractStepsFromRoute(route, geometry);
+  // Extract steps/instructions
+  const steps = extractStepsFromRoute(route);
 
   return {
     geometry,
@@ -200,7 +200,7 @@ function normalizeDirectionsResponse(orsResponse) {
  * Extract turn-by-turn instructions from ORS route
  * @private
  */
-function extractStepsFromRoute(route, geometry = []) {
+function extractStepsFromRoute(route) {
   const steps = [];
 
   if (!route.segments || !Array.isArray(route.segments)) {
@@ -225,21 +225,12 @@ function extractStepsFromRoute(route, geometry = []) {
       
       cumulativeDistance += (step.distance || 0);
 
-      // Use way_points to resolve coordinates from geometry array
-      let lat, lng;
-      if (step.way_points && step.way_points.length > 1 && geometry.length > 0) {
-        const coordIndex = step.way_points[1]; // End point of this step
-        if (coordIndex < geometry.length) {
-          [lat, lng] = geometry[coordIndex];
-        }
-      }
-
       steps.push({
         instruction: step.instruction || 'Continue',
         distance: step.distance || 0,
         type: normalizeStepType(step.type),
-        lat: lat,
-        lng: lng,
+        lat: step.maneuver?.location?.[1],
+        lng: step.maneuver?.location?.[0],
         name: step.name || '',
         exit_number: step.exit_number,
         bearing_before: step.maneuver?.bearing_before,
@@ -310,19 +301,16 @@ export function transformStepsToTurns(steps) {
 
   // ---------------------------------------------------------------------------
   // Pre-process step list to clean up odd cases reported by the user:
-  //  * ORS sometimes returns a tiny "straight" segment followed by a sharp-
-  //    right/left at intersections with turn lanes.  The UI would show "go
-  //    straight" then "turn sharply right" even though the driver merely
-  //    needed to turn right.  Collapse those two steps into a single turn.
+  //  * ORS sometimes returns a tiny "straight" or "slight" segment followed by a 
+  //    sharp-right/left at intersections with turn lanes. Collapse them.
   // ---------------------------------------------------------------------------
   const merged = [];
   for (let i = 0; i < steps.length; i++) {
     const s = steps[i];
-    // Merge tiny straights OR merge first straight after depart
     if (
       s &&
-      (s.type === 'straight' || s.type === 'depart') &&
-      ((s.distance || 0) < 150 || s.type === 'depart') &&
+      ['straight', 'slight-left', 'slight-right'].includes(s.type) &&
+      (s.distance || 0) < 100 &&
       i + 1 < steps.length
     ) {
       const nxt = steps[i + 1];
@@ -333,8 +321,8 @@ export function transformStepsToTurns(steps) {
         // convert sharp turns into normal ones since we've merged
         if (nxt.type === 'turn-sharp-right') nxt.type = 'turn-right';
         if (nxt.type === 'turn-sharp-left') nxt.type = 'turn-left';
-        console.log(`Merged ${s.type} (${s.distance}m) with ${nxt.type}`);
-        continue; // drop this segment
+        console.log(`Merged tiny ${s.type} (${s.distance}m) with ${nxt.type}`);
+        continue; // drop this tiny segment
       }
     }
     merged.push(s);
@@ -356,7 +344,7 @@ export function transformStepsToTurns(steps) {
   steps.forEach((step, idx) => {
     if (!step) return;
     
-    // Skip straight segments and depart steps
+    // Skip straight segments
     if (step.type === 'straight' || step.type === 'depart') {
       distanceFromStart += (step.distance || 0);
       return;
@@ -376,8 +364,8 @@ export function transformStepsToTurns(steps) {
       type: step.type
     });
 
-    // Add turn marker for map - ONLY for actual turns, not arrive steps
-    if (step.lat !== undefined && step.lng !== undefined && step.type !== 'arrive') {
+    // Add turn marker for map
+    if (step.lat !== undefined && step.lng !== undefined) {
       turnMarkers.push({
         lat: step.lat,
         lng: step.lng,
