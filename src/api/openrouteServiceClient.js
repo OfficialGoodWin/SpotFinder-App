@@ -1,6 +1,6 @@
 /**
  * OpenRouteService Integration Client
- * Updated to fix \"Shortcut Detours\" and \"Instruction Noise\" at junctions.
+ * Fixed API request structure to resolve the 400 error.
  */
 
 import { API_CONFIG } from './apiConfig.js';
@@ -29,16 +29,22 @@ export async function getDirectionsRoute(from, to, profile = 'driving-car') {
         coordinates,
         instructions: true,
         geometry: true,
-        // FIX: continue_straight forces the engine to stay on the main road
-        // unless a turn is strictly necessary.
+        preference: 'fastest',
+        // REVISED OPTIONS STRUCTURE
         options: {
-          continue_straight: true
-        },
-        preference: 'fastest' 
+          avoid_features: [\"unpavedroads\"], 
+          continue_straight: true 
+        }
       })
     });
 
-    if (!response.ok) throw new Error('ORS API error');
+    if (!response.ok) {
+      // Log the exact error from the server to pinpoint the issue
+      const errorData = await response.json();
+      console.error('Detailed ORS Error:', errorData);
+      throw new Error(`ORS API error: ${errorData.error?.message || response.statusText}`);
+    }
+
     const data = await response.json();
     return normalizeDirectionsResponse(data);
   } catch (err) {
