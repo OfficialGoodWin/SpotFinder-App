@@ -45,7 +45,7 @@ export async function getDirectionsRoute(from, to, profile) {
     instructions: true,
     geometry: true,
     maneuvers: true,
-    preference: 'recommended',
+    preference: 'fastest',
     units: 'km',
     elevations: false,
     roundabouts: 1,
