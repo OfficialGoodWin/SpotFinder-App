@@ -22,17 +22,37 @@ import SettingsModal from '../components/SettingsModal';
 
 const MAPY_API_KEY = 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
 
-const TILE_URLS = {
+// ── TomTom API key for real-time traffic overlay ────────────────────────────
+// Sign up free at https://developer.tomtom.com — 2,500 req/day on free tier.
+// Paste your key below; traffic overlay is silently disabled without it.
+const TOMTOM_API_KEY = 'pJihafJsZIUIzkTGF32ps6KPNJmg6K9u';
+
+// ── Base tile URLs ────────────────────────────────────────────────────────────
+// Light tiles (default)
+const LIGHT_TILES = {
   basic:   `https://api.mapy.com/v1/maptiles/basic/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
   outdoor: `https://api.mapy.com/v1/maptiles/outdoor/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
   aerial:  `https://api.mapy.com/v1/maptiles/aerial/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
   winter:  `https://api.mapy.com/v1/maptiles/winter/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
-  // roads-focused tile — shows road names & numbers prominently
   traffic: `https://api.mapy.com/v1/maptiles/basic/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
 };
 
-// Layers where the dark CSS filter should NOT be applied (aerial looks wrong inverted)
-const NO_DARK_FILTER_LAYERS = new Set(['aerial']);
+// Dark tiles — CartoDB Dark Matter (free, no API key required)
+// aerial stays as Mapy.cz (inverted satellite looks terrible), winter keeps its own style
+const DARK_TILES = {
+  basic:   'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  outdoor: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  aerial:  `https://api.mapy.com/v1/maptiles/aerial/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
+  winter:  `https://api.mapy.com/v1/maptiles/winter/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
+  traffic: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+};
+
+// ── TomTom traffic flow overlay ───────────────────────────────────────────────
+// Overlaid on top of ANY base layer when mapLayer === 'traffic'
+// Green = free flow  |  Yellow = slow  |  Red = heavy congestion
+const TRAFFIC_OVERLAY_URL = TOMTOM_API_KEY
+  ? `https://api.tomtom.com/traffic/map/4/tile/flow/relative-delay/{z}/{x}/{y}.png?tileSize=256&key=${TOMTOM_API_KEY}`
+  : null;
 
 // Map controller component
 function MapController({ flyTo, setMapRef }) {
@@ -59,8 +79,11 @@ export default function Home() {
   const { isDark } = useTheme();
   const [spots, setSpots] = useState([]);
   const [mapLayer, setMapLayer] = useState('basic');
-  // Apply dark CSS filter when dark mode is on, except for aerial/satellite
-  const mapDarkMode = isDark && !NO_DARK_FILTER_LAYERS.has(mapLayer);
+  // Select the right tile set based on dark mode
+  const tileUrls = isDark ? DARK_TILES : LIGHT_TILES;
+  // CartoDB needs subdomains; Mapy.cz does not
+  const cartoDomains = ['a', 'b', 'c', 'd'];
+  const useCartoTile = isDark && mapLayer !== 'aerial' && mapLayer !== 'winter';
   const [userPos, setUserPos] = useState(null);
   const [userAccuracy, setUserAccuracy] = useState(null);
   const [addMode, setAddMode] = useState(false);
@@ -208,7 +231,7 @@ export default function Home() {
     : { lat: 50.0755, lng: 14.4378 };
 
   return (
-    <div className={`relative w-full h-full${mapDarkMode ? ' map-dark' : ''}`} style={{ touchAction: addMode ? 'none' : undefined }}>
+    <div className="relative w-full h-full" style={{ touchAction: addMode ? 'none' : undefined }}>
       {/* Cursor overlay in add mode */}
       {addMode && (
         <div
@@ -229,11 +252,27 @@ export default function Home() {
         zoomControl={false}
         attributionControl={false}
       >
+        {/* Base map tile */}
         <TileLayer
-          url={TILE_URLS[mapLayer]}
-          attribution='&copy; <a href="https://mapy.com">Mapy.cz</a>'
+          key={`${mapLayer}-${isDark}`}
+          url={tileUrls[mapLayer]}
+          subdomains={useCartoTile ? cartoDomains : []}
+          attribution={useCartoTile
+            ? '&copy; <a href="https://carto.com">CARTO</a> &copy; <a href="https://osm.org/copyright">OpenStreetMap</a>'
+            : '&copy; <a href="https://mapy.com">Mapy.cz</a>'}
           maxZoom={20}
         />
+
+        {/* TomTom real-time traffic flow overlay (only on traffic layer) */}
+        {mapLayer === 'traffic' && TRAFFIC_OVERLAY_URL && (
+          <TileLayer
+            key="traffic-overlay"
+            url={TRAFFIC_OVERLAY_URL}
+            opacity={0.75}
+            maxZoom={20}
+            zIndex={200}
+          />
+        )}
         <MapController flyTo={flyTo} setMapRef={(m) => { mapRef.current = m; }} />
         <MapClickHandler addMode={addMode} onMapClick={handleMapClick} />
 

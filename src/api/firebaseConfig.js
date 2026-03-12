@@ -6,6 +6,7 @@
 // 4. Enable Firestore Database
 // 5. Copy your config from Project Settings > General > Your apps
 import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
 
 
 export const firebaseConfig = {
@@ -21,5 +22,9 @@ export const firebaseConfig = {
 // 1. Go to Authentication > Sign-in method > Google > Enable
 // 2. Set up authorized domains in Firebase Console
 const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+
+
+
 
 export default app;
