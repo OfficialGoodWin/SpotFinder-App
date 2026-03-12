@@ -44,7 +44,11 @@ export async function getDirectionsRoute(from, to, profile) {
     coordinates,
     instructions: true,
     geometry: true,
-    maneuvers: true
+    maneuvers: true,
+    // Add parameters to prefer simpler, more direct routing
+    preference: 'recommended',
+    // Suppress complex intersection descriptions that cause confusing turn sequences
+    suppress_warnings: true
   };
 
   try {
@@ -313,16 +317,18 @@ export function transformStepsToTurns(steps) {
     if (
       s &&
       s.type === 'straight' &&
-      (s.distance || 0) < 20 &&
+      (s.distance || 0) < 50 &&
       i + 1 < steps.length
     ) {
       const nxt = steps[i + 1];
-      if (nxt && /right|left/.test(nxt.type) && nxt.type.startsWith('turn-')) {
+      // Match any turn type: turn-left, turn-right, turn-sharp-left, turn-sharp-right, etc.
+      if (nxt && (nxt.type.startsWith('turn-') || nxt.type.includes('left') || nxt.type.includes('right'))) {
         // merge into next step
         nxt.distance = (nxt.distance || 0) + (s.distance || 0);
         // convert sharp turns into normal ones since we've merged
         if (nxt.type === 'turn-sharp-right') nxt.type = 'turn-right';
         if (nxt.type === 'turn-sharp-left') nxt.type = 'turn-left';
+        console.log(`Merged tiny straight (${s.distance}m) with ${nxt.type}`);
         continue; // drop this tiny straight segment
       }
     }
