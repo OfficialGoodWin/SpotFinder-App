@@ -318,10 +318,11 @@ export function transformStepsToTurns(steps) {
   const merged = [];
   for (let i = 0; i < steps.length; i++) {
     const s = steps[i];
-      if (
+    // Merge tiny straights OR merge first straight after depart
+    if (
       s &&
-      s.type === 'straight' &&
-      (s.distance || 0) < 100 &&
+      (s.type === 'straight' || s.type === 'depart') &&
+      ((s.distance || 0) < 150 || s.type === 'depart') &&
       i + 1 < steps.length
     ) {
       const nxt = steps[i + 1];
@@ -332,8 +333,8 @@ export function transformStepsToTurns(steps) {
         // convert sharp turns into normal ones since we've merged
         if (nxt.type === 'turn-sharp-right') nxt.type = 'turn-right';
         if (nxt.type === 'turn-sharp-left') nxt.type = 'turn-left';
-        console.log(`Merged tiny straight (${s.distance}m) with ${nxt.type}`);
-        continue; // drop this tiny straight segment
+        console.log(`Merged ${s.type} (${s.distance}m) with ${nxt.type}`);
+        continue; // drop this segment
       }
     }
     merged.push(s);
@@ -355,7 +356,7 @@ export function transformStepsToTurns(steps) {
   steps.forEach((step, idx) => {
     if (!step) return;
     
-    // Skip straight segments
+    // Skip straight segments and depart steps
     if (step.type === 'straight' || step.type === 'depart') {
       distanceFromStart += (step.distance || 0);
       return;
@@ -375,8 +376,8 @@ export function transformStepsToTurns(steps) {
       type: step.type
     });
 
-    // Add turn marker for map
-    if (step.lat !== undefined && step.lng !== undefined) {
+    // Add turn marker for map - ONLY for actual turns, not arrive steps
+    if (step.lat !== undefined && step.lng !== undefined && step.type !== 'arrive') {
       turnMarkers.push({
         lat: step.lat,
         lng: step.lng,
