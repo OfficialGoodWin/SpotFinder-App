@@ -14,48 +14,49 @@ import { useEffect, useRef } from 'react';
  */
 
 // ── Replace these two values after AdSense approval ─────────────────────────
-const PUBLISHER_ID = 'ca-pub-9210597135045895'; // e.g. ca-pub-1234567890123456
-const AD_SLOT      = '3588954548';              // e.g. 1234567890
+const CLIENT = 'ca-pub-9210597135045895'; // e.g. ca-pub-1234567890123456
+const SLOT      = '3588954548';              // e.g. 1234567890
 // ────────────────────────────────────────────────────────────────────────────
-
+ 
 export default function AdBanner() {
   const adRef = useRef(null);
   const pushed = useRef(false);
-
+ 
   useEffect(() => {
-    // adsbygoogle must be loaded (via the script in index.html) before push works
-    if (pushed.current) return;
+    if (!CLIENT || !SLOT || pushed.current) return;
     try {
-      if (window.adsbygoogle) {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
-        pushed.current = true;
-      }
+      // adsbygoogle is injected by the script tag in index.html
+      (window.adsbygoogle = window.adsbygoogle || []).push({});
+      pushed.current = true;
     } catch (e) {
-      // silently ignore — AdSense not loaded yet or blocked by ad-blocker
+      console.warn('AdSense push failed:', e);
     }
   }, []);
-
-  // Don't render if publisher ID hasn't been configured
-  if (PUBLISHER_ID === 'ca-pub-XXXXXXXXXXXXXXXX') {
+ 
+  // Placeholder shown when no AdSense credentials are configured
+  if (!CLIENT || !SLOT) {
     return (
-      <div className="w-full h-[50px] bg-gray-100 dark:bg-card border-t border-gray-200 dark:border-border flex items-center justify-center">
-        <span className="text-xs text-gray-400 dark:text-muted-foreground select-none">
-          Ad banner — configure AdSense publisher ID
+      <div
+        className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-accent/40 rounded-lg border border-dashed border-gray-300 dark:border-border"
+        style={{ minHeight: 40 }}
+      >
+        <span className="text-[10px] text-gray-400 dark:text-muted-foreground text-center leading-tight px-1">
+          Ad
         </span>
       </div>
     );
   }
-
+ 
   return (
-    <div className="w-full bg-background border-t border-gray-200 dark:border-border overflow-hidden" style={{ minHeight: 50 }}>
+    <div className="w-full h-full overflow-hidden rounded-lg" style={{ minHeight: 40 }}>
       <ins
         ref={adRef}
         className="adsbygoogle"
-        style={{ display: 'block', width: '100%', height: 50 }}
-        data-ad-client={PUBLISHER_ID}
-        data-ad-slot={AD_SLOT}
-        data-ad-format="banner"
-        data-full-width-responsive="false"
+        style={{ display: 'block', width: '100%', height: '100%', minHeight: 40 }}
+        data-ad-client={CLIENT}
+        data-ad-slot={SLOT}
+        data-ad-format="horizontal"
+        data-full-width-responsive="true"
       />
     </div>
   );

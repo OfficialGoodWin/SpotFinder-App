@@ -382,11 +382,8 @@ export default function Home() {
  
       {/* Bottom bar */}
       <div className="absolute bottom-0 inset-x-0 z-[1000]">
-        {/* Google AdSense banner */}
-        <AdBanner />
-
         {/* FAB — green + floating above bar */}
-        <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none" style={{ bottom: '100%', transform: 'translateX(-50%) translateY(50%)' }}>
+        <div className="absolute left-1/2 -translate-x-1/2 z-10 pointer-events-none" style={{ bottom: '100%', marginBottom: '-36px' }}>
           <button
             onClick={() => { if (!user) { setShowAuth(true); return; } setAddMode(a => !a); }}
             className={`w-[72px] h-[72px] rounded-full shadow-2xl flex items-center justify-center transition-all active:scale-95 pointer-events-auto
@@ -397,9 +394,9 @@ export default function Home() {
         </div>
 
         {/* Bar row */}
-        <div className="flex items-center justify-between px-4 pt-2 pb-5 bg-background/95 backdrop-blur-md border-t border">
+        <div className="flex items-center px-4 pt-2 pb-5 bg-background/95 backdrop-blur-md border-t border gap-2">
           {/* Left: Layers + Location */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <MapLayerSwitcher activeLayer={mapLayer} onLayerChange={setMapLayer} />
             <button
               onClick={() => userPos && setFlyTo([...userPos])}
@@ -410,16 +407,17 @@ export default function Home() {
             </button>
           </div>
 
-          {/* Center spacer for FAB */}
-          <div className="w-[72px]" />
+          {/* Center: Ad banner */}
+          <div className="flex-1 min-w-0 mx-1">
+            <AdBanner />
+          </div>
 
           {/* Right: Feedback + Settings */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button
-              onClick={() => { setShowSettings(true); }}
+              onClick={() => setShowSettings(true)}
               className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-accent/60 flex items-center justify-center text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent active:scale-95 transition-all"
               title="Feedback"
-              data-settings-tab="feedback"
             >
               <MessageSquare className="w-5 h-5" />
             </button>
