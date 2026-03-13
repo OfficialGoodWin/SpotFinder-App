@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MapContainer, TileLayer, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Plus, User, Settings, Crosshair, LogOut, Trash2, List } from 'lucide-react';
+import { Plus, Settings, Crosshair, MessageSquare, Trash2 } from 'lucide-react';
 import { getPublicSpots, createSpot, deleteSpot } from '@/api/firebaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
  
 import SpotMarker from '../components/map/SpotMarker';
-import AdBanner from '../components/AdBanner';
 import UserLocationMarker from '../components/map/UserLocationMarker';
 import MapLayerSwitcher from '../components/map/MapLayerSwitcher';
 import SearchBar from '../components/map/SearchBar';
@@ -18,8 +17,10 @@ import RouteOverlay from '../components/navigation/RouteOverlay';
 import RoadClosureLayer from '../components/map/RoadClosureLayer';
 import AuthModal from '../components/auth/AuthModal';
 import MySpotsPanel from '../components/spots/MySpotsPanel';
+import AdBanner from '../components/AdBanner';
 import SpotsPanel from '../components/spots/SpotsPanel';
 import SettingsModal from '../components/SettingsModal';
+import ProfileMenu from '../components/ProfileMenu';
  
 // Note: Leaflet marker icons are fixed via src/lib/leaflet-fix.js
  
@@ -105,6 +106,7 @@ export default function Home() {
   const [pendingLatlng, setPendingLatlng] = useState(null);
   const [selectedSpot, setSelectedSpot] = useState(null);
   const [navTarget, setNavTarget] = useState(null);
+  const [navFrom, setNavFrom] = useState(null); // snapshot of start position, never changes mid-nav
   const [flyTo, setFlyTo] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
   const [showMySpots, setShowMySpots] = useState(false);
@@ -207,7 +209,7 @@ export default function Home() {
  
   const handleNavigate = (spot) => {
     if (!userPos) return alert('Location not available yet');
-    setNavTarget({ lat: spot.lat, lng: spot.lng, label: spot.title || 'Spot' });
+    startNavTo({ lat: spot.lat, lng: spot.lng, label: spot.title || 'Spot' });
     setSelectedSpot(null);
   };
  
@@ -244,6 +246,13 @@ export default function Home() {
     }
   };
  
+  // Stable nav start — set both target and snapshot from-position together
+  const startNavTo = (destination) => {
+    if (!userPos) return alert('Location not available yet');
+    setNavFrom({ lat: userPos[0], lng: userPos[1] });
+    setNavTarget(destination);
+  };
+
   const mapCenter = userPos
     ? { lat: userPos[0], lng: userPos[1] }
     : { lat: 50.0755, lng: 14.4378 };
@@ -324,15 +333,29 @@ export default function Home() {
       </MapContainer>
  
       {/* Search bar */}
-      <SearchBar 
-        onSelect={handleSearchSelect} 
+      <SearchBar
+        onSelect={handleSearchSelect}
         mapCenter={mapCenter}
+        showSpots={showSpots}
+        onToggleSpots={() => setShowSpots(v => !v)}
         onNavigate={(destination) => {
           if (!userPos) return alert('Location not available yet');
-          setNavTarget(destination);
+          startNavTo(destination);
         }}
       />
  
+      {/* Profile menu — top right */}
+      <ProfileMenu
+        user={user}
+        isAuthenticated={isAuthenticated}
+        showMenu={showAccountMenu}
+        onToggleMenu={() => setShowAccountMenu(v => !v)}
+        onShowMySpots={() => setShowMySpots(true)}
+        onSignOut={handleSignOut}
+        onShowDeleteConfirm={() => setShowDeleteConfirm(true)}
+        onShowAuth={() => setShowAuth(true)}
+      />
+
       {/* Spots toggle — sits between search bar and layer switcher */}
       <SpotsPanel
         spots={spots}
@@ -347,119 +370,70 @@ export default function Home() {
         onFlyTo={(pos) => { setFlyTo(pos); setTimeout(() => setFlyTo(null), 1000); }}
         onNavigate={(spot) => {
           if (!userPos) return alert('Location not available yet');
-          setNavTarget({ lat: spot.lat, lng: spot.lng, label: spot.title || 'Spot' });
+          startNavTo({ lat: spot.lat, lng: spot.lng, label: spot.title || 'Spot' });
         }}
         onSelectSpot={setSelectedSpot}
       />
  
-      {/* Layer switcher */}
-      <MapLayerSwitcher activeLayer={mapLayer} onLayerChange={setMapLayer} />
  
-      {/* Center on user location */}
-      <button
-        onClick={() => userPos && setFlyTo([...userPos])}
-        className="absolute bottom-32 right-4 z-[1000] w-11 h-11 bg-white dark:bg-card rounded-full shadow-lg flex items-center justify-center border border-gray-200 dark:border-border active:scale-95 transition-transform"
-      >
-        <Crosshair className="w-5 h-5 text-gray-700" />
-      </button>
+
  
  
- 
-      {/* Ad banner sits at very bottom, bottom bar sits above it */}
-      <div className="absolute bottom-0 inset-x-0 z-[999]">
-        <AdBanner />
-      </div>
  
       {/* Bottom bar */}
-      <div className="absolute inset-x-0 z-[1000]" style={{ bottom: '50px' }}>
-        {/* FAB — green + button floating above the bar */}
-        <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+      <div className="absolute bottom-0 inset-x-0 z-[1000]">
+        {/* Google AdSense banner */}
+        <AdBanner />
+
+        {/* FAB — green + floating above bar */}
+        <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none" style={{ bottom: '100%', transform: 'translateX(-50%) translateY(50%)' }}>
           <button
-            onClick={() => {
-              if (!user) { setShowAuth(true); return; }
-              setAddMode(a => !a);
-            }}
-            className={`w-[4.5rem] h-[4.5rem] rounded-full shadow-2xl flex items-center justify-center transition-all active:scale-95
+            onClick={() => { if (!user) { setShowAuth(true); return; } setAddMode(a => !a); }}
+            className={`w-[72px] h-[72px] rounded-full shadow-2xl flex items-center justify-center transition-all active:scale-95 pointer-events-auto
               ${addMode ? 'bg-red-500 rotate-45 shadow-red-300' : 'bg-green-500 shadow-green-300'}`}
           >
             <Plus className="w-9 h-9 text-white" />
           </button>
         </div>
- 
-        <div className="flex items-center justify-between px-8 pt-2 pb-6 bg-background/95 backdrop-blur-md border-t border">
-        {/* Profile / Auth - shows Account or Sign In */}
-        {isAuthenticated && user ? (
-          <div className="relative">
+
+        {/* Bar row */}
+        <div className="flex items-center justify-between px-4 pt-2 pb-5 bg-background/95 backdrop-blur-md border-t border">
+          {/* Left: Layers + Location */}
+          <div className="flex items-center gap-2">
+            <MapLayerSwitcher activeLayer={mapLayer} onLayerChange={setMapLayer} />
             <button
-              onClick={() => setShowAccountMenu(!showAccountMenu)}
-              className="flex flex-col items-center gap-1 text-gray-600 active:scale-95 transition-transform"
+              onClick={() => userPos && setFlyTo([...userPos])}
+              className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-accent/60 flex items-center justify-center text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent active:scale-95 transition-all"
+              title="Center location"
             >
-              <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center overflow-hidden">
-                {user.photoURL ? (
-                  <img src={user.photoURL} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-lg font-bold text-blue-500">{user.displayName?.[0] || user.email?.[0] || '?'}</span>
-                )}
-              </div>
-              <span className="text-xs font-medium">Account</span>
+              <Crosshair className="w-5 h-5" />
             </button>
- 
-            {/* Account dropdown menu */}
-            {showAccountMenu && (
-              <div className="absolute bottom-full left-0 mb-2 w-40 bg-white dark:bg-card rounded-2xl shadow-xl border border-gray-200 dark:border-border py-2">
-                <button
-                  onClick={() => { setShowMySpots(true); setShowAccountMenu(false); }}
-                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                >
-                  <List className="w-4 h-4" />
-                  My Spots
-                </button>
-                <button
-                  onClick={() => { handleSignOut(); setShowAccountMenu(false); }}
-                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Sign Out
-                </button>
-                <hr className="my-1 border-gray-100" />
-                <button
-                  onClick={() => { setShowDeleteConfirm(true); setShowAccountMenu(false); }}
-                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Delete Account
-                </button>
-              </div>
-            )}
           </div>
-        ) : (
-          <button
-            onClick={() => setShowAuth(true)}
-            className="flex flex-col items-center gap-1 text-gray-600 active:scale-95 transition-transform"
-          >
-            <div className="w-10 h-10 bg-gray-100 rounded-2xl flex items-center justify-center">
-              <User className="w-5 h-5 text-gray-500" />
-            </div>
-            <span className="text-xs font-medium">Sign In</span>
-          </button>
-        )}
- 
-        {/* spacer where FAB was */}
-        <div className="w-14"/>
- 
-        {/* Settings button */}
-        <button
-          onClick={() => setShowSettings(true)}
-          className="flex flex-col items-center gap-1 text-gray-600 active:scale-95 transition-transform"
-        >
-          <div className="w-10 h-10 bg-gray-100 rounded-2xl flex items-center justify-center">
-            <Settings className="w-5 h-5 text-gray-500" />
+
+          {/* Center spacer for FAB */}
+          <div className="w-[72px]" />
+
+          {/* Right: Feedback + Settings */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setShowSettings(true); }}
+              className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-accent/60 flex items-center justify-center text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent active:scale-95 transition-all"
+              title="Feedback"
+              data-settings-tab="feedback"
+            >
+              <MessageSquare className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setShowSettings(true)}
+              className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-accent/60 flex items-center justify-center text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent active:scale-95 transition-all"
+              title="Settings"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
           </div>
-          <span className="text-xs font-medium">Settings</span>
-        </button>
         </div>
       </div>
- 
+
       {/* Modals */}
       {pendingLatlng && (
         <AddSpotModal
@@ -480,12 +454,12 @@ export default function Home() {
         />
       )}
  
-      {navTarget && userPos && (
+      {navTarget && navFrom && (
         <NavigationPanel
-          from={{ lat: userPos[0], lng: userPos[1] }}
+          from={navFrom}
           to={{ lat: navTarget.lat, lng: navTarget.lng }}
           toLabel={navTarget.label}
-          onClose={() => setNavTarget(null)}
+          onClose={() => { setNavTarget(null); setNavFrom(null); }}
           onRouteReady={() => {}}
           onRouteData={(data) => {
             setNavRouteData(data);
@@ -569,4 +543,3 @@ export default function Home() {
     </div>
   );
 }
- 

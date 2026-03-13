@@ -52,6 +52,10 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
   const lastSpokenStep = useRef(-1);
   const routeDebounceTimer = useRef(null);
   const lastFetchedCoords = useRef(null);
+  const isRerouting = useRef(false);
+  const lastRerouteTime = useRef(0);
+  const OFF_ROUTE_THRESHOLD_M = 80;   // metres before we consider user off-route
+  const REROUTE_COOLDOWN_MS = 15000;  // minimum 15 s between reroutes
 
   // ---------- Helper: Convert OSRM steps to turns & markers ----------
   // Steps now come pre-processed from osrmServiceClient with:
@@ -183,23 +187,65 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
     return R * c;
   }
 
+  // ── Off-route detection + automatic rerouting ───────────────────────────────
   useEffect(() => {
-    if (userPosition && route && routeCoordinates.length > 0) {
-      const userLat = userPosition[0];
-      const userLng = userPosition[1];
-      const destLat = to.lat;
-      const destLng = to.lng;
-      
-      const distToDestination = Math.hypot(
-        destLat - userLat,
-        destLng - userLng
-      ) * 111000;
-      
-      if (distToDestination < 100) {
-        console.log('Approaching destination:', formatDist(distToDestination));
-      }
+    if (!userPosition || !isNavigating || routeCoordinates.length < 2) return;
+
+    const now = Date.now();
+    if (isRerouting.current || now - lastRerouteTime.current < REROUTE_COOLDOWN_MS) return;
+
+    // Find the closest point on the polyline to the user
+    const userLat = userPosition[0];
+    const userLng = userPosition[1];
+    let minDist = Infinity;
+
+    for (let i = 0; i < routeCoordinates.length - 1; i++) {
+      const [aLat, aLng] = routeCoordinates[i];
+      const [bLat, bLng] = routeCoordinates[i + 1];
+      // Project user onto segment AB
+      const dx = bLat - aLat, dy = bLng - aLng;
+      const lenSq = dx * dx + dy * dy;
+      let t = lenSq > 0 ? ((userLat - aLat) * dx + (userLng - aLng) * dy) / lenSq : 0;
+      t = Math.max(0, Math.min(1, t));
+      const closestLat = aLat + t * dx;
+      const closestLng = aLng + t * dy;
+      const d = haversineDistance([userLat, userLng], [closestLat, closestLng]);
+      if (d < minDist) minDist = d;
     }
-  }, [userPosition, to, routeCoordinates]);
+
+    if (minDist > OFF_ROUTE_THRESHOLD_M) {
+      console.log(`[Nav] Off-route by ${Math.round(minDist)}m — rerouting from current position`);
+      isRerouting.current = true;
+      lastRerouteTime.current = now;
+
+      if (!muted) {
+        const utt = new SpeechSynthesisUtterance('Rerouting');
+        utt.lang = 'en-US'; utt.rate = 0.95;
+        window.speechSynthesis?.cancel();
+        window.speechSynthesis?.speak(utt);
+      }
+
+      // Reroute from user's current position
+      const newFrom = { lat: userLat, lng: userLng };
+      const profile = ORS_PROFILE_MAP[routeType] || 'driving-car';
+      getOSRMRoute(newFrom, to, profile.replace('-', '/'))
+        .then(result => {
+          if (!result || !result.geometry || result.geometry.length === 0) throw new Error('empty');
+          setRouteCoordinates(result.geometry);
+          const { turns, turnMarkers: markers } = convertOSRMStepsToTurns(result.steps || []);
+          setSteps(turns);
+          setTurnMarkers(markers);
+          setCurrentStep(0);
+          lastSpokenStep.current = -1;
+          setRoute({ properties: { distance: result.distance, duration: result.duration } });
+          const routes = [result];
+          setAllRoutes(routes);
+          console.log('[Nav] Reroute complete');
+        })
+        .catch(err => console.warn('[Nav] Reroute failed:', err.message))
+        .finally(() => { isRerouting.current = false; });
+    }
+  }, [userPosition, isNavigating, routeCoordinates, muted, to, routeType]);
 
   const updateRouteDisplay = (routes, routeIdx) => {
     const selectedRoute = routes[routeIdx];
