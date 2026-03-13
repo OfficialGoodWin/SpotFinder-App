@@ -14,8 +14,8 @@ import { useEffect, useRef } from 'react';
  */
 
 // ── Replace these two values after AdSense approval ─────────────────────────
-const PUBLISHER_ID = 'ca-pub-XXXXXXXXXXXXXXXX'; // e.g. ca-pub-1234567890123456
-const AD_SLOT      = 'XXXXXXXXXX';              // e.g. 1234567890
+const PUBLISHER_ID = 'ca-pub-9210597135045895'; // e.g. ca-pub-1234567890123456
+const AD_SLOT      = '3588954548';              // e.g. 1234567890
 // ────────────────────────────────────────────────────────────────────────────
 
 export default function AdBanner() {
