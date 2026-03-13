@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Navigation, X, ChevronUp } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Navigation, X } from 'lucide-react';
 
 function haversineKm([lat1, lng1], [lat2, lng2]) {
   const R = 6371;
@@ -59,6 +59,69 @@ function SpotRow({ spot, onFlyTo, onSelectSpot, onNavigate, onClose }) {
   );
 }
 
+// ── Safari-safe scroll container ──────────────────────────────────────────────
+// Attaches a non-passive touchmove listener that:
+//  - allows scrolling inside the element (pan-y)
+//  - blocks the event from bubbling to document (kills pull-to-refresh)
+//  - only preventDefault at the top/bottom boundary so internal scroll works
+function SafeScroll({ children, style, className }) {
+  const ref = useRef(null);
+  const startYRef = useRef(0);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const onTouchStart = (e) => {
+      startYRef.current = e.touches[0].clientY;
+    };
+
+    const onTouchMove = (e) => {
+      const el = ref.current;
+      if (!el) return;
+
+      const deltaY = e.touches[0].clientY - startYRef.current;
+      const atTop    = el.scrollTop <= 0 && deltaY > 0;   // pulling down at top
+      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1 && deltaY < 0; // pushing up at bottom
+
+      // Always stop the event reaching the document (kills Safari pull-to-refresh)
+      e.stopPropagation();
+
+      // Prevent default only at boundaries — otherwise internal scroll works fine
+      if (atTop || atBottom) {
+        e.preventDefault();
+      }
+    };
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove',  onTouchMove,  { passive: false }); // must be non-passive to preventDefault
+
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove',  onTouchMove);
+    };
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      className={className}
+      style={{
+        overflowY: 'scroll',          // 'scroll' not 'auto' — Safari needs explicit scroll
+        overscrollBehavior: 'contain', // modern browsers
+        WebkitOverflowScrolling: 'touch',
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+const HEADER_H = 52; // px — keep in sync with header padding
+
 export default function SpotsPanel({ spots, userPos, showSpots, onToggleSpots, onZoomToArea, onFlyTo, onNavigate, onSelectSpot }) {
   const [open, setOpen] = useState(false);
 
@@ -71,7 +134,6 @@ export default function SpotsPanel({ spots, userPos, showSpots, onToggleSpots, o
       .slice(0, 60);
   }, [spots, userPos]);
 
-  // Auto-open when spots are enabled
   useEffect(() => {
     if (showSpots) { setOpen(true); onZoomToArea?.(); }
     else setOpen(false);
@@ -87,54 +149,72 @@ export default function SpotsPanel({ spots, userPos, showSpots, onToggleSpots, o
       {nearby.map(spot => (
         <SpotRow key={spot.id} spot={spot} onFlyTo={onFlyTo} onSelectSpot={onSelectSpot} onNavigate={onNavigate} onClose={handleClose} />
       ))}
-      <div className="h-3" />
+      {/* Bottom padding so last item isn't flush against edge */}
+      <div style={{ height: 12 }} />
     </>
   );
 
   const header = (
-    <div className="flex items-center justify-between px-4 py-3 flex-shrink-0">
-      {/* Drag handle (mobile) */}
+    <div className="flex items-center justify-between px-4 flex-shrink-0" style={{ height: HEADER_H }}>
+      {/* Drag handle pill */}
       <div className="absolute top-2 left-1/2 -translate-x-1/2 w-10 h-1 bg-gray-300 dark:bg-border rounded-full md:hidden" />
-      <span className="text-sm font-bold text-foreground pt-1 md:pt-0">
+      <span className="text-sm font-bold text-foreground">
         Nearby Spots
         {!userPos && <span className="font-normal text-muted-foreground"> · no location</span>}
         <span className="font-normal text-muted-foreground ml-1">({nearby.length})</span>
       </span>
-      <button onClick={handleClose} className="w-7 h-7 rounded-full bg-gray-100 dark:bg-accent flex items-center justify-center hover:bg-gray-200 dark:hover:bg-border transition-colors">
+      <button
+        onClick={handleClose}
+        className="w-7 h-7 rounded-full bg-gray-100 dark:bg-accent flex items-center justify-center hover:bg-gray-200 dark:hover:bg-border transition-colors"
+      >
         <X className="w-3.5 h-3.5" />
       </button>
     </div>
   );
 
+  // 62vh sheet — subtract header for the exact scroll area height
+  // Using explicit px height avoids Safari flex-1-inside-max-height collapse
+  const SHEET_VH   = 0.62;
+  const sheetPx    = `calc(${SHEET_VH * 100}vh)`;
+  const scrollPx   = `calc(${SHEET_VH * 100}vh - ${HEADER_H}px)`;
+
   return (
     <>
-      {/* ── MOBILE: fixed bottom sheet ───────────────────────────────────────── */}
-      <div className="md:hidden fixed inset-x-0 z-[1500]" style={{ bottom: '4rem' }}>
-        {/* Backdrop — tap to close */}
-        <div className="absolute inset-x-0 bottom-0 bg-transparent" style={{ top: '-200vh' }} onClick={handleClose} />
+      {/* ── MOBILE bottom sheet ──────────────────────────────────────────────── */}
+      <div
+        className="md:hidden fixed inset-x-0 z-[1500]"
+        style={{ bottom: '4rem' }}
+      >
+        {/* Invisible full-screen backdrop — tap to close, blocks map touches */}
+        <div
+          className="fixed inset-0"
+          style={{ zIndex: -1 }}
+          onClick={handleClose}
+        />
 
         <div
-          className="relative mx-2 rounded-t-3xl shadow-2xl border border-gray-100 dark:border-border bg-white dark:bg-card flex flex-col overflow-hidden"
-          style={{ maxHeight: '62vh' }}
+          className="relative mx-2 rounded-t-3xl shadow-2xl border border-gray-100 dark:border-border bg-white dark:bg-card overflow-hidden"
+          style={{ height: sheetPx }}
         >
-          {/* Border top highlight */}
           <div className="absolute top-0 inset-x-0 h-px bg-gray-200 dark:bg-border" />
-          <div className="relative border-b border-gray-100 dark:border-border">{header}</div>
-          <div className="overflow-y-auto overscroll-contain flex-1" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div className="border-b border-gray-100 dark:border-border relative">{header}</div>
+
+          {/* SafeScroll: explicit pixel height, non-passive touchmove kills pull-to-refresh */}
+          <SafeScroll style={{ height: scrollPx }}>
             {listContent}
-          </div>
+          </SafeScroll>
         </div>
       </div>
 
-      {/* ── DESKTOP: dropdown below search bar ──────────────────────────────── */}
+      {/* ── DESKTOP dropdown ─────────────────────────────────────────────────── */}
       <div
-        className="hidden md:flex absolute z-[1002] flex-col rounded-2xl shadow-2xl border border-gray-100 dark:border-border bg-white dark:bg-card overflow-hidden"
-        style={{ top: '5rem', left: '1rem', width: 340, maxHeight: 'calc(100vh - 180px)' }}
+        className="hidden md:block absolute z-[1002] rounded-2xl shadow-2xl border border-gray-100 dark:border-border bg-white dark:bg-card overflow-hidden"
+        style={{ top: '5rem', left: '1rem', width: 340 }}
       >
-        <div className="border-b border-gray-100 dark:border-border flex-shrink-0">{header}</div>
-        <div className="overflow-y-auto overscroll-contain flex-1" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="border-b border-gray-100 dark:border-border">{header}</div>
+        <SafeScroll style={{ maxHeight: 'calc(100vh - 220px)' }}>
           {listContent}
-        </div>
+        </SafeScroll>
       </div>
     </>
   );
