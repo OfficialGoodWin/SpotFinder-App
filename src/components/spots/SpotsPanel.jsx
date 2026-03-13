@@ -9,8 +9,11 @@ function haversineKm([lat1, lng1], [lat2, lng2]) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-const TYPE_LABEL = { parking: 'Parking', food: 'Food', toilet: 'Toilet' };
-const TYPE_EMOJI = { parking: '🅿️', food: '🍽️', toilet: '🚽' };
+const TYPE_LABEL  = { parking: 'Parking', food: 'Food', toilet: 'Toilet' };
+const TYPE_EMOJI  = { parking: '🅿️', food: '🍽️', toilet: '🚽' };
+const HEADER_H    = 56;   // px — drag handle area height
+const SHEET_VH    = 0.60; // fraction of viewport height when fully open
+const PEEK_SHOW   = HEADER_H + 8; // px of sheet visible when peeked (just the handle row)
 
 function StarRow({ rating }) {
   if (!rating) return <span className="text-xs text-muted-foreground">No ratings</span>;
@@ -41,7 +44,8 @@ function SpotRow({ spot, onFlyTo, onSelectSpot, onNavigate, onClose }) {
       {spot._km != null && (
         <div className="flex-shrink-0 flex flex-col items-end gap-0.5 min-w-[44px]">
           <div className="w-10 h-1 rounded-full bg-gray-200 dark:bg-border overflow-hidden">
-            <div className="h-full bg-primary rounded-full" style={{ width: `${Math.max(4, Math.min(100, (1 - Math.min(spot._km, 40) / 40) * 100))}%` }} />
+            <div className="h-full bg-primary rounded-full"
+              style={{ width: `${Math.max(4, Math.min(100, (1 - Math.min(spot._km, 40) / 40) * 100))}%` }} />
           </div>
           <span className="text-xs text-muted-foreground whitespace-nowrap">
             {spot._km < 1 ? `${Math.round(spot._km * 1000)} m` : `${spot._km.toFixed(1)} km`}
@@ -50,7 +54,7 @@ function SpotRow({ spot, onFlyTo, onSelectSpot, onNavigate, onClose }) {
       )}
       <button
         onClick={e => { e.stopPropagation(); onNavigate?.(spot); onClose(); }}
-        className="flex-shrink-0 w-9 h-9 rounded-full bg-primary/10 hover:bg-primary/20 active:bg-primary/30 flex items-center justify-center transition-colors"
+        className="flex-shrink-0 w-9 h-9 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-colors"
         title="Navigate"
       >
         <Navigation className="w-4 h-4 text-primary" />
@@ -59,70 +63,162 @@ function SpotRow({ spot, onFlyTo, onSelectSpot, onNavigate, onClose }) {
   );
 }
 
-// ── Safari-safe scroll container ──────────────────────────────────────────────
-// Attaches a non-passive touchmove listener that:
-//  - allows scrolling inside the element (pan-y)
-//  - blocks the event from bubbling to document (kills pull-to-refresh)
-//  - only preventDefault at the top/bottom boundary so internal scroll works
-function SafeScroll({ children, style, className }) {
-  const ref = useRef(null);
-  const startYRef = useRef(0);
+// ─── MobileSheet ─────────────────────────────────────────────────────────────
+// Two snap points:
+//   "full"  → translateY = 0            (full SHEET_VH height visible)
+//   "peek"  → translateY = sheetH - PEEK_SHOW  (only handle visible)
+function MobileSheet({ children, header, onClose, bottomOffset }) {
+  const [snap, setSnap]       = useState('full'); // 'full' | 'peek'
+  const [dragY, setDragY]     = useState(0);      // live drag offset
+  const [dragging, setDragging] = useState(false);
+  const startTouchY = useRef(0);
+  const startDragY  = useRef(0);
+  const sheetRef    = useRef(null);
+  const scrollRef   = useRef(null);
 
+  // sheetH computed from viewport
+  const sheetH = typeof window !== 'undefined' ? window.innerHeight * SHEET_VH : 400;
+  const peekOffset = sheetH - PEEK_SHOW;
+
+  // Current base offset for current snap
+  const baseOffset = snap === 'full' ? 0 : peekOffset;
+  // Rendered translateY = base + live drag, clamped so sheet never goes above 0
+  const translateY = Math.max(0, baseOffset + dragY);
+
+  // ── Block pull-to-refresh while sheet is mounted ───────────────────────────
+  // We add a non-passive touchmove on document that prevents default when
+  // the touch is NOT inside the scroll area (i.e. on the sheet shell / handle).
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-
-    const onTouchStart = (e) => {
-      startYRef.current = e.touches[0].clientY;
+    const preventPTR = (e) => {
+      // If touch is inside the scrollable list, only block at top boundary
+      if (scrollRef.current && scrollRef.current.contains(e.target)) {
+        if (scrollRef.current.scrollTop <= 0) {
+          // At top — check direction
+          const firstTouch = e.changedTouches[0];
+          if (firstTouch && firstTouch.clientY > (firstTouch._startY || firstTouch.clientY)) {
+            e.preventDefault();
+          }
+        }
+        // mid-list: let browser scroll naturally but stop propagation
+        e.stopPropagation();
+        return;
+      }
+      // Anywhere else on the sheet (handle, header, background): always block
+      e.preventDefault();
     };
 
-    const onTouchMove = (e) => {
-      const el = ref.current;
-      if (!el) return;
-
-      const deltaY = e.touches[0].clientY - startYRef.current;
-      const atTop    = el.scrollTop <= 0 && deltaY > 0;   // pulling down at top
-      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1 && deltaY < 0; // pushing up at bottom
-
-      // Always stop the event reaching the document (kills Safari pull-to-refresh)
-      e.stopPropagation();
-
-      // Prevent default only at boundaries — otherwise internal scroll works fine
-      if (atTop || atBottom) {
-        e.preventDefault();
+    // Track startY on each touchstart so we can measure direction in PTR handler
+    const trackStart = (e) => {
+      if (e.changedTouches[0]) {
+        e.changedTouches[0]._startY = e.changedTouches[0].clientY;
       }
     };
 
-    el.addEventListener('touchstart', onTouchStart, { passive: true });
-    el.addEventListener('touchmove',  onTouchMove,  { passive: false }); // must be non-passive to preventDefault
-
+    document.addEventListener('touchstart',  trackStart,   { passive: true });
+    document.addEventListener('touchmove',   preventPTR,   { passive: false });
     return () => {
-      el.removeEventListener('touchstart', onTouchStart);
-      el.removeEventListener('touchmove',  onTouchMove);
+      document.removeEventListener('touchstart',  trackStart);
+      document.removeEventListener('touchmove',   preventPTR);
+    };
+  }, []);
+
+  // ── Drag handle touch handlers ─────────────────────────────────────────────
+  const onHandleTouchStart = (e) => {
+    startTouchY.current = e.touches[0].clientY;
+    startDragY.current  = 0;
+    setDragging(true);
+  };
+
+  const onHandleTouchMove = (e) => {
+    if (!dragging) return;
+    const delta = e.touches[0].clientY - startTouchY.current;
+    setDragY(delta);
+  };
+
+  const onHandleTouchEnd = () => {
+    setDragging(false);
+    const threshold = 60; // px needed to trigger snap
+    if (snap === 'full') {
+      setSnap(dragY > threshold ? 'peek' : 'full');
+    } else {
+      setSnap(dragY < -threshold ? 'full' : 'peek');
+    }
+    setDragY(0);
+  };
+
+  // ── Scroll area: intercept touchmove to prevent bubbling to document ───────
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    let startY = 0;
+
+    const onStart = (e) => { startY = e.touches[0].clientY; };
+    const onMove  = (e) => {
+      e.stopPropagation(); // never let scroll touch reach document PTR handler
+      const goingDown = e.touches[0].clientY > startY;
+      if (goingDown && el.scrollTop <= 0) {
+        e.preventDefault(); // block overscroll-into-PTR at top of list
+      }
+    };
+
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove',  onMove,  { passive: false });
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove',  onMove);
     };
   }, []);
 
   return (
     <div
-      ref={ref}
-      className={className}
+      ref={sheetRef}
+      className="fixed inset-x-0 z-[1500] mx-2 rounded-t-3xl shadow-2xl border border-gray-100 dark:border-border bg-white dark:bg-card overflow-hidden"
       style={{
-        overflowY: 'scroll',          // 'scroll' not 'auto' — Safari needs explicit scroll
-        overscrollBehavior: 'contain', // modern browsers
-        WebkitOverflowScrolling: 'touch',
-        ...style,
+        bottom: bottomOffset,
+        height: sheetH,
+        transform: `translateY(${translateY}px)`,
+        transition: dragging ? 'none' : 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)',
+        willChange: 'transform',
+        touchAction: 'none', // let our JS handle all touch on the sheet shell
       }}
     >
-      {children}
+      {/* Drag handle zone — captures vertical drag */}
+      <div
+        className="cursor-grab active:cursor-grabbing select-none"
+        onTouchStart={onHandleTouchStart}
+        onTouchMove={onHandleTouchMove}
+        onTouchEnd={onHandleTouchEnd}
+        style={{ touchAction: 'none' }}
+      >
+        {/* Pill */}
+        <div className="flex justify-center pt-2 pb-1">
+          <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-border" />
+        </div>
+        {/* Header row */}
+        <div className="border-b border-gray-100 dark:border-border">{header}</div>
+      </div>
+
+      {/* Scroll list — explicit height so Safari doesn't collapse it */}
+      <div
+        ref={scrollRef}
+        style={{
+          height: sheetH - HEADER_H - 12, // subtract handle zone height
+          overflowY: 'scroll',
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'contain',
+          touchAction: 'pan-y',
+        }}
+      >
+        {children}
+      </div>
     </div>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
-const HEADER_H = 52; // px — keep in sync with header padding
-
-export default function SpotsPanel({ spots, userPos, showSpots, onToggleSpots, onZoomToArea, onFlyTo, onNavigate, onSelectSpot }) {
+// ─── Main export ──────────────────────────────────────────────────────────────
+export default function SpotsPanel({
+  spots, userPos, showSpots, onToggleSpots, onZoomToArea, onFlyTo, onNavigate, onSelectSpot
+}) {
   const [open, setOpen] = useState(false);
 
   const nearby = useMemo(() => {
@@ -143,21 +239,8 @@ export default function SpotsPanel({ spots, userPos, showSpots, onToggleSpots, o
 
   const handleClose = () => { setOpen(false); onToggleSpots(); };
 
-  const listContent = (
-    <>
-      {nearby.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">No spots found</p>}
-      {nearby.map(spot => (
-        <SpotRow key={spot.id} spot={spot} onFlyTo={onFlyTo} onSelectSpot={onSelectSpot} onNavigate={onNavigate} onClose={handleClose} />
-      ))}
-      {/* Bottom padding so last item isn't flush against edge */}
-      <div style={{ height: 12 }} />
-    </>
-  );
-
   const header = (
-    <div className="flex items-center justify-between px-4 flex-shrink-0" style={{ height: HEADER_H }}>
-      {/* Drag handle pill */}
-      <div className="absolute top-2 left-1/2 -translate-x-1/2 w-10 h-1 bg-gray-300 dark:bg-border rounded-full md:hidden" />
+    <div className="flex items-center justify-between px-4" style={{ height: HEADER_H - 18 }}>
       <span className="text-sm font-bold text-foreground">
         Nearby Spots
         {!userPos && <span className="font-normal text-muted-foreground"> · no location</span>}
@@ -165,56 +248,46 @@ export default function SpotsPanel({ spots, userPos, showSpots, onToggleSpots, o
       </span>
       <button
         onClick={handleClose}
-        className="w-7 h-7 rounded-full bg-gray-100 dark:bg-accent flex items-center justify-center hover:bg-gray-200 dark:hover:bg-border transition-colors"
+        className="w-7 h-7 rounded-full bg-gray-100 dark:bg-accent flex items-center justify-center hover:bg-gray-200 transition-colors"
       >
         <X className="w-3.5 h-3.5" />
       </button>
     </div>
   );
 
-  // 62vh sheet — subtract header for the exact scroll area height
-  // Using explicit px height avoids Safari flex-1-inside-max-height collapse
-  const SHEET_VH   = 0.62;
-  const sheetPx    = `calc(${SHEET_VH * 100}vh)`;
-  const scrollPx   = `calc(${SHEET_VH * 100}vh - ${HEADER_H}px)`;
+  const listContent = (
+    <>
+      {nearby.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">No spots found</p>}
+      {nearby.map(spot => (
+        <SpotRow key={spot.id} spot={spot} onFlyTo={onFlyTo} onSelectSpot={onSelectSpot} onNavigate={onNavigate} onClose={handleClose} />
+      ))}
+      <div style={{ height: 16 }} />
+    </>
+  );
 
   return (
     <>
-      {/* ── MOBILE bottom sheet ──────────────────────────────────────────────── */}
-      <div
-        className="md:hidden fixed inset-x-0 z-[1500]"
-        style={{ bottom: '4rem' }}
-      >
-        {/* Invisible full-screen backdrop — tap to close, blocks map touches */}
-        <div
-          className="fixed inset-0"
-          style={{ zIndex: -1 }}
-          onClick={handleClose}
-        />
-
-        <div
-          className="relative mx-2 rounded-t-3xl shadow-2xl border border-gray-100 dark:border-border bg-white dark:bg-card overflow-hidden"
-          style={{ height: sheetPx }}
-        >
-          <div className="absolute top-0 inset-x-0 h-px bg-gray-200 dark:bg-border" />
-          <div className="border-b border-gray-100 dark:border-border relative">{header}</div>
-
-          {/* SafeScroll: explicit pixel height, non-passive touchmove kills pull-to-refresh */}
-          <SafeScroll style={{ height: scrollPx }}>
-            {listContent}
-          </SafeScroll>
-        </div>
+      {/* ── MOBILE ── */}
+      <div className="md:hidden">
+        <MobileSheet header={header} onClose={handleClose} bottomOffset="4rem">
+          {listContent}
+        </MobileSheet>
       </div>
 
-      {/* ── DESKTOP dropdown ─────────────────────────────────────────────────── */}
+      {/* ── DESKTOP ── */}
       <div
         className="hidden md:block absolute z-[1002] rounded-2xl shadow-2xl border border-gray-100 dark:border-border bg-white dark:bg-card overflow-hidden"
         style={{ top: '5rem', left: '1rem', width: 340 }}
       >
         <div className="border-b border-gray-100 dark:border-border">{header}</div>
-        <SafeScroll style={{ maxHeight: 'calc(100vh - 220px)' }}>
+        <div style={{
+          maxHeight: 'calc(100vh - 220px)',
+          overflowY: 'scroll',
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'contain',
+        }}>
           {listContent}
-        </SafeScroll>
+        </div>
       </div>
     </>
   );
