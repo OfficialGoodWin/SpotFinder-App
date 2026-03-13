@@ -1,21 +1,16 @@
 import React, { useState } from 'react';
-import { X, Navigation, MapPin, Car, Utensils, TreePine, Edit2, Trash2 } from 'lucide-react';
+import { X, Navigation, MapPin, Edit2, Trash2 } from 'lucide-react';
 import StarRating from './StarRating';
 import { rateSpot, updateSpotRating } from '@/api/firebaseClient';
-
-const TYPE_CONFIG = {
-  parking: { label: 'Parking', Icon: Car, color: 'text-blue-600', bg: 'bg-blue-100' },
-  food: { label: 'Eat / Picnic', Icon: Utensils, color: 'text-green-600', bg: 'bg-green-100' },
-  toilet: { label: 'Hidden Toilet', Icon: TreePine, color: 'text-orange-600', bg: 'bg-orange-100' },
-};
+import { useLanguage } from '@/lib/LanguageContext';
 
 export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdit, onDelete }) {
+  const { t } = useLanguage();
   const [userRating, setUserRating] = useState(0);
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
 
-  const cfg = TYPE_CONFIG[spot.spot_type] || TYPE_CONFIG.parking;
-  const { Icon } = cfg;
   const isOwner = user && spot.created_by === user.email;
+  const isSuperAdmin = user && user.email === 'superadmin@spotfinder.cz';
 
   const handleRate = async (val) => {
     setUserRating(val);
@@ -26,18 +21,26 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
     setRatingSubmitted(true);
   };
 
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString();
+  };
+
   return (
     <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white dark:bg-card w-full max-w-lg rounded-t-3xl shadow-2xl max-h-[85vh] overflow-y-auto">
         <div className="sticky top-0 bg-white dark:bg-card px-6 pt-5 pb-3 border-b border-gray-100 dark:border-border">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-2xl ${cfg.bg} flex items-center justify-center`}>
-                <Icon className={`w-5 h-5 ${cfg.color}`} />
+              <div className="w-10 h-10 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                <MapPin className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-foreground">{spot.title || cfg.label}</h2>
-                <span className={`text-xs font-semibold ${cfg.color}`}>{cfg.label}</span>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-foreground">{spot.title || 'Spot'}</h2>
+                <p className="text-xs text-gray-500 dark:text-muted-foreground">
+                  {t('spotDetail.addedBy')} {spot.created_by_name || spot.created_by || 'Unknown'} {spot.created_date && `${t('spotDetail.addedOn')} ${formatDate(spot.created_date)}`}
+                </p>
               </div>
             </div>
             <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-accent">
@@ -55,28 +58,71 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
             <p className="text-gray-600 dark:text-muted-foreground text-sm leading-relaxed">{spot.description}</p>
           )}
 
+          {/* Overall Rating */}
           <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-accent rounded-2xl">
-            <StarRating value={Math.round(spot.rating || 0)} readOnly size="md" />
-            <span className="text-gray-700 dark:text-foreground font-semibold">{spot.rating ? spot.rating.toFixed(1) : '–'}</span>
-            <span className="text-gray-400 dark:text-muted-foreground text-sm">({spot.rating_count || 0} ratings)</span>
+            <div className="flex-1">
+              <p className="text-xs text-gray-500 dark:text-muted-foreground mb-1">{t('spotDetail.overallRating')}</p>
+              <div className="flex items-center gap-2">
+                <StarRating value={Math.round(spot.rating || 0)} readOnly size="md" />
+                <span className="text-gray-700 dark:text-foreground font-semibold">{spot.rating ? spot.rating.toFixed(1) : '–'}</span>
+                <span className="text-gray-400 dark:text-muted-foreground text-sm">({spot.rating_count || 0} {t('spotDetail.ratings')})</span>
+              </div>
+            </div>
           </div>
 
+          {/* Individual Ratings */}
+          {(spot.parking_rating || spot.beauty_rating || spot.privacy_rating) && (
+            <div className="space-y-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-200 dark:border-blue-800">
+              <p className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-2">Detailed Ratings</p>
+              
+              {spot.parking_rating > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-700 dark:text-foreground">{t('spotDetail.parkingQuality')}</span>
+                  <div className="flex items-center gap-2">
+                    <StarRating value={spot.parking_rating} readOnly size="sm" />
+                    <span className="text-sm font-semibold text-gray-700 dark:text-foreground w-8">{spot.parking_rating.toFixed(1)}</span>
+                  </div>
+                </div>
+              )}
+              
+              {spot.beauty_rating > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-700 dark:text-foreground">{t('spotDetail.beauty')}</span>
+                  <div className="flex items-center gap-2">
+                    <StarRating value={spot.beauty_rating} readOnly size="sm" />
+                    <span className="text-sm font-semibold text-gray-700 dark:text-foreground w-8">{spot.beauty_rating.toFixed(1)}</span>
+                  </div>
+                </div>
+              )}
+              
+              {spot.privacy_rating > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-700 dark:text-foreground">{t('spotDetail.privacy')}</span>
+                  <div className="flex items-center gap-2">
+                    <StarRating value={spot.privacy_rating} readOnly size="sm" />
+                    <span className="text-sm font-semibold text-gray-700 dark:text-foreground w-8">{spot.privacy_rating.toFixed(1)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {user && !ratingSubmitted && !isOwner && (
-            <div className="p-4 bg-blue-50 rounded-2xl">
-              <p className="text-sm font-semibold text-blue-700 mb-2">Rate this spot</p>
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl">
+              <p className="text-sm font-semibold text-blue-700 dark:text-blue-400 mb-2">Rate this spot</p>
               <StarRating value={userRating} onChange={handleRate} size="lg" />
             </div>
           )}
           {!user && !ratingSubmitted && (
             <div className="p-4 bg-gray-50 dark:bg-accent rounded-xl text-center border border-gray-200 dark:border-border">
               <p className="text-sm text-gray-500 dark:text-muted-foreground">
-                Sign in to rate this spot
+                {t('spotDetail.signInToRate')}
               </p>
             </div>
           )}
           {ratingSubmitted && (
-            <div className="p-3 bg-green-50 rounded-2xl text-center text-green-700 text-sm font-semibold">
-              ✓ Thanks for rating!
+            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-2xl text-center text-green-700 dark:text-green-400 text-sm font-semibold">
+              ✓ {t('spotDetail.thanksRating')}
             </div>
           )}
 
@@ -87,12 +133,14 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
         </div>
 
         <div className="px-6 py-4 border-t border-gray-100 dark:border-border flex gap-3">
-          {isOwner && (
+          {(isOwner || isSuperAdmin) && (
             <>
-              <button onClick={onEdit} className="p-3 rounded-2xl border-2 border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent transition-colors">
-                <Edit2 className="w-5 h-5 text-gray-600 dark:text-foreground" />
-              </button>
-              <button onClick={onDelete} className="p-3 rounded-2xl border-2 border-red-200 hover:bg-red-50 transition-colors">
+              {isOwner && (
+                <button onClick={onEdit} className="p-3 rounded-2xl border-2 border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent transition-colors">
+                  <Edit2 className="w-5 h-5 text-gray-600 dark:text-foreground" />
+                </button>
+              )}
+              <button onClick={onDelete} className="p-3 rounded-2xl border-2 border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                 <Trash2 className="w-5 h-5 text-red-500" />
               </button>
             </>
@@ -102,7 +150,7 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
             className="flex-1 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-2xl flex items-center justify-center gap-2 transition-colors"
           >
             <Navigation className="w-5 h-5" />
-            Navigate Here
+            {t('spotDetail.navigateHere')}
           </button>
         </div>
       </div>

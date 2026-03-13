@@ -7,6 +7,7 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { ThemeProvider } from '@/lib/ThemeContext';
+import { LanguageProvider } from '@/lib/LanguageContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ErrorBoundary from '@/lib/ErrorBoundary';
 
@@ -71,8 +72,10 @@ function App() {
       <QueryClientProvider client={queryClientInstance}>
         <Router>
         <ThemeProvider>
-          <NavigationTracker />
-          <AuthenticatedApp />
+          <LanguageProvider>
+            <NavigationTracker />
+            <AuthenticatedApp />
+          </LanguageProvider>
         </ThemeProvider>
 
         </Router>

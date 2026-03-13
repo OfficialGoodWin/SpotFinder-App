@@ -19,7 +19,9 @@ import {
   query, 
   where, 
   orderBy, 
-  limit 
+  limit,
+  setDoc,
+  getDoc
 } from 'firebase/firestore';
 import { firebaseConfig } from './firebaseConfig';
 
@@ -81,6 +83,46 @@ export const onAuthChange = (callback) => {
   return onAuthStateChanged(auth, callback);
 };
 
+// IP Ban functions (superadmin only)
+const IP_BANS_COLLECTION = 'ip_bans';
+
+export const banIP = async (ipAddress, reason = 'Violation of terms') => {
+  const { db, auth } = getFirebaseServices();
+  const user = auth.currentUser;
+  
+  // Check if user is superadmin
+  if (!user || user.email !== 'superadmin@spotfinder.cz') {
+    throw new Error('Unauthorized: Only superadmin can ban IPs');
+  }
+  
+  const banRef = doc(db, IP_BANS_COLLECTION, ipAddress);
+  await setDoc(banRef, {
+    ip: ipAddress,
+    reason,
+    banned_by: user.email,
+    banned_at: new Date().toISOString()
+  });
+};
+
+export const unbanIP = async (ipAddress) => {
+  const { db, auth } = getFirebaseServices();
+  const user = auth.currentUser;
+  
+  if (!user || user.email !== 'superadmin@spotfinder.cz') {
+    throw new Error('Unauthorized: Only superadmin can unban IPs');
+  }
+  
+  const banRef = doc(db, IP_BANS_COLLECTION, ipAddress);
+  await deleteDoc(banRef);
+};
+
+export const isIPBanned = async (ipAddress) => {
+  const { db } = getFirebaseServices();
+  const banRef = doc(db, IP_BANS_COLLECTION, ipAddress);
+  const banDoc = await getDoc(banRef);
+  return banDoc.exists();
+};
+
 // Spot functions - using Firestore
 const SPOTS_COLLECTION = 'spots';
 const RATINGS_COLLECTION = 'ratings';
@@ -140,6 +182,19 @@ export const updateSpot = async (spotId, data) => {
 
 export const deleteSpot = async (spotId) => {
   const { db } = getFirebaseServices();
+  const spotRef = doc(db, SPOTS_COLLECTION, spotId);
+  await deleteDoc(spotRef);
+};
+
+// Superadmin can delete any spot
+export const deleteSpotAsSuperAdmin = async (spotId) => {
+  const { db, auth } = getFirebaseServices();
+  const user = auth.currentUser;
+  
+  if (!user || user.email !== 'superadmin@spotfinder.cz') {
+    throw new Error('Unauthorized: Only superadmin can delete any spot');
+  }
+  
   const spotRef = doc(db, SPOTS_COLLECTION, spotId);
   await deleteDoc(spotRef);
 };

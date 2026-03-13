@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MapContainer, TileLayer, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Plus, Settings, Crosshair, MessageSquare, Trash2 } from 'lucide-react';
-import { getPublicSpots, createSpot, deleteSpot } from '@/api/firebaseClient';
+import { Plus, Settings, Crosshair, HelpCircle, Trash2 } from 'lucide-react';
+import { getPublicSpots, createSpot, deleteSpot, updateSpot } from '@/api/firebaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
+import { useNavigate } from 'react-router-dom';
  
 import SpotMarker from '../components/map/SpotMarker';
 import UserLocationMarker from '../components/map/UserLocationMarker';
 import MapLayerSwitcher from '../components/map/MapLayerSwitcher';
 import SearchBar from '../components/map/SearchBar';
 import AddSpotModal from '../components/spots/AddSpotModal';
+import EditSpotModal from '../components/spots/EditSpotModal';
 import SpotDetailModal from '../components/spots/SpotDetailModal';
 import NavigationPanel from '../components/navigation/NavigationPanel';
 import RouteOverlay from '../components/navigation/RouteOverlay';
@@ -93,6 +95,7 @@ function MapClickHandler({ addMode, onMapClick }) {
 export default function Home() {
   const { user, logout, isAuthenticated } = useAuth();
   const { isDark } = useTheme();
+  const navigate = useNavigate();
   const [spots, setSpots] = useState([]);
   const [mapLayer, setMapLayer] = useState('basic');
   // Select the right tile set based on dark mode
@@ -105,6 +108,7 @@ export default function Home() {
   const [addMode, setAddMode] = useState(false);
   const [pendingLatlng, setPendingLatlng] = useState(null);
   const [selectedSpot, setSelectedSpot] = useState(null);
+  const [editingSpot, setEditingSpot] = useState(null);
   const [navTarget, setNavTarget] = useState(null);
   const [navFrom, setNavFrom] = useState(null); // snapshot of start position, never changes mid-nav
   const [flyTo, setFlyTo] = useState(null);
@@ -204,6 +208,13 @@ export default function Home() {
   const handleDeleteSpot = async (spot) => {
     await deleteSpot(spot.id);
     setSpots(prev => prev.filter(s => s.id !== spot.id));
+    setSelectedSpot(null);
+  };
+
+  const handleEditSpot = async (updatedSpot) => {
+    await updateSpot(updatedSpot.id, updatedSpot);
+    setSpots(prev => prev.map(s => s.id === updatedSpot.id ? updatedSpot : s));
+    setEditingSpot(null);
     setSelectedSpot(null);
   };
  
@@ -412,14 +423,14 @@ export default function Home() {
             <AdBanner />
           </div>
 
-          {/* Right: Feedback + Settings */}
+          {/* Right: FAQ + Settings */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
-              onClick={() => setShowSettings(true)}
+              onClick={() => navigate('/faq')}
               className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-accent/60 flex items-center justify-center text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent active:scale-95 transition-all"
-              title="Feedback"
+              title="FAQ"
             >
-              <MessageSquare className="w-5 h-5" />
+              <HelpCircle className="w-5 h-5" />
             </button>
             <button
               onClick={() => setShowSettings(true)}
@@ -438,17 +449,26 @@ export default function Home() {
           latlng={pendingLatlng}
           onClose={() => setPendingLatlng(null)}
           onSave={handleSaveSpot}
+          user={user}
         />
       )}
  
-      {selectedSpot && (
+      {selectedSpot && !editingSpot && (
         <SpotDetailModal
           spot={selectedSpot}
           user={user}
           onClose={() => setSelectedSpot(null)}
           onNavigate={handleNavigate}
-          onEdit={() => { /* TODO: edit */ }}
+          onEdit={() => { setEditingSpot(selectedSpot); setSelectedSpot(null); }}
           onDelete={() => handleDeleteSpot(selectedSpot)}
+        />
+      )}
+
+      {editingSpot && (
+        <EditSpotModal
+          spot={editingSpot}
+          onClose={() => setEditingSpot(null)}
+          onSave={handleEditSpot}
         />
       )}
  

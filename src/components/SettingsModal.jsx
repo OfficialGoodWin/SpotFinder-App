@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import { X, Moon, Info, Send, HelpCircle, ExternalLink } from 'lucide-react';
+import { X, Moon, Info, Send, HelpCircle, ExternalLink, Globe } from 'lucide-react';
 import { useTheme } from '@/lib/ThemeContext';
+import { useLanguage } from '@/lib/LanguageContext';
+import { LANGUAGES } from '@/locales/translations';
  
 export default function SettingsModal({ onClose }) {
   const { isDark, toggleTheme } = useTheme();
+  const { language, setLanguage, t } = useLanguage();
   const [activeTab, setActiveTab] = useState('settings');
   const [feedbackText, setFeedbackText] = useState('');
   const [feedbackEmail, setFeedbackEmail] = useState('');
@@ -72,7 +75,7 @@ export default function SettingsModal({ onClose }) {
       
       <div className="relative w-full bg-background text-foreground rounded-t-3xl shadow-2xl p-6 pointer-events-auto max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold">Settings</h2>
+          <h2 className="text-2xl font-bold">{t('settings.title')}</h2>
           <button 
             onClick={onClose}
             className="p-2 rounded-full bg-muted hover:bg-muted/80 transition-colors"
@@ -91,7 +94,7 @@ export default function SettingsModal({ onClose }) {
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
-            Settings
+            {t('nav.settings')}
           </button>
           <button
             onClick={() => setActiveTab('about')}
@@ -132,9 +135,9 @@ export default function SettingsModal({ onClose }) {
               <div className="flex items-center gap-3">
                 <Moon className="w-5 h-5 text-primary" />
                 <div>
-                  <p className="font-semibold">Dark Mode</p>
+                  <p className="font-semibold">{t('settings.darkMode')}</p>
                   <p className="text-sm text-muted-foreground">
-                    {isDark ? 'Enabled' : 'Disabled'}
+                    {isDark ? t('settings.enabled') : t('settings.disabled')}
                   </p>
                 </div>
               </div>
@@ -151,9 +154,31 @@ export default function SettingsModal({ onClose }) {
                 />
               </button>
             </div>
+
+            {/* Language Selector */}
+            <div className="p-4 bg-muted rounded-2xl">
+              <div className="flex items-center gap-3 mb-3">
+                <Globe className="w-5 h-5 text-primary" />
+                <div>
+                  <p className="font-semibold">{t('settings.language')}</p>
+                  <p className="text-sm text-muted-foreground">{t('settings.selectLanguage')}</p>
+                </div>
+              </div>
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                {LANGUAGES.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.nativeName}
+                  </option>
+                ))}
+              </select>
+            </div>
  
             <p className="text-sm text-muted-foreground text-center mt-6">
-              Preference saved automatically
+              {t('settings.prefSaved')}
             </p>
           </div>
         )}
@@ -174,7 +199,7 @@ export default function SettingsModal({ onClose }) {
                   Create, explore, and navigate to interesting locations with ease.
                 </p>
                 <div className="pt-2 border-t border-border">
-                  <p><strong>Version:</strong> 1.0.0</p>
+                  <p><strong>Version:</strong> 2.0.0</p>
                   <p><strong>Built with:</strong> React, Leaflet, Firebase</p>
                 </div>
               </div>
@@ -194,9 +219,7 @@ export default function SettingsModal({ onClose }) {
                 Find answers to common questions, guides, and tips for using Spotfinder.
               </p>
               <a
-                href="https://spotfinder-app.vercel.app/faq"
-                target="_blank"
-                rel="noopener noreferrer"
+                href="/faq"
                 className="flex items-center justify-between w-full p-4 bg-primary text-primary-foreground rounded-xl font-semibold hover:opacity-90 transition-opacity"
               >
                 <span>Open FAQ Page</span>
@@ -208,7 +231,7 @@ export default function SettingsModal({ onClose }) {
               {[
                 { q: 'How do I add a spot?', a: 'Tap the green + button, then tap any location on the map.' },
                 { q: 'How do I navigate to a spot?', a: 'Tap a spot marker, then press the Navigate button in the popup.' },
-                { q: 'What are the spot types?', a: 'Parking 🅿️, Food 🍽️, and Toilet 🚽 — more types coming soon.' },
+                { q: 'What ratings can I give?', a: 'You can rate parking quality, beauty/scenery, and privacy level — each from 1-5 stars.' },
                 { q: 'How do I switch map style?', a: 'Use the layers button (top-right corner of the map).' },
                 { q: 'Is my data private?', a: 'Spots you create are public. Your account info is stored securely via Firebase.' },
               ].map(({ q, a }) => (

@@ -3,14 +3,14 @@ import { X, Camera, MapPin } from 'lucide-react';
 import StarRating from './StarRating';
 import { useLanguage } from '@/lib/LanguageContext';
 
-export default function AddSpotModal({ latlng, onClose, onSave, user }) {
+export default function EditSpotModal({ spot, onClose, onSave }) {
   const { t } = useLanguage();
-  const [description, setDescription] = useState('');
-  const [parkingRating, setParkingRating] = useState(0);
-  const [beautyRating, setBeautyRating] = useState(0);
-  const [privacyRating, setPrivacyRating] = useState(0);
+  const [description, setDescription] = useState(spot.description || '');
+  const [parkingRating, setParkingRating] = useState(spot.parking_rating || 0);
+  const [beautyRating, setBeautyRating] = useState(spot.beauty_rating || 0);
+  const [privacyRating, setPrivacyRating] = useState(spot.privacy_rating || 0);
   const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
+  const [imagePreview, setImagePreview] = useState(spot.image_url || null);
   const [loading, setLoading] = useState(false);
 
   const handleImageChange = (e) => {
@@ -29,26 +29,19 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
       : 0;
 
     setLoading(true);
-    let image_url = null;
+    let image_url = spot.image_url;
     if (imageFile) {
       image_url = imagePreview;
     }
     
     await onSave({
-      lat: latlng.lat,
-      lng: latlng.lng,
-      spot_type: 'general', // All spots are now general type
-      title: 'Spot', // Default title
+      ...spot,
       description,
       rating: overallRating,
-      rating_count: overallRating > 0 ? 1 : 0,
       parking_rating: parkingRating,
       beauty_rating: beautyRating,
       privacy_rating: privacyRating,
       image_url,
-      is_public: true,
-      created_by: user?.email || 'anonymous',
-      created_by_name: user?.displayName || user?.email?.split('@')[0] || 'Anonymous',
     });
     setLoading(false);
   };
@@ -59,7 +52,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
         <div className="sticky top-0 bg-white dark:bg-card px-6 pt-5 pb-3 border-b border-gray-100 dark:border-border flex items-center justify-between">
           <div className="flex items-center gap-2">
             <MapPin className="w-5 h-5 text-blue-500" />
-            <h2 className="text-lg font-bold text-gray-900 dark:text-foreground">{t('addSpot.title')}</h2>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-foreground">{t('common.edit')} Spot</h2>
           </div>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-accent">
             <X className="w-5 h-5 text-gray-500 dark:text-muted-foreground" />
@@ -121,16 +114,6 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
               </label>
             )}
           </div>
-
-          {/* Ad Banners - Two on desktop, one on mobile */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="w-full h-24 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-xl flex items-center justify-center border border-blue-200 dark:border-blue-800">
-              <span className="text-sm text-blue-600 dark:text-blue-400 font-semibold">Ad Space</span>
-            </div>
-            <div className="hidden md:block w-full h-24 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-xl items-center justify-center border border-green-200 dark:border-green-800 flex">
-              <span className="text-sm text-green-600 dark:text-green-400 font-semibold">Ad Space</span>
-            </div>
-          </div>
         </div>
 
         <div className="px-6 py-4 border-t border-gray-100 dark:border-border flex gap-3">
@@ -142,7 +125,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
             disabled={loading}
             className="flex-2 px-8 py-3 rounded-2xl bg-blue-500 text-white font-semibold text-sm hover:bg-blue-600 disabled:opacity-50 transition-colors"
           >
-            {loading ? t('addSpot.saving') : t('addSpot.saveSpot')}
+            {loading ? t('addSpot.saving') : t('common.save')}
           </button>
         </div>
       </div>
