@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
-
+ 
 // ── Icon: No-entry sign (closed road) ────────────────────────────────────────
 const NO_ENTRY_ICON = L.divIcon({
   html: `<div style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.45));line-height:0"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="36" height="36"><circle cx="50" cy="50" r="49" fill="white"/><circle cx="50" cy="50" r="44" fill="#CC1111"/><rect x="16" y="38" width="68" height="24" rx="4" fill="white"/></svg></div>`,
@@ -10,7 +10,7 @@ const NO_ENTRY_ICON = L.divIcon({
   iconAnchor:  [18, 18],
   popupAnchor: [0, -20],
 });
-
+ 
 // ── Icon: Traffic-jam warning sign ───────────────────────────────────────────
 const JAM_ICON = L.divIcon({
   html: `<div style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.45));line-height:0"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 98" width="40" height="36"><polygon points="55,4 106,94 4,94" fill="white" stroke="#CC1111" stroke-width="10" stroke-linejoin="round"/><g transform="translate(22,60) scale(0.72)"><rect x="0" y="8" width="28" height="14" rx="2" fill="#111"/><rect x="4" y="2" width="20" height="10" rx="2" fill="#111"/><circle cx="6" cy="23" r="4" fill="#444"/><circle cx="22" cy="23" r="4" fill="#444"/></g><g transform="translate(38,54) scale(0.82)"><rect x="0" y="8" width="30" height="15" rx="2" fill="#111"/><rect x="4" y="2" width="22" height="10" rx="2" fill="#111"/><circle cx="6" cy="24" r="4" fill="#444"/><circle cx="24" cy="24" r="4" fill="#444"/></g><g transform="translate(56,48) scale(0.92)"><rect x="0" y="8" width="32" height="16" rx="2" fill="#111"/><rect x="5" y="2" width="22" height="10" rx="2" fill="#111"/><circle cx="7" cy="25" r="5" fill="#444"/><circle cx="25" cy="25" r="5" fill="#444"/></g></svg></div>`,
@@ -19,13 +19,13 @@ const JAM_ICON = L.divIcon({
   iconAnchor:  [20, 18],
   popupAnchor: [0, -20],
 });
-
+ 
 // ── TomTom incident categories ────────────────────────────────────────────────
 // 1=Accident 2=Fog 3=DangerousConditions 4=Rain 5=Ice 6=Jam 7=LaneClosed
 // 8=RoadClosed 9=RoadWorks 10=Wind 11=Flooding 13=BrokenDownVehicle 14=RoadClosed
 const isClosure = cat => [8, 13, 14].includes(cat);
 const isJam     = cat => [1, 6, 7, 9].includes(cat);  // accidents + jams + roadworks
-
+ 
 // ── Debounce helper ───────────────────────────────────────────────────────────
 function useDebounce(fn, delay) {
   const timer = useRef(null);
@@ -34,12 +34,12 @@ function useDebounce(fn, delay) {
     timer.current = setTimeout(() => fn(...args), delay);
   }, [fn, delay]);
 }
-
+ 
 // ── TomTom Incidents API v5 ───────────────────────────────────────────────────
 async function fetchIncidents(bounds, apiKey) {
   const { _southWest: sw, _northEast: ne } = bounds;
   const bbox = `${sw.lng},${sw.lat},${ne.lng},${ne.lat}`;
-  const fields = '{incidents{type,geometry{type,coordinates},properties{id,iconCategory,magnitudeOfDelay,from,to,roadNumbers,description,events{description,code,iconCategory}}}}';
+  const fields = encodeURIComponent('{incidents{type,geometry{type,coordinates},properties{id,iconCategory,magnitudeOfDelay,from,to,roadNumbers,description,events{description,code,iconCategory}}}}');
   const url = `https://api.tomtom.com/traffic/services/5/incidentDetails?bbox=${bbox}&fields=${fields}&language=en-GB&timeValidityFilter=present&key=${apiKey}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`TomTom incidents ${res.status}`);
@@ -49,20 +49,20 @@ async function fetchIncidents(bounds, apiKey) {
     return isClosure(cat) || isJam(cat);
   });
 }
-
+ 
 function midpoint(geometry) {
   const coords = geometry.coordinates;
   if (geometry.type === 'Point') return { lat: coords[1], lng: coords[0] };
   const mid = coords[Math.floor(coords.length / 2)];
   return { lat: mid[1], lng: mid[0] };
 }
-
+ 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function RoadClosureLayer({ apiKey, enabled }) {
   const map = useMap();
   const [incidents, setIncidents] = useState([]);
   const abortRef = useRef(null);
-
+ 
   const load = useCallback(async () => {
     if (!apiKey || !enabled) { setIncidents([]); return; }
     abortRef.current?.abort();
@@ -75,13 +75,13 @@ export default function RoadClosureLayer({ apiKey, enabled }) {
       if (err.name !== 'AbortError') console.warn('Incident fetch failed:', err.message);
     }
   }, [map, apiKey, enabled]);
-
+ 
   const loadDebounced = useDebounce(load, 600);
   useEffect(() => { load(); }, [load]);
   useMapEvents({ moveend: loadDebounced, zoomend: loadDebounced });
-
+ 
   if (!apiKey || !enabled || incidents.length === 0) return null;
-
+ 
   return incidents.map(inc => {
     if (!inc.geometry) return null;
     const { lat, lng } = midpoint(inc.geometry);
@@ -92,7 +92,7 @@ export default function RoadClosureLayer({ apiKey, enabled }) {
     const to     = props.to   || '';
     const roads  = (props.roadNumbers || []).join(', ');
     const desc   = props.events?.[0]?.description || props.description || '';
-
+ 
     return (
       <Marker
         key={props.id || `${lat}-${lng}`}

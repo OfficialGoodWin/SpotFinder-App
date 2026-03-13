@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
  
 import SpotMarker from '../components/map/SpotMarker';
+import AdBanner from '../components/AdBanner';
 import UserLocationMarker from '../components/map/UserLocationMarker';
 import MapLayerSwitcher from '../components/map/MapLayerSwitcher';
 import SearchBar from '../components/map/SearchBar';
@@ -364,8 +365,13 @@ export default function Home() {
  
  
  
+      {/* Ad banner sits at very bottom, bottom bar sits above it */}
+      <div className="absolute bottom-0 inset-x-0 z-[999]">
+        <AdBanner />
+      </div>
+ 
       {/* Bottom bar */}
-      <div className="absolute bottom-0 inset-x-0 z-[1000]">
+      <div className="absolute inset-x-0 z-[1000]" style={{ bottom: '50px' }}>
         {/* FAB — green + button floating above the bar */}
         <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
           <button
@@ -373,10 +379,10 @@ export default function Home() {
               if (!user) { setShowAuth(true); return; }
               setAddMode(a => !a);
             }}
-            className={`w-16 h-16 rounded-full shadow-2xl flex items-center justify-center transition-all active:scale-95
+            className={`w-[4.5rem] h-[4.5rem] rounded-full shadow-2xl flex items-center justify-center transition-all active:scale-95
               ${addMode ? 'bg-red-500 rotate-45 shadow-red-300' : 'bg-green-500 shadow-green-300'}`}
           >
-            <Plus className="w-8 h-8 text-white" />
+            <Plus className="w-9 h-9 text-white" />
           </button>
         </div>
  
