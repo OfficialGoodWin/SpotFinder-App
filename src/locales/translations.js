@@ -116,7 +116,7 @@ export const translations = {
         "aerial": "Satellite",
         "winter": "Winter",
         "traffic": "Traffic",
-        "title": "Map layers"
+        "title": "Map layers",
         "eventAccident": "Accident",
         "eventFog": "Fog",
         "eventDangerous": "Dangerous conditions",
@@ -356,7 +356,7 @@ export const translations = {
         "aerial": "Satelit",
         "winter": "Zimní",
         "traffic": "Doprava",
-        "title": "Vrstvy mapy"
+        "title": "Vrstvy mapy",
         "eventAccident": "Nehoda",
         "eventFog": "Mlha",
         "eventDangerous": "Nebezpečné podmínky",
@@ -596,7 +596,7 @@ export const translations = {
         "aerial": "Satelita",
         "winter": "Zimowa",
         "traffic": "Ruch",
-        "title": "Warstwy mapy"
+        "title": "Warstwy mapy",
         "eventAccident": "Wypadek",
         "eventFog": "Mgła",
         "eventDangerous": "Niebezpieczne warunki",
@@ -836,7 +836,7 @@ export const translations = {
         "aerial": "Satellit",
         "winter": "Winter",
         "traffic": "Verkehr",
-        "title": "Kartenebenen"
+        "title": "Kartenebenen",
         "eventAccident": "Unfall",
         "eventFog": "Nebel",
         "eventDangerous": "Gefährliche Bedingungen",
@@ -1076,7 +1076,7 @@ export const translations = {
         "aerial": "Satelit",
         "winter": "Zimná",
         "traffic": "Doprava",
-        "title": "Vrstvy mapy"
+        "title": "Vrstvy mapy",
         "eventAccident": "Nehoda",
         "eventFog": "Hmla",
         "eventDangerous": "Nebezpečné podmienky",
@@ -1316,7 +1316,7 @@ export const translations = {
         "aerial": "Satellite",
         "winter": "Invernale",
         "traffic": "Traffico",
-        "title": "Livelli mappa"
+        "title": "Livelli mappa",
         "eventAccident": "Incidente",
         "eventFog": "Nebbia",
         "eventDangerous": "Condizioni pericolose",
@@ -1556,7 +1556,7 @@ export const translations = {
         "aerial": "Satellite",
         "winter": "Hiver",
         "traffic": "Trafic",
-        "title": "Couches de carte"
+        "title": "Couches de carte",
         "eventAccident": "Accident",
         "eventFog": "Brouillard",
         "eventDangerous": "Conditions dangereuses",
@@ -1796,7 +1796,7 @@ export const translations = {
         "aerial": "Спутник",
         "winter": "Зимняя",
         "traffic": "Трафик",
-        "title": "Слои карты"
+        "title": "Слои карты",
         "eventAccident": "ДТП",
         "eventFog": "Туман",
         "eventDangerous": "Опасные условия",
@@ -2036,7 +2036,7 @@ export const translations = {
         "aerial": "Супутник",
         "winter": "Зимова",
         "traffic": "Трафік",
-        "title": "Шари карти"
+        "title": "Шари карти",
         "eventAccident": "ДТП",
         "eventFog": "Туман",
         "eventDangerous": "Небезпечні умови",
@@ -2276,7 +2276,7 @@ export const translations = {
         "aerial": "Műhold",
         "winter": "Téli",
         "traffic": "Forgalom",
-        "title": "Térképrétegek"
+        "title": "Térképrétegek",
         "eventAccident": "Baleset",
         "eventFog": "Köd",
         "eventDangerous": "Veszélyes körülmények",
@@ -2516,7 +2516,7 @@ export const translations = {
         "aerial": "Satelit",
         "winter": "Iarnă",
         "traffic": "Trafic",
-        "title": "Straturi hartă"
+        "title": "Straturi hartă",
         "eventAccident": "Accident",
         "eventFog": "Ceață",
         "eventDangerous": "Condiții periculoase",
@@ -2756,7 +2756,7 @@ export const translations = {
         "aerial": "Satélite",
         "winter": "Invierno",
         "traffic": "Tráfico",
-        "title": "Capas de mapa"
+        "title": "Capas de mapa",
         "eventAccident": "Accidente",
         "eventFog": "Niebla",
         "eventDangerous": "Condiciones peligrosas",
