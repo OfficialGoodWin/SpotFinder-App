@@ -18,6 +18,11 @@ const ROUTE_TYPE_KEYS = [
 // Takes the raw OSRM step data and builds a human-readable instruction
 // in whatever language t() is currently set to.
 function localizeInstruction(step, t) {
+  // Special: closed road warning step
+  if (step._closedRoadWarning) {
+    return t ? t('traffic.roadClosedStep') : '⚠️ Warning: road ahead is closed';
+  }
+
   const { maneuverType, modifier, name, ref, destinations, exit, bearingAfter } = step;
 
   // helpers
@@ -170,6 +175,26 @@ function haversineDistance([lat1, lng1], [lat2, lng2]) {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
+
+// ─── Check if destination is on/near a closed road ───────────────────────────
+async function isDestinationOnClosedRoad(lat, lng) {
+  try {
+    const r = 30; // metres radius
+    // Convert radius to approx degrees
+    const dLat = r / 111000;
+    const dLng = r / (111000 * Math.cos(lat * Math.PI / 180));
+    const bbox = `${lat-dLat},${lng-dLng},${lat+dLat},${lng+dLng}`;
+    const q = `[out:json][timeout:5];way["access"="no"]["highway"](${bbox});out center 1;`;
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST', body: 'data=' + encodeURIComponent(q),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return (data.elements || []).length > 0;
+  } catch (_) { return false; }
+}
+
 export default function NavigationPanel({ from, to, toLabel, onClose, onRouteReady, onRouteData, userPosition }) {
   const { t, language } = useLanguage();
   const [routeType, setRouteType] = useState('car_fast');
@@ -376,6 +401,27 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
           maneuverType: 'depart', modifier: 'straight', name: '', ref: '', destinations: '',
           distance: result.distance || 0, lat: from.lat, lng: from.lng, bearingAfter: 0,
         }];
+      }
+
+      // Check if destination is on a closed road and warn user
+      const destClosed = await isDestinationOnClosedRoad(to.lat, to.lng);
+      if (destClosed && result.steps.length > 0) {
+        // Insert warning step just before the final "arrive" step
+        const lastIdx = result.steps.length - 1;
+        const warningStep = {
+          maneuverType: 'notification',
+          modifier: 'straight',
+          name: '',
+          ref: '',
+          destinations: '',
+          distance: 0,
+          lat: to.lat,
+          lng: to.lng,
+          bearingAfter: 0,
+          _closedRoadWarning: true, // flag for special localization
+        };
+        result.steps.splice(lastIdx, 0, warningStep);
+        console.warn('[Nav] Destination is on a closed road — warning step inserted');
       }
 
       // Off-road last-mile check for driving

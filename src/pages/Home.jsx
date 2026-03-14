@@ -95,6 +95,7 @@ function MapClickHandler({ addMode, onMapClick }) {
  
 export default function Home() {
   const { user, logout, isAuthenticated } = useAuth();
+  const { t, language } = useLanguage();
   const { t } = useLanguage();
   const { isDark } = useTheme();
   const navigate = useNavigate();
@@ -312,6 +313,13 @@ export default function Home() {
         style={{ width: '100%', height: '100%' }}
         zoomControl={false}
         attributionControl={false}
+        scrollWheelZoom={true}
+        wheelPxPerZoomLevel={80}
+        zoomSnap={0.5}
+        zoomDelta={0.5}
+        wheelDebounceTime={40}
+        touchZoom={true}
+        bounceAtZoomLimits={false}
       >
         {/* Base map tile */}
         <TileLayer
@@ -322,6 +330,8 @@ export default function Home() {
             ? '&copy; <a href="https://carto.com">CARTO</a> &copy; <a href="https://osm.org/copyright">OpenStreetMap</a>'
             : '&copy; <a href="https://mapy.com">Mapy.cz</a>'}
           maxZoom={20}
+          maxNativeZoom={useCartoTile ? 19 : 18}
+          errorTileUrl="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
         />
  
         {/* TomTom real-time traffic flow overlay (only on traffic layer) */}
@@ -339,6 +349,8 @@ export default function Home() {
         <RoadClosureLayer
           apiKey={TOMTOM_API_KEY}
           enabled={mapLayer === 'traffic'}
+          lang={language}
+          t={t}
         />
  
         <MapController flyTo={flyTo} fitBoundsData={fitBoundsData} zoomToArea={zoomToArea} setMapRef={(m) => { mapRef.current = m; }} />

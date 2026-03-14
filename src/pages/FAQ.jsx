@@ -1,725 +1,1082 @@
-import React, { useState } from 'react';
-import { ChevronDown, ArrowLeft } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ChevronDown, ArrowLeft, MapPin, Star, Navigation, Layers, Share2, Mic, Car, Wifi, Lock, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/lib/LanguageContext';
 
-// ─── SVG Picture Guides ───────────────────────────────────────────────────────
+// ─── Reusable step-by-step guide component ───────────────────────────────────
+function StepGuide({ steps }) {
+  return (
+    <div className="mt-4 space-y-3">
+      {steps.map((step, i) => (
+        <div key={i} className="flex gap-3 items-start">
+          {/* Step number */}
+          <div className="flex-shrink-0 w-7 h-7 rounded-full bg-blue-500 text-white text-xs font-bold flex items-center justify-center mt-0.5">
+            {i + 1}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-gray-800 dark:text-foreground mb-2">{step.label}</p>
+            {/* Illustration */}
+            <div className="rounded-2xl overflow-hidden border border-gray-100 dark:border-border bg-gray-50 dark:bg-accent/30">
+              {step.svg}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
-const GuideAddSpot = () => (
-  <svg viewBox="0 0 320 120" className="w-full rounded-xl my-3" style={{maxHeight:120}}>
-    <rect width="320" height="120" rx="12" fill="#f0f9ff"/>
-    {/* Phone outline */}
-    <rect x="10" y="8" width="60" height="104" rx="8" fill="white" stroke="#93c5fd" strokeWidth="1.5"/>
-    <rect x="14" y="18" width="52" height="70" rx="4" fill="#dbeafe"/>
-    {/* Map dots */}
-    <circle cx="28" cy="38" r="3" fill="#60a5fa"/>
-    <circle cx="50" cy="45" r="3" fill="#60a5fa"/>
-    <circle cx="38" cy="60" r="3" fill="#60a5fa"/>
-    {/* Plus button */}
-    <circle cx="40" cy="100" r="8" fill="#22c55e"/>
-    <line x1="40" y1="96" x2="40" y2="104" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-    <line x1="36" y1="100" x2="44" y2="100" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-    {/* Arrow */}
-    <path d="M82 60 L108 60" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="3,2" markerEnd="url(#arr)"/>
-    <defs><marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#94a3b8"/></marker></defs>
-    {/* Step 2: tap map */}
-    <rect x="112" y="8" width="60" height="104" rx="8" fill="white" stroke="#93c5fd" strokeWidth="1.5"/>
-    <rect x="116" y="18" width="52" height="70" rx="4" fill="#dbeafe"/>
-    <circle cx="142" cy="50" r="5" fill="#ef4444" stroke="white" strokeWidth="1.5"/>
-    <line x1="142" y1="55" x2="142" y2="65" stroke="#ef4444" strokeWidth="2"/>
-    <circle cx="142" cy="100" r="8" fill="#ef4444"/>
-    <line x1="142" y1="96" x2="142" y2="104" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-    <line x1="138" y1="100" x2="146" y2="100" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-    <path d="M184 60 L210 60" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="3,2" markerEnd="url(#arr)"/>
-    {/* Step 3: form */}
-    <rect x="214" y="8" width="96" height="104" rx="8" fill="white" stroke="#93c5fd" strokeWidth="1.5"/>
-    <rect x="222" y="18" width="80" height="12" rx="3" fill="#dbeafe"/>
-    <rect x="222" y="35" width="80" height="20" rx="3" fill="#f1f5f9"/>
-    <text x="230" y="49" fontSize="7" fill="#64748b">Nice place...</text>
-    {/* Stars */}
-    <text x="222" y="70" fontSize="12" fill="#fbbf24">★★★★☆</text>
+// ─── SVG Illustrations ────────────────────────────────────────────────────────
+
+// Map with + button highlighted
+const SvgPlusButton = () => (
+  <svg viewBox="0 0 300 160" className="w-full" style={{display:'block'}}>
+    <rect width="300" height="160" fill="#f0f9ff"/>
+    {/* Phone frame */}
+    <rect x="60" y="10" width="180" height="140" rx="14" fill="#1e293b"/>
+    <rect x="65" y="18" width="170" height="110" rx="8" fill="#dbeafe"/>
+    {/* Map tiles */}
+    <rect x="65" y="18" width="85" height="55" rx="0" fill="#e0f2fe"/>
+    <rect x="150" y="18" width="85" height="55" rx="0" fill="#f0fdf4"/>
+    <rect x="65" y="73" width="85" height="55" rx="0" fill="#fef9f0"/>
+    <rect x="150" y="73" width="85" height="55" rx="0" fill="#f0f9ff"/>
+    {/* Roads */}
+    <line x1="65" y1="73" x2="235" y2="73" stroke="white" strokeWidth="3"/>
+    <line x1="150" y1="18" x2="150" y2="128" stroke="white" strokeWidth="3"/>
+    {/* Spot markers on map */}
+    <circle cx="110" cy="50" r="5" fill="#3b82f6"/>
+    <circle cx="185" cy="95" r="5" fill="#22c55e"/>
+    {/* Bottom bar */}
+    <rect x="65" y="128" width="170" height="22" rx="0" fill="#f8fafc"/>
+    {/* + button — highlighted with glow */}
+    <circle cx="150" cy="139" r="14" fill="#22c55e" opacity="0.25"/>
+    <circle cx="150" cy="139" r="10" fill="#22c55e"/>
+    <line x1="150" y1="134" x2="150" y2="144" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+    <line x1="145" y1="139" x2="155" y2="139" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+    {/* Arrow pointing to + button */}
+    <path d="M40 139 L132 139" stroke="#ef4444" strokeWidth="2" markerEnd="url(#red)"/>
+    <defs><marker id="red" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#ef4444"/></marker></defs>
+    <text x="20" y="136" fontSize="9" fill="#ef4444" fontWeight="bold">TAP</text>
+  </svg>
+);
+
+// Map with crosshair + tap animation
+const SvgTapMap = () => (
+  <svg viewBox="0 0 300 160" className="w-full" style={{display:'block'}}>
+    <rect width="300" height="160" fill="#f0fdf4"/>
+    <rect x="60" y="10" width="180" height="140" rx="14" fill="#1e293b"/>
+    <rect x="65" y="18" width="170" height="110" rx="8" fill="#dbeafe"/>
+    {/* Map background */}
+    <rect x="65" y="18" width="85" height="55" fill="#e0f2fe"/>
+    <rect x="150" y="18" width="85" height="55" fill="#f0fdf4"/>
+    <rect x="65" y="73" width="85" height="55" fill="#fef9f0"/>
+    <rect x="150" y="73" width="85" height="55" fill="#f0f9ff"/>
+    <line x1="65" y1="73" x2="235" y2="73" stroke="white" strokeWidth="3"/>
+    <line x1="150" y1="18" x2="150" y2="128" stroke="white" strokeWidth="3"/>
+    {/* Tap ripples */}
+    <circle cx="175" cy="58" r="22" fill="none" stroke="#ef4444" strokeWidth="1.5" opacity="0.3"/>
+    <circle cx="175" cy="58" r="14" fill="none" stroke="#ef4444" strokeWidth="1.5" opacity="0.5"/>
+    <circle cx="175" cy="58" r="7" fill="none" stroke="#ef4444" strokeWidth="1.5" opacity="0.8"/>
+    {/* Pin being placed */}
+    <ellipse cx="175" cy="70" rx="4" ry="2" fill="#00000022"/>
+    <path d="M175 58 Q178 48 175 44 Q172 48 175 58 Z" fill="#ef4444"/>
+    <circle cx="175" cy="44" r="6" fill="#ef4444"/>
+    <circle cx="173" cy="42" r="2" fill="white" opacity="0.6"/>
+    {/* Bottom bar */}
+    <rect x="65" y="128" width="170" height="22" rx="0" fill="#f8fafc"/>
+    <circle cx="150" cy="139" r="10" fill="#ef4444"/>
+    <line x1="147" y1="136" x2="147" y2="142" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+    <line x1="144" y1="139" x2="150" y2="139" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+    <line x1="150" y1="136" x2="153" y2="142" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+    {/* Crosshair mode indicator */}
+    <rect x="75" y="22" width="100" height="14" rx="7" fill="#3b82f6"/>
+    <text x="125" y="32" fontSize="7" fill="white" textAnchor="middle">Tap to place spot</text>
+    {/* Finger icon */}
+    <text x="185" y="75" fontSize="20">👆</text>
+  </svg>
+);
+
+// Form with description + ratings
+const SvgFillForm = () => (
+  <svg viewBox="0 0 300 200" className="w-full" style={{display:'block'}}>
+    <rect width="300" height="200" fill="#fffbeb"/>
+    {/* Bottom sheet form */}
+    <rect x="20" y="10" width="260" height="180" rx="16" fill="white" stroke="#e2e8f0" strokeWidth="1.5"/>
+    {/* Header */}
+    <rect x="20" y="10" width="260" height="38" rx="16" fill="#3b82f6"/>
+    <rect x="20" y="30" width="260" height="18" fill="#3b82f6"/>
+    <circle cx="42" cy="29" r="10" fill="#60a5fa"/>
+    <path d="M38 29 Q40 25 42 23 Q44 25 46 29 Q44 33 42 35 Q40 33 38 29Z" fill="white" opacity="0.9"/>
+    <text x="58" y="27" fontSize="10" fill="white" fontWeight="bold">Add Spot</text>
+    <text x="58" y="38" fontSize="7.5" fill="#bfdbfe">lat 50.075, lng 14.437</text>
+    {/* Description field */}
+    <rect x="32" y="56" width="236" height="38" rx="8" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1"/>
+    <text x="40" y="71" fontSize="8" fill="#94a3b8">Description…</text>
+    <text x="40" y="83" fontSize="8.5" fill="#374151">Nice quiet spot near the river</text>
+    {/* Parking rating */}
+    <text x="32" y="108" fontSize="8" fill="#64748b" fontWeight="bold">Parking Quality</text>
+    <text x="32" y="122" fontSize="18" fill="#fbbf24">★★★★</text>
+    <text x="104" y="122" fontSize="18" fill="#d1d5db">★</text>
+    {/* Beauty rating */}
+    <text x="32" y="142" fontSize="8" fill="#64748b" fontWeight="bold">Scenery &amp; Beauty</text>
+    <text x="32" y="156" fontSize="18" fill="#fbbf24">★★★★★</text>
     {/* Save button */}
-    <rect x="222" y="80" width="80" height="20" rx="5" fill="#3b82f6"/>
-    <text x="262" y="94" fontSize="9" fill="white" textAnchor="middle">Save</text>
-    {/* Step labels */}
-    <text x="40" y="8" fontSize="7" fill="#3b82f6" textAnchor="middle">1</text>
-    <text x="142" y="8" fontSize="7" fill="#3b82f6" textAnchor="middle">2</text>
-    <text x="262" y="8" fontSize="7" fill="#3b82f6" textAnchor="middle">3</text>
+    <rect x="32" y="165" width="236" height="20" rx="8" fill="#22c55e"/>
+    <text x="150" y="178" fontSize="9" fill="white" textAnchor="middle" fontWeight="bold">Save Spot</text>
   </svg>
 );
 
-const GuideNavigate = () => (
-  <svg viewBox="0 0 280 110" className="w-full rounded-xl my-3" style={{maxHeight:110}}>
-    <rect width="280" height="110" rx="12" fill="#f0fdf4"/>
+// Photo upload
+const SvgAddPhoto = () => (
+  <svg viewBox="0 0 300 160" className="w-full" style={{display:'block'}}>
+    <rect width="300" height="160" fill="#fdf4ff"/>
+    {/* Camera box */}
+    <rect x="30" y="20" width="110" height="120" rx="12" fill="white" stroke="#e2e8f0" strokeWidth="1.5"/>
+    {/* Camera icon area */}
+    <rect x="40" y="30" width="90" height="65" rx="8" fill="#f1f5f9" stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4,3"/>
+    <circle cx="85" cy="63" r="14" fill="#cbd5e1"/>
+    <circle cx="85" cy="63" r="9" fill="#94a3b8"/>
+    <circle cx="85" cy="63" r="4" fill="#64748b"/>
+    <rect x="96" y="34" width="12" height="8" rx="3" fill="#cbd5e1"/>
+    <text x="85" y="110" fontSize="8" fill="#94a3b8" textAnchor="middle">Tap to add photo</text>
+    {/* Arrow */}
+    <path d="M148 80 L165 80" stroke="#94a3b8" strokeWidth="2" strokeDasharray="3,2" markerEnd="url(#gray)"/>
+    <defs><marker id="gray" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#94a3b8"/></marker></defs>
+    {/* Preview with photo */}
+    <rect x="168" y="20" width="102" height="120" rx="12" fill="white" stroke="#e2e8f0" strokeWidth="1.5"/>
+    <rect x="178" y="30" width="82" height="65" rx="8" fill="#dcfce7"/>
+    {/* Landscape photo preview */}
+    <ellipse cx="219" cy="70" rx="35" ry="15" fill="#86efac"/>
+    <ellipse cx="200" cy="75" rx="15" ry="10" fill="#4ade80"/>
+    <ellipse cx="235" cy="73" rx="18" ry="12" fill="#22c55e"/>
+    <rect x="178" y="75" width="82" height="20" fill="#bfdbfe"/>
+    <circle cx="196" cy="64" r="8" fill="#fcd34d"/>
+    {/* Remove X */}
+    <circle cx="252" cy="34" r="8" fill="#00000066"/>
+    <line x1="249" y1="31" x2="255" y2="37" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+    <line x1="255" y1="31" x2="249" y2="37" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+    <text x="219" y="115" fontSize="8" fill="#22c55e" textAnchor="middle" fontWeight="bold">✓ Photo added</text>
+  </svg>
+);
+
+// Map showing spot pin
+const SvgSpotAppears = () => (
+  <svg viewBox="0 0 300 160" className="w-full" style={{display:'block'}}>
+    <rect width="300" height="160" fill="#f0f9ff"/>
     {/* Map */}
-    <rect x="10" y="10" width="120" height="90" rx="8" fill="white" stroke="#86efac" strokeWidth="1.5"/>
-    <rect x="14" y="14" width="112" height="68" rx="4" fill="#dcfce7"/>
-    {/* Route line */}
-    <path d="M30 70 Q50 50 60 40 Q80 30 100 28" stroke="#22c55e" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+    <rect x="20" y="10" width="260" height="140" rx="12" fill="#dbeafe"/>
+    <rect x="20" y="10" width="130" height="70" rx="0" fill="#e0f2fe"/>
+    <rect x="150" y="10" width="130" height="70" rx="0" fill="#f0fdf4"/>
+    <rect x="20" y="80" width="130" height="70" rx="0" fill="#fef9f0"/>
+    <rect x="150" y="80" width="130" height="70" rx="0" fill="#f0f9ff"/>
+    <line x1="20" y1="80" x2="280" y2="80" stroke="white" strokeWidth="4"/>
+    <line x1="150" y1="10" x2="150" y2="150" stroke="white" strokeWidth="4"/>
+    {/* New spot pin with animation ring */}
+    <circle cx="190" cy="52" r="24" fill="#22c55e" opacity="0.15"/>
+    <circle cx="190" cy="52" r="16" fill="#22c55e" opacity="0.25"/>
+    {/* Pin */}
+    <ellipse cx="190" cy="63" rx="5" ry="2.5" fill="#00000022"/>
+    <path d="M190 52 Q194 42 190 37 Q186 42 190 52Z" fill="#22c55e"/>
+    <circle cx="190" cy="37" r="8" fill="#22c55e"/>
+    <circle cx="188" cy="35" r="2.5" fill="white" opacity="0.7"/>
+    {/* Sparkle */}
+    <text x="204" y="30" fontSize="14">✨</text>
+    {/* Other existing spots */}
+    <circle cx="90" cy="45" r="7" fill="#3b82f6"/>
+    <circle cx="88" cy="43" r="2" fill="white" opacity="0.7"/>
+    <circle cx="105" cy="110" r="7" fill="#f97316"/>
+    {/* Label callout */}
+    <rect x="140" y="90" width="120" height="36" rx="8" fill="white" stroke="#22c55e" strokeWidth="1.5"/>
+    <text x="200" y="104" fontSize="8" fill="#166534" textAnchor="middle" fontWeight="bold">✓ Spot saved!</text>
+    <text x="200" y="118" fontSize="7" fill="#64748b" textAnchor="middle">Visible to everyone</text>
+  </svg>
+);
+
+// Open spot detail
+const SvgOpenDetail = () => (
+  <svg viewBox="0 0 300 180" className="w-full" style={{display:'block'}}>
+    <rect width="300" height="180" fill="#f0fdf4"/>
+    {/* Map background */}
+    <rect x="20" y="10" width="260" height="80" rx="12" fill="#dbeafe"/>
+    <line x1="20" y1="50" x2="280" y2="50" stroke="white" strokeWidth="3"/>
+    <line x1="150" y1="10" x2="150" y2="90" stroke="white" strokeWidth="3"/>
+    {/* Spot pin */}
+    <circle cx="110" cy="40" r="10" fill="#3b82f6"/>
+    <circle cx="108" cy="38" r="3" fill="white" opacity="0.7"/>
+    {/* Tap finger */}
+    <text x="118" y="55" fontSize="16">👆</text>
+    {/* Bottom sheet popping up */}
+    <rect x="20" y="95" width="260" height="75" rx="16" fill="white" stroke="#e2e8f0" strokeWidth="1.5"/>
+    <rect x="130" y="101" width="40" height="4" rx="2" fill="#e2e8f0"/>
+    {/* Spot detail content */}
+    <circle cx="42" cy="120" r="11" fill="#dbeafe"/>
+    <path d="M38 120 Q40 116 42 114 Q44 116 46 120 Q44 124 42 126 Q40 124 38 120Z" fill="#3b82f6" opacity="0.8"/>
+    <text x="58" y="118" fontSize="9" fill="#1e293b" fontWeight="bold">Nice Parking Spot</text>
+    <text x="58" y="129" fontSize="7.5" fill="#94a3b8">Added by user · today</text>
+    {/* Stars */}
+    <text x="32" y="148" fontSize="14" fill="#fbbf24">★★★★</text>
+    <text x="89" y="148" fontSize="14" fill="#d1d5db">★</text>
+    <text x="104" y="148" fontSize="8" fill="#64748b">4.0 (12 ratings)</text>
+    {/* Nav button */}
+    <rect x="200" y="105" width="72" height="22" rx="8" fill="#3b82f6"/>
+    <text x="236" y="119" fontSize="8" fill="white" textAnchor="middle">▶ Navigate</text>
+  </svg>
+);
+
+// Rate the spot
+const SvgRateSpot = () => (
+  <svg viewBox="0 0 300 180" className="w-full" style={{display:'block'}}>
+    <rect width="300" height="180" fill="#fffbeb"/>
+    {/* Detail card */}
+    <rect x="20" y="10" width="260" height="160" rx="16" fill="white" stroke="#e2e8f0" strokeWidth="1.5"/>
+    {/* Header */}
+    <circle cx="44" cy="32" r="14" fill="#dbeafe"/>
+    <path d="M40 32 Q42 28 44 26 Q46 28 48 32 Q46 36 44 38 Q42 36 40 32Z" fill="#3b82f6" opacity="0.8"/>
+    <text x="64" y="29" fontSize="9" fill="#1e293b" fontWeight="bold">Great Viewpoint</text>
+    <text x="64" y="40" fontSize="7.5" fill="#94a3b8">Added by jan.novak</text>
+    {/* Overall rating section */}
+    <rect x="30" y="52" width="240" height="32" rx="8" fill="#f8fafc"/>
+    <text x="40" y="64" fontSize="7.5" fill="#64748b">Overall Rating</text>
+    <text x="40" y="77" fontSize="16" fill="#fbbf24">★★★★</text>
+    <text x="108" y="77" fontSize="16" fill="#d1d5db">★</text>
+    <text x="126" y="77" fontSize="8" fill="#64748b">4.2 (28)</text>
+    {/* Rate this spot section */}
+    <rect x="30" y="92" width="240" height="44" rx="8" fill="#eff6ff" stroke="#bfdbfe" strokeWidth="1"/>
+    <text x="40" y="104" fontSize="8" fill="#1d4ed8" fontWeight="bold">Rate this spot</text>
+    {/* Interactive stars */}
+    <text x="40" y="126" fontSize="22" fill="#fbbf24">★★★★★</text>
+    {/* Finger tapping 5th star */}
+    <text x="140" y="136" fontSize="14">👆</text>
+    {/* Submitted */}
+    <rect x="30" y="144" width="240" height="18" rx="6" fill="#dcfce7"/>
+    <text x="150" y="156" fontSize="8.5" fill="#166534" textAnchor="middle" fontWeight="bold">✓ Thanks for rating!</text>
+  </svg>
+);
+
+// Navigate panel
+const SvgNavigate = () => (
+  <svg viewBox="0 0 300 200" className="w-full" style={{display:'block'}}>
+    <rect width="300" height="200" fill="#f0fdf4"/>
+    {/* Map with route */}
+    <rect x="20" y="10" width="260" height="90" rx="12" fill="#1e3a5f"/>
+    {/* Route path */}
+    <path d="M50 85 Q70 60 100 50 Q130 40 170 35 Q200 32 240 30" stroke="#22c55e" strokeWidth="3" fill="none" strokeLinecap="round"/>
     {/* User dot */}
-    <circle cx="30" cy="70" r="5" fill="#3b82f6" stroke="white" strokeWidth="1.5"/>
-    {/* Destination pin */}
-    <circle cx="100" cy="28" r="6" fill="#ef4444" stroke="white" strokeWidth="1.5"/>
-    {/* Popup */}
-    <rect x="20" y="82" width="100" height="16" rx="4" fill="#3b82f6"/>
-    <text x="70" y="94" fontSize="8" fill="white" textAnchor="middle">▶ Navigate Here</text>
-    {/* Arrow */}
-    <path d="M140 55 L165 55" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="3,2" markerEnd="url(#a2)"/>
-    <defs><marker id="a2" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#94a3b8"/></marker></defs>
+    <circle cx="50" cy="85" r="8" fill="#3b82f6" stroke="white" strokeWidth="2"/>
+    <circle cx="50" cy="85" r="4" fill="white"/>
+    {/* Destination */}
+    <circle cx="240" cy="30" r="9" fill="#ef4444" stroke="white" strokeWidth="2"/>
+    <circle cx="238" cy="28" r="2.5" fill="white" opacity="0.7"/>
     {/* Nav panel */}
-    <rect x="168" y="10" width="100" height="90" rx="8" fill="white" stroke="#86efac" strokeWidth="1.5"/>
-    <rect x="174" y="16" width="88" height="30" rx="4" fill="#1d4ed8"/>
-    <text x="218" y="26" fontSize="7" fill="#93c5fd" textAnchor="middle">Navigating to</text>
-    <text x="218" y="38" fontSize="9" fill="white" textAnchor="middle" fontWeight="bold">Park Spot</text>
-    <rect x="174" y="52" width="40" height="16" rx="4" fill="#f1f5f9"/>
-    <text x="194" y="63" fontSize="7" fill="#475569" textAnchor="middle">3.2 km</text>
-    <rect x="220" y="52" width="40" height="16" rx="4" fill="#f1f5f9"/>
-    <text x="240" y="63" fontSize="7" fill="#475569" textAnchor="middle">8 min</text>
-    <rect x="174" y="74" width="88" height="20" rx="5" fill="#22c55e"/>
-    <text x="218" y="88" fontSize="9" fill="white" textAnchor="middle">Start Navigation</text>
+    <rect x="20" y="108" width="260" height="82" rx="16" fill="white" stroke="#e2e8f0" strokeWidth="1.5"/>
+    {/* Current instruction banner */}
+    <rect x="20" y="108" width="260" height="40" rx="16" fill="#1d4ed8"/>
+    <rect x="20" y="128" width="260" height="20" fill="#1d4ed8"/>
+    <rect x="30" y="114" width="28" height="28" rx="8" fill="#3b82f6"/>
+    <path d="M38 128 L44 122 L50 128" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round"/>
+    <text x="66" y="126" fontSize="9" fill="white" fontWeight="bold">Turn right onto Strakonická</text>
+    <text x="66" y="138" fontSize="8" fill="#93c5fd">in 200 m</text>
+    {/* Distance / time */}
+    <text x="50" y="165" fontSize="11" fill="#1e293b" textAnchor="middle" fontWeight="bold">3.2 km</text>
+    <text x="50" y="178" fontSize="7.5" fill="#64748b" textAnchor="middle">Distance</text>
+    <line x1="130" y1="155" x2="130" y2="180" stroke="#e2e8f0" strokeWidth="1"/>
+    <text x="185" y="165" fontSize="11" fill="#1e293b" textAnchor="middle" fontWeight="bold">8 min</text>
+    <text x="185" y="178" fontSize="7.5" fill="#64748b" textAnchor="middle">Duration</text>
+    <rect x="220" y="156" width="52" height="24" rx="8" fill="#22c55e"/>
+    <text x="246" y="172" fontSize="8.5" fill="white" textAnchor="middle" fontWeight="bold">Start</text>
   </svg>
 );
 
-const GuideRate = () => (
-  <svg viewBox="0 0 260 100" className="w-full rounded-xl my-3" style={{maxHeight:100}}>
-    <rect width="260" height="100" rx="12" fill="#fffbeb"/>
-    {/* Spot card */}
-    <rect x="10" y="10" width="110" height="80" rx="8" fill="white" stroke="#fcd34d" strokeWidth="1.5"/>
-    <rect x="18" y="18" width="94" height="28" rx="4" fill="#dbeafe"/>
-    <text x="65" y="28" fontSize="8" fill="#3b82f6" textAnchor="middle" fontWeight="bold">Parking Spot</text>
-    <text x="65" y="40" fontSize="7" fill="#64748b" textAnchor="middle">Added by user</text>
-    {/* Stars interactive */}
-    <text x="18" y="60" fontSize="14" fill="#fbbf24">★★★</text>
-    <text x="68" y="60" fontSize="14" fill="#d1d5db">★★</text>
-    <text x="18" y="75" fontSize="7" fill="#64748b">Tap stars to rate</text>
-    {/* Arrow */}
-    <path d="M128 50 L148 50" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="3,2" markerEnd="url(#a3)"/>
-    <defs><marker id="a3" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#94a3b8"/></marker></defs>
-    {/* After rating */}
-    <rect x="150" y="10" width="100" height="80" rx="8" fill="white" stroke="#86efac" strokeWidth="1.5"/>
-    <text x="200" y="35" fontSize="12" fill="#fbbf24" textAnchor="middle">★★★★★</text>
-    <rect x="158" y="48" width="84" height="22" rx="6" fill="#dcfce7"/>
-    <text x="200" y="57" fontSize="7" fill="#166534" textAnchor="middle">✓ Thanks for</text>
-    <text x="200" y="67" fontSize="7" fill="#166534" textAnchor="middle">rating!</text>
-    {/* Labels */}
-    <text x="65" y="97" fontSize="7" fill="#92400e" textAnchor="middle">Before</text>
-    <text x="200" y="97" fontSize="7" fill="#166534" textAnchor="middle">After</text>
-  </svg>
-);
-
-const GuideShare = () => (
-  <svg viewBox="0 0 280 100" className="w-full rounded-xl my-3" style={{maxHeight:100}}>
-    <rect width="280" height="100" rx="12" fill="#fdf4ff"/>
-    {/* Phone 1 - spot detail */}
-    <rect x="10" y="10" width="90" height="80" rx="8" fill="white" stroke="#d8b4fe" strokeWidth="1.5"/>
-    <rect x="16" y="16" width="78" height="40" rx="4" fill="#ede9fe"/>
-    <text x="55" y="30" fontSize="8" fill="#7c3aed" textAnchor="middle" fontWeight="bold">Great Spot</text>
-    <text x="55" y="42" fontSize="7" fill="#8b5cf6" textAnchor="middle">⭐ 4.5 · 12 ratings</text>
-    {/* Share button */}
-    <rect x="16" y="62" width="78" height="20" rx="5" fill="#7c3aed"/>
-    <text x="55" y="76" fontSize="8" fill="white" textAnchor="middle">↑ Share</text>
-    {/* Arrow */}
-    <path d="M106 50 L128 50" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="3,2" markerEnd="url(#a4)"/>
-    <defs><marker id="a4" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#94a3b8"/></marker></defs>
-    {/* Share sheet */}
-    <rect x="130" y="10" width="60" height="80" rx="8" fill="white" stroke="#d8b4fe" strokeWidth="1.5"/>
-    <text x="160" y="30" fontSize="7" fill="#475569" textAnchor="middle">Share via…</text>
-    <rect x="138" y="36" width="44" height="14" rx="3" fill="#f1f5f9"/>
-    <text x="160" y="46" fontSize="7" fill="#3b82f6" textAnchor="middle">📋 Copy link</text>
-    <rect x="138" y="54" width="44" height="14" rx="3" fill="#f1f5f9"/>
-    <text x="160" y="64" fontSize="7" fill="#22c55e" textAnchor="middle">💬 WhatsApp</text>
-    <rect x="138" y="72" width="44" height="12" rx="3" fill="#f1f5f9"/>
-    <text x="160" y="81" fontSize="7" fill="#ef4444" textAnchor="middle">More…</text>
-    {/* Arrow */}
-    <path d="M196 50 L218 50" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="3,2" markerEnd="url(#a4)"/>
-    {/* Phone 2 - opens link */}
-    <rect x="220" y="10" width="50" height="80" rx="8" fill="white" stroke="#86efac" strokeWidth="1.5"/>
-    <rect x="226" y="16" width="38" height="30" rx="4" fill="#dcfce7"/>
-    {/* Map pin */}
-    <circle cx="244" cy="28" r="5" fill="#ef4444" stroke="white" strokeWidth="1"/>
-    <line x1="244" y1="33" x2="244" y2="38" stroke="#ef4444" strokeWidth="1.5"/>
-    <text x="245" y="56" fontSize="6" fill="#64748b" textAnchor="middle">Opens map</text>
-    <text x="245" y="65" fontSize="6" fill="#64748b" textAnchor="middle">at exact spot</text>
-  </svg>
-);
-
-const GuideMapLayers = () => (
-  <svg viewBox="0 0 260 100" className="w-full rounded-xl my-3" style={{maxHeight:100}}>
-    <rect width="260" height="100" rx="12" fill="#f0f9ff"/>
-    {/* Map backgrounds */}
+// Route modes
+const SvgRouteModes = () => (
+  <svg viewBox="0 0 300 120" className="w-full" style={{display:'block'}}>
+    <rect width="300" height="120" fill="#f8fafc"/>
+    {/* Three mode cards */}
     {[
-      {x:10,  label:'Basic',     fill:'#dbeafe', road:'#93c5fd'},
-      {x:62,  label:'Outdoor',   fill:'#dcfce7', road:'#86efac'},
-      {x:114, label:'Satellite', fill:'#1e3a5f', road:'#3b82f6'},
-      {x:166, label:'Traffic',   fill:'#dbeafe', road:'#ef4444'},
-    ].map(({x, label, fill, road}) => (
+      { x:20,  icon:'🚗', label:'Drive',  color:'#3b82f6', bg:'#dbeafe', active:true  },
+      { x:115, icon:'🚲', label:'Bike',   color:'#22c55e', bg:'#dcfce7', active:false },
+      { x:210, icon:'🚶', label:'Walk',   color:'#f97316', bg:'#ffedd5', active:false },
+    ].map(({x, icon, label, color, bg, active}) => (
       <g key={label}>
-        <rect x={x} y="10" width="44" height="70" rx="6" fill="white" stroke="#e2e8f0" strokeWidth="1"/>
-        <rect x={x+2} y="12" width="40" height="50" rx="4" fill={fill}/>
-        <line x1={x+10} y1="40" x2={x+35} y2="32" stroke={road} strokeWidth="2" strokeLinecap="round"/>
-        <line x1={x+15} y1="50" x2={x+35} y2="44" stroke={road} strokeWidth="1.5" strokeLinecap="round"/>
-        <text x={x+22} y="74" fontSize="6.5" fill="#475569" textAnchor="middle">{label}</text>
-        {label==='Traffic' && <><circle cx={x+10} cy="35" r="3" fill="#22c55e"/><circle cx={x+22} cy="38" r="3" fill="#fbbf24"/><circle cx={x+34} cy="34" r="3" fill="#ef4444"/></>}
+        <rect x={x} y="10" width="85" height="100" rx="14" fill={active ? color : 'white'} stroke={active ? color : '#e2e8f0'} strokeWidth={active ? 0 : 1.5}/>
+        <text x={x+42} y="55" fontSize="28" textAnchor="middle">{icon}</text>
+        <text x={x+42} y="75" fontSize="10" textAnchor="middle" fill={active ? 'white' : '#374151'} fontWeight={active ? 'bold' : 'normal'}>{label}</text>
+        {active && <rect x={x+22} y="84" width="41" height="16" rx="6" fill="white" opacity="0.25"/>}
+        {active && <text x={x+42} y="95" fontSize="8" textAnchor="middle" fill="white">Selected</text>}
+        {/* Route time */}
+        <text x={x+42} y="105" fontSize="7.5" textAnchor="middle" fill={active ? '#bfdbfe' : '#94a3b8'}>
+          {label==='Drive' ? '8 min' : label==='Bike' ? '22 min' : '45 min'}
+        </text>
+      </g>
+    ))}
+  </svg>
+);
+
+// Voice dictation
+const SvgVoice = () => (
+  <svg viewBox="0 0 300 160" className="w-full" style={{display:'block'}}>
+    <rect width="300" height="160" fill="#fffbeb"/>
+    {/* Form */}
+    <rect x="20" y="10" width="260" height="140" rx="16" fill="white" stroke="#e2e8f0" strokeWidth="1.5"/>
+    {/* Textarea */}
+    <rect x="32" y="20" width="190" height="60" rx="8" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1"/>
+    <text x="42" y="38" fontSize="8.5" fill="#374151">Nice place</text>
+    <text x="42" y="51" fontSize="8.5" fill="#f97316" fontStyle="italic">to rest…</text>
+    <rect x="42" y="56" width="8" height="12" rx="2" fill="#3b82f6" opacity="0.7">
+      <animate attributeName="opacity" values="0.7;0;0.7" dur="1s" repeatCount="indefinite"/>
+    </rect>
+    {/* Mic button highlighted */}
+    <rect x="226" y="20" width="54" height="24" rx="8" fill="#fef3c7" stroke="#fbbf24" strokeWidth="1.5"/>
+    <circle cx="253" cy="32" r="5" fill="#f97316"/>
+    <path d="M250 37 Q253 41 256 37" stroke="#f97316" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+    <line x1="253" y1="41" x2="253" y2="44" stroke="#f97316" strokeWidth="1.5"/>
+    <text x="262" y="36" fontSize="7" fill="#92400e">●REC</text>
+    {/* Waveform */}
+    <rect x="32" y="88" width="236" height="28" rx="8" fill="#fef3c7" stroke="#fcd34d" strokeWidth="1"/>
+    {[8,14,10,18,12,20,8,16,10,18,14,8,16,12,20,8,14,18,10,16,12,8,20,14,10,18].map((h,i) => (
+      <rect key={i} x={40+i*8.5} y={95+(20-h)/2} width="5" height={h} rx="2.5" fill="#f97316" opacity="0.8"/>
+    ))}
+    <text x="150" y="126" fontSize="8" fill="#92400e" textAnchor="middle" fontWeight="bold">🎙 Listening… speak now</text>
+    {/* Language badge */}
+    <rect x="32" y="132" width="60" height="14" rx="5" fill="#dbeafe"/>
+    <text x="62" y="142" fontSize="7.5" fill="#1d4ed8" textAnchor="middle">🌍 Auto-language</text>
+    <text x="200" y="140" fontSize="7.5" fill="#64748b">Tap mic again to stop</text>
+  </svg>
+);
+
+// Share button
+const SvgShare = () => (
+  <svg viewBox="0 0 300 180" className="w-full" style={{display:'block'}}>
+    <rect width="300" height="180" fill="#fdf4ff"/>
+    {/* Spot detail */}
+    <rect x="20" y="10" width="260" height="80" rx="16" fill="white" stroke="#e2e8f0" strokeWidth="1.5"/>
+    <circle cx="44" cy="35" r="14" fill="#ede9fe"/>
+    <path d="M40 35 Q42 31 44 29 Q46 31 48 35 Q46 39 44 41 Q42 39 40 35Z" fill="#7c3aed" opacity="0.8"/>
+    <text x="64" y="32" fontSize="9" fill="#1e293b" fontWeight="bold">Hidden Waterfall</text>
+    <text x="64" y="43" fontSize="7.5" fill="#94a3b8">⭐ 4.8 · 34 ratings</text>
+    {/* Action buttons row */}
+    <rect x="30" y="58" width="48" height="26" rx="8" fill="#f1f5f9"/>
+    <text x="54" y="75" fontSize="8" fill="#374151" textAnchor="middle">✏️ Edit</text>
+    <rect x="84" y="58" width="48" height="26" rx="8" fill="#fee2e2"/>
+    <text x="108" y="75" fontSize="8" fill="#dc2626" textAnchor="middle">🗑 Del</text>
+    {/* Share button highlighted */}
+    <rect x="138" y="58" width="56" height="26" rx="8" fill="#7c3aed"/>
+    <circle cx="142" cy="58" r="8" fill="#fbbf24" opacity="0"/>
+    <text x="166" y="73" fontSize="8.5" fill="white" textAnchor="middle" fontWeight="bold">↑ Share</text>
+    {/* Arrow pointing to share */}
+    <path d="M166 88 L166 100" stroke="#7c3aed" strokeWidth="2" markerEnd="url(#purple)"/>
+    <defs><marker id="purple" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#7c3aed"/></marker></defs>
+    {/* Share result panel */}
+    <rect x="20" y="104" width="260" height="66" rx="16" fill="white" stroke="#e2e8f0" strokeWidth="1.5"/>
+    <text x="40" y="120" fontSize="8.5" fill="#374151" fontWeight="bold">Link copied to clipboard!</text>
+    <rect x="30" y="126" width="240" height="16" rx="6" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1"/>
+    <text x="40" y="138" fontSize="7" fill="#94a3b8">spotfinder.app/?spot=AbC123xYz</text>
+    <text x="40" y="158" fontSize="7.5" fill="#64748b">📱 Share via WhatsApp, SMS, or paste anywhere</text>
+    <text x="40" y="168" fontSize="7.5" fill="#22c55e">✓ Recipient opens map pinpointed to this spot</text>
+  </svg>
+);
+
+// Map layers
+const SvgMapLayers = () => (
+  <svg viewBox="0 0 300 140" className="w-full" style={{display:'block'}}>
+    <rect width="300" height="140" fill="#f0f9ff"/>
+    {/* Layer cards */}
+    {[
+      { x:10,  fill:'#dbeafe', road:'#93c5fd', label:'Basic',     extra: null },
+      { x:68,  fill:'#dcfce7', road:'#86efac', label:'Outdoor',   extra: null },
+      { x:126, fill:'#1e3a5f', road:'#3b82f6', label:'Satellite', extra: null },
+      { x:184, fill:'#e0f2fe', road:'#0ea5e9', label:'Winter',    extra: 'snow' },
+      { x:242, fill:'#dbeafe', road:'#ef4444', label:'Traffic',   extra: 'traffic' },
+    ].map(({x, fill, road, label, extra}) => (
+      <g key={label}>
+        <rect x={x} y="8" width="52" height="90" rx="10" fill="white" stroke="#e2e8f0" strokeWidth="1"/>
+        <rect x={x+3} y="11" width="46" height="60" rx="7" fill={fill}/>
+        {/* Roads */}
+        <line x1={x+3} y1="41" x2={x+49} y2="41" stroke={road} strokeWidth="3"/>
+        <line x1={x+26} y1="11" x2={x+26} y2="71" stroke={road} strokeWidth="3"/>
+        {extra==='snow' && <>
+          <text x={x+10} y="38" fontSize="9">❄</text>
+          <text x={x+32} y="60" fontSize="9">❄</text>
+        </>}
+        {extra==='traffic' && <>
+          <circle cx={x+14} cy="32" r="4" fill="#22c55e"/>
+          <circle cx={x+26} cy="36" r="4" fill="#fbbf24"/>
+          <circle cx={x+38} cy="32" r="4" fill="#ef4444"/>
+          <circle cx={x+14} cy="55" r="4" fill="#22c55e"/>
+          <circle cx={x+38} cy="55" r="4" fill="#22c55e"/>
+        </>}
+        <text x={x+26} y="82" fontSize="7.5" fill="#475569" textAnchor="middle">{label}</text>
       </g>
     ))}
     {/* Layers button */}
-    <rect x="218" y="10" width="32" height="70" rx="6" fill="#3b82f6"/>
-    <rect x="222" y="22" width="24" height="4" rx="2" fill="white"/>
-    <rect x="222" y="30" width="24" height="4" rx="2" fill="white"/>
-    <rect x="222" y="38" width="24" height="4" rx="2" fill="white"/>
-    <text x="234" y="60" fontSize="6.5" fill="white" textAnchor="middle">Layers</text>
-    <text x="234" y="68" fontSize="6.5" fill="#93c5fd" textAnchor="middle">button</text>
+    <rect x="10" y="104" width="280" height="30" rx="10" fill="white" stroke="#e2e8f0" strokeWidth="1"/>
+    <text x="35" y="123" fontSize="8.5" fill="#374151">Tap the</text>
+    <rect x="80" y="111" width="52" height="18" rx="6" fill="#3b82f6"/>
+    <rect x="84" y="117" width="10" height="2" rx="1" fill="white"/>
+    <rect x="84" y="121" width="10" height="2" rx="1" fill="white"/>
+    <rect x="84" y="125" width="10" height="2" rx="1" fill="white"/>
+    <text x="104" y="123" fontSize="8" fill="white">Layers</text>
+    <text x="140" y="123" fontSize="8.5" fill="#374151">button in the bottom-left corner</text>
   </svg>
 );
 
-const GuideVoice = () => (
-  <svg viewBox="0 0 260 100" className="w-full rounded-xl my-3" style={{maxHeight:100}}>
-    <rect width="260" height="100" rx="12" fill="#fef9f0"/>
-    {/* Form */}
-    <rect x="10" y="10" width="160" height="80" rx="8" fill="white" stroke="#fcd34d" strokeWidth="1.5"/>
-    <text x="90" y="24" fontSize="8" fill="#374151" textAnchor="middle" fontWeight="bold">Add Spot</text>
-    {/* Textarea */}
-    <rect x="18" y="30" width="120" height="30" rx="4" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="1"/>
-    <text x="22" y="43" fontSize="7" fill="#374151">Nice place</text>
-    <text x="22" y="53" fontSize="7" fill="#d97706" fontStyle="italic">to rest…</text>
-    {/* Mic button */}
-    <rect x="118" y="27" width="24" height="12" rx="4" fill="#fef3c7"/>
-    <circle cx="130" cy="31" r="3" fill="#f97316"/>
-    <path d="M127 34 Q130 37 133 34" stroke="#f97316" strokeWidth="1" fill="none"/>
-    <line x1="130" y1="37" x2="130" y2="39" stroke="#f97316" strokeWidth="1"/>
-    {/* Recording bars */}
-    <rect x="18" y="64" width="120" height="18" rx="4" fill="#fef3c7"/>
-    <text x="78" y="71" fontSize="6" fill="#92400e" textAnchor="middle">🔴 Listening…</text>
-    <text x="78" y="79" fontSize="6" fill="#b45309" textAnchor="middle">Speak your description</text>
-    {/* Tips */}
-    <rect x="178" y="10" width="72" height="80" rx="8" fill="white" stroke="#fcd34d" strokeWidth="1.5"/>
-    <text x="214" y="22" fontSize="7" fill="#374151" textAnchor="middle" fontWeight="bold">Tips</text>
-    {[
-      '✓ Speak clearly',
-      '✓ Any language',
-      '✓ Tap again',
-      '  to stop',
-      '✓ Edit after',
-    ].map((tip, i) => (
-      <text key={i} x="182" y={34 + i*12} fontSize="6.5" fill="#475569">{tip}</text>
-    ))}
-  </svg>
-);
-
-const GuideTraffic = () => (
-  <svg viewBox="0 0 260 100" className="w-full rounded-xl my-3" style={{maxHeight:100}}>
-    <rect width="260" height="100" rx="12" fill="#fff5f5"/>
-    {/* Map with traffic */}
-    <rect x="10" y="10" width="150" height="80" rx="8" fill="#1e3a5f" stroke="#ef4444" strokeWidth="1.5"/>
+// Traffic layer
+const SvgTrafficLayer = () => (
+  <svg viewBox="0 0 300 160" className="w-full" style={{display:'block'}}>
+    <rect width="300" height="160" fill="#fff5f5"/>
+    {/* Dark map background */}
+    <rect x="10" y="10" width="180" height="140" rx="12" fill="#1e3a5f"/>
     {/* Roads */}
-    <line x1="10" y1="50" x2="160" y2="50" stroke="#94a3b8" strokeWidth="6"/>
-    <line x1="85" y1="10" x2="85" y2="90" stroke="#94a3b8" strokeWidth="6"/>
-    {/* Traffic colors */}
-    <line x1="10" y1="50" x2="50" y2="50" stroke="#22c55e" strokeWidth="4"/>
-    <line x1="50" y1="50" x2="85" y2="50" stroke="#fbbf24" strokeWidth="4"/>
-    <line x1="85" y1="50" x2="160" y2="50" stroke="#ef4444" strokeWidth="4"/>
+    <line x1="10" y1="80" x2="190" y2="80" stroke="#334155" strokeWidth="10"/>
+    <line x1="100" y1="10" x2="100" y2="150" stroke="#334155" strokeWidth="10"/>
+    {/* Traffic flow */}
+    <line x1="10" y1="80" x2="60" y2="80" stroke="#22c55e" strokeWidth="6"/>
+    <line x1="60" y1="80" x2="100" y2="80" stroke="#fbbf24" strokeWidth="6"/>
+    <line x1="100" y1="80" x2="190" y2="80" stroke="#ef4444" strokeWidth="6"/>
+    <line x1="100" y1="10" x2="100" y2="50" stroke="#22c55e" strokeWidth="6"/>
+    <line x1="100" y1="50" x2="100" y2="80" stroke="#ef4444" strokeWidth="6"/>
+    <line x1="100" y1="80" x2="100" y2="150" stroke="#22c55e" strokeWidth="6"/>
     {/* Road closure icon */}
-    <circle cx="110" cy="30" r="9" fill="white"/>
-    <circle cx="110" cy="30" r="8" fill="#CC1111"/>
-    <rect x="103" y="27" width="14" height="6" rx="1" fill="white"/>
+    <circle cx="135" cy="45" r="11" fill="white"/>
+    <circle cx="135" cy="45" r="10" fill="#CC1111"/>
+    <rect x="127" y="42" width="16" height="6" rx="2" fill="white"/>
     {/* Jam icon */}
-    <path d="M45 72 L65 72 L56 58 Z" fill="#FFD600" stroke="#CC6600" strokeWidth="1.5"/>
-    <text x="55" y="70" fontSize="7" fill="#333" textAnchor="middle">!</text>
+    <path d="M68 102 L82 102 L75 90 Z" fill="#FFD600" stroke="#CC6600" strokeWidth="1.5"/>
+    <text x="75" y="100" fontSize="7" fill="#333" textAnchor="middle">!</text>
     {/* Legend */}
-    <rect x="168" y="10" width="82" height="80" rx="8" fill="white" stroke="#fca5a5" strokeWidth="1.5"/>
-    <text x="209" y="22" fontSize="7" fill="#374151" textAnchor="middle" fontWeight="bold">Traffic key</text>
-    {[
-      {col:'#22c55e', label:'Free flow'},
-      {col:'#fbbf24', label:'Slow'},
-      {col:'#ef4444', label:'Congested'},
-    ].map(({col, label}, i) => (
-      <g key={label}>
-        <rect x="176" y={30 + i*16} width="12" height="8" rx="2" fill={col}/>
-        <text x="192" y={38 + i*16} fontSize="7" fill="#374151">{label}</text>
+    <rect x="200" y="10" width="90" height="140" rx="12" fill="white" stroke="#fca5a5" strokeWidth="1.5"/>
+    <text x="245" y="28" fontSize="8" fill="#374151" textAnchor="middle" fontWeight="bold">Legend</text>
+    {[{col:'#22c55e',lbl:'Free flow'},{col:'#fbbf24',lbl:'Slow'},{col:'#ef4444',lbl:'Congested'}].map(({col,lbl},i)=>(
+      <g key={lbl}>
+        <rect x="210" y={38+i*22} width="14" height="10" rx="3" fill={col}/>
+        <text x="230" y={47+i*22} fontSize="8" fill="#374151">{lbl}</text>
       </g>
     ))}
-    <text x="176" y="80" fontSize="6.5" fill="#64748b">⛔ Closed  🚦 Jam</text>
+    <line x1="210" y1="108" x2="282" y2="108" stroke="#e2e8f0" strokeWidth="1"/>
+    <text x="215" y="120" fontSize="8" fill="#374151">⛔ Closed</text>
+    <text x="215" y="133" fontSize="8" fill="#374151">🚦 Jam</text>
+    <text x="215" y="146" fontSize="7" fill="#94a3b8">Auto-detected</text>
   </svg>
 );
 
-const GuideGPS = () => (
-  <svg viewBox="0 0 240 90" className="w-full rounded-xl my-3" style={{maxHeight:90}}>
-    <rect width="240" height="90" rx="12" fill="#f0f9ff"/>
-    {/* Good GPS */}
-    <rect x="10" y="10" width="100" height="70" rx="8" fill="white" stroke="#86efac" strokeWidth="1.5"/>
-    <rect x="16" y="16" width="88" height="50" rx="4" fill="#dbeafe"/>
-    <circle cx="60" cy="41" r="20" fill="#bfdbfe" opacity="0.5"/>
-    <circle cx="60" cy="41" r="6" fill="#3b82f6" stroke="white" strokeWidth="2"/>
-    <text x="60" y="74" fontSize="7" fill="#166534" textAnchor="middle" fontWeight="bold">✓ Good GPS</text>
-    {/* Bad GPS */}
-    <rect x="130" y="10" width="100" height="70" rx="8" fill="white" stroke="#fca5a5" strokeWidth="1.5"/>
-    <rect x="136" y="16" width="88" height="50" rx="4" fill="#dbeafe"/>
-    <circle cx="180" cy="41" r="38" fill="#fecaca" opacity="0.4"/>
-    <circle cx="180" cy="41" r="6" fill="#ef4444" stroke="white" strokeWidth="2"/>
-    <text x="180" y="74" fontSize="7" fill="#dc2626" textAnchor="middle" fontWeight="bold">Poor GPS (indoors)</text>
-    <text x="60" y="85" fontSize="6" fill="#374151" textAnchor="middle">Small circle = accurate</text>
-    <text x="180" y="85" fontSize="6" fill="#374151" textAnchor="middle">Large circle = approximate</text>
-  </svg>
-);
+// ─── All FAQ content, fully translated, with step-by-step guides ──────────────
+const FAQ_CONTENT = {
+  en: {
+    sections: [
+      {
+        category: 'Getting Started',
+        items: [
+          {
+            q: 'What is SpotFinder?',
+            a: 'SpotFinder is a free community map app for discovering and sharing useful spots — parking areas, scenic viewpoints, rest stops, and more. Everyone can add spots, rate them, and navigate directly from the app — no account required.',
+            steps: null
+          },
+          {
+            q: 'Do I need an account?',
+            a: 'No account needed! You can browse the map, add spots, and rate them as a guest. Creating an account (email or Google) lets you manage and track your own spots later.',
+            steps: null
+          },
+        ]
+      },
+      {
+        category: 'Adding Spots',
+        items: [
+          {
+            q: 'How do I add a spot?',
+            a: 'Follow these 5 steps:',
+            steps: [
+              { label: 'Tap the green + button at the bottom of the screen', svg: <SvgPlusButton /> },
+              { label: 'The map enters "add mode" — tap anywhere to place your spot', svg: <SvgTapMap /> },
+              { label: 'Fill in a description and set star ratings for Parking, Scenery, and Privacy', svg: <SvgFillForm /> },
+              { label: 'Optionally add a photo by tapping the camera area', svg: <SvgAddPhoto /> },
+              { label: 'Tap Save Spot — your spot immediately appears on the map for everyone', svg: <SvgSpotAppears /> },
+            ]
+          },
+          {
+            q: 'How do I use voice to write the description?',
+            a: 'Tap the Voice button next to the description field. The mic listens in whichever language you have set in Settings (Czech, English, German, etc.). Your words appear live in the field. Tap again to stop.',
+            steps: [
+              { label: 'Tap the Voice / mic button next to the description field', svg: <SvgVoice /> },
+            ]
+          },
+        ]
+      },
+      {
+        category: 'Rating Spots',
+        items: [
+          {
+            q: 'How do I rate a spot?',
+            a: 'Anyone can rate — including guests. Tap a spot on the map, then tap the stars in the detail panel. There is an overall rating plus individual ratings for Parking, Beauty, and Privacy.',
+            steps: [
+              { label: 'Tap any spot marker to open its detail', svg: <SvgOpenDetail /> },
+              { label: 'Tap the stars to leave your rating — no account required', svg: <SvgRateSpot /> },
+            ]
+          },
+        ]
+      },
+      {
+        category: 'Navigation',
+        items: [
+          {
+            q: 'How do I navigate to a spot?',
+            a: 'Open a spot\'s detail and tap Navigate Here. Choose your travel mode, then tap Start Navigation for turn-by-turn voice directions.',
+            steps: [
+              { label: 'Open any spot and tap the Navigate Here button', svg: <SvgOpenDetail /> },
+              { label: 'Choose Drive, Bike, or Walk — then tap Start Navigation', svg: <SvgNavigate /> },
+              { label: 'Switch between driving, cycling, and walking mode anytime', svg: <SvgRouteModes /> },
+            ]
+          },
+          {
+            q: 'Will it reroute if I go off-route?',
+            a: 'Yes. If you go more than 80 m off the planned route, SpotFinder automatically recalculates from your current position and announces "Rerouting" in your language.',
+            steps: null
+          },
+        ]
+      },
+      {
+        category: 'Map & Traffic',
+        items: [
+          {
+            q: 'How do I switch the map style?',
+            a: 'Tap the Layers button in the bottom-left corner to choose between Basic, Outdoor, Satellite, Winter, or Traffic view.',
+            steps: [
+              { label: 'Tap the Layers button to open the style picker', svg: <SvgMapLayers /> },
+            ]
+          },
+          {
+            q: 'What does the Traffic layer show?',
+            a: 'Real-time traffic flow (green = free, yellow = slow, red = heavy), plus road closure icons (⛔) and traffic jam icons (🚦) that appear automatically.',
+            steps: [
+              { label: 'Switch to Traffic view to see live road conditions', svg: <SvgTrafficLayer /> },
+            ]
+          },
+        ]
+      },
+      {
+        category: 'Sharing',
+        items: [
+          {
+            q: 'How do I share a spot?',
+            a: 'Open any spot detail and tap the Share button. On mobile the system share sheet opens. On desktop the link is copied. The recipient opens the map directly at that spot.',
+            steps: [
+              { label: 'Open a spot and tap the Share (↑) button', svg: <SvgShare /> },
+            ]
+          },
+        ]
+      },
+    ],
+    about: {
+      title: 'About SpotFinder',
+      desc: 'SpotFinder is a free, community-driven map app built to help people discover and share useful spots — from hidden parking to scenic viewpoints. Anyone can contribute.',
+      features: ['Free to use — no subscription', 'Works as a guest — no account needed', 'Add, rate, navigate, and share spots', 'Voice dictation in 12 languages', 'Real-time traffic & road closure overlay', 'Turn-by-turn navigation for car, bike, and foot'],
+      built: 'Built with React, Leaflet, Firebase, and OSRM.',
+      version: 'Version 2.1',
+    }
+  },
 
-// ─── Full FAQ content in all 12 languages ─────────────────────────────────────
-const FAQ_DATA = {
-  en: [
-    {
-      category: 'Getting Started',
-      items: [
-        { q: 'What is SpotFinder?', a: 'SpotFinder is a community map app for discovering and sharing useful spots — parking areas, scenic viewpoints, rest stops, and more. Add spots, rate them, and navigate directly from the app.', guide: null },
-        { q: 'Do I need an account to use SpotFinder?', a: 'No! You can browse, add spots, and rate them all as a guest. Creating an account lets you manage and track the spots you\'ve added.', guide: null },
-        { q: 'How do I create an account?', a: 'Tap the person icon in the top-right corner of the map, then choose Sign In or Sign Up. You can register with email/password or sign in with Google.', guide: null },
-      ]
-    },
-    {
-      category: 'Adding & Rating Spots',
-      items: [
-        { q: 'How do I add a spot?', a: 'Tap the green + button at the bottom of the screen to enter add mode, then tap anywhere on the map to place the spot. A form will appear — add a description, star ratings, and a photo.', guide: <GuideAddSpot /> },
-        { q: 'Can I use voice to write the description?', a: 'Yes! Tap the Voice button next to the description field. The app listens in whichever language you have selected, so if you switch to Czech in Settings the mic will understand Czech. Tap again to stop — your spoken text will appear in the field and you can edit it.', guide: <GuideVoice /> },
-        { q: 'How do I rate a spot?', a: 'Tap any spot on the map to open its detail. You\'ll see an overall star rating you can tap, plus separate ratings for Parking, Beauty, and Privacy. Anyone — including guests — can rate.', guide: <GuideRate /> },
-        { q: 'Can I add a photo to my spot?', a: 'Yes — when creating or editing a spot, tap the camera icon to pick a photo from your device. It\'s uploaded to Firebase Storage so it appears for everyone and persists permanently.', guide: null },
-        { q: 'Can I delete a spot I added?', a: 'Yes. Open the spot detail and tap the trash icon. You can only delete spots you created (or all spots if you are a super admin).', guide: null },
-      ]
-    },
-    {
-      category: 'Navigation',
-      items: [
-        { q: 'How do I navigate to a spot?', a: 'Tap a spot marker on the map to open the detail panel, then press "Navigate Here". You can also tap the arrow icon next to any spot in the nearby list. Choose Drive, Bike, or Walk and hit Start Navigation.', guide: <GuideNavigate /> },
-        { q: 'What routing engine does SpotFinder use?', a: 'SpotFinder uses OSRM (Open Source Routing Machine) — a fast, free routing engine that supports driving, cycling, and walking. Turn-by-turn instructions are spoken aloud using your device\'s text-to-speech in the language you have selected in Settings.', guide: null },
-        { q: 'Can I navigate to a searched address?', a: 'Yes. Type any address or place in the search bar at the top. Tap the navigation arrow next to a result to start routing straight to that address.', guide: null },
-        { q: 'Will it reroute if I leave the planned road?', a: 'Yes. If you go more than 80 m off the route, SpotFinder automatically recalculates from your current position and announces "Rerouting" in your chosen language.', guide: null },
-      ]
-    },
-    {
-      category: 'Map & Traffic',
-      items: [
-        { q: 'How do I switch the map style?', a: 'Tap the Layers button in the bottom-left corner of the map. You can choose Basic, Outdoor, Satellite, Winter, or Traffic view.', guide: <GuideMapLayers /> },
-        { q: 'What does the Traffic layer show?', a: 'The Traffic layer overlays real-time traffic flow — green means free flow, yellow means slow, red means heavy congestion. Road closure markers (⛔) and traffic jam markers (🚦) appear on the map when incidents are detected. These use the TomTom API if a key is configured, or fall back to OpenStreetMap data automatically.', guide: <GuideTraffic /> },
-        { q: 'Why is my GPS dot inaccurate?', a: 'GPS accuracy depends on your device and surroundings. Indoors or in dense urban canyons the signal is weaker. The light-blue circle around your dot represents the estimated accuracy radius — the smaller the circle, the better the fix.', guide: <GuideGPS /> },
-      ]
-    },
-    {
-      category: 'Sharing & Privacy',
-      items: [
-        { q: 'How do I share a spot with someone?', a: 'Open any spot detail and tap the Share button (↑). On mobile it opens the native share sheet. On desktop it copies a direct link to the clipboard. When the recipient opens the link, the map flies straight to that exact spot.', guide: <GuideShare /> },
-        { q: 'Are my spots public?', a: 'Yes — all spots are visible to everyone. SpotFinder is a community sharing platform so public visibility is intentional.', guide: null },
-        { q: 'Where is my data stored?', a: 'Spot data and user accounts live in Firebase (Google Cloud). Photos are stored in Firebase Storage. Authentication is handled by Firebase Auth. No personal data is sold to third parties.', guide: null },
-        { q: 'How do I delete my account?', a: 'Tap the profile icon → Delete Account. Type the confirmation word shown and press Delete. Note: full backend deletion requires contacting support.', guide: null },
-      ]
-    },
-  ],
+  cs: {
+    sections: [
+      {
+        category: 'Začínáme',
+        items: [
+          { q: 'Co je SpotFinder?', a: 'SpotFinder je bezplatná komunitní mapová aplikace pro sdílení užitečných míst — parkovišť, výhledů, odpočívadel a dalšího. Kdokoli může přidávat spoty, hodnotit je a navigovat — bez nutnosti registrace.', steps: null },
+          { q: 'Potřebuji účet?', a: 'Nepotřebujete! Jako host můžete procházet mapu, přidávat spoty a hodnotit je. Účet (e-mail nebo Google) umožňuje spravovat vaše spoty.', steps: null },
+        ]
+      },
+      {
+        category: 'Přidávání spotů',
+        items: [
+          {
+            q: 'Jak přidám spot?',
+            a: 'Postupujte podle těchto 5 kroků:',
+            steps: [
+              { label: 'Klepněte na zelené tlačítko + dole na obrazovce', svg: <SvgPlusButton /> },
+              { label: 'Mapa přejde do režimu přidávání — klepněte kdekoliv pro umístění spotu', svg: <SvgTapMap /> },
+              { label: 'Vyplňte popis a nastavte hvězdičkové hodnocení parkování, krásy a soukromí', svg: <SvgFillForm /> },
+              { label: 'Volitelně přidejte fotku klepnutím na oblast fotoaparátu', svg: <SvgAddPhoto /> },
+              { label: 'Klepněte na Uložit spot — váš spot se okamžitě zobrazí na mapě', svg: <SvgSpotAppears /> },
+            ]
+          },
+          {
+            q: 'Jak použít hlas pro popis?',
+            a: 'Klepněte na tlačítko Hlas vedle pole popisu. Mikrofon naslouchá v jazyce nastaveném v Nastavení. Vaše slova se živě zobrazují v poli. Klepněte znovu pro zastavení.',
+            steps: [{ label: 'Klepněte na tlačítko hlasu vedle pole popisu', svg: <SvgVoice /> }]
+          },
+        ]
+      },
+      {
+        category: 'Hodnocení spotů',
+        items: [
+          {
+            q: 'Jak hodnotím spot?',
+            a: 'Hodnotit může kdokoli — i hosté. Klepněte na spot na mapě, poté klepněte na hvězdičky v detailu. Můžete hodnotit celkově i jednotlivě (parkování, krása, soukromí).',
+            steps: [
+              { label: 'Klepněte na značku spotu pro otevření detailu', svg: <SvgOpenDetail /> },
+              { label: 'Klepněte na hvězdičky — bez potřeby účtu', svg: <SvgRateSpot /> },
+            ]
+          },
+        ]
+      },
+      {
+        category: 'Navigace',
+        items: [
+          {
+            q: 'Jak navigovat ke spotu?',
+            a: 'Otevřete detail spotu a klepněte na Navigovat sem. Vyberte způsob dopravy a klepněte na Spustit navigaci pro hlasové pokyny.',
+            steps: [
+              { label: 'Otevřete spot a klepněte na tlačítko Navigovat sem', svg: <SvgOpenDetail /> },
+              { label: 'Vyberte Auto, Kolo nebo Pěšky — pak klepněte na Spustit navigaci', svg: <SvgNavigate /> },
+              { label: 'Kdykoli přepínejte mezi režimy dopravy', svg: <SvgRouteModes /> },
+            ]
+          },
+          { q: 'Přepočítá trasu automaticky?', a: 'Ano. Odchýlíte-li se o více než 80 m, SpotFinder automaticky přepočítá z aktuální polohy a ohlásí "Přepočítávám trasu" ve vašem jazyce.', steps: null },
+        ]
+      },
+      {
+        category: 'Mapa a doprava',
+        items: [
+          {
+            q: 'Jak přepnu styl mapy?',
+            a: 'Klepněte na tlačítko Vrstvy v levém dolním rohu pro výběr ze stylů Základní, Venkovní, Satelit, Zimní nebo Doprava.',
+            steps: [{ label: 'Klepněte na tlačítko Vrstvy pro výběr stylu', svg: <SvgMapLayers /> }]
+          },
+          {
+            q: 'Co zobrazuje vrstva Doprava?',
+            a: 'Provoz v reálném čase (zelená = volno, žlutá = pomalu, červená = zácpa) plus ikony uzavírek (⛔) a kolon (🚦), které se zobrazují automaticky.',
+            steps: [{ label: 'Přepněte na vrstvu Doprava pro zobrazení aktuálního provozu', svg: <SvgTrafficLayer /> }]
+          },
+        ]
+      },
+      {
+        category: 'Sdílení',
+        items: [
+          {
+            q: 'Jak sdílet spot?',
+            a: 'Otevřete detail spotu a klepněte na Sdílet. Na mobilu se otevře nativní sdílení, na desktopu se zkopíruje odkaz. Příjemce otevře mapu přímo na daném spotu.',
+            steps: [{ label: 'Otevřete spot a klepněte na tlačítko Sdílet (↑)', svg: <SvgShare /> }]
+          },
+        ]
+      },
+    ],
+    about: {
+      title: 'O SpotFinderu',
+      desc: 'SpotFinder je bezplatná komunitní mapová aplikace, která pomáhá lidem objevovat a sdílet užitečná místa — od skrytých parkovišť po malebné výhledy. Přispět může kdokoli.',
+      features: ['Zdarma — žádné předplatné', 'Funguje jako host — bez účtu', 'Přidávání, hodnocení, navigace a sdílení spotů', 'Hlasové diktování ve 12 jazycích', 'Přehled dopravy a uzavírek v reálném čase', 'Navigace hlasovými pokyny pro auto, kolo i pěšky'],
+      built: 'Postaveno na React, Leaflet, Firebase a OSRM.',
+      version: 'Verze 2.1',
+    }
+  },
 
-  cs: [
-    {
-      category: 'Začínáme',
-      items: [
-        { q: 'Co je SpotFinder?', a: 'SpotFinder je komunitní mapová aplikace pro sdílení zajímavých míst — parkovišť, výhledů, odpočívadel a dalších. Přidávejte spoty, hodnoťte je a navigujte přímo z aplikace.', guide: null },
-        { q: 'Potřebuji účet?', a: 'Ne! Jako host můžete procházet mapu, přidávat spoty i hodnotit. Účet umožňuje spravovat vaše přidané spoty.', guide: null },
-        { q: 'Jak si vytvořím účet?', a: 'Klepněte na ikonu osoby v pravém horním rohu mapy, poté zvolte Přihlásit se nebo Zaregistrovat se. Lze se přihlásit e-mailem nebo přes Google.', guide: null },
-      ]
-    },
-    {
-      category: 'Přidávání a hodnocení spotů',
-      items: [
-        { q: 'Jak přidám spot?', a: 'Klepněte na zelené tlačítko + dole na obrazovce pro vstup do režimu přidávání, poté klepněte kdekoliv na mapu. Zobrazí se formulář — přidejte popis, hvězdičkové hodnocení a fotku.', guide: <GuideAddSpot /> },
-        { q: 'Mohu použít hlas pro popis?', a: 'Ano! Klepněte na tlačítko Hlas vedle pole popisu. Aplikace poslouchá v jazyce nastaveném v Nastavení — přepnete-li na češtinu, mikrofon bude rozumět češtině. Klepnutím znovu zastavíte nahrávání.', guide: <GuideVoice /> },
-        { q: 'Jak hodnotím spot?', a: 'Klepněte na spot na mapě a otevřete detail. Uvidíte celkové hvězdičkové hodnocení i samostatná hodnocení Parkování, Krásy a Soukromí. Hodnotit může kdokoli — i hosté.', guide: <GuideRate /> },
-        { q: 'Mohu přidat fotku?', a: 'Ano — při vytváření nebo úpravě spotu klepněte na ikonu fotoaparátu. Fotka se nahraje do Firebase Storage a zůstane viditelná trvale.', guide: null },
-        { q: 'Mohu smazat svůj spot?', a: 'Ano. Otevřete detail spotu a klepněte na ikonu koše. Smazat lze pouze spoty, které jste sami vytvořili.', guide: null },
-      ]
-    },
-    {
-      category: 'Navigace',
-      items: [
-        { q: 'Jak navigovat ke spotu?', a: 'Klepněte na značku spotu a otevřete detail, poté stiskněte „Navigovat sem". Vyberte Auto, Kolo nebo Pěšky a stiskněte Spustit navigaci.', guide: <GuideNavigate /> },
-        { q: 'Jaký navigační engine SpotFinder používá?', a: 'SpotFinder používá OSRM — rychlý bezplatný navigační engine. Pokyny pro odbočky jsou hlasitě čteny v jazyce nastaveném v Nastavení.', guide: null },
-        { q: 'Přepočítá trasu automaticky?', a: 'Ano. Odchýlíte-li se od trasy o více než 80 m, SpotFinder automaticky přepočítá z aktuální polohy a ohlásí „Přepočítávám trasu".', guide: null },
-      ]
-    },
-    {
-      category: 'Mapa a doprava',
-      items: [
-        { q: 'Jak přepnu styl mapy?', a: 'Klepněte na tlačítko Vrstvy v levém dolním rohu mapy. Vyberte Základní, Venkovní, Satelit, Zimní nebo Doprava.', guide: <GuideMapLayers /> },
-        { q: 'Co zobrazuje vrstva Doprava?', a: 'Vrstva Doprava zobrazuje provoz v reálném čase — zelená = volno, žlutá = pomalu, červená = zácpa. Ikony uzavírek (⛔) a kolon (🚦) se zobrazují automaticky.', guide: <GuideTraffic /> },
-        { q: 'Proč je moje GPS tečka nepřesná?', a: 'Přesnost GPS závisí na zařízení a prostředí. V budovách nebo husté zástavbě je signál slabší. Světle modrý kruh kolem tečky znázorňuje odhadovaný poloměr přesnosti.', guide: <GuideGPS /> },
-      ]
-    },
-    {
-      category: 'Sdílení a soukromí',
-      items: [
-        { q: 'Jak sdílet spot?', a: 'Otevřete detail spotu a klepněte na Sdílet (↑). Na mobilu se otevře nativní sdílení, na desktopu se zkopíruje odkaz. Příjemce otevře mapu přesně na daném spotu.', guide: <GuideShare /> },
-        { q: 'Jsou moje spoty veřejné?', a: 'Ano — všechny spoty jsou viditelné pro všechny. SpotFinder je komunitní platforma pro sdílení.', guide: null },
-        { q: 'Kde jsou uložena má data?', a: 'Data spotů a uživatelské účty jsou uloženy ve Firebase (Google Cloud). Fotky jsou v Firebase Storage. Osobní data nejsou prodávána třetím stranám.', guide: null },
-      ]
-    },
-  ],
+  de: {
+    sections: [
+      {
+        category: 'Erste Schritte',
+        items: [
+          { q: 'Was ist SpotFinder?', a: 'SpotFinder ist eine kostenlose Community-Karten-App zum Entdecken nützlicher Spots — Parkplätze, Aussichtspunkte, Rastplätze und mehr. Jeder kann Spots hinzufügen, bewerten und direkt navigieren — ohne Konto.', steps: null },
+          { q: 'Benötige ich ein Konto?', a: 'Nein! Als Gast können Sie die Karte durchsuchen, Spots hinzufügen und bewerten. Ein Konto ermöglicht die Verwaltung Ihrer eigenen Spots.', steps: null },
+        ]
+      },
+      {
+        category: 'Spots hinzufügen',
+        items: [
+          {
+            q: 'Wie füge ich einen Spot hinzu?',
+            a: 'Folgen Sie diesen 5 Schritten:',
+            steps: [
+              { label: 'Tippen Sie auf die grüne +-Schaltfläche am unteren Bildschirmrand', svg: <SvgPlusButton /> },
+              { label: 'Die Karte wechselt in den Hinzufüge-Modus — tippen Sie irgendwo auf die Karte', svg: <SvgTapMap /> },
+              { label: 'Füllen Sie Beschreibung und Sternebewertungen für Parken, Landschaft und Privatsphäre aus', svg: <SvgFillForm /> },
+              { label: 'Optional: Tippen Sie auf den Kamerabereich, um ein Foto hinzuzufügen', svg: <SvgAddPhoto /> },
+              { label: 'Tippen Sie auf Spot speichern — Ihr Spot erscheint sofort auf der Karte', svg: <SvgSpotAppears /> },
+            ]
+          },
+          {
+            q: 'Wie nutze ich die Spracheingabe?',
+            a: 'Tippen Sie auf die Sprach-Schaltfläche neben dem Beschreibungsfeld. Das Mikrofon hört in der in den Einstellungen gewählten Sprache zu. Ihre Worte erscheinen live im Feld.',
+            steps: [{ label: 'Tippen Sie auf die Sprach-Schaltfläche neben dem Beschreibungsfeld', svg: <SvgVoice /> }]
+          },
+        ]
+      },
+      {
+        category: 'Spots bewerten',
+        items: [
+          {
+            q: 'Wie bewerte ich einen Spot?',
+            a: 'Jeder kann bewerten — auch Gäste. Tippen Sie auf einen Spot, dann auf die Sterne im Detailbereich.',
+            steps: [
+              { label: 'Tippen Sie auf einen Spot-Marker, um das Detail zu öffnen', svg: <SvgOpenDetail /> },
+              { label: 'Tippen Sie auf die Sterne — kein Konto erforderlich', svg: <SvgRateSpot /> },
+            ]
+          },
+        ]
+      },
+      {
+        category: 'Navigation',
+        items: [
+          {
+            q: 'Wie navigiere ich zu einem Spot?',
+            a: 'Öffnen Sie das Detail eines Spots und tippen Sie auf Hierher navigieren. Wählen Sie den Fahrmodus und starten Sie die Navigation.',
+            steps: [
+              { label: 'Öffnen Sie einen Spot und tippen Sie auf Hierher navigieren', svg: <SvgOpenDetail /> },
+              { label: 'Wählen Sie Auto, Fahrrad oder Zu Fuß — dann Navigation starten', svg: <SvgNavigate /> },
+              { label: 'Wechseln Sie jederzeit den Fahrmodus', svg: <SvgRouteModes /> },
+            ]
+          },
+          { q: 'Berechnet es die Route neu?', a: 'Ja. Bei mehr als 80 m Abweichung berechnet SpotFinder automatisch neu und kündigt „Umleitung" in Ihrer Sprache an.', steps: null },
+        ]
+      },
+      {
+        category: 'Karte & Verkehr',
+        items: [
+          {
+            q: 'Wie wechsle ich den Kartenstil?',
+            a: 'Tippen Sie auf die Ebenen-Schaltfläche unten links, um zwischen Grundkarte, Outdoor, Satellit, Winter und Verkehr zu wählen.',
+            steps: [{ label: 'Tippen Sie auf die Ebenen-Schaltfläche für den Stilwechsel', svg: <SvgMapLayers /> }]
+          },
+          {
+            q: 'Was zeigt die Verkehrsebene?',
+            a: 'Echtzeit-Verkehrsfluss (grün = frei, gelb = langsam, rot = Stau) plus Sperr-Icons (⛔) und Stau-Icons (🚦) automatisch.',
+            steps: [{ label: 'Wechseln Sie zur Verkehrsebene für Live-Straßenbedingungen', svg: <SvgTrafficLayer /> }]
+          },
+        ]
+      },
+      {
+        category: 'Teilen',
+        items: [
+          {
+            q: 'Wie teile ich einen Spot?',
+            a: 'Öffnen Sie das Spot-Detail und tippen Sie auf Teilen. Auf dem Handy öffnet sich das native Teilen-Menü, am Desktop wird der Link kopiert.',
+            steps: [{ label: 'Öffnen Sie einen Spot und tippen Sie auf Teilen (↑)', svg: <SvgShare /> }]
+          },
+        ]
+      },
+    ],
+    about: {
+      title: 'Über SpotFinder',
+      desc: 'SpotFinder ist eine kostenlose Community-App zum Entdecken nützlicher Orte — von versteckten Parkplätzen bis zu malerischen Aussichtspunkten. Jeder kann beitragen.',
+      features: ['Kostenlos — kein Abo', 'Als Gast nutzbar — kein Konto nötig', 'Spots hinzufügen, bewerten, navigieren und teilen', 'Spracheingabe in 12 Sprachen', 'Echtzeit-Verkehr & Straßensperren', 'Abbieg-Navigationsansagen für Auto, Fahrrad, Fußgänger'],
+      built: 'Entwickelt mit React, Leaflet, Firebase und OSRM.',
+      version: 'Version 2.1',
+    }
+  },
 
-  de: [
-    {
-      category: 'Erste Schritte',
-      items: [
-        { q: 'Was ist SpotFinder?', a: 'SpotFinder ist eine Community-Karten-App zum Entdecken und Teilen nützlicher Spots — Parkplätze, Aussichtspunkte, Rastplätze und mehr.', guide: null },
-        { q: 'Benötige ich ein Konto?', a: 'Nein! Als Gast können Sie Spots durchsuchen, hinzufügen und bewerten. Ein Konto ermöglicht Ihnen die Verwaltung Ihrer eigenen Spots.', guide: null },
-        { q: 'Wie erstelle ich ein Konto?', a: 'Tippen Sie auf das Personensymbol oben rechts auf der Karte und wählen Sie Anmelden oder Registrieren. Sie können sich mit E-Mail/Passwort oder Google anmelden.', guide: null },
-      ]
-    },
-    {
-      category: 'Spots hinzufügen & bewerten',
-      items: [
-        { q: 'Wie füge ich einen Spot hinzu?', a: 'Tippen Sie auf die grüne +-Schaltfläche am unteren Bildschirmrand, um den Hinzufüge-Modus zu aktivieren, dann tippen Sie auf eine beliebige Stelle auf der Karte.', guide: <GuideAddSpot /> },
-        { q: 'Kann ich Spracheingabe für die Beschreibung nutzen?', a: 'Ja! Tippen Sie auf die Sprach-Schaltfläche neben dem Beschreibungsfeld. Die App hört in der in den Einstellungen ausgewählten Sprache zu — bei Deutsch versteht das Mikrofon Deutsch.', guide: <GuideVoice /> },
-        { q: 'Wie bewerte ich einen Spot?', a: 'Tippen Sie auf einen Spot-Marker und öffnen Sie das Detail. Sie sehen eine Gesamtbewertung sowie separate Bewertungen für Parken, Schönheit und Privatsphäre. Jeder kann bewerten.', guide: <GuideRate /> },
-        { q: 'Kann ich einen Spot löschen?', a: 'Ja. Öffnen Sie das Detail des Spots und tippen Sie auf das Papierkorb-Symbol. Sie können nur Spots löschen, die Sie selbst erstellt haben.', guide: null },
-      ]
-    },
-    {
-      category: 'Navigation',
-      items: [
-        { q: 'Wie navigiere ich zu einem Spot?', a: 'Tippen Sie auf einen Spot-Marker, dann auf „Hierher navigieren". Wählen Sie Auto, Fahrrad oder Zu Fuß und starten Sie die Navigation.', guide: <GuideNavigate /> },
-        { q: 'Wird die Route automatisch neu berechnet?', a: 'Ja. Wenn Sie mehr als 80 m von der Route abweichen, berechnet SpotFinder automatisch neu und kündigt „Umleitung" in Ihrer gewählten Sprache an.', guide: null },
-      ]
-    },
-    {
-      category: 'Karte & Verkehr',
-      items: [
-        { q: 'Wie wechsle ich den Kartenstil?', a: 'Tippen Sie auf die Ebenen-Schaltfläche unten links auf der Karte. Sie können zwischen Grundkarte, Outdoor, Satellit, Winter und Verkehr wählen.', guide: <GuideMapLayers /> },
-        { q: 'Was zeigt die Verkehrsebene?', a: 'Die Verkehrsebene zeigt den Echtzeit-Verkehrsfluss — Grün = freie Fahrt, Gelb = langsam, Rot = Stau. Straßensperren (⛔) und Stau-Marker (🚦) erscheinen automatisch.', guide: <GuideTraffic /> },
-      ]
-    },
-    {
-      category: 'Teilen & Datenschutz',
-      items: [
-        { q: 'Wie teile ich einen Spot?', a: 'Öffnen Sie ein Spot-Detail und tippen Sie auf Teilen (↑). Auf dem Handy öffnet sich das native Teilen-Menü, am Desktop wird ein Link kopiert. Der Empfänger öffnet die Karte direkt am Spot.', guide: <GuideShare /> },
-        { q: 'Sind meine Spots öffentlich?', a: 'Ja — alle Spots sind für alle sichtbar. SpotFinder ist eine Community-Plattform.', guide: null },
-      ]
-    },
-  ],
+  pl: {
+    sections: [
+      { category: 'Pierwsze kroki', items: [
+        { q: 'Czym jest SpotFinder?', a: 'SpotFinder to bezpłatna aplikacja mapowa do odkrywania i udostępniania miejsc — parkingów, widoków, miejsc odpoczynku i nie tylko. Każdy może dodawać spoty bez konta.', steps: null },
+        { q: 'Czy potrzebuję konta?', a: 'Nie! Jako gość możesz przeglądać mapę, dodawać spoty i je oceniać. Konto pozwala zarządzać swoimi spotami.', steps: null },
+      ]},
+      { category: 'Dodawanie spotów', items: [
+        { q: 'Jak dodać spot?', a: 'Wykonaj 5 kroków:', steps: [
+          { label: 'Naciśnij zielony przycisk + na dole ekranu', svg: <SvgPlusButton /> },
+          { label: 'Mapa przechodzi w tryb dodawania — dotknij dowolnego miejsca na mapie', svg: <SvgTapMap /> },
+          { label: 'Wypełnij opis i ustaw oceny gwiazdkowe dla Parkingu, Scenerii i Prywatności', svg: <SvgFillForm /> },
+          { label: 'Opcjonalnie dodaj zdjęcie, dotykając obszaru aparatu', svg: <SvgAddPhoto /> },
+          { label: 'Naciśnij Zapisz spot — spot natychmiast pojawia się na mapie', svg: <SvgSpotAppears /> },
+        ]},
+        { q: 'Jak korzystać z dyktowania głosowego?', a: 'Naciśnij przycisk Głos obok pola opisu. Mikrofon słucha w języku ustawionym w Ustawieniach. Słowa pojawiają się na bieżąco.', steps: [{ label: 'Naciśnij przycisk głosu obok pola opisu', svg: <SvgVoice /> }]},
+      ]},
+      { category: 'Ocenianie spotów', items: [
+        { q: 'Jak ocenić spot?', a: 'Każdy może oceniać — w tym goście. Dotknij spotu, potem gwiazdek w panelu szczegółów.', steps: [
+          { label: 'Dotknij znacznika spotu, aby otworzyć szczegóły', svg: <SvgOpenDetail /> },
+          { label: 'Dotknij gwiazdek — konto nie jest wymagane', svg: <SvgRateSpot /> },
+        ]},
+      ]},
+      { category: 'Nawigacja', items: [
+        { q: 'Jak nawigować do spotu?', a: 'Otwórz szczegóły spotu i naciśnij Nawiguj tutaj. Wybierz tryb podróży i uruchom nawigację.', steps: [
+          { label: 'Otwórz spot i naciśnij Nawiguj tutaj', svg: <SvgOpenDetail /> },
+          { label: 'Wybierz Samochód, Rower lub Pieszo — potem Rozpocznij nawigację', svg: <SvgNavigate /> },
+          { label: 'Zmieniaj tryb transportu w dowolnym momencie', svg: <SvgRouteModes /> },
+        ]},
+        { q: 'Czy trasa jest przeliczana automatycznie?', a: 'Tak. Przy odchyleniu ponad 80 m SpotFinder automatycznie przelicza trasę i ogłasza "Przeliczam trasę" w Twoim języku.', steps: null },
+      ]},
+      { category: 'Udostępnianie', items: [
+        { q: 'Jak udostępnić spot?', a: 'Otwórz szczegóły spotu i naciśnij Udostępnij. Na telefonie otwiera się natywne menu udostępniania, na komputerze kopiowany jest link.', steps: [{ label: 'Otwórz spot i naciśnij Udostępnij (↑)', svg: <SvgShare /> }]},
+      ]},
+    ],
+    about: { title: 'O SpotFinderze', desc: 'SpotFinder to bezpłatna aplikacja mapowa do odkrywania miejsc — od ukrytych parkingów po malownicze widoki. Każdy może dodawać spoty bez konta.', features: ['Bezpłatna — bez subskrypcji', 'Działa jako gość — bez konta', 'Dodaj, oceń, nawiguj i udostępnij spoty', 'Dyktowanie głosowe w 12 językach', 'Ruch drogowy i zamknięcia dróg w czasie rzeczywistym', 'Nawigacja głosowa dla samochodu, roweru i pieszych'], built: 'Zbudowany z React, Leaflet, Firebase i OSRM.', version: 'Wersja 2.1' }
+  },
 
-  pl: [
-    {
-      category: 'Pierwsze kroki',
-      items: [
-        { q: 'Czym jest SpotFinder?', a: 'SpotFinder to aplikacja mapowa do odkrywania i udostępniania miejsc — parkingów, punktów widokowych, miejsc odpoczynku i nie tylko.', guide: null },
-        { q: 'Czy potrzebuję konta?', a: 'Nie! Jako gość możesz przeglądać mapę, dodawać spoty i je oceniać. Konto umożliwia zarządzanie dodanymi przez Ciebie spotami.', guide: null },
-      ]
-    },
-    {
-      category: 'Dodawanie i ocenianie spotów',
-      items: [
-        { q: 'Jak dodać spot?', a: 'Naciśnij zielony przycisk + na dole ekranu, aby przejść do trybu dodawania, a następnie dotknij dowolnego miejsca na mapie. Wypełnij formularz z opisem, ocenami i zdjęciem.', guide: <GuideAddSpot /> },
-        { q: 'Czy mogę użyć głosu do opisu?', a: 'Tak! Naciśnij przycisk Głos obok pola opisu. Aplikacja słucha w języku wybranym w Ustawieniach. Naciśnij ponownie, aby zatrzymać nagrywanie.', guide: <GuideVoice /> },
-        { q: 'Jak ocenić spot?', a: 'Dotknij znacznika spotu na mapie, aby otworzyć szczegóły. Zobaczysz ogólną ocenę oraz osobne oceny dla Parkowania, Piękna i Prywatności. Każdy może oceniać — również goście.', guide: <GuideRate /> },
-      ]
-    },
-    {
-      category: 'Nawigacja',
-      items: [
-        { q: 'Jak nawigować do spotu?', a: 'Dotknij znacznika spotu, następnie naciśnij „Nawiguj tutaj". Wybierz Auto, Rower lub Pieszo i uruchom nawigację.', guide: <GuideNavigate /> },
-      ]
-    },
-    {
-      category: 'Mapa i ruch drogowy',
-      items: [
-        { q: 'Jak zmienić styl mapy?', a: 'Naciśnij przycisk Warstwy w lewym dolnym rogu mapy. Dostępne opcje: Podstawowa, Zewnętrzna, Satelita, Zimowa, Ruch.', guide: <GuideMapLayers /> },
-        { q: 'Co pokazuje warstwa Ruchu?', a: 'Warstwa Ruchu pokazuje ruch w czasie rzeczywistym — zielony = swobodny, żółty = wolny, czerwony = korek. Ikony zamkniętych dróg (⛔) i korków (🚦) pojawiają się automatycznie.', guide: <GuideTraffic /> },
-      ]
-    },
-    {
-      category: 'Udostępnianie i prywatność',
-      items: [
-        { q: 'Jak udostępnić spot?', a: 'Otwórz szczegóły spotu i naciśnij Udostępnij (↑). Na telefonie otworzy się natywne udostępnianie, na komputerze zostanie skopiowany link. Odbiorca otworzy mapę dokładnie w tym miejscu.', guide: <GuideShare /> },
-        { q: 'Czy moje spoty są publiczne?', a: 'Tak — wszystkie spoty są widoczne dla wszystkich. SpotFinder to platforma do wspólnego odkrywania miejsc.', guide: null },
-      ]
-    },
-  ],
+  sk: {
+    sections: [
+      { category: 'Začíname', items: [
+        { q: 'Čo je SpotFinder?', a: 'SpotFinder je bezplatná komunitná mapová aplikácia na zdieľanie zaujímavých miest — parkovísk, výhľadov, oddychových miest a ďalšieho. Každý môže pridávať spoty bez účtu.', steps: null },
+        { q: 'Potrebujem účet?', a: 'Nie! Ako hosť môžete prezerať mapu, pridávať spoty a hodnotiť ich. Účet umožňuje spravovať vaše spoty.', steps: null },
+      ]},
+      { category: 'Pridávanie spotov', items: [
+        { q: 'Ako pridám spot?', a: 'Postupujte podľa 5 krokov:', steps: [
+          { label: 'Klepnite na zelené tlačidlo + dole na obrazovke', svg: <SvgPlusButton /> },
+          { label: 'Mapa prejde do režimu pridávania — klepnite kdekoľvek na mapu', svg: <SvgTapMap /> },
+          { label: 'Vyplňte popis a hodnotenia parkovania, krásy a súkromia', svg: <SvgFillForm /> },
+          { label: 'Voliteľne pridajte fotku klepnutím na oblasť fotoaparátu', svg: <SvgAddPhoto /> },
+          { label: 'Klepnite na Uložiť spot — okamžite sa zobrazí na mape', svg: <SvgSpotAppears /> },
+        ]},
+      ]},
+      { category: 'Hodnotenie spotov', items: [
+        { q: 'Ako hodnotím spot?', a: 'Hodnotiť môže kdokoľvek — aj hostia. Klepnite na spot a potom na hviezdy v detaile.', steps: [
+          { label: 'Klepnite na značku spotu pre otvorenie detailu', svg: <SvgOpenDetail /> },
+          { label: 'Klepnite na hviezdy — bez potreby účtu', svg: <SvgRateSpot /> },
+        ]},
+      ]},
+      { category: 'Navigácia', items: [
+        { q: 'Ako navigovať k spotu?', a: 'Otvorte detail spotu a klepnite na Navigovať sem. Vyberte spôsob dopravy a spustite navigáciu.', steps: [
+          { label: 'Otvorte spot a klepnite na Navigovať sem', svg: <SvgOpenDetail /> },
+          { label: 'Vyberte Auto, Bicykel alebo Pešo — potom Spustiť navigáciu', svg: <SvgNavigate /> },
+        ]},
+      ]},
+      { category: 'Zdieľanie', items: [
+        { q: 'Ako zdieľam spot?', a: 'Otvorte detail spotu a klepnite na Zdieľať. Na mobile sa otvorí natívne zdieľanie, na počítači sa skopíruje odkaz.', steps: [{ label: 'Otvorte spot a klepnite na Zdieľať (↑)', svg: <SvgShare /> }]},
+      ]},
+    ],
+    about: { title: 'O SpotFinderi', desc: 'SpotFinder je bezplatná komunitná aplikácia na objavovanie miest — od skrytých parkovísk po malebné výhľady. Každý môže pridávať spoty bez účtu.', features: ['Zadarmo — bez predplatného', 'Funguje ako hosť — bez účtu', 'Pridávanie, hodnotenie, navigácia a zdieľanie spotov', 'Hlasové diktovanie v 12 jazykoch', 'Doprava a uzávierky ciest v reálnom čase', 'Hlasová navigácia pre auto, bicykel a pešo'], built: 'Postavené na React, Leaflet, Firebase a OSRM.', version: 'Verzia 2.1' }
+  },
 
-  sk: [
-    {
-      category: 'Začíname',
-      items: [
-        { q: 'Čo je SpotFinder?', a: 'SpotFinder je komunitná mapová aplikácia na objavovanie a zdieľanie zaujímavých miest — parkovísk, výhľadov, oddychových miest a ďalšieho.', guide: null },
-        { q: 'Potrebujem účet?', a: 'Nie! Ako hosť môžete prezerať mapu, pridávať spoty aj ich hodnotiť. Účet umožňuje spravovať vaše pridané spoty.', guide: null },
-      ]
-    },
-    {
-      category: 'Pridávanie a hodnotenie spotov',
-      items: [
-        { q: 'Ako pridám spot?', a: 'Klepnite na zelené tlačidlo + dole na obrazovke, potom klepnite kdekoľvek na mapu. Vyplňte formulár s popisom, hodnoteniami a fotkou.', guide: <GuideAddSpot /> },
-        { q: 'Ako hodnotím spot?', a: 'Klepnite na spot a otvorte detail. Uvidíte celkové hodnotenie aj samostatné hodnotenia Parkovania, Krásy a Súkromia. Hodnotiť môže ktokoľvek — aj hostia.', guide: <GuideRate /> },
-      ]
-    },
-    {
-      category: 'Navigácia',
-      items: [
-        { q: 'Ako navigovať k spotu?', a: 'Klepnite na značku spotu, potom stlačte „Navigovať sem". Vyberte Auto, Bicykel alebo Pešo a spustite navigáciu.', guide: <GuideNavigate /> },
-      ]
-    },
-    {
-      category: 'Mapa a doprava',
-      items: [
-        { q: 'Ako prepnem štýl mapy?', a: 'Klepnite na tlačidlo Vrstvy vľavo dole na mape. Vyberte Základnú, Vonkajšiu, Satelit, Zimnú alebo Dopravu.', guide: <GuideMapLayers /> },
-      ]
-    },
-    {
-      category: 'Zdieľanie a súkromie',
-      items: [
-        { q: 'Ako zdieľam spot?', a: 'Otvorte detail spotu a klepnite na Zdieľať (↑). Na mobile sa otvorí natívne zdieľanie, na počítači sa skopíruje odkaz.', guide: <GuideShare /> },
-      ]
-    },
-  ],
+  fr: {
+    sections: [
+      { category: 'Premiers pas', items: [
+        { q: 'Qu\'est-ce que SpotFinder ?', a: 'SpotFinder est une application de carte communautaire gratuite pour découvrir des spots utiles — parkings, points de vue, aires de repos et plus. Tout le monde peut ajouter des spots sans compte.', steps: null },
+        { q: 'Ai-je besoin d\'un compte ?', a: 'Non ! En tant qu\'invité, vous pouvez parcourir la carte, ajouter des spots et les noter. Un compte permet de gérer vos spots.', steps: null },
+      ]},
+      { category: 'Ajouter des spots', items: [
+        { q: 'Comment ajouter un spot ?', a: 'Suivez ces 5 étapes :', steps: [
+          { label: 'Appuyez sur le bouton vert + en bas de l\'écran', svg: <SvgPlusButton /> },
+          { label: 'La carte passe en mode ajout — appuyez n\'importe où sur la carte', svg: <SvgTapMap /> },
+          { label: 'Remplissez la description et les étoiles pour Stationnement, Paysage et Confidentialité', svg: <SvgFillForm /> },
+          { label: 'Ajoutez optionnellement une photo en appuyant sur la zone appareil photo', svg: <SvgAddPhoto /> },
+          { label: 'Appuyez sur Enregistrer le spot — il apparaît immédiatement sur la carte', svg: <SvgSpotAppears /> },
+        ]},
+      ]},
+      { category: 'Noter des spots', items: [
+        { q: 'Comment noter un spot ?', a: 'Tout le monde peut noter — même les invités. Appuyez sur un spot, puis sur les étoiles dans le panneau de détail.', steps: [
+          { label: 'Appuyez sur un marqueur de spot pour ouvrir le détail', svg: <SvgOpenDetail /> },
+          { label: 'Appuyez sur les étoiles — aucun compte requis', svg: <SvgRateSpot /> },
+        ]},
+      ]},
+      { category: 'Navigation', items: [
+        { q: 'Comment naviguer vers un spot ?', a: 'Ouvrez le détail d\'un spot et appuyez sur Naviguer ici. Choisissez votre mode de déplacement et démarrez la navigation.', steps: [
+          { label: 'Ouvrez un spot et appuyez sur Naviguer ici', svg: <SvgOpenDetail /> },
+          { label: 'Choisissez Voiture, Vélo ou À pied — puis Démarrer la navigation', svg: <SvgNavigate /> },
+        ]},
+      ]},
+      { category: 'Partage', items: [
+        { q: 'Comment partager un spot ?', a: 'Ouvrez le détail d\'un spot et appuyez sur Partager. Sur mobile le menu natif s\'ouvre, sur ordinateur le lien est copié.', steps: [{ label: 'Ouvrez un spot et appuyez sur Partager (↑)', svg: <SvgShare /> }]},
+      ]},
+    ],
+    about: { title: 'À propos de SpotFinder', desc: 'SpotFinder est une application de carte communautaire gratuite pour découvrir des endroits utiles — des parkings cachés aux points de vue panoramiques. Tout le monde peut contribuer.', features: ['Gratuit — sans abonnement', 'Utilisable en tant qu\'invité — sans compte', 'Ajouter, noter, naviguer et partager des spots', 'Dictée vocale en 12 langues', 'Trafic en temps réel et fermetures de routes', 'Navigation vocale pour voiture, vélo et piétons'], built: 'Développé avec React, Leaflet, Firebase et OSRM.', version: 'Version 2.1' }
+  },
 
-  fr: [
-    {
-      category: 'Premiers pas',
-      items: [
-        { q: 'Qu\'est-ce que SpotFinder ?', a: 'SpotFinder est une application cartographique communautaire pour découvrir et partager des spots utiles — parkings, points de vue, aires de repos et bien plus.', guide: null },
-        { q: 'Ai-je besoin d\'un compte ?', a: 'Non ! En tant qu\'invité, vous pouvez parcourir la carte, ajouter des spots et les noter. Un compte vous permet de gérer vos spots ajoutés.', guide: null },
-      ]
-    },
-    {
-      category: 'Ajouter & noter des spots',
-      items: [
-        { q: 'Comment ajouter un spot ?', a: 'Appuyez sur le bouton vert + en bas de l\'écran pour activer le mode ajout, puis appuyez n\'importe où sur la carte. Remplissez le formulaire avec une description, des étoiles et une photo.', guide: <GuideAddSpot /> },
-        { q: 'Comment noter un spot ?', a: 'Appuyez sur un marqueur de spot pour ouvrir le détail. Vous verrez une note globale et des notes séparées pour le Stationnement, la Beauté et la Confidentialité. Tout le monde peut noter.', guide: <GuideRate /> },
-      ]
-    },
-    {
-      category: 'Navigation',
-      items: [
-        { q: 'Comment naviguer vers un spot ?', a: 'Appuyez sur un marqueur de spot, puis sur « Naviguer ici ». Choisissez Voiture, Vélo ou À pied et démarrez la navigation.', guide: <GuideNavigate /> },
-      ]
-    },
-    {
-      category: 'Carte & Trafic',
-      items: [
-        { q: 'Comment changer le style de carte ?', a: 'Appuyez sur le bouton Couches en bas à gauche de la carte. Choisissez entre Base, Extérieur, Satellite, Hiver ou Trafic.', guide: <GuideMapLayers /> },
-        { q: 'Que montre la couche Trafic ?', a: 'La couche Trafic affiche le flux en temps réel — vert = fluide, jaune = ralenti, rouge = embouteillage. Les marqueurs de fermetures (⛔) et d\'embouteillages (🚦) apparaissent automatiquement.', guide: <GuideTraffic /> },
-      ]
-    },
-    {
-      category: 'Partage & Confidentialité',
-      items: [
-        { q: 'Comment partager un spot ?', a: 'Ouvrez le détail d\'un spot et appuyez sur Partager (↑). Sur mobile, le menu de partage natif s\'ouvre. Sur ordinateur, un lien est copié. Le destinataire ouvre la carte directement sur le spot.', guide: <GuideShare /> },
-      ]
-    },
-  ],
+  it: {
+    sections: [
+      { category: 'Per iniziare', items: [
+        { q: 'Cos\'è SpotFinder?', a: 'SpotFinder è un\'app di mappe comunitaria gratuita per scoprire e condividere spot utili — parcheggi, panorami, aree di sosta e altro. Chiunque può aggiungere spot senza account.', steps: null },
+        { q: 'Ho bisogno di un account?', a: 'No! Come ospite puoi sfogliare la mappa, aggiungere spot e valutarli. Un account permette di gestire i tuoi spot.', steps: null },
+      ]},
+      { category: 'Aggiungere spot', items: [
+        { q: 'Come aggiungo uno spot?', a: 'Segui questi 5 passaggi:', steps: [
+          { label: 'Tocca il pulsante verde + in basso sullo schermo', svg: <SvgPlusButton /> },
+          { label: 'La mappa entra in modalità aggiunta — tocca qualsiasi punto della mappa', svg: <SvgTapMap /> },
+          { label: 'Compila la descrizione e le stelle per Parcheggio, Paesaggio e Privacy', svg: <SvgFillForm /> },
+          { label: 'Aggiungi opzionalmente una foto toccando l\'area fotocamera', svg: <SvgAddPhoto /> },
+          { label: 'Tocca Salva spot — appare immediatamente sulla mappa', svg: <SvgSpotAppears /> },
+        ]},
+      ]},
+      { category: 'Valutare spot', items: [
+        { q: 'Come valuto uno spot?', a: 'Chiunque può valutare — anche gli ospiti. Tocca uno spot, poi tocca le stelle nel pannello dei dettagli.', steps: [
+          { label: 'Tocca un marcatore spot per aprire i dettagli', svg: <SvgOpenDetail /> },
+          { label: 'Tocca le stelle — nessun account richiesto', svg: <SvgRateSpot /> },
+        ]},
+      ]},
+      { category: 'Navigazione', items: [
+        { q: 'Come navigo verso uno spot?', a: 'Apri il dettaglio di uno spot e tocca Naviga qui. Scegli la modalità di trasporto e avvia la navigazione.', steps: [
+          { label: 'Apri uno spot e tocca Naviga qui', svg: <SvgOpenDetail /> },
+          { label: 'Scegli Auto, Bici o A piedi — poi Avvia navigazione', svg: <SvgNavigate /> },
+        ]},
+      ]},
+      { category: 'Condivisione', items: [
+        { q: 'Come condivido uno spot?', a: 'Apri il dettaglio di uno spot e tocca Condividi. Su mobile si apre il menu nativo, su desktop viene copiato un link.', steps: [{ label: 'Apri uno spot e tocca Condividi (↑)', svg: <SvgShare /> }]},
+      ]},
+    ],
+    about: { title: 'Informazioni su SpotFinder', desc: 'SpotFinder è un\'app di mappe comunitaria gratuita per scoprire posti utili — dai parcheggi nascosti ai panorami mozzafiato. Tutti possono contribuire.', features: ['Gratuita — nessun abbonamento', 'Utilizzabile come ospite — senza account', 'Aggiungi, valuta, naviga e condividi spot', 'Dettatura vocale in 12 lingue', 'Traffico e chiusure stradali in tempo reale', 'Navigazione vocale per auto, bici e pedoni'], built: 'Sviluppato con React, Leaflet, Firebase e OSRM.', version: 'Versione 2.1' }
+  },
 
-  it: [
-    {
-      category: 'Per iniziare',
-      items: [
-        { q: 'Cos\'è SpotFinder?', a: 'SpotFinder è un\'app di mappe comunitaria per scoprire e condividere spot utili — parcheggi, punti panoramici, aree di sosta e altro ancora.', guide: null },
-        { q: 'Ho bisogno di un account?', a: 'No! Come ospite puoi sfogliare la mappa, aggiungere spot e valutarli. Un account ti permette di gestire gli spot che hai aggiunto.', guide: null },
-      ]
-    },
-    {
-      category: 'Aggiungere e valutare spot',
-      items: [
-        { q: 'Come aggiungo uno spot?', a: 'Tocca il pulsante verde + in basso sullo schermo per entrare in modalità aggiunta, poi tocca qualsiasi punto della mappa. Compila il modulo con descrizione, stelle e foto.', guide: <GuideAddSpot /> },
-        { q: 'Come valuto uno spot?', a: 'Tocca un marcatore spot per aprire il dettaglio. Vedrai una valutazione complessiva e valutazioni separate per Parcheggio, Bellezza e Privacy. Chiunque può valutare.', guide: <GuideRate /> },
-      ]
-    },
-    {
-      category: 'Navigazione',
-      items: [
-        { q: 'Come navigo verso uno spot?', a: 'Tocca un marcatore spot, poi premi "Naviga qui". Scegli Auto, Bici o A piedi e avvia la navigazione.', guide: <GuideNavigate /> },
-      ]
-    },
-    {
-      category: 'Mappa & Traffico',
-      items: [
-        { q: 'Come cambio lo stile della mappa?', a: 'Tocca il pulsante Livelli in basso a sinistra sulla mappa. Scegli tra Base, Outdoor, Satellite, Inverno o Traffico.', guide: <GuideMapLayers /> },
-      ]
-    },
-    {
-      category: 'Condivisione & Privacy',
-      items: [
-        { q: 'Come condivido uno spot?', a: 'Apri il dettaglio di uno spot e tocca Condividi (↑). Su mobile si apre il menu di condivisione nativo. Su desktop viene copiato un link. Il destinatario apre la mappa esattamente su quello spot.', guide: <GuideShare /> },
-      ]
-    },
-  ],
+  ru: {
+    sections: [
+      { category: 'Начало работы', items: [
+        { q: 'Что такое SpotFinder?', a: 'SpotFinder — бесплатное сообщество карт для открытия полезных мест — парковок, смотровых площадок, мест отдыха и многого другого. Каждый может добавлять споты без регистрации.', steps: null },
+        { q: 'Нужна ли мне учётная запись?', a: 'Нет! Как гость вы можете просматривать карту, добавлять споты и оценивать их. Аккаунт позволяет управлять своими спотами.', steps: null },
+      ]},
+      { category: 'Добавление спотов', items: [
+        { q: 'Как добавить спот?', a: 'Следуйте 5 шагам:', steps: [
+          { label: 'Нажмите зелёную кнопку + внизу экрана', svg: <SvgPlusButton /> },
+          { label: 'Карта переходит в режим добавления — нажмите в любом месте', svg: <SvgTapMap /> },
+          { label: 'Заполните описание и выставьте звёзды за Парковку, Красоту и Приватность', svg: <SvgFillForm /> },
+          { label: 'Опционально добавьте фото, нажав на область камеры', svg: <SvgAddPhoto /> },
+          { label: 'Нажмите Сохранить спот — он сразу появится на карте', svg: <SvgSpotAppears /> },
+        ]},
+      ]},
+      { category: 'Оценка спотов', items: [
+        { q: 'Как оценить спот?', a: 'Оценивать может любой — включая гостей. Нажмите на спот, затем на звёзды в панели деталей.', steps: [
+          { label: 'Нажмите на маркер спота, чтобы открыть подробности', svg: <SvgOpenDetail /> },
+          { label: 'Нажмите на звёзды — без регистрации', svg: <SvgRateSpot /> },
+        ]},
+      ]},
+      { category: 'Навигация', items: [
+        { q: 'Как навигировать к споту?', a: 'Откройте подробности спота и нажмите Навигация сюда. Выберите режим транспорта и начните навигацию.', steps: [
+          { label: 'Откройте спот и нажмите Навигация сюда', svg: <SvgOpenDetail /> },
+          { label: 'Выберите Авто, Велосипед или Пешком — затем Начать навигацию', svg: <SvgNavigate /> },
+        ]},
+      ]},
+      { category: 'Совместный доступ', items: [
+        { q: 'Как поделиться спотом?', a: 'Откройте подробности спота и нажмите Поделиться. На мобильном откроется нативное меню, на десктопе скопируется ссылка.', steps: [{ label: 'Откройте спот и нажмите Поделиться (↑)', svg: <SvgShare /> }]},
+      ]},
+    ],
+    about: { title: 'О SpotFinder', desc: 'SpotFinder — бесплатное приложение-карта для открытия мест — от скрытых парковок до живописных площадок. Каждый может вносить вклад.', features: ['Бесплатно — без подписки', 'Работает как гость — без аккаунта', 'Добавляйте, оценивайте, навигируйте и делитесь спотами', 'Голосовое дiktоvание на 12 языках', 'Пробки и перекрытия дорог в реальном времени', 'Голосовая навигация для авто, велосипеда и пешеходов'], built: 'Создано на React, Leaflet, Firebase и OSRM.', version: 'Версия 2.1' }
+  },
 
-  ru: [
-    {
-      category: 'Начало работы',
-      items: [
-        { q: 'Что такое SpotFinder?', a: 'SpotFinder — это приложение-карта для обмена полезными местами: парковками, видовыми площадками, местами отдыха и многим другим.', guide: null },
-        { q: 'Нужна ли мне учётная запись?', a: 'Нет! В качестве гостя вы можете просматривать карту, добавлять споты и оценивать их. Аккаунт позволяет управлять добавленными спотами.', guide: null },
-      ]
-    },
-    {
-      category: 'Добавление и оценка спотов',
-      items: [
-        { q: 'Как добавить спот?', a: 'Нажмите зелёную кнопку + внизу экрана для входа в режим добавления, затем нажмите в любом месте карты. Заполните форму с описанием, звёздами и фото.', guide: <GuideAddSpot /> },
-        { q: 'Как оценить спот?', a: 'Нажмите на маркер спота, чтобы открыть подробности. Вы увидите общую оценку и отдельные оценки для Парковки, Красоты и Приватности. Оценивать может любой, включая гостей.', guide: <GuideRate /> },
-      ]
-    },
-    {
-      category: 'Навигация',
-      items: [
-        { q: 'Как навигировать к споту?', a: 'Нажмите на маркер спота, затем нажмите «Навигация сюда». Выберите Авто, Велосипед или Пешком и начните навигацию.', guide: <GuideNavigate /> },
-      ]
-    },
-    {
-      category: 'Карта и трафик',
-      items: [
-        { q: 'Как переключить стиль карты?', a: 'Нажмите кнопку Слои в левом нижнем углу карты. Выберите Базовую, Природную, Спутник, Зимнюю или Трафик.', guide: <GuideMapLayers /> },
-        { q: 'Что показывает слой Трафик?', a: 'Слой Трафик отображает поток движения в реальном времени — зелёный = свободно, жёлтый = медленно, красный = пробка. Иконки перекрытых дорог (⛔) и пробок (🚦) появляются автоматически.', guide: <GuideTraffic /> },
-      ]
-    },
-    {
-      category: 'Совместный доступ и конфиденциальность',
-      items: [
-        { q: 'Как поделиться спотом?', a: 'Откройте подробности спота и нажмите Поделиться (↑). На мобильном откроется нативное меню, на десктопе скопируется ссылка. Получатель откроет карту прямо на этом споте.', guide: <GuideShare /> },
-      ]
-    },
-  ],
+  uk: {
+    sections: [
+      { category: 'Початок роботи', items: [
+        { q: 'Що таке SpotFinder?', a: 'SpotFinder — безкоштовний спільнотний картографічний застосунок для відкриття корисних місць — паркінгів, видових майданчиків, місць відпочинку та іншого. Кожен може додавати споти без реєстрації.', steps: null },
+        { q: 'Чи потрібен мені обліковий запис?', a: 'Ні! Як гість ви можете переглядати карту, додавати споти та оцінювати їх. Акаунт дозволяє керувати своїми спотами.', steps: null },
+      ]},
+      { category: 'Додавання спотів', items: [
+        { q: 'Як додати спот?', a: 'Виконайте 5 кроків:', steps: [
+          { label: 'Натисніть зелену кнопку + внизу екрана', svg: <SvgPlusButton /> },
+          { label: 'Карта переходить у режим додавання — натисніть будь-де на карті', svg: <SvgTapMap /> },
+          { label: 'Заповніть опис і встановіть зірки за Паркінг, Красу та Приватність', svg: <SvgFillForm /> },
+          { label: 'За бажанням додайте фото, натиснувши на область камери', svg: <SvgAddPhoto /> },
+          { label: 'Натисніть Зберегти спот — він одразу з\'явиться на карті', svg: <SvgSpotAppears /> },
+        ]},
+      ]},
+      { category: 'Оцінка спотів', items: [
+        { q: 'Як оцінити спот?', a: 'Оцінювати може будь-хто — включно з гостями. Натисніть на спот, потім на зірки в панелі деталей.', steps: [
+          { label: 'Натисніть на маркер спота, щоб відкрити подробиці', svg: <SvgOpenDetail /> },
+          { label: 'Натисніть на зірки — без реєстрації', svg: <SvgRateSpot /> },
+        ]},
+      ]},
+      { category: 'Навігація', items: [
+        { q: 'Як навігувати до спота?', a: 'Відкрийте подробиці спота і натисніть Навігація сюди. Виберіть режим транспорту і розпочніть навігацію.', steps: [
+          { label: 'Відкрийте спот і натисніть Навігація сюди', svg: <SvgOpenDetail /> },
+          { label: 'Виберіть Авто, Велосипед або Пішки — потім Розпочати навігацію', svg: <SvgNavigate /> },
+        ]},
+      ]},
+      { category: 'Поширення', items: [
+        { q: 'Як поділитися спотом?', a: 'Відкрийте подробиці спота і натисніть Поділитися. На мобільному відкриється нативне меню, на десктопі скопіюється посилання.', steps: [{ label: 'Відкрийте спот і натисніть Поділитися (↑)', svg: <SvgShare /> }]},
+      ]},
+    ],
+    about: { title: 'Про SpotFinder', desc: 'SpotFinder — безкоштовний застосунок-карта для відкриття місць — від прихованих паркінгів до мальовничих майданчиків. Кожен може додавати споти.', features: ['Безкоштовно — без підписки', 'Працює як гість — без акаунта', 'Додавайте, оцінюйте, навігуйте та діліться спотами', 'Голосове диктування 12 мовами', 'Пробки та перекриття доріг у реальному часі', 'Голосова навігація для авто, велосипеда та пішоходів'], built: 'Створено на React, Leaflet, Firebase та OSRM.', version: 'Версія 2.1' }
+  },
 
-  uk: [
-    {
-      category: 'Початок роботи',
-      items: [
-        { q: 'Що таке SpotFinder?', a: 'SpotFinder — це спільнотний картографічний застосунок для обміну корисними місцями: паркінгами, видовими майданчиками, місцями відпочинку та іншим.', guide: null },
-        { q: 'Чи потрібен мені обліковий запис?', a: 'Ні! Як гість ви можете переглядати карту, додавати споти та оцінювати їх. Акаунт дозволяє керувати доданими спотами.', guide: null },
-      ]
-    },
-    {
-      category: 'Додавання і оцінка спотів',
-      items: [
-        { q: 'Як додати спот?', a: 'Натисніть зелену кнопку + внизу екрана для входу в режим додавання, потім натисніть будь-де на карті. Заповніть форму з описом, зірками та фото.', guide: <GuideAddSpot /> },
-        { q: 'Як оцінити спот?', a: 'Натисніть на маркер спота, щоб відкрити подробиці. Ви побачите загальну оцінку та окремі оцінки для Паркінгу, Краси та Приватності. Оцінювати може будь-хто.', guide: <GuideRate /> },
-      ]
-    },
-    {
-      category: 'Навігація',
-      items: [
-        { q: 'Як навігувати до спота?', a: 'Натисніть на маркер спота, потім натисніть «Навігація сюди». Виберіть Авто, Велосипед або Пішки і розпочніть навігацію.', guide: <GuideNavigate /> },
-      ]
-    },
-    {
-      category: 'Карта і трафік',
-      items: [
-        { q: 'Як переключити стиль карти?', a: 'Натисніть кнопку Шари у лівому нижньому куті карти. Виберіть Базову, Природну, Супутник, Зимову або Трафік.', guide: <GuideMapLayers /> },
-      ]
-    },
-    {
-      category: 'Поширення і конфіденційність',
-      items: [
-        { q: 'Як поділитися спотом?', a: 'Відкрийте подробиці спота і натисніть Поділитися (↑). На мобільному відкриється нативне меню, на десктопі скопіюється посилання.', guide: <GuideShare /> },
-      ]
-    },
-  ],
+  hu: {
+    sections: [
+      { category: 'Első lépések', items: [
+        { q: 'Mi az a SpotFinder?', a: 'A SpotFinder egy ingyenes közösségi térképalkalmazás hasznos helyek felfedezéséhez — parkolók, kilátópontok, pihenőhelyek és egyebek. Mindenki hozzáadhat spotokat regisztráció nélkül.', steps: null },
+        { q: 'Szükségem van fiókra?', a: 'Nem! Vendégként böngészheted a térképet, hozzáadhatsz spotokat és értékelheted őket. Fiók lehetővé teszi saját spotjaid kezelését.', steps: null },
+      ]},
+      { category: 'Spot hozzáadása', items: [
+        { q: 'Hogyan adok hozzá egy spotot?', a: 'Kövesd ezt az 5 lépést:', steps: [
+          { label: 'Koppints a zöld + gombra a képernyő alján', svg: <SvgPlusButton /> },
+          { label: 'A térkép hozzáadási módba vált — koppints bárhol a térképen', svg: <SvgTapMap /> },
+          { label: 'Töltsd ki a leírást és állítsd be a csillagokat Parkolás, Szépség és Magánszféra szerint', svg: <SvgFillForm /> },
+          { label: 'Opcionálisan adj hozzá fotót a kamera területre koppintva', svg: <SvgAddPhoto /> },
+          { label: 'Koppints a Spot mentése gombra — azonnal megjelenik a térképen', svg: <SvgSpotAppears /> },
+        ]},
+      ]},
+      { category: 'Spotok értékelése', items: [
+        { q: 'Hogyan értékelek egy spotot?', a: 'Bárki értékelhet — vendégek is. Koppints egy spotra, majd a csillagokra a részletek panelben.', steps: [
+          { label: 'Koppints egy spot jelölőre a részletek megnyitásához', svg: <SvgOpenDetail /> },
+          { label: 'Koppints a csillagokra — fiók nem szükséges', svg: <SvgRateSpot /> },
+        ]},
+      ]},
+      { category: 'Navigáció', items: [
+        { q: 'Hogyan navigálok egy spothoz?', a: 'Nyisd meg egy spot részleteit és koppints az Ide navigálás gombra. Válassz közlekedési módot és indítsd el a navigációt.', steps: [
+          { label: 'Nyisd meg a spotot és koppints az Ide navigálás gombra', svg: <SvgOpenDetail /> },
+          { label: 'Válassz Autó, Kerékpár vagy Gyalog módot — majd Navigáció indítása', svg: <SvgNavigate /> },
+        ]},
+      ]},
+      { category: 'Megosztás', items: [
+        { q: 'Hogyan osztok meg egy spotot?', a: 'Nyisd meg egy spot részleteit és koppints a Megosztás gombra. Mobilon a natív menü nyílik meg, asztali gépen a link másolódik.', steps: [{ label: 'Nyisd meg a spotot és koppints a Megosztás (↑) gombra', svg: <SvgShare /> }]},
+      ]},
+    ],
+    about: { title: 'A SpotFinderről', desc: 'A SpotFinder egy ingyenes közösségi térképalkalmazás hasznos helyek felfedezéséhez — rejtett parkolóktól festői kilátópontokig. Mindenki hozzájárulhat.', features: ['Ingyenes — nincs előfizetés', 'Vendégként használható — fiók nélkül', 'Spotok hozzáadása, értékelése, navigálása és megosztása', 'Hangbevitel 12 nyelven', 'Valós idejű forgalom és útlezárások', 'Hangos navigáció autóhoz, kerékpárhoz és gyalogosokhoz'], built: 'Fejlesztve React, Leaflet, Firebase és OSRM alapokon.', version: '2.1-es verzió' }
+  },
 
-  hu: [
-    {
-      category: 'Első lépések',
-      items: [
-        { q: 'Mi az a SpotFinder?', a: 'A SpotFinder egy közösségi térképalkalmazás hasznos spotok felfedezéséhez és megosztásához — parkolók, kilátópontok, pihenőhelyek és egyebek.', guide: null },
-        { q: 'Szükségem van fiókra?', a: 'Nem! Vendégként böngészheted a térképet, hozzáadhatsz spotokat és értékelheted őket. A fiók lehetővé teszi az általad hozzáadott spotok kezelését.', guide: null },
-      ]
-    },
-    {
-      category: 'Spotok hozzáadása és értékelése',
-      items: [
-        { q: 'Hogyan adok hozzá egy spotot?', a: 'Koppints a zöld + gombra a képernyő alján a hozzáadási mód aktiválásához, majd koppints a térkép bármely pontjára. Töltsd ki az űrlapot leírással, csillagokkal és fotóval.', guide: <GuideAddSpot /> },
-        { q: 'Hogyan értékelek egy spotot?', a: 'Koppints egy spot jelölőre a részletek megnyitásához. Látni fogod az összesített értékelést és a Parkolás, Szépség és Magánszféra kategóriák külön értékeléseit. Bárki értékelhet.', guide: <GuideRate /> },
-      ]
-    },
-    {
-      category: 'Navigáció',
-      items: [
-        { q: 'Hogyan navigálok egy spothoz?', a: 'Koppints egy spot jelölőre, majd nyomd meg az „Ide navigálás" gombot. Válassz Autó, Kerékpár vagy Gyalog módot, és indítsd el a navigációt.', guide: <GuideNavigate /> },
-      ]
-    },
-    {
-      category: 'Megosztás és adatvédelem',
-      items: [
-        { q: 'Hogyan osztom meg a spotot?', a: 'Nyiss meg egy spot részletet és koppints a Megosztás gombra (↑). Mobilon megnyílik a natív megosztási menü, asztali gépen másolódik a link.', guide: <GuideShare /> },
-      ]
-    },
-  ],
+  ro: {
+    sections: [
+      { category: 'Noțiuni de bază', items: [
+        { q: 'Ce este SpotFinder?', a: 'SpotFinder este o aplicație de hartă comunitară gratuită pentru descoperirea locurilor utile — parcări, priveliști, locuri de odihnă și altele. Oricine poate adăuga spoturi fără cont.', steps: null },
+        { q: 'Am nevoie de un cont?', a: 'Nu! Ca vizitator poți naviga pe hartă, adăuga spoturi și le poți evalua. Un cont permite gestionarea spoturilor tale.', steps: null },
+      ]},
+      { category: 'Adăugarea spoturilor', items: [
+        { q: 'Cum adaug un spot?', a: 'Urmează acești 5 pași:', steps: [
+          { label: 'Atinge butonul verde + din josul ecranului', svg: <SvgPlusButton /> },
+          { label: 'Harta intră în modul de adăugare — atinge oriunde pe hartă', svg: <SvgTapMap /> },
+          { label: 'Completează descrierea și stele pentru Parcare, Peisaj și Intimitate', svg: <SvgFillForm /> },
+          { label: 'Opțional adaugă o fotografie atingând zona camerei', svg: <SvgAddPhoto /> },
+          { label: 'Atinge Salvează spot — apare imediat pe hartă', svg: <SvgSpotAppears /> },
+        ]},
+      ]},
+      { category: 'Evaluarea spoturilor', items: [
+        { q: 'Cum evaluez un spot?', a: 'Oricine poate evalua — inclusiv vizitatorii. Atinge un spot, apoi stelele din panoul de detalii.', steps: [
+          { label: 'Atinge un marker de spot pentru a deschide detaliile', svg: <SvgOpenDetail /> },
+          { label: 'Atinge stelele — cont neobligatoriu', svg: <SvgRateSpot /> },
+        ]},
+      ]},
+      { category: 'Navigare', items: [
+        { q: 'Cum navighez la un spot?', a: 'Deschide detaliile unui spot și atinge Navighează aici. Alege modul de transport și pornește navigarea.', steps: [
+          { label: 'Deschide un spot și atinge Navighează aici', svg: <SvgOpenDetail /> },
+          { label: 'Alege Mașină, Bicicletă sau Pe jos — apoi Pornire navigare', svg: <SvgNavigate /> },
+        ]},
+      ]},
+      { category: 'Partajare', items: [
+        { q: 'Cum partajez un spot?', a: 'Deschide detaliile unui spot și atinge Distribuie. Pe mobil se deschide meniul nativ, pe desktop se copiază linkul.', steps: [{ label: 'Deschide un spot și atinge Distribuie (↑)', svg: <SvgShare /> }]},
+      ]},
+    ],
+    about: { title: 'Despre SpotFinder', desc: 'SpotFinder este o aplicație de hartă comunitară gratuită pentru descoperirea locurilor utile — de la parcări ascunse la priveliști panoramice. Oricine poate contribui.', features: ['Gratuit — fără abonament', 'Utilizabil ca vizitator — fără cont', 'Adaugă, evaluează, navighează și distribuie spoturi', 'Dictare vocală în 12 limbi', 'Trafic și închideri de drumuri în timp real', 'Navigare vocală pentru mașină, bicicletă și pietoni'], built: 'Construit cu React, Leaflet, Firebase și OSRM.', version: 'Versiunea 2.1' }
+  },
 
-  ro: [
-    {
-      category: 'Noțiuni de bază',
-      items: [
-        { q: 'Ce este SpotFinder?', a: 'SpotFinder este o aplicație de hărți comunitară pentru descoperirea și partajarea spoturilor utile — parcări, priveliști, locuri de odihnă și altele.', guide: null },
-        { q: 'Am nevoie de un cont?', a: 'Nu! Ca vizitator poți naviga pe hartă, adăuga spoturi și le poți evalua. Un cont îți permite să gestionezi spoturile adăugate de tine.', guide: null },
-      ]
-    },
-    {
-      category: 'Adăugarea și evaluarea spoturilor',
-      items: [
-        { q: 'Cum adaug un spot?', a: 'Atinge butonul verde + din josul ecranului pentru a intra în modul de adăugare, apoi atinge orice loc de pe hartă. Completează formularul cu descriere, stele și fotografie.', guide: <GuideAddSpot /> },
-        { q: 'Cum evaluez un spot?', a: 'Atinge un marker de spot pentru a deschide detaliile. Vei vedea o evaluare generală și evaluări separate pentru Parcare, Frumusețe și Intimitate. Oricine poate evalua.', guide: <GuideRate /> },
-      ]
-    },
-    {
-      category: 'Navigare',
-      items: [
-        { q: 'Cum navighez la un spot?', a: 'Atinge un marker de spot, apoi apasă „Navighează aici". Alege Mașină, Bicicletă sau Pe jos și pornește navigarea.', guide: <GuideNavigate /> },
-      ]
-    },
-    {
-      category: 'Hartă și trafic',
-      items: [
-        { q: 'Cum schimb stilul hărții?', a: 'Atinge butonul Straturi din colțul stânga jos al hărții. Alege între De bază, Exterior, Satelit, Iarnă sau Trafic.', guide: <GuideMapLayers /> },
-      ]
-    },
-    {
-      category: 'Partajare și confidențialitate',
-      items: [
-        { q: 'Cum partajez un spot?', a: 'Deschide detaliile unui spot și atinge Distribuie (↑). Pe mobil se deschide meniul nativ de partajare. Pe desktop se copiază un link. Destinatarul deschide harta exact pe acel spot.', guide: <GuideShare /> },
-      ]
-    },
-  ],
-
-  es: [
-    {
-      category: 'Primeros pasos',
-      items: [
-        { q: '¿Qué es SpotFinder?', a: 'SpotFinder es una aplicación de mapas comunitaria para descubrir y compartir spots útiles — aparcamientos, miradores, áreas de descanso y más.', guide: null },
-        { q: '¿Necesito una cuenta?', a: '¡No! Como invitado puedes explorar el mapa, añadir spots y valorarlos. Una cuenta te permite gestionar los spots que hayas añadido.', guide: null },
-      ]
-    },
-    {
-      category: 'Añadir y valorar spots',
-      items: [
-        { q: '¿Cómo añado un spot?', a: 'Toca el botón verde + en la parte inferior de la pantalla para activar el modo de adición, luego toca cualquier lugar del mapa. Rellena el formulario con descripción, estrellas y foto.', guide: <GuideAddSpot /> },
-        { q: '¿Puedo usar voz para la descripción?', a: 'Sí. Toca el botón Voz junto al campo de descripción. La app escucha en el idioma seleccionado en Configuración. Toca de nuevo para detener la grabación.', guide: <GuideVoice /> },
-        { q: '¿Cómo valoro un spot?', a: 'Toca un marcador de spot para abrir el detalle. Verás una valoración general y valoraciones separadas para Aparcamiento, Belleza y Privacidad. Cualquiera puede valorar.', guide: <GuideRate /> },
-      ]
-    },
-    {
-      category: 'Navegación',
-      items: [
-        { q: '¿Cómo navego a un spot?', a: 'Toca un marcador de spot, luego pulsa «Navegar aquí». Elige Coche, Bici o A pie e inicia la navegación.', guide: <GuideNavigate /> },
-      ]
-    },
-    {
-      category: 'Mapa y tráfico',
-      items: [
-        { q: '¿Cómo cambio el estilo del mapa?', a: 'Toca el botón Capas en la esquina inferior izquierda del mapa. Elige entre Básico, Exterior, Satélite, Invierno o Tráfico.', guide: <GuideMapLayers /> },
-        { q: '¿Qué muestra la capa de Tráfico?', a: 'La capa de Tráfico muestra el flujo en tiempo real — verde = libre, amarillo = lento, rojo = atasco. Los marcadores de cortes de tráfico (⛔) y atascos (🚦) aparecen automáticamente.', guide: <GuideTraffic /> },
-      ]
-    },
-    {
-      category: 'Compartir y privacidad',
-      items: [
-        { q: '¿Cómo comparto un spot?', a: 'Abre el detalle de un spot y toca Compartir (↑). En móvil se abre el menú nativo de compartir. En escritorio se copia un enlace. El destinatario abre el mapa justo en ese spot.', guide: <GuideShare /> },
-        { q: '¿Mis spots son públicos?', a: 'Sí — todos los spots son visibles para todos. SpotFinder es una plataforma comunitaria.', guide: null },
-      ]
-    },
-  ],
+  es: {
+    sections: [
+      { category: 'Primeros pasos', items: [
+        { q: '¿Qué es SpotFinder?', a: 'SpotFinder es una app de mapas comunitaria gratuita para descubrir lugares útiles — aparcamientos, miradores, áreas de descanso y más. Cualquiera puede añadir spots sin cuenta.', steps: null },
+        { q: '¿Necesito una cuenta?', a: '¡No! Como invitado puedes explorar el mapa, añadir spots y valorarlos. Una cuenta permite gestionar tus spots.', steps: null },
+      ]},
+      { category: 'Añadir spots', items: [
+        { q: '¿Cómo añado un spot?', a: 'Sigue estos 5 pasos:', steps: [
+          { label: 'Toca el botón verde + en la parte inferior de la pantalla', svg: <SvgPlusButton /> },
+          { label: 'El mapa entra en modo añadir — toca cualquier lugar del mapa', svg: <SvgTapMap /> },
+          { label: 'Rellena la descripción y las estrellas de Aparcamiento, Paisaje y Privacidad', svg: <SvgFillForm /> },
+          { label: 'Opcionalmente añade una foto tocando el área de la cámara', svg: <SvgAddPhoto /> },
+          { label: 'Toca Guardar spot — aparece inmediatamente en el mapa para todos', svg: <SvgSpotAppears /> },
+        ]},
+        { q: '¿Puedo usar voz para la descripción?', a: 'Sí. Toca el botón Voz junto al campo de descripción. El micrófono escucha en el idioma configurado en Ajustes. Toca de nuevo para detener.', steps: [{ label: 'Toca el botón Voz junto al campo de descripción', svg: <SvgVoice /> }]},
+      ]},
+      { category: 'Valorar spots', items: [
+        { q: '¿Cómo valoro un spot?', a: 'Cualquiera puede valorar — incluso invitados. Toca un spot, luego las estrellas en el panel de detalles.', steps: [
+          { label: 'Toca un marcador de spot para abrir los detalles', svg: <SvgOpenDetail /> },
+          { label: 'Toca las estrellas — no se requiere cuenta', svg: <SvgRateSpot /> },
+        ]},
+      ]},
+      { category: 'Navegación', items: [
+        { q: '¿Cómo navego a un spot?', a: 'Abre el detalle de un spot y toca Navegar aquí. Elige el modo de desplazamiento y toca Iniciar navegación.', steps: [
+          { label: 'Abre un spot y toca Navegar aquí', svg: <SvgOpenDetail /> },
+          { label: 'Elige Coche, Bici o A pie — luego Iniciar navegación', svg: <SvgNavigate /> },
+          { label: 'Cambia el modo de transporte en cualquier momento', svg: <SvgRouteModes /> },
+        ]},
+      ]},
+      { category: 'Compartir', items: [
+        { q: '¿Cómo comparto un spot?', a: 'Abre el detalle de un spot y toca Compartir. En móvil se abre el menú nativo, en escritorio se copia el enlace.', steps: [{ label: 'Abre un spot y toca Compartir (↑)', svg: <SvgShare /> }]},
+      ]},
+    ],
+    about: { title: 'Acerca de SpotFinder', desc: 'SpotFinder es una app de mapas comunitaria gratuita para descubrir lugares útiles — desde aparcamientos ocultos hasta miradores panorámicos. Cualquiera puede contribuir.', features: ['Gratis — sin suscripción', 'Funciona como invitado — sin cuenta', 'Añade, valora, navega y comparte spots', 'Dictado por voz en 12 idiomas', 'Tráfico y cortes de carretera en tiempo real', 'Navegación por voz para coche, bici y peatones'], built: 'Desarrollado con React, Leaflet, Firebase y OSRM.', version: 'Versión 2.1' }
+  },
 };
 
-// ─── Accordion item ───────────────────────────────────────────────────────────
-function AccordionItem({ q, a, guide }) {
+// ─── Accordion item with step-by-step guide ───────────────────────────────────
+function AccordionItem({ q, a, steps }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className={`border-b border-gray-100 dark:border-border last:border-0 transition-colors ${open ? 'bg-gray-50 dark:bg-accent/40' : ''}`}>
+    <div className={`border-b border-gray-100 dark:border-border last:border-0 ${open ? 'bg-gray-50 dark:bg-accent/30' : ''}`}>
       <button
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center justify-between px-5 py-4 text-left gap-4"
@@ -729,27 +1086,70 @@ function AccordionItem({ q, a, guide }) {
       </button>
       {open && (
         <div className="px-5 pb-5">
-          {guide && <div className="mb-3">{guide}</div>}
-          <p className="text-sm text-gray-600 dark:text-muted-foreground leading-relaxed">{a}</p>
+          <p className="text-sm text-gray-600 dark:text-muted-foreground leading-relaxed mb-1">{a}</p>
+          {steps && <StepGuide steps={steps} />}
         </div>
       )}
     </div>
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── About section ────────────────────────────────────────────────────────────
+function AboutSection({ data }) {
+  const icons = [Star, MapPin, Navigation, Mic, Layers, Share2];
+  return (
+    <div className="rounded-2xl overflow-hidden border border-blue-100 dark:border-blue-900/40 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
+      {/* Header */}
+      <div className="px-6 py-5 bg-gradient-to-r from-blue-600 to-indigo-600">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+            <MapPin className="w-5 h-5 text-white" />
+          </div>
+          <h2 className="text-xl font-bold text-white">{data.title}</h2>
+        </div>
+        <p className="text-sm text-blue-100 leading-relaxed">{data.desc}</p>
+      </div>
+      {/* Features */}
+      <div className="px-6 py-4">
+        <div className="grid grid-cols-1 gap-2">
+          {data.features.map((f, i) => {
+            const Icon = icons[i] || Star;
+            return (
+              <div key={i} className="flex items-start gap-3 py-2 border-b border-blue-100 dark:border-blue-900/40 last:border-0">
+                <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Icon className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <p className="text-sm text-gray-700 dark:text-foreground">{f}</p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {/* Footer */}
+      <div className="px-6 py-4 bg-blue-50 dark:bg-blue-950/40 border-t border-blue-100 dark:border-blue-900/40">
+        <p className="text-xs text-gray-500 dark:text-muted-foreground">{data.built}</p>
+        <p className="text-xs text-gray-400 dark:text-muted-foreground mt-0.5">{data.version}</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main FAQ page ────────────────────────────────────────────────────────────
 export default function FAQ() {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
+  const content = FAQ_CONTENT[language] || FAQ_CONTENT.en;
 
-  const sections = FAQ_DATA[language] || FAQ_DATA.en;
+
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    // FIX: use fixed+overflow-y-auto to escape the Layout's overflow:hidden prison
+    <div className="bg-background text-foreground min-h-screen">
+      {/* Sticky header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border px-4 py-4 flex items-center gap-3">
         <button
           onClick={() => navigate('/')}
-          className="w-9 h-9 rounded-full bg-muted flex items-center justify-center active:scale-95 transition-transform"
+          className="w-9 h-9 rounded-full bg-muted flex items-center justify-center active:scale-95 transition-transform flex-shrink-0"
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
@@ -759,22 +1159,23 @@ export default function FAQ() {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        {sections.map(section => (
+      {/* Content */}
+      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6 pb-16">
+        {content.sections.map(section => (
           <div key={section.category}>
             <h2 className="text-xs font-bold uppercase tracking-widest text-primary mb-2 px-1">
               {section.category}
             </h2>
             <div className="bg-white dark:bg-card rounded-2xl shadow-sm border border-gray-100 dark:border-border overflow-hidden">
               {section.items.map(item => (
-                <AccordionItem key={item.q} q={item.q} a={item.a} guide={item.guide} />
+                <AccordionItem key={item.q} q={item.q} a={item.a} steps={item.steps} />
               ))}
             </div>
           </div>
         ))}
-        <p className="text-center text-xs text-muted-foreground pb-8">
-          {t('settings.feedback')} → Settings
-        </p>
+
+        {/* About section */}
+        <AboutSection data={content.about} />
       </div>
     </div>
   );

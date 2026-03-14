@@ -209,7 +209,16 @@ export const translations = {
         "deleteAccountPlaceholder": "Type DELETE",
         "deleteAccountConfirm": "Delete"
     },
-    "errors": {
+    "traffic": {
+        "roadClosed": "⛔ Road Closed",
+        "trafficJam": "🚦 Traffic Jam",
+        "roadWorks": "🚧 Road Works",
+        "roadFrom": "From",
+        "roadTo": "To",
+        "roadWarning": "⚠️ Warning: this road is reported as closed",
+        "roadClosedStep": "Warning: the road ahead is reported closed",
+    },
+        "errors": {
         "accessRestricted": "Access Restricted",
         "accessRestrictedBody": "You are not registered to use this application. Please contact the app administrator to request access.",
         "pageNotFound": "Page Not Found",
@@ -427,7 +436,16 @@ export const translations = {
         "deleteAccountPlaceholder": "Napište SMAZAT",
         "deleteAccountConfirm": "Smazat"
     },
-    "errors": {
+    "traffic": {
+        "roadClosed": "⛔ Uzavřená silnice",
+        "trafficJam": "🚦 Dopravní zácpa",
+        "roadWorks": "🚧 Silniční práce",
+        "roadFrom": "Od",
+        "roadTo": "Do",
+        "roadWarning": "⚠️ Upozornění: tato silnice je hlášena jako uzavřená",
+        "roadClosedStep": "Upozornění: hlášena uzavírka silnice vpřed",
+    },
+        "errors": {
         "accessRestricted": "Přístup omezen",
         "accessRestrictedBody": "Nejste registrováni pro použití této aplikace.",
         "pageNotFound": "Stránka nenalezena",
@@ -645,7 +663,16 @@ export const translations = {
         "deleteAccountPlaceholder": "Wpisz USUŃ",
         "deleteAccountConfirm": "Usuń"
     },
-    "errors": {
+    "traffic": {
+        "roadClosed": "⛔ Zamknięta droga",
+        "trafficJam": "🚦 Korek drogowy",
+        "roadWorks": "🚧 Roboty drogowe",
+        "roadFrom": "Od",
+        "roadTo": "Do",
+        "roadWarning": "⚠️ Uwaga: ta droga jest zgłoszona jako zamknięta",
+        "roadClosedStep": "Uwaga: zgłoszono zamknięcie drogi przed Tobą",
+    },
+        "errors": {
         "accessRestricted": "Dostęp ograniczony",
         "accessRestrictedBody": "Nie jesteś zarejestrowany do korzystania z tej aplikacji.",
         "pageNotFound": "Strona nie znaleziona",
@@ -863,7 +890,16 @@ export const translations = {
         "deleteAccountPlaceholder": "LÖSCHEN eingeben",
         "deleteAccountConfirm": "Löschen"
     },
-    "errors": {
+    "traffic": {
+        "roadClosed": "⛔ Straße gesperrt",
+        "trafficJam": "🚦 Stau",
+        "roadWorks": "🚧 Baustelle",
+        "roadFrom": "Von",
+        "roadTo": "Nach",
+        "roadWarning": "⚠️ Achtung: Diese Straße ist als gesperrt gemeldet",
+        "roadClosedStep": "Achtung: vorausliegende Straßensperrung gemeldet",
+    },
+        "errors": {
         "accessRestricted": "Zugang eingeschränkt",
         "accessRestrictedBody": "Sie sind nicht für diese Anwendung registriert.",
         "pageNotFound": "Seite nicht gefunden",
@@ -1081,7 +1117,16 @@ export const translations = {
         "deleteAccountPlaceholder": "Napíšte ZMAZAŤ",
         "deleteAccountConfirm": "Zmazať"
     },
-    "errors": {
+    "traffic": {
+        "roadClosed": "⛔ Uzavretá cesta",
+        "trafficJam": "🚦 Dopravná zácpa",
+        "roadWorks": "🚧 Cestné práce",
+        "roadFrom": "Od",
+        "roadTo": "Do",
+        "roadWarning": "⚠️ Upozornenie: táto cesta je hlásená ako uzavretá",
+        "roadClosedStep": "Upozornenie: hlásená uzávierka cesty vpred",
+    },
+        "errors": {
         "accessRestricted": "Prístup obmedzený",
         "accessRestrictedBody": "Nie ste registrovaní pre použitie tejto aplikácie.",
         "pageNotFound": "Stránka nenájdená",
@@ -1299,7 +1344,16 @@ export const translations = {
         "deleteAccountPlaceholder": "Scrivi ELIMINA",
         "deleteAccountConfirm": "Elimina"
     },
-    "errors": {
+    "traffic": {
+        "roadClosed": "⛔ Strada chiusa",
+        "trafficJam": "🚦 Ingorgo",
+        "roadWorks": "🚧 Lavori stradali",
+        "roadFrom": "Da",
+        "roadTo": "A",
+        "roadWarning": "⚠️ Attenzione: questa strada è segnalata come chiusa",
+        "roadClosedStep": "Attenzione: strada chiusa segnalata avanti",
+    },
+        "errors": {
         "accessRestricted": "Accesso limitato",
         "accessRestrictedBody": "Non sei registrato per utilizzare questa applicazione.",
         "pageNotFound": "Pagina non trovata",
@@ -1517,7 +1571,16 @@ export const translations = {
         "deleteAccountPlaceholder": "Tapez SUPPRIMER",
         "deleteAccountConfirm": "Supprimer"
     },
-    "errors": {
+    "traffic": {
+        "roadClosed": "⛔ Route fermée",
+        "trafficJam": "🚦 Embouteillage",
+        "roadWorks": "🚧 Travaux routiers",
+        "roadFrom": "De",
+        "roadTo": "À",
+        "roadWarning": "⚠️ Attention : cette route est signalée comme fermée",
+        "roadClosedStep": "Attention : fermeture de route signalée devant vous",
+    },
+        "errors": {
         "accessRestricted": "Accès restreint",
         "accessRestrictedBody": "Vous n'êtes pas enregistré pour utiliser cette application.",
         "pageNotFound": "Page introuvable",
@@ -1735,7 +1798,16 @@ export const translations = {
         "deleteAccountPlaceholder": "Введите УДАЛИТЬ",
         "deleteAccountConfirm": "Удалить"
     },
-    "errors": {
+    "traffic": {
+        "roadClosed": "⛔ Дорога закрыта",
+        "trafficJam": "🚦 Пробка",
+        "roadWorks": "🚧 Дорожные работы",
+        "roadFrom": "От",
+        "roadTo": "До",
+        "roadWarning": "⚠️ Внимание: эта дорога сообщается как закрытая",
+        "roadClosedStep": "Внимание: впереди сообщается о закрытии дороги",
+    },
+        "errors": {
         "accessRestricted": "Доступ ограничен",
         "accessRestrictedBody": "Вы не зарегистрированы для использования этого приложения.",
         "pageNotFound": "Страница не найдена",
@@ -1953,7 +2025,16 @@ export const translations = {
         "deleteAccountPlaceholder": "Введіть ВИДАЛИТИ",
         "deleteAccountConfirm": "Видалити"
     },
-    "errors": {
+    "traffic": {
+        "roadClosed": "⛔ Дорогу закрито",
+        "trafficJam": "🚦 Затор",
+        "roadWorks": "🚧 Дорожні роботи",
+        "roadFrom": "Від",
+        "roadTo": "До",
+        "roadWarning": "⚠️ Увага: ця дорога повідомляється як закрита",
+        "roadClosedStep": "Увага: попереду повідомляється про закриття дороги",
+    },
+        "errors": {
         "accessRestricted": "Доступ обмежено",
         "accessRestrictedBody": "Ви не зареєстровані для використання цього додатка.",
         "pageNotFound": "Сторінку не знайдено",
@@ -2171,7 +2252,16 @@ export const translations = {
         "deleteAccountPlaceholder": "Írd be: TÖRLÉS",
         "deleteAccountConfirm": "Törlés"
     },
-    "errors": {
+    "traffic": {
+        "roadClosed": "⛔ Lezárt út",
+        "trafficJam": "🚦 Forgalmi torlódás",
+        "roadWorks": "🚧 Útépítés",
+        "roadFrom": "Tól",
+        "roadTo": "Ig",
+        "roadWarning": "⚠️ Figyelem: ez az út lezártnak van jelölve",
+        "roadClosedStep": "Figyelem: útlezárás jelzése előttünk",
+    },
+        "errors": {
         "accessRestricted": "Hozzáférés korlátozott",
         "accessRestrictedBody": "Nem vagy regisztrálva az alkalmazás használatához.",
         "pageNotFound": "Az oldal nem található",
@@ -2389,7 +2479,16 @@ export const translations = {
         "deleteAccountPlaceholder": "Scrie ȘTERGE",
         "deleteAccountConfirm": "Șterge"
     },
-    "errors": {
+    "traffic": {
+        "roadClosed": "⛔ Drum închis",
+        "trafficJam": "🚦 Ambuteiaj",
+        "roadWorks": "🚧 Lucrări rutiere",
+        "roadFrom": "De la",
+        "roadTo": "Până la",
+        "roadWarning": "⚠️ Atenție: acest drum este raportat ca închis",
+        "roadClosedStep": "Atenție: raportată închidere de drum în față",
+    },
+        "errors": {
         "accessRestricted": "Acces restricționat",
         "accessRestrictedBody": "Nu ești înregistrat pentru a utiliza această aplicație.",
         "pageNotFound": "Pagina nu a fost găsită",
@@ -2607,7 +2706,16 @@ export const translations = {
         "deleteAccountPlaceholder": "Escribe ELIMINAR",
         "deleteAccountConfirm": "Eliminar"
     },
-    "errors": {
+    "traffic": {
+        "roadClosed": "⛔ Carretera cerrada",
+        "trafficJam": "🚦 Atasco",
+        "roadWorks": "🚧 Obras viales",
+        "roadFrom": "Desde",
+        "roadTo": "Hasta",
+        "roadWarning": "⚠️ Advertencia: esta carretera está reportada como cerrada",
+        "roadClosedStep": "Advertencia: cierre de carretera reportado adelante",
+    },
+        "errors": {
         "accessRestricted": "Acceso restringido",
         "accessRestrictedBody": "No estás registrado para usar esta aplicación.",
         "pageNotFound": "Página no encontrada",
