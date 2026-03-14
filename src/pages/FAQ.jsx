@@ -162,9 +162,7 @@ export default function FAQ() {
           </div>
         ))}
 
-        <p className="text-center text-xs text-muted-foreground pb-8">
-          Still need help? Use the Feedback form in Settings to reach us.
-        </p>
+        <p className="text-center text-xs text-muted-foreground pb-8">{t('faq.needHelp') || 'Still need help? Use the Feedback form in Settings.'}</p>
       </div>
     </div>
   );

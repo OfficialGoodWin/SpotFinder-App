@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Car, Bike, PersonStanding, Volume2, VolumeX, ArrowLeft, ArrowRight, ArrowUp, CircleArrowRight } from 'lucide-react';
 import { getOSRMRoute, mapOSRMModifier } from '@/api/osrmServiceClient';
+import { useLanguage } from '@/lib/LanguageContext';
+const LANG_BCP47 = {'en':'en-US','cs':'cs-CZ','pl':'pl-PL','de':'de-DE','sk':'sk-SK','it':'it-IT','fr':'fr-FR','ru':'ru-RU','uk':'uk-UA','hu':'hu-HU','ro':'ro-RO','es':'es-ES'};
 
-const ROUTE_TYPES = [
-  { id: 'car_fast', label: 'Drive', icon: Car, profile: 'driving-car' },
-  { id: 'bike', label: 'Bike', icon: Bike, profile: 'cycling-regular' },
-  { id: 'pedestrian', label: 'Walk', icon: PersonStanding, profile: 'foot-hiking' },
+
+const ROUTE_TYPE_KEYS = [
+  { id: 'car_fast', labelKey: 'navPanel.drive', icon: Car, profile: 'driving-car' },
+  { id: 'bike', labelKey: 'navPanel.bike', icon: Bike, profile: 'cycling-regular' },
+  { id: 'pedestrian', labelKey: 'navPanel.walk', icon: PersonStanding, profile: 'foot-hiking' },
 ];
 
 const ORS_PROFILE_MAP = {
@@ -36,6 +39,7 @@ const TURN_ICONS = {
 };
 
 export default function NavigationPanel({ from, to, toLabel, onClose, onRouteReady, onRouteData, userPosition }) {
+  const { t, language } = useLanguage();
   const [routeType, setRouteType] = useState('car_fast');
   const [route, setRoute] = useState(null);
   const [steps, setSteps] = useState([]);
@@ -71,7 +75,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
       const type = mapOSRMModifier(step.modifier);
 
       // instruction is already built by the client; provide a safe fallback
-      const instruction = step.instruction || 'Continue ahead';
+      const instruction = step.instruction || t('navPanel.continueAhead');
 
       turns.push({
         instruction,
@@ -91,13 +95,13 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
     // Mark first as 'depart', last as 'arrive'
     if (turns.length > 0) {
       turns[0].type = 'depart';
-      turns[0].instruction = turns[0].instruction || 'Depart';
+      turns[0].instruction = turns[0].instruction || t('navPanel.depart');
       markers[0].type = 'depart';
       markers[0].instruction = turns[0].instruction;
 
       const lastIdx = turns.length - 1;
       turns[lastIdx].type = 'arrive';
-      turns[lastIdx].instruction = turns[lastIdx].instruction || 'Arrive at destination';
+      turns[lastIdx].instruction = turns[lastIdx].instruction || t('navPanel.arrive');
       markers[lastIdx].type = 'arrive';
       markers[lastIdx].instruction = turns[lastIdx].instruction;
     }
@@ -219,8 +223,8 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
       lastRerouteTime.current = now;
 
       if (!muted) {
-        const utt = new SpeechSynthesisUtterance('Rerouting');
-        utt.lang = 'en-US'; utt.rate = 0.95;
+        const utt = new SpeechSynthesisUtterance(t('navPanel.rerouting'));
+        utt.lang = LANG_BCP47[language] || 'en-US'; utt.rate = 0.95;
         window.speechSynthesis?.cancel();
         window.speechSynthesis?.speak(utt);
       }
@@ -278,7 +282,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
           type: 'depart'
         },
         {
-          instruction: 'Arrive at destination',
+          instruction: t('navPanel.arrive'),
           distance: 0,
           type: 'arrive'
         }
@@ -317,7 +321,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
       if (!result.steps || result.steps.length === 0) {
         console.warn('No steps in route, creating minimal route');
         result.steps = [{
-          instruction: 'Navigate to destination',
+          instruction: t('navPanel.navigateToDestination'),
           distance: result.distance || 0,
           type: 'depart',
           lat: to.lat,
@@ -333,7 +337,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
           const gap = Math.hypot(dx, dy);
           if (gap > 50) {
             result.steps.push({
-              instruction: 'Destination off-road – walk the remaining distance',
+              instruction: t('navPanel.offRoad'),
               distance: gap,
               type: 'pedestrian',
               lat: to.lat,
@@ -422,7 +426,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
       console.log('Speaking:', text);
       
       const utt = new SpeechSynthesisUtterance(text);
-      utt.lang = 'en-US';
+      utt.lang = LANG_BCP47[language] || 'en-US';
       utt.rate = 0.95;
       utt.pitch = 1.0;
       
@@ -452,7 +456,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
         <div className="bg-background rounded-t-3xl shadow-2xl px-4 pt-4 pb-6 pointer-events-auto mx-3 mb-3">
           <div className="flex items-center justify-between mb-4">
             <div className="flex-1">
-              <p className="text-sm text-muted-foreground font-medium">Navigating to</p>
+              <p className="text-sm text-muted-foreground font-medium">{t('navPanel.navigatingTo')}</p>
               <p className="font-bold text-foreground text-lg truncate">{toLabel}</p>
             </div>
             <button onClick={onClose} className="p-2 rounded-full bg-gray-100 ml-3">
@@ -463,7 +467,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
           {loading ? (
             <div className="py-8 text-center">
               <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-              <p className="text-muted-foreground">Calculating route...</p>
+              <p className="text-muted-foreground">{t('navPanel.calculatingRoute')}</p>
             </div>
           ) : steps.length > 0 ? (
             <>
@@ -481,7 +485,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
                           ? 'bg-primary text-primary-foreground shadow-md' 
                           : 'bg-muted text-muted-foreground hover:bg-accent'}`}
                     >
-                      Route {idx + 1}: {formatDist(r.distance)} • {formatTime(r.duration)}
+                      {t('navPanel.route')} {idx + 1}: {formatDist(r.distance)} • {formatTime(r.duration)}
                     </button>
                   ))}
                 </div>
@@ -504,7 +508,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
               </div>
               
               <div className="flex gap-2 mb-4">
-                {ROUTE_TYPES.map(rt => {
+                {ROUTE_TYPE_KEYS.map(rt => {
                   const Icon = rt.icon;
                   return (
                     <button
@@ -514,7 +518,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
                         ${routeType === rt.id ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'}`}
                     >
                       <Icon className="w-4 h-4" />
-                      {rt.label}
+                      {t(rt.labelKey)}
                     </button>
                   );
                 })}
@@ -568,7 +572,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
       <div className="bg-card rounded-t-3xl shadow-2xl px-4 pt-4 pb-8 pointer-events-auto">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <p className="text-sm text-muted-foreground font-medium">Navigating to</p>
+            <p className="text-sm text-muted-foreground font-medium">{t('navPanel.navigatingTo')}</p>
             <p className="font-bold text-foreground truncate max-w-[200px]">{toLabel}</p>
           </div>
           <div className="flex items-center gap-3">
@@ -613,7 +617,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
         {steps.length <= 1 && (
           <div className="text-center py-2">
             <p className="text-xs text-muted-foreground">
-              {steps.length === 1 ? 'Single step route' : 'No detailed steps available'}
+              {steps.length === 1 ? t('navPanel.singleStep') : t('navPanel.noSteps')}
             </p>
           </div>
         )}

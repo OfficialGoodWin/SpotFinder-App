@@ -31,7 +31,12 @@ export default function EditSpotModal({ spot, onClose, onSave }) {
     setLoading(true);
     let image_url = spot.image_url;
     if (imageFile) {
-      image_url = imagePreview;
+      try {
+        const { uploadSpotImage } = await import('@/api/firebaseClient');
+        image_url = await uploadSpotImage(imageFile);
+      } catch (e) {
+        image_url = imagePreview;
+      }
     }
     
     await onSave({

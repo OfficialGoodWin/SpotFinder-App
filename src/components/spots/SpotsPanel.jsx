@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Navigation, X } from 'lucide-react';
+import { useLanguage } from '@/lib/LanguageContext';
 
 function haversineKm([lat1, lng1], [lat2, lng2]) {
   const R = 6371;
@@ -16,7 +17,7 @@ const SHEET_VH    = 0.60; // fraction of viewport height when fully open
 const PEEK_SHOW   = HEADER_H + 8; // px of sheet visible when peeked (just the handle row)
 
 function StarRow({ rating }) {
-  if (!rating) return <span className="text-xs text-muted-foreground">No ratings</span>;
+  if (!rating) return <span className="text-xs text-muted-foreground">–</span>;
   return (
     <span className="flex items-center gap-0.5">
       {[1, 2, 3, 4, 5].map(i => (
@@ -219,6 +220,7 @@ function MobileSheet({ children, header, onClose, bottomOffset }) {
 export default function SpotsPanel({
   spots, userPos, showSpots, onToggleSpots, onZoomToArea, onFlyTo, onNavigate, onSelectSpot
 }) {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
 
   const nearby = useMemo(() => {
@@ -242,7 +244,7 @@ export default function SpotsPanel({
   const header = (
     <div className="flex items-center justify-between px-4" style={{ height: HEADER_H - 18 }}>
       <span className="text-sm font-bold text-foreground">
-        Nearby Spots
+        {t('spotsPanel.nearby')}
         {!userPos && <span className="font-normal text-muted-foreground"> · no location</span>}
         <span className="font-normal text-muted-foreground ml-1">({nearby.length})</span>
       </span>
@@ -257,7 +259,7 @@ export default function SpotsPanel({
 
   const listContent = (
     <>
-      {nearby.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">No spots found</p>}
+      {nearby.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">{t('spotsPanel.noSpots')}</p>}
       {nearby.map(spot => (
         <SpotRow key={spot.id} spot={spot} onFlyTo={onFlyTo} onSelectSpot={onSelectSpot} onNavigate={onNavigate} onClose={handleClose} />
       ))}

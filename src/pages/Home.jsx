@@ -6,6 +6,7 @@ import { getPublicSpots, createSpot, deleteSpot, updateSpot } from '@/api/fireba
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
 import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '@/lib/LanguageContext';
  
 import SpotMarker from '../components/map/SpotMarker';
 import UserLocationMarker from '../components/map/UserLocationMarker';
@@ -94,6 +95,7 @@ function MapClickHandler({ addMode, onMapClick }) {
  
 export default function Home() {
   const { user, logout, isAuthenticated } = useAuth();
+  const { t } = useLanguage();
   const { isDark } = useTheme();
   const navigate = useNavigate();
   const [spots, setSpots] = useState([]);
@@ -240,7 +242,7 @@ export default function Home() {
   };
  
   const handleNavigate = (spot) => {
-    if (!userPos) return alert('Location not available yet');
+    if (!userPos) return alert(t('home.locationUnavailable'));
     startNavTo({ lat: spot.lat, lng: spot.lng, label: spot.title || 'Spot' });
     setSelectedSpot(null);
   };
@@ -251,7 +253,7 @@ export default function Home() {
   };
  
   const showNearby = () => {
-    if (!userPos) return alert('Enable location to find nearby spots');
+    if (!userPos) return alert(t('home.enableLocation'));
     const nearby = spots
       .map(s => ({
         ...s,
@@ -280,7 +282,7 @@ export default function Home() {
  
   // Stable nav start — set both target and snapshot from-position together
   const startNavTo = (destination) => {
-    if (!userPos) return alert('Location not available yet');
+    if (!userPos) return alert(t('home.locationUnavailable'));
     setNavFrom({ lat: userPos[0], lng: userPos[1] });
     setNavTarget(destination);
   };
@@ -298,7 +300,7 @@ export default function Home() {
           style={{ cursor: 'crosshair' }}
         >
           <div className="bg-blue-600 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-lg animate-pulse top-20 absolute">
-            Tap on the map to place spot
+            {t('home.tapToPlace')}
           </div>
         </div>
       )}
@@ -371,7 +373,7 @@ export default function Home() {
         showSpots={showSpots}
         onToggleSpots={() => setShowSpots(v => !v)}
         onNavigate={(destination) => {
-          if (!userPos) return alert('Location not available yet');
+          if (!userPos) return alert(t('home.locationUnavailable'));
           startNavTo(destination);
         }}
       />
@@ -401,7 +403,7 @@ export default function Home() {
         }}
         onFlyTo={(pos) => { setFlyTo(pos); setTimeout(() => setFlyTo(null), 1000); }}
         onNavigate={(spot) => {
-          if (!userPos) return alert('Location not available yet');
+          if (!userPos) return alert(t('home.locationUnavailable'));
           startNavTo({ lat: spot.lat, lng: spot.lng, label: spot.title || 'Spot' });
         }}
         onSelectSpot={setSelectedSpot}
@@ -538,22 +540,22 @@ export default function Home() {
               <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
                 <Trash2 className="w-5 h-5 text-red-600" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-foreground">Delete Account</h3>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-foreground">{t('home.deleteAccountTitle')}</h3>
             </div>
             
             <p className="text-gray-600 dark:text-muted-foreground text-sm mb-4">
-              This action cannot be undone. All your data will be permanently deleted.
+              {t('home.deleteAccountWarning')}
             </p>
             
             <p className="text-gray-500 dark:text-muted-foreground text-xs mb-4">
-              Type <span className="font-mono font-bold text-red-600">DELETE</span> to confirm:
+              {t('home.deleteAccountType')}
             </p>
             
             <input
               type="text"
               value={deleteInput}
               onChange={(e) => setDeleteInput(e.target.value)}
-              placeholder="Type DELETE"
+              placeholder={t('home.deleteAccountPlaceholder')}
               className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-border bg-white dark:bg-background text-gray-900 dark:text-foreground focus:outline-none focus:ring-2 focus:ring-red-300 text-sm mb-4"
             />
             
@@ -569,7 +571,7 @@ export default function Home() {
                 disabled={deleteInput !== 'DELETE'}
                 className="flex-1 py-3 rounded-2xl bg-red-500 text-white font-semibold text-sm hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Delete
+                {t('home.deleteAccountConfirm')}
               </button>
             </div>
           </div>
