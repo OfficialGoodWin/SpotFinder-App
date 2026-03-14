@@ -196,14 +196,35 @@ export default function Home() {
   }, []);
  
   const handleSaveSpot = async (data) => {
-    const spotData = {
-      ...data,
-      created_by: user?.email || 'anonymous'
-    };
-    const spot = await createSpot(spotData);
+    const spot = await createSpot(data);
     setSpots(prev => [spot, ...prev]);
     setPendingLatlng(null);
   };
+
+  // Deep-link: ?spot=<id> opens that spot detail
+  const deepLinkProcessed = React.useRef(false);
+  React.useEffect(() => {
+    if (deepLinkProcessed.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const spotId = params.get('spot');
+    if (!spotId) return;
+    deepLinkProcessed.current = true;
+    const tryOpen = (retries = 0) => {
+      setSpots(current => {
+        const found = current.find(s => s.id === spotId);
+        if (found) {
+          setSelectedSpot(found);
+          setFlyTo([found.lat, found.lng]);
+          setTimeout(() => setFlyTo(null), 1200);
+          window.history.replaceState({}, '', window.location.pathname);
+        } else if (retries < 10) {
+          setTimeout(() => tryOpen(retries + 1), 600);
+        }
+        return current;
+      });
+    };
+    setTimeout(() => tryOpen(), 800);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
  
   const handleDeleteSpot = async (spot) => {
     await deleteSpot(spot.id);
@@ -396,7 +417,7 @@ export default function Home() {
         {/* FAB — green + floating above bar */}
         <div className="absolute left-1/2 -translate-x-1/2 z-10 pointer-events-none" style={{ bottom: '100%', marginBottom: '-36px' }}>
           <button
-            onClick={() => { if (!user) { setShowAuth(true); return; } setAddMode(a => !a); }}
+            onClick={() => setAddMode(a => !a)}
             className={`w-[72px] h-[72px] rounded-full shadow-2xl flex items-center justify-center transition-all active:scale-95 pointer-events-auto
               ${addMode ? 'bg-red-500 rotate-45 shadow-red-300' : 'bg-green-500 shadow-green-300'}`}
           >
@@ -461,6 +482,10 @@ export default function Home() {
           onNavigate={handleNavigate}
           onEdit={() => { setEditingSpot(selectedSpot); setSelectedSpot(null); }}
           onDelete={() => handleDeleteSpot(selectedSpot)}
+          onSpotUpdate={(updated) => {
+            setSpots(prev => prev.map(s => s.id === updated.id ? updated : s));
+            setSelectedSpot(updated);
+          }}
         />
       )}
 

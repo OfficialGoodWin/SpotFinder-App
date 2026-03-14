@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { getFirebaseServices, onAuthChange } from '@/api/firebaseClient';
+import { getFirebaseServices, onAuthChange, handleGoogleRedirectResult } from '@/api/firebaseClient';
 
 const AuthContext = createContext();
 
@@ -15,6 +15,11 @@ export const AuthProvider = ({ children }) => {
     // Set up Firebase auth state listener
     checkAppState();
     
+    // Handle redirect result from Google OAuth (TikTok/WebView flow)
+    handleGoogleRedirectResult().then(redirectUser => {
+      if (redirectUser) console.log('Google redirect sign-in succeeded:', redirectUser.email);
+    }).catch(e => console.warn('Redirect result:', e));
+
     try {
       // Listen for auth state changes
       const { auth } = getFirebaseServices();

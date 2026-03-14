@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '@/lib/LanguageContext';
 
 const FAQS = [
   {
@@ -12,7 +13,7 @@ const FAQS = [
       },
       {
         q: 'Do I need an account to use Spotfinder?',
-        a: 'No! You can browse and navigate to spots without an account. You only need to sign in if you want to add new spots or leave ratings.'
+        a: 'No! You can browse, add spots, and rate them without an account. Creating an account lets you manage your spots later.'
       },
       {
         q: 'How do I create an account?',
@@ -128,6 +129,7 @@ function AccordionItem({ q, a }) {
 
 export default function FAQ() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -140,8 +142,8 @@ export default function FAQ() {
           <ArrowLeft className="w-4 h-4" />
         </button>
         <div>
-          <h1 className="text-lg font-bold">Help & FAQ</h1>
-          <p className="text-xs text-muted-foreground">Frequently asked questions</p>
+          <h1 className="text-lg font-bold">{t('faq.title')}</h1>
+          <p className="text-xs text-muted-foreground">{t('faq.backToMap')}</p>
         </div>
       </div>
 

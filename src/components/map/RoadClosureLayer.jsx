@@ -1,126 +1,155 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
+import { useEffect, useRef, useCallback } from 'react';
+import { useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
- 
-// ── Icon: No-entry sign (closed road) ────────────────────────────────────────
-const NO_ENTRY_ICON = L.divIcon({
-  html: `<div style="filter:drop-shadow(0 3px 6px rgba(0,0,0,0.6));line-height:0"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="48" height="48"><circle cx="50" cy="50" r="49" fill="white"/><circle cx="50" cy="50" r="44" fill="#CC1111"/><rect x="16" y="38" width="68" height="24" rx="4" fill="white"/></svg></div>`,
+
+// No-entry SVG icon (road closed)
+const NO_ENTRY_HTML = `<div style="filter:drop-shadow(0 2px 6px rgba(0,0,0,.55));line-height:0"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="44" height="44"><circle cx="50" cy="50" r="49" fill="white"/><circle cx="50" cy="50" r="44" fill="#CC1111"/><rect x="16" y="38" width="68" height="24" rx="4" fill="white"/></svg></div>`;
+
+// Warning triangle with cars (traffic jam)
+const JAM_HTML = `<div style="filter:drop-shadow(0 2px 6px rgba(0,0,0,.55));line-height:0"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 90" width="46" height="42"><polygon points="50,5 97,85 3,85" fill="#FFD600" stroke="#CC6600" stroke-width="5" stroke-linejoin="round"/><text x="50" y="75" font-size="40" text-anchor="middle" fill="#333">🚗</text></svg></div>`;
+
+const makeIcon = (html, size) => L.divIcon({
+  html,
   className: '',
-  iconSize:    [48, 48],
-  iconAnchor:  [24, 24],
-  popupAnchor: [0, -28],
+  iconSize: size,
+  iconAnchor: [size[0] / 2, size[1] / 2],
+  popupAnchor: [0, -size[1] / 2 - 4],
 });
- 
-// ── Icon: Traffic-jam warning sign ───────────────────────────────────────────
-const JAM_ICON = L.divIcon({
-  html: `<div style="filter:drop-shadow(0 3px 6px rgba(0,0,0,0.6));line-height:0"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 98" width="52" height="48"><polygon points="55,4 106,94 4,94" fill="white" stroke="#CC1111" stroke-width="10" stroke-linejoin="round"/><g transform="translate(22,60) scale(0.72)"><rect x="0" y="8" width="28" height="14" rx="2" fill="#111"/><rect x="4" y="2" width="20" height="10" rx="2" fill="#111"/><circle cx="6" cy="23" r="4" fill="#444"/><circle cx="22" cy="23" r="4" fill="#444"/></g><g transform="translate(38,54) scale(0.82)"><rect x="0" y="8" width="30" height="15" rx="2" fill="#111"/><rect x="4" y="2" width="22" height="10" rx="2" fill="#111"/><circle cx="6" cy="24" r="4" fill="#444"/><circle cx="24" cy="24" r="4" fill="#444"/></g><g transform="translate(56,48) scale(0.92)"><rect x="0" y="8" width="32" height="16" rx="2" fill="#111"/><rect x="5" y="2" width="22" height="10" rx="2" fill="#111"/><circle cx="7" cy="25" r="5" fill="#444"/><circle cx="25" cy="25" r="5" fill="#444"/></g></svg></div>`,
-  className: '',
-  iconSize:    [52, 48],
-  iconAnchor:  [26, 24],
-  popupAnchor: [0, -28],
-});
- 
-// ── TomTom incident categories ────────────────────────────────────────────────
-// 1=Accident 2=Fog 3=DangerousConditions 4=Rain 5=Ice 6=Jam 7=LaneClosed
-// 8=RoadClosed 9=RoadWorks 10=Wind 11=Flooding 13=BrokenDownVehicle 14=RoadClosed
-const isClosure = cat => [8, 13, 14].includes(cat);
-const isJam     = cat => [1, 6, 7, 9].includes(cat);  // accidents + jams + roadworks
- 
-// ── Debounce helper ───────────────────────────────────────────────────────────
-function useDebounce(fn, delay) {
-  const timer = useRef(null);
-  return useCallback((...args) => {
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => fn(...args), delay);
-  }, [fn, delay]);
+
+const CLOSED_ICON = makeIcon(NO_ENTRY_HTML, [44, 44]);
+const JAM_ICON    = makeIcon(JAM_HTML,    [46, 42]);
+
+// TomTom incident category helpers
+const isClosure = cat => [8, 14].includes(cat);
+const isJam     = cat => [1, 6, 7, 9, 13].includes(cat);
+
+function midpoint(geometry) {
+  const c = geometry.coordinates;
+  if (geometry.type === 'Point') return [c[1], c[0]];
+  const m = c[Math.floor(c.length / 2)];
+  return [m[1], m[0]];
 }
- 
-// ── TomTom Incidents API v5 ───────────────────────────────────────────────────
-async function fetchIncidents(bounds, apiKey) {
+
+async function fetchTomTomIncidents(bounds, apiKey) {
   const { _southWest: sw, _northEast: ne } = bounds;
   const bbox = `${sw.lng},${sw.lat},${ne.lng},${ne.lat}`;
-  const fields = encodeURIComponent('{incidents{type,geometry{type,coordinates},properties{id,iconCategory,magnitudeOfDelay,from,to,roadNumbers,description,events{description,code,iconCategory}}}}');
+  const fields = encodeURIComponent('{incidents{type,geometry{type,coordinates},properties{id,iconCategory,from,to,roadNumbers,events{description,iconCategory}}}}');
   const url = `https://api.tomtom.com/traffic/services/5/incidentDetails?bbox=${bbox}&fields=${fields}&language=en-GB&timeValidityFilter=present&key=${apiKey}`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    console.error(`TomTom incidents API error: ${res.status} - ${res.statusText}`);
-    throw new Error(`TomTom incidents ${res.status}`);
-  }
+  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error(`TomTom ${res.status}`);
   const data = await res.json();
-  return (data.incidents || []).filter(inc => {
-    const cat = inc.properties?.iconCategory;
+  return (data.incidents || []).filter(i => {
+    const cat = i.properties?.iconCategory;
     return isClosure(cat) || isJam(cat);
   });
 }
- 
-function midpoint(geometry) {
-  const coords = geometry.coordinates;
-  if (geometry.type === 'Point') return { lat: coords[1], lng: coords[0] };
-  const mid = coords[Math.floor(coords.length / 2)];
-  return { lat: mid[1], lng: mid[0] };
+
+// Overpass fallback – permanent OSM road closures (no key needed)
+async function fetchOverpassClosures(bounds) {
+  const { _southWest: sw, _northEast: ne } = bounds;
+  const bbox = `${sw.lat},${sw.lng},${ne.lat},${ne.lng}`;
+  const query = `[out:json][timeout:10];(way["access"="no"]["highway"](${bbox});way["motor_vehicle"="no"]["highway"](${bbox}););out center;`;
+  const res = await fetch('https://overpass-api.de/api/interpreter', {
+    method: 'POST',
+    body: 'data=' + encodeURIComponent(query),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) throw new Error('Overpass API error');
+  const data = await res.json();
+  return (data.elements || []).slice(0, 20).map(el => ({
+    _type: 'closure',
+    lat: el.center?.lat || el.lat,
+    lng: el.center?.lon || el.lon,
+    label: el.tags?.name || el.tags?.ref || 'Road Closed',
+    road: el.tags?.ref || '',
+  })).filter(e => e.lat && e.lng);
 }
- 
+
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function RoadClosureLayer({ apiKey, enabled }) {
   const map = useMap();
-  const [incidents, setIncidents] = useState([]);
-  const abortRef = useRef(null);
- 
+  const markersRef = useRef([]);
+  const timerRef   = useRef(null);
+
+  const clearMarkers = useCallback(() => {
+    markersRef.current.forEach(m => map.removeLayer(m));
+    markersRef.current = [];
+  }, [map]);
+
   const load = useCallback(async () => {
-    if (!apiKey || !enabled) { setIncidents([]); return; }
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
-    try {
-      const result = await fetchIncidents(map.getBounds(), apiKey);
-      console.log(`[RoadClosureLayer] fetched ${result.length} incidents`);
-      if (result.length === 0) {
-        console.log('[RoadClosureLayer] No traffic incidents in current view - this is normal if traffic is clear!');
-      }
-      setIncidents(result);
-    } catch (err) {
-      if (err.name !== 'AbortError') {
-        console.warn('[RoadClosureLayer] Incident fetch failed:', err.message);
-        console.warn('[RoadClosureLayer] Make sure VITE_TOMTOM_API_KEY is valid in your .env file');
+    if (!enabled) { clearMarkers(); return; }
+    clearMarkers();
+
+    const bounds = map.getBounds();
+    let incidents = [];
+
+    if (apiKey) {
+      try {
+        const raw = await fetchTomTomIncidents(bounds, apiKey);
+        incidents = raw.map(inc => {
+          if (!inc.geometry) return null;
+          const [lat, lng] = midpoint(inc.geometry);
+          const p = inc.properties || {};
+          const closed = isClosure(p.iconCategory);
+          return {
+            lat, lng,
+            icon: closed ? CLOSED_ICON : JAM_ICON,
+            title: closed ? '⛔ Road Closed' : '🚦 Traffic Jam',
+            road: (p.roadNumbers || []).join(', '),
+            from: p.from || '',
+            to: p.to || '',
+            desc: p.events?.[0]?.description || '',
+          };
+        }).filter(Boolean);
+      } catch (err) {
+        console.warn('[RoadClosureLayer] TomTom failed, trying Overpass fallback:', err.message);
       }
     }
-  }, [map, apiKey, enabled]);
- 
-  const loadDebounced = useDebounce(load, 600);
-  useEffect(() => { load(); }, [load]);
-  useMapEvents({ moveend: loadDebounced, zoomend: loadDebounced });
- 
-  if (!apiKey || !enabled || incidents.length === 0) return null;
- 
-  return incidents.map(inc => {
-    if (!inc.geometry) return null;
-    const { lat, lng } = midpoint(inc.geometry);
-    const props  = inc.properties || {};
-    const cat    = props.iconCategory;
-    const closed = isClosure(cat);
-    const from   = props.from || '';
-    const to     = props.to   || '';
-    const roads  = (props.roadNumbers || []).join(', ');
-    const desc   = props.events?.[0]?.description || props.description || '';
- 
-    return (
-      <Marker
-        key={props.id || `${lat}-${lng}`}
-        position={[lat, lng]}
-        icon={closed ? NO_ENTRY_ICON : JAM_ICON}
-        zIndexOffset={3000}
-      >
-        <Popup>
-          <div style={{ minWidth: 180, fontSize: 14 }}>
-            <strong style={{ color: '#CC1111', fontSize: 15 }}>
-              {closed ? '⛔ Road Closed' : '🚦 Traffic Jam'}
-            </strong>
-            {roads && <div style={{ marginTop: 6 }}>🛣️ {roads}</div>}
-            {from  && <div style={{ marginTop: 3 }}>From: {from}</div>}
-            {to    && <div style={{ marginTop: 3 }}>To: {to}</div>}
-            {desc  && <div style={{ marginTop: 6, color: '#555', fontSize: 13 }}>{desc}</div>}
-          </div>
-        </Popup>
-      </Marker>
-    );
-  });
+
+    // If no TomTom key (or it failed), use Overpass
+    if (incidents.length === 0) {
+      try {
+        const overpass = await fetchOverpassClosures(bounds);
+        incidents = overpass.map(o => ({
+          lat: o.lat, lng: o.lng,
+          icon: CLOSED_ICON,
+          title: '⛔ Road Closed',
+          road: o.road,
+          from: '', to: '',
+          desc: o.label,
+        }));
+      } catch (err) {
+        console.warn('[RoadClosureLayer] Overpass fallback also failed:', err.message);
+      }
+    }
+
+    // Create Leaflet markers imperatively (avoids React-Leaflet rendering issues)
+    incidents.forEach(inc => {
+      const popup = L.popup({ maxWidth: 220 }).setContent(
+        `<div style="font-size:14px;line-height:1.4">
+          <strong style="color:#CC1111;font-size:15px">${inc.title}</strong>
+          ${inc.road ? `<div style="margin-top:6px">🛣️ ${inc.road}</div>` : ''}
+          ${inc.from  ? `<div style="margin-top:3px">From: ${inc.from}</div>` : ''}
+          ${inc.to    ? `<div style="margin-top:3px">To: ${inc.to}</div>` : ''}
+          ${inc.desc  ? `<div style="margin-top:6px;color:#555;font-size:13px">${inc.desc}</div>` : ''}
+        </div>`
+      );
+      const marker = L.marker([inc.lat, inc.lng], { icon: inc.icon, zIndexOffset: 5000 })
+        .bindPopup(popup)
+        .addTo(map);
+      markersRef.current.push(marker);
+    });
+  }, [map, apiKey, enabled, clearMarkers]);
+
+  const scheduleLoad = useCallback(() => {
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(load, 700);
+  }, [load]);
+
+  useEffect(() => { load(); return () => clearMarkers(); }, [load]);
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  useMapEvents({ moveend: scheduleLoad, zoomend: scheduleLoad });
+
+  return null; // Markers added imperatively to map
 }
