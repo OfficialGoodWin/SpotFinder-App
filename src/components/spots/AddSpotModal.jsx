@@ -22,8 +22,10 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   const [imagePreview, setImagePreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
+  const [interimText, setInterimText] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const recognitionRef = useRef(null);
+  const committedRef = useRef(''); // tracks already-committed final transcript
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -52,19 +54,34 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
     rec.continuous = true;
     rec.interimResults = true;
 
+    committedRef.current = description; // snapshot current text
+
     rec.onresult = (event) => {
-      let transcript = '';
-      for (let i = 0; i < event.results.length; i++) {
+      // KEY FIX: start from event.resultIndex, not 0 — prevents replaying old results
+      let newFinal = '';
+      let interim = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const t = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
-          transcript += event.results[i][0].transcript + ' ';
+          newFinal += t;
+        } else {
+          interim += t;
         }
       }
-      if (transcript) {
-        setDescription(prev => (prev + transcript).trimStart());
+
+      // Append only newly finalized text to the committed snapshot
+      if (newFinal) {
+        const sep = committedRef.current && !committedRef.current.endsWith(' ') ? ' ' : '';
+        committedRef.current = committedRef.current + sep + newFinal.trim();
+        setDescription(committedRef.current);
       }
+
+      // Show live interim preview (doesn't modify committed text)
+      setInterimText(interim);
     };
-    rec.onerror = () => setListening(false);
-    rec.onend = () => setListening(false);
+    rec.onerror = () => { setListening(false); setInterimText(''); };
+    rec.onend = () => { setListening(false); setInterimText(''); };
     rec.start();
     recognitionRef.current = rec;
     setListening(true);
@@ -155,6 +172,11 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
                 listening ? 'border-red-300 dark:border-red-600' : 'border-gray-200 dark:border-border'
               }`}
             />
+            {interimText && (
+              <p className="mt-1 text-xs text-red-500 dark:text-red-400 italic px-1">
+                {interimText}…
+              </p>
+            )}
           </div>
 
           {/* Ratings */}
