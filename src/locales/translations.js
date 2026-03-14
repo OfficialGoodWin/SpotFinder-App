@@ -146,7 +146,7 @@ export const translations = {
         "depart": "Depart",
         "arrive": "Arrive at destination",
         "continueAhead": "Continue ahead",
-        "navigateToDestination": "Navigate to destination"
+        "navigateToDestination": "Navigate to destination",
         "in": "In",
         "on": "on",
         "onto": "onto",
@@ -364,7 +364,7 @@ export const translations = {
         "depart": "Vyjet",
         "arrive": "Dorazit do cíle",
         "continueAhead": "Pokračovat rovně",
-        "navigateToDestination": "Navigovat do cíle"
+        "navigateToDestination": "Navigovat do cíle",
         "in": "Za",
         "on": "na",
         "onto": "na",
@@ -582,7 +582,7 @@ export const translations = {
         "depart": "Wyjedź",
         "arrive": "Dotrzej do celu",
         "continueAhead": "Jedź prosto",
-        "navigateToDestination": "Nawiguj do celu"
+        "navigateToDestination": "Nawiguj do celu",
         "in": "Za",
         "on": "na",
         "onto": "na",
@@ -800,7 +800,7 @@ export const translations = {
         "depart": "Abfahrt",
         "arrive": "Ziel erreicht",
         "continueAhead": "Geradeaus weiter",
-        "navigateToDestination": "Zum Ziel navigieren"
+        "navigateToDestination": "Zum Ziel navigieren",
         "in": "In",
         "on": "auf",
         "onto": "auf",
@@ -1018,7 +1018,7 @@ export const translations = {
         "depart": "Vyraziť",
         "arrive": "Doraziť do cieľa",
         "continueAhead": "Pokračovať rovno",
-        "navigateToDestination": "Navigovať do cieľa"
+        "navigateToDestination": "Navigovať do cieľa",
         "in": "O",
         "on": "na",
         "onto": "na",
@@ -1236,7 +1236,7 @@ export const translations = {
         "depart": "Parti",
         "arrive": "Arrivo a destinazione",
         "continueAhead": "Prosegui dritto",
-        "navigateToDestination": "Naviga alla destinazione"
+        "navigateToDestination": "Naviga alla destinazione",
         "in": "Tra",
         "on": "su",
         "onto": "su",
@@ -1454,7 +1454,7 @@ export const translations = {
         "depart": "Partir",
         "arrive": "Arriver à destination",
         "continueAhead": "Continuer tout droit",
-        "navigateToDestination": "Naviguer vers la destination"
+        "navigateToDestination": "Naviguer vers la destination",
         "in": "Dans",
         "on": "sur",
         "onto": "sur",
@@ -1672,7 +1672,7 @@ export const translations = {
         "depart": "Отправление",
         "arrive": "Прибытие в пункт назначения",
         "continueAhead": "Прямо",
-        "navigateToDestination": "Навигировать к цели"
+        "navigateToDestination": "Навигировать к цели",
         "in": "Через",
         "on": "по",
         "onto": "на",
@@ -1890,7 +1890,7 @@ export const translations = {
         "depart": "Відправлення",
         "arrive": "Прибуття до пункту призначення",
         "continueAhead": "Прямо",
-        "navigateToDestination": "Навігувати до цілі"
+        "navigateToDestination": "Навігувати до цілі",
         "in": "Через",
         "on": "по",
         "onto": "на",
@@ -2108,7 +2108,7 @@ export const translations = {
         "depart": "Indulás",
         "arrive": "Érkezés a célállomásra",
         "continueAhead": "Egyenesen tovább",
-        "navigateToDestination": "Navigálás a célhoz"
+        "navigateToDestination": "Navigálás a célhoz",
         "in": "",
         "on": "az",
         "onto": "ra",
@@ -2326,7 +2326,7 @@ export const translations = {
         "depart": "Pornire",
         "arrive": "Sosire la destinație",
         "continueAhead": "Continuă înainte",
-        "navigateToDestination": "Navighează la destinație"
+        "navigateToDestination": "Navighează la destinație",
         "in": "Peste",
         "on": "pe",
         "onto": "pe",
@@ -2544,7 +2544,7 @@ export const translations = {
         "depart": "Salida",
         "arrive": "Llegada al destino",
         "continueAhead": "Sigue recto",
-        "navigateToDestination": "Navegar al destino"
+        "navigateToDestination": "Navegar al destino",
         "in": "En",
         "on": "en",
         "onto": "en",
