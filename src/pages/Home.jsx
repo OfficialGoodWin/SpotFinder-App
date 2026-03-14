@@ -96,7 +96,6 @@ function MapClickHandler({ addMode, onMapClick }) {
 export default function Home() {
   const { user, logout, isAuthenticated } = useAuth();
   const { t, language } = useLanguage();
-  const { t } = useLanguage();
   const { isDark } = useTheme();
   const navigate = useNavigate();
   const [spots, setSpots] = useState([]);
