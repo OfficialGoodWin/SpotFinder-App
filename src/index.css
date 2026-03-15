@@ -123,3 +123,9 @@
 }
 
 
+
+/* Leaflet divIcon: remove default white background + black border */
+.leaflet-div-icon-clean {
+  background: transparent !important;
+  border: none !important;
+}
