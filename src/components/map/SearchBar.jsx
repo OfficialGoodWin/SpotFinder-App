@@ -110,7 +110,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
           <button onMouseDown={e => { e.preventDefault(); toggleMic(); }}
             className={`p-1.5 rounded-lg flex-shrink-0 transition-colors ${listening ? 'bg-red-500 text-white' : 'text-gray-400 dark:text-muted-foreground hover:text-gray-600'}`}
             title={listening ? t('search.voiceStop') : t('search.voiceSearch')}>
-            {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            {listening ? <Mic className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
           </button>
           <div className="w-px h-5 bg-gray-200 dark:bg-border flex-shrink-0" />
           <button onClick={onToggleSpots}
