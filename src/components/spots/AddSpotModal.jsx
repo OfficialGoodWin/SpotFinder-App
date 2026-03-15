@@ -159,7 +159,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
                 }`}
                 title={listening ? t('addSpot.stopListening') : t('addSpot.startListening')}
               >
-                {listening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+                {listening ? <Mic className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
                 {listening ? t('addSpot.listening') : t('addSpot.voice')}
               </button>
             </div>
