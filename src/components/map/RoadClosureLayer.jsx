@@ -20,8 +20,8 @@ const triSign = (innerSVG, w = 26, h = 24) => `
 const JAM_ICON = L.divIcon({
   html: triSign(`
     <!-- 3 cars from back (small) to front (large), rear view, stacked -->
-    <!-- Car 3 (back, smallest) -->
-    <g transform="translate(16,52) scale(0.52)">
+    <!-- Car 3 (back, smallest) — bottom-left -->
+    <g transform="translate(16,62) scale(0.52)">
       <rect x="2" y="12" width="28" height="16" rx="3" fill="#111"/>
       <rect x="5" y="4"  width="18" height="12" rx="2" fill="#111"/>
       <rect x="1" y="27" width="7"  height="5"  rx="2" fill="#333"/>
@@ -29,15 +29,15 @@ const JAM_ICON = L.divIcon({
       <rect x="6" y="6"  width="16" height="8"  rx="1" fill="white" opacity=".85"/>
     </g>
     <!-- Car 2 (middle) -->
-    <g transform="translate(29,44) scale(0.65)">
+    <g transform="translate(29,55) scale(0.65)">
       <rect x="2" y="12" width="32" height="18" rx="3" fill="#111"/>
       <rect x="5" y="4"  width="22" height="12" rx="2" fill="#111"/>
       <rect x="1" y="29" width="8"  height="5"  rx="2" fill="#333"/>
       <rect x="25" y="29" width="8" height="5"  rx="2" fill="#333"/>
       <rect x="6" y="6"  width="20" height="8"  rx="1" fill="white" opacity=".85"/>
     </g>
-    <!-- Car 1 (front, largest) -->
-    <g transform="translate(43,34) scale(0.80)">
+    <!-- Car 1 (front, largest) — bottom-right -->
+    <g transform="translate(43,46) scale(0.80)">
       <rect x="2" y="14" width="38" height="20" rx="3.5" fill="#111"/>
       <rect x="5" y="4"  width="28" height="14" rx="3"   fill="#111"/>
       <rect x="1" y="33" width="9"  height="6"  rx="2.5" fill="#333"/>
@@ -80,14 +80,12 @@ const WORKS_ICON = L.divIcon({
 // ─── Icon 3: Lane Closed — red triangle, right lane narrows (matches real sign)
 const LANE_CLOSED_ICON = L.divIcon({
   html: triSign(`
-    <!-- Two lanes: left stays straight, right narrows into left -->
-    <!-- Left lane (straight, stays vertical) -->
-    <rect x="38" y="28" width="10" height="48" rx="2" fill="#111"/>
-    <!-- Right lane (curves left to merge) -->
-    <path d="M72 28 L72 52 Q72 72 53 76" stroke="#111" stroke-width="10" 
+    <!-- Left lane: straight vertical bar -->
+    <rect x="36" y="26" width="11" height="52" rx="3" fill="#111"/>
+    <!-- Right lane: vertical at top, smooth S-curve merging left at bottom -->
+    <path d="M70 26 L70 48 C70 68 50 68 47 80"
+          stroke="#111" stroke-width="11"
           fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-    <!-- Arrow tip on merge end -->
-    <polygon points="48,70 53,82 58,70" fill="#111"/>
   `, 26, 24),
   className: '', iconSize: [26,24], iconAnchor: [13,12], popupAnchor: [0,-14],
 });
@@ -243,24 +241,30 @@ export default function RoadClosureLayer({ apiKey, enabled, lang, t }) {
     </div>`;
   }, [t, translateEventCode]);
 
+  const JAM_MIN_ZOOM = 13; // jams only visible when zoomed in (closures/works always visible)
+
   const renderMarkers = useCallback((incidents) => {
     clearMarkers();
+    const zoom = map.getZoom();
     requestAnimationFrame(() => {
       const newMarkers = [];
       incidents.forEach(inc => {
+        // Jams only show at JAM_MIN_ZOOM and above — closures/works always show
+        if (inc.type === 'jam' && zoom < JAM_MIN_ZOOM) return;
+
         const icon = inc.type === 'closure' ? CLOSED_ICON
                    : inc.type === 'works'  ? WORKS_ICON
                    : inc.type === 'lane'   ? LANE_CLOSED_ICON
                    :                         JAM_ICON;
         const marker = L.marker([inc.lat, inc.lng], {
           icon,
-          zIndexOffset: 5000,   // always above map tiles
-          riseOnHover: true,    // pop to front on hover
+          zIndexOffset: 5000,
+          riseOnHover: true,
           keyboard: false,
         })
           .bindPopup(makePopupHTML(inc), {
             maxWidth: 240,
-            className: 'traffic-popup',   // hook for CSS if needed
+            className: 'traffic-popup',
           })
           .addTo(map);
         newMarkers.push(marker);
@@ -279,23 +283,6 @@ export default function RoadClosureLayer({ apiKey, enabled, lang, t }) {
 
     const bounds = map.getBounds();
 
-    // Cache skip: only if map moved less than 15% of view size
-    // At high zoom this threshold is intentionally small so we always refresh
-    if (lastBoundsRef.current && cacheRef.current.length > 0 && zoom < 16) {
-      const prev = lastBoundsRef.current;
-      const dist = haversineM(
-        [prev.getCenter().lat, prev.getCenter().lng],
-        [bounds.getCenter().lat, bounds.getCenter().lng]
-      );
-      const viewSize = haversineM(
-        [prev._southWest.lat, prev._southWest.lng],
-        [prev._northEast.lat, prev._northEast.lng]
-      );
-      if (dist < viewSize * 0.15) {
-        renderMarkers(cacheRef.current);
-        return;
-      }
-    }
     lastBoundsRef.current = bounds;
 
     abortRef.current?.abort();
