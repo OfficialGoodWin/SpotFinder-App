@@ -49,45 +49,40 @@ const JAM_ICON = L.divIcon({
   className: '', iconSize: [26,24], iconAnchor: [13,12], popupAnchor: [0,-14],
 });
 
-// ─── ACCIDENT: red triangle, two side-view cars colliding + spiky explosion ────
+// ─── ACCIDENT: red triangle, explosion + two side-view cars ────────────────────
 const ACCIDENT_ICON = L.divIcon({
-  html: triSign(`
-    <!-- Spiky starburst — 8 sharp points, orange/yellow -->
-    <polygon points="55,38 57,44 63,41 60,47 67,48 61,52 65,58 58,55 57,63 54,56 47,60 50,53 43,51 50,47 46,40 53,44"
-             fill="#FF7700"/>
-    <polygon points="55,41 57,46 62,43 60,48 66,49 61,52 64,57 58,54 57,61 54,57 48,59 51,53 45,52 51,48 47,42 53,46"
-             fill="#FFD700" opacity="0.8"/>
-    <!-- Left car: side view, pointing RIGHT toward centre -->
-    <g transform="translate(14,64)">
-      <rect x="0" y="3" width="20" height="10" rx="2" fill="#111"/>
-      <rect x="3" y="0" width="11" height="7"  rx="1.5" fill="#111"/>
-      <circle cx="4"  cy="14" r="3" fill="#333"/>
-      <circle cx="16" cy="14" r="3" fill="#333"/>
-      <rect x="4" y="1" width="9" height="4" rx="1" fill="white" opacity=".75"/>
+  html: `<div style="filter:drop-shadow(0 2px 4px rgba(0,0,0,.55));line-height:0"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 100" width="26" height="24">
+    <!-- Bold 6-point star explosion, centred in triangle -->
+    <polygon points="55.0,39.0 58.0,46.8 66.3,45.5 61.0,52.0 66.3,58.5 58.0,57.2 55.0,65.0 52.0,57.2 43.7,58.5 49.0,52.0 43.7,45.5 52.0,46.8" fill="#FF8800"/>
+    <circle cx="55" cy="52" r="6" fill="#FFE500"/>
+    <!-- Left car: side profile facing right, bottom-left corner -->
+    <g transform="translate(10,66)">
+      <rect x="0" y="5"  width="24" height="13" rx="3" fill="#111"/>
+      <rect x="4" y="0"  width="13" height="9"  rx="2" fill="#111"/>
+      <circle cx="5"  cy="19" r="4" fill="#444"/>
+      <circle cx="19" cy="19" r="4" fill="#444"/>
     </g>
-    <!-- Right car: side view, pointing LEFT (mirrored) toward centre -->
-    <g transform="translate(76,64) scale(-1,1)">
-      <rect x="0" y="3" width="20" height="10" rx="2" fill="#111"/>
-      <rect x="3" y="0" width="11" height="7"  rx="1.5" fill="#111"/>
-      <circle cx="4"  cy="14" r="3" fill="#333"/>
-      <circle cx="16" cy="14" r="3" fill="#333"/>
-      <rect x="4" y="1" width="9" height="4" rx="1" fill="white" opacity=".75"/>
+    <!-- Right car: mirrored, bottom-right corner -->
+    <g transform="translate(100,66) scale(-1,1)">
+      <rect x="0" y="5"  width="24" height="13" rx="3" fill="#111"/>
+      <rect x="4" y="0"  width="13" height="9"  rx="2" fill="#111"/>
+      <circle cx="5"  cy="19" r="4" fill="#444"/>
+      <circle cx="19" cy="19" r="4" fill="#444"/>
     </g>
-  `),
+  </svg></div>`,
   className: '', iconSize: [26,24], iconAnchor: [13,12], popupAnchor: [0,-14],
 });
 
-// ─── LANE CLOSED: red triangle, right lane merges INTO left lane ──────────────
+// ─── LANE CLOSED: two vertical bars at top, right bar angles into left bar ─────
+// Pure straight-line segments — no bezier. Reads clearly at 26px.
 const LANE_CLOSED_ICON = L.divIcon({
   html: triSign(`
-    <!-- Left lane — straight vertical, centred at x=36 -->
-    <rect x="30" y="26" width="12" height="56" rx="3" fill="#111"/>
-    <!-- Right lane — goes straight down then hooks HARD LEFT to join left lane.
-         Q uses a single control point at (72,80) — keeping x right until near
-         the bottom, then the endpoint at (36,84) forces the hard left turn.      -->
-    <path d="M72 26 L72 52 Q72 84 36 84"
-          stroke="#111" stroke-width="12"
-          fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Left lane: full-height vertical bar -->
+    <rect x="28" y="24" width="13" height="58" rx="3" fill="#111"/>
+    <!-- Right lane: straight down to midpoint, then sharp diagonal left to join left lane -->
+    <polyline points="72,24 72,52 41,82"
+              stroke="#111" stroke-width="13"
+              fill="none" stroke-linecap="round" stroke-linejoin="round"/>
   `),
   className: '', iconSize: [26,24], iconAnchor: [13,12], popupAnchor: [0,-14],
 });
