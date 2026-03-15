@@ -294,19 +294,30 @@ export default function RoadClosureLayer({ apiKey, enabled, lang, t }) {
   // onZoom: re-render cached data immediately with new zoom thresholds applied.
   // Also trigger a fresh fetch (debounced) since bbox may now cover a different area.
   const onZoom = useCallback(() => {
-    // Re-render immediately from cache so thresholds apply without waiting for fetch
+    if (!enabled) { clearMarkers(); return; }   // ← fix: don't flash icons on other layers
     if (cacheRef.current.length > 0) {
       renderMarkers(cacheRef.current);
     }
-  }, [renderMarkers]);
+  }, [enabled, clearMarkers, renderMarkers]);
 
   const loadDebounced = useCallback(debounce(load, 900), [load]);
   const onZoomDebounced = useCallback(debounce(() => { onZoom(); loadDebounced(); }, 200), [onZoom, loadDebounced]);
 
+  // Clear markers immediately and synchronously when disabled (layer switch)
+  // This runs BEFORE the load() effect so there is no flash of cached icons
   useEffect(() => {
+    if (!enabled) {
+      abortRef.current?.abort();
+      clearMarkers();
+      cacheRef.current = [];
+    }
+  }, [enabled, clearMarkers]);
+
+  useEffect(() => {
+    if (!enabled) return;
     load();
     return () => { clearMarkers(); abortRef.current?.abort(); };
-  }, [load]);
+  }, [load, enabled]);
 
   useEffect(() => () => { abortRef.current?.abort(); }, []);
 
