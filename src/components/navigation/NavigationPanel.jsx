@@ -5,7 +5,7 @@ import { useLanguage } from '@/lib/LanguageContext';
 
 const LANG_BCP47 = {
   en:'en-US', cs:'cs-CZ', pl:'pl-PL', de:'de-DE', sk:'sk-SK',
-  it:'it-IT', fr:'fr-FR', ru:'ru-RU', uk:'uk-UA', hu:'hu-HU', ro:'ro-RO', es:'es-ES',
+  it:'it-IT', fr:'fr-FR', ru:'ru-RU', uk:'uk-UA', hu:'hu-HU', ro:'ro-RO', es:'es-ES', bg:'bg-BG',
 };
 
 const ROUTE_TYPE_KEYS = [

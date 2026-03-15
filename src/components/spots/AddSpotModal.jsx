@@ -9,7 +9,7 @@ import { uploadSpotImage } from '@/api/firebaseClient';
 const LANG_TO_BCP47 = {
   en: 'en-US', cs: 'cs-CZ', pl: 'pl-PL', de: 'de-DE', sk: 'sk-SK',
   it: 'it-IT', fr: 'fr-FR', ru: 'ru-RU', uk: 'uk-UA', hu: 'hu-HU',
-  ro: 'ro-RO', es: 'es-ES',
+  ro: 'ro-RO', es: 'es-ES', bg: 'bg-BG',
 };
 
 export default function AddSpotModal({ latlng, onClose, onSave, user }) {

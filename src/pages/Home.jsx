@@ -57,8 +57,17 @@ const DARK_TILES = {
 // ── TomTom traffic flow overlay ───────────────────────────────────────────────
 // Overlaid on top of ANY base layer when mapLayer === 'traffic'
 // Green = free flow  |  Yellow = slow  |  Red = heavy congestion
+// TomTom traffic tile URL — 256px tiles load ~4× faster than 512px,
+// have better browser cache hit rate, and avoid ERR_FAILED on slow connections.
+// We use 'relative' style (proportional width coloring) which renders cleaner at zoom <14.
 const TRAFFIC_OVERLAY_URL = TOMTOM_API_KEY
-  ? `https://api.tomtom.com/traffic/map/4/tile/flow/absolute/{z}/{x}/{y}.png?tileSize=512&key=${TOMTOM_API_KEY}`
+  ? `https://api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?key=${TOMTOM_API_KEY}`
+  : null;
+
+// Second TomTom subdomain mirror — round-robin between a/b/c/d to parallelise requests
+// Leaflet's {s} subdomain syntax picks randomly from the subdomains array per tile
+const TRAFFIC_OVERLAY_URL_SUB = TOMTOM_API_KEY
+  ? `https://{s}.api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?key=${TOMTOM_API_KEY}`
   : null;
  
 // Map controller component
@@ -309,6 +318,8 @@ export default function Home() {
       <MapContainer
         center={[mapCenter.lat, mapCenter.lng]}
         zoom={13}
+        minZoom={3}
+        maxZoom={20}
         style={{ width: '100%', height: '100%' }}
         zoomControl={false}
         attributionControl={false}
@@ -319,6 +330,7 @@ export default function Home() {
         wheelDebounceTime={40}
         touchZoom={true}
         bounceAtZoomLimits={false}
+        preferCanvas={true}
       >
         {/* Base map tile */}
         <TileLayer
@@ -329,19 +341,30 @@ export default function Home() {
             ? '&copy; <a href="https://carto.com">CARTO</a> &copy; <a href="https://osm.org/copyright">OpenStreetMap</a>'
             : '&copy; <a href="https://mapy.com">Mapy.cz</a>'}
           maxZoom={20}
-          maxNativeZoom={useCartoTile ? 19 : 18}
+          maxNativeZoom={useCartoTile ? 19 : 19}
+          keepBuffer={4}
+          updateWhenIdle={false}
+          updateWhenZooming={false}
+          crossOrigin="anonymous"
           errorTileUrl="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
         />
  
         {/* TomTom real-time traffic flow overlay (only on traffic layer) */}
-        {mapLayer === 'traffic' && TRAFFIC_OVERLAY_URL && (
+        {mapLayer === 'traffic' && TRAFFIC_OVERLAY_URL_SUB && (
           <TileLayer
             key="traffic-overlay"
-            url={TRAFFIC_OVERLAY_URL}
+            url={TRAFFIC_OVERLAY_URL_SUB}
+            subdomains={['a','b','c','d']}
             tileSize={256}
-            opacity={0.55}
+            opacity={0.60}
             maxZoom={20}
+            maxNativeZoom={18}
             zIndex={200}
+            keepBuffer={4}
+            updateWhenIdle={false}
+            updateWhenZooming={false}
+            crossOrigin="anonymous"
+            errorTileUrl="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
           />
         )}
         {/* Road closure markers — shown on traffic layer when TomTom key is set */}
