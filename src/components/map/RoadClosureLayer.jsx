@@ -49,42 +49,22 @@ const JAM_ICON = L.divIcon({
   className: '', iconSize: [26,24], iconAnchor: [13,12], popupAnchor: [0,-14],
 });
 
-// ─── ACCIDENT: red triangle, explosion + two side-view cars ────────────────────
+// ─── ACCIDENT: embedded PNG icon (user-provided)
 const ACCIDENT_ICON = L.divIcon({
-  html: `<div style="filter:drop-shadow(0 2px 4px rgba(0,0,0,.55));line-height:0"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 100" width="26" height="24">
-    <!-- Bold 6-point star explosion, centred in triangle -->
-    <polygon points="55.0,39.0 58.0,46.8 66.3,45.5 61.0,52.0 66.3,58.5 58.0,57.2 55.0,65.0 52.0,57.2 43.7,58.5 49.0,52.0 43.7,45.5 52.0,46.8" fill="#FF8800"/>
-    <circle cx="55" cy="52" r="6" fill="#FFE500"/>
-    <!-- Left car: side profile facing right, bottom-left corner -->
-    <g transform="translate(10,66)">
-      <rect x="0" y="5"  width="24" height="13" rx="3" fill="#111"/>
-      <rect x="4" y="0"  width="13" height="9"  rx="2" fill="#111"/>
-      <circle cx="5"  cy="19" r="4" fill="#444"/>
-      <circle cx="19" cy="19" r="4" fill="#444"/>
-    </g>
-    <!-- Right car: mirrored, bottom-right corner -->
-    <g transform="translate(100,66) scale(-1,1)">
-      <rect x="0" y="5"  width="24" height="13" rx="3" fill="#111"/>
-      <rect x="4" y="0"  width="13" height="9"  rx="2" fill="#111"/>
-      <circle cx="5"  cy="19" r="4" fill="#444"/>
-      <circle cx="19" cy="19" r="4" fill="#444"/>
-    </g>
-  </svg></div>`,
-  className: '', iconSize: [26,24], iconAnchor: [13,12], popupAnchor: [0,-14],
+  html: `<div style="filter:drop-shadow(0 2px 4px rgba(0,0,0,.55));line-height:0">
+    <img src="data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAAdACADASIAAhEBAxEB/8QAGQABAAMBAQAAAAAAAAAAAAAACAUGBwMJ/8QAJhAAAQQCAgEEAgMAAAAAAAAAAQIDBAUGEQASIQcTIjEIFRZCYf/EABYBAQEBAAAAAAAAAAAAAAAAAAQAA//EACARAAICAQMFAAAAAAAAAAAAAAECAAMEBRESEyFBgZH/2gAMAwEAAhEDEQA/ABlyVxrHL7JrBFfj9PNs5K1pQERmSvRUdDsR4SP9Oh98iuNX8Lsbu670ssLNyreq37B/3655p5Ud6ySOqEdyVBJaCnD1HxJ2emyVE5XO1dZZRuR4mtNa2WBGOwPmEPKcVyTFpLcfIqOwq1vdiwZLCkIfSDoqbUfi4nyPkkkHYIPnkNz0k/iL19VXdRKgv1NVaVT8Z0LWs7KkrQHEISCHFoOyEq87II+xwA+pmD5B6eZbIxrI46W5bSEuNutbUzIaUPi40ogd0HyN6+wR9gjhtPy2y6uoy8T7+9wIrUcNcS7pq3IevnYmVni/z+uyqdKhNYX6k4pRxi6l/Gy3LdjzH4qIzQMcONdkey0UnolQAIJXvSuEDnSM+9FktSYzzjL7SwttxtRSpCgdhQI8gg+d8dARrOTcou/Sm2qfUzL7jHrSK/HYfu5amUxC83IKkoZDKkCS0ph49/cPXuW/J0NZF+Ws1f6zD6eZew7iwjqsJbjkWOY7TbL7jZZS20QOiOqPrz8vc8kaJyfMM9y/L4sWLkl7JsWIpJZbcCQEeNf1A2AN6B+tq1rsd1rlKf/Z"
+         width="32" height="29" style="display:block;image-rendering:pixelated"/>
+  </div>`,
+  className: '', iconSize: [32,29], iconAnchor: [16,14], popupAnchor: [0,-16],
 });
 
-// ─── LANE CLOSED: two vertical bars at top, right bar angles into left bar ─────
-// Pure straight-line segments — no bezier. Reads clearly at 26px.
+// ─── LANE CLOSED: embedded PNG icon (user-provided)
 const LANE_CLOSED_ICON = L.divIcon({
-  html: triSign(`
-    <!-- Left lane: full-height vertical bar -->
-    <rect x="28" y="24" width="13" height="58" rx="3" fill="#111"/>
-    <!-- Right lane: straight down to midpoint, then sharp diagonal left to join left lane -->
-    <polyline points="72,24 72,52 41,82"
-              stroke="#111" stroke-width="13"
-              fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-  `),
-  className: '', iconSize: [26,24], iconAnchor: [13,12], popupAnchor: [0,-14],
+  html: `<div style="filter:drop-shadow(0 2px 4px rgba(0,0,0,.55));line-height:0">
+    <img src="data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAAgABsDASIAAhEBAxEB/8QAGAAAAwEBAAAAAAAAAAAAAAAABgcIAwX/xAApEAABBAEEAgECBwAAAAAAAAABAgMEEQUABhIhBwhBIzFCQ1FSYXGB/8QAGAEAAgMAAAAAAAAAAAAAAAAAAgMABAX/xAAmEQABAwMCBQUAAAAAAAAAAAABAgMRACExBBITQWGBkTJRcdHh/9oADAMBAAIRAxEAPwCMtHfizx3M36zmGsWpT2Qgw1SkRmljlwTYK1CjY5FIod9/bsWK7ZxEnPZ+Fh4iVKelOhscQCqvkgEjkauhdk9Ds6feE3BM9fvZfKqbxTuSx0HGQ4mYbaBWpiO4xFUpSFE9cXOASVGj0kkFV6UuVHYDFXdNDI460hQmIPO1/FvIqeJcd2JLeivpCXWXFNuAKCgFA0ex0ex9xrLTl9o8Bg07kjb32hKambb3AgPRXWzQSe/pkE2lSaUgoocQhF9q0mtE2rcmTmk6lkNOEJuMg+4OP3raq49C/Fb8rMOb/wAqyRFjJAioUhQ5OE2m7oH8Dn2P5ZB7IB7syJFn+/Xk2DOjMyYsja7bTzLqApDiFNY8FKgeiCPjUo4rzVv7EQkQcRlXcbDQSURocl9lpF/tQhwJH+DWDHl7erGfk7gYyLjWXlNBmRPRJfTIdbFUlTgc5EDinon4H6DSEF1Mkpuetab6NE5tSl6AkR6T3Pc/XKnj4A8fJ8k+oW48Yw0TkoefkuxCASVkRoxKAARd0kgXRUhN9alnL4+Ri8nIx8pNPMLKT0QFD4ULANEUQa7BGjXb3l/eu3YS4WAyDmKirdU8tmHJfZQpxVWohLgBJod/wNc6Tv6dKkOSZmD29MkOKKnH5MAOuLJ+VLUSon+zqS6FyE560K0aNTIQXrg2O04OR5uPk1//2Q=="
+         width="27" height="32" style="display:block;image-rendering:pixelated"/>
+  </div>`,
+  className: '', iconSize: [27,32], iconAnchor: [13,16], popupAnchor: [0,-18],
 });
 
 // ─── ROAD WORKS: orange emoji badge — clean, universally recognised ────────────
