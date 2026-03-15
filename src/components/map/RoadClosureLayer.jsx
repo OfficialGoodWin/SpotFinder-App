@@ -8,7 +8,7 @@ const ZOOM = {
   accident: 8,   // accident:    visible when zoom > 8
   lane:     8,   // lane closed: visible when zoom > 8
   works:    12,  // road works:  visible when zoom > 12
-  closure:  12,  // road closed: visible when zoom > 12
+  closure:  11,  // road closed: visible when zoom > 11
 };
 
 // ─── Helper: European red-triangle warning sign ───────────────────────────────
@@ -49,41 +49,43 @@ const JAM_ICON = L.divIcon({
   className: '', iconSize: [26,24], iconAnchor: [13,12], popupAnchor: [0,-14],
 });
 
-// ─── ACCIDENT: red triangle, two cars colliding head-on with explosion ─────────
+// ─── ACCIDENT: red triangle, two side-view cars colliding + spiky explosion ────
 const ACCIDENT_ICON = L.divIcon({
   html: triSign(`
-    <!-- Starburst explosion in centre -->
-    <polygon points="55,46 58,38 62,45 68,40 66,48 74,47 69,53 74,59 66,57 68,65 62,60 58,67 55,59 52,67 48,60 44,65 46,57 38,59 43,53 38,47 46,48 44,40 50,45 52,38" fill="#FF6600" opacity="0.9"/>
-    <circle cx="55" cy="52" r="7" fill="#FFD700"/>
-    <!-- Left car facing RIGHT, hitting centre -->
-    <g transform="translate(17,60)">
-      <rect x="0" y="4"  width="22" height="12" rx="2" fill="#111"/>
-      <rect x="4" y="0"  width="12" height="8"  rx="1.5" fill="#111"/>
-      <circle cx="5"  cy="17" r="3.5" fill="#444"/>
-      <circle cx="17" cy="17" r="3.5" fill="#444"/>
-      <rect x="5" y="1" width="10" height="5" rx="1" fill="white" opacity=".8"/>
+    <!-- Spiky starburst — 8 sharp points, orange/yellow -->
+    <polygon points="55,38 57,44 63,41 60,47 67,48 61,52 65,58 58,55 57,63 54,56 47,60 50,53 43,51 50,47 46,40 53,44"
+             fill="#FF7700"/>
+    <polygon points="55,41 57,46 62,43 60,48 66,49 61,52 64,57 58,54 57,61 54,57 48,59 51,53 45,52 51,48 47,42 53,46"
+             fill="#FFD700" opacity="0.8"/>
+    <!-- Left car: side view, pointing RIGHT toward centre -->
+    <g transform="translate(14,64)">
+      <rect x="0" y="3" width="20" height="10" rx="2" fill="#111"/>
+      <rect x="3" y="0" width="11" height="7"  rx="1.5" fill="#111"/>
+      <circle cx="4"  cy="14" r="3" fill="#333"/>
+      <circle cx="16" cy="14" r="3" fill="#333"/>
+      <rect x="4" y="1" width="9" height="4" rx="1" fill="white" opacity=".75"/>
     </g>
-    <!-- Right car facing LEFT, hitting centre -->
-    <g transform="translate(71,60) scale(-1,1)">
-      <rect x="0" y="4"  width="22" height="12" rx="2" fill="#111"/>
-      <rect x="4" y="0"  width="12" height="8"  rx="1.5" fill="#111"/>
-      <circle cx="5"  cy="17" r="3.5" fill="#444"/>
-      <circle cx="17" cy="17" r="3.5" fill="#444"/>
-      <rect x="5" y="1" width="10" height="5" rx="1" fill="white" opacity=".8"/>
+    <!-- Right car: side view, pointing LEFT (mirrored) toward centre -->
+    <g transform="translate(76,64) scale(-1,1)">
+      <rect x="0" y="3" width="20" height="10" rx="2" fill="#111"/>
+      <rect x="3" y="0" width="11" height="7"  rx="1.5" fill="#111"/>
+      <circle cx="4"  cy="14" r="3" fill="#333"/>
+      <circle cx="16" cy="14" r="3" fill="#333"/>
+      <rect x="4" y="1" width="9" height="4" rx="1" fill="white" opacity=".75"/>
     </g>
   `),
   className: '', iconSize: [26,24], iconAnchor: [13,12], popupAnchor: [0,-14],
 });
 
 // ─── LANE CLOSED: red triangle, right lane merges INTO left lane ──────────────
-// Left lane: straight vertical bar on left
-// Right lane: starts vertical on right, curves HARD LEFT, joins left lane at bottom
 const LANE_CLOSED_ICON = L.divIcon({
   html: triSign(`
-    <!-- Left lane — stays straight full height -->
-    <rect x="32" y="26" width="12" height="56" rx="3" fill="#111"/>
-    <!-- Right lane — vertical top half, then curves sharply LEFT into left lane -->
-    <path d="M74 26 L74 52 C74 74 38 74 38 82"
+    <!-- Left lane — straight vertical, centred at x=36 -->
+    <rect x="30" y="26" width="12" height="56" rx="3" fill="#111"/>
+    <!-- Right lane — goes straight down then hooks HARD LEFT to join left lane.
+         Q uses a single control point at (72,80) — keeping x right until near
+         the bottom, then the endpoint at (36,84) forces the hard left turn.      -->
+    <path d="M72 26 L72 52 Q72 84 36 84"
           stroke="#111" stroke-width="12"
           fill="none" stroke-linecap="round" stroke-linejoin="round"/>
   `),
