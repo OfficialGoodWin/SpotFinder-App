@@ -3,29 +3,6 @@ import { ChevronDown, ArrowLeft, MapPin, Star, Navigation, Layers, Share2, Mic, 
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/lib/LanguageContext';
 
-// ─── Reusable step-by-step guide component ───────────────────────────────────
-function StepGuide({ steps }) {
-  return (
-    <div className="mt-4 space-y-3">
-      {steps.map((step, i) => (
-        <div key={i} className="flex gap-3 items-start">
-          {/* Step number */}
-          <div className="flex-shrink-0 w-7 h-7 rounded-full bg-blue-500 text-white text-xs font-bold flex items-center justify-center mt-0.5">
-            {i + 1}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-gray-800 dark:text-foreground mb-2">{step.label}</p>
-            {/* Illustration */}
-            <div className="rounded-2xl overflow-hidden border border-gray-100 dark:border-border bg-gray-50 dark:bg-accent/30">
-              {step.svg}
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // ─── SVG Illustrations ────────────────────────────────────────────────────────
 
 // Map with + button highlighted
