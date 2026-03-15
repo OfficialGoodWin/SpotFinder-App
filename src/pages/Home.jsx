@@ -6,6 +6,7 @@ import { getPublicSpots, createSpot, deleteSpot, updateSpot } from '@/api/fireba
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
 import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '@/lib/LanguageContext';
  
 import SpotMarker from '../components/map/SpotMarker';
 import UserLocationMarker from '../components/map/UserLocationMarker';
@@ -56,8 +57,17 @@ const DARK_TILES = {
 // ── TomTom traffic flow overlay ───────────────────────────────────────────────
 // Overlaid on top of ANY base layer when mapLayer === 'traffic'
 // Green = free flow  |  Yellow = slow  |  Red = heavy congestion
+// TomTom traffic tile URL — 256px tiles load ~4× faster than 512px,
+// have better browser cache hit rate, and avoid ERR_FAILED on slow connections.
+// We use 'relative' style (proportional width coloring) which renders cleaner at zoom <14.
 const TRAFFIC_OVERLAY_URL = TOMTOM_API_KEY
-  ? `https://api.tomtom.com/traffic/map/4/tile/flow/absolute/{z}/{x}/{y}.png?tileSize=512&key=${TOMTOM_API_KEY}`
+  ? `https://api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?key=${TOMTOM_API_KEY}`
+  : null;
+
+// Second TomTom subdomain mirror — round-robin between a/b/c/d to parallelise requests
+// Leaflet's {s} subdomain syntax picks randomly from the subdomains array per tile
+const TRAFFIC_OVERLAY_URL_SUB = TOMTOM_API_KEY
+  ? `https://{s}.api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?key=${TOMTOM_API_KEY}`
   : null;
  
 // Map controller component
@@ -94,6 +104,7 @@ function MapClickHandler({ addMode, onMapClick }) {
  
 export default function Home() {
   const { user, logout, isAuthenticated } = useAuth();
+  const { t, language } = useLanguage();
   const { isDark } = useTheme();
   const navigate = useNavigate();
   const [spots, setSpots] = useState([]);
@@ -125,7 +136,6 @@ export default function Home() {
   const [deleteInput, setDeleteInput] = useState('');
   const mapRef = useRef(null);
  
-  console.log('[Home] Component mounted');
  
   // Load spots
   useEffect(() => {
@@ -140,15 +150,13 @@ export default function Home() {
   useEffect(() => {
     if (!navigator.geolocation) return;
  
-    // Set timeout to allow app to work without geolocation (e.g., if permission denied on mobile)
+    // Fallback center after 15s if geolocation is slow or denied
     geolocationTimeoutRef.current = setTimeout(() => {
-      console.warn('Geolocation timeout - proceeding without location');
       if (!hasCenteredToUser.current) {
         hasCenteredToUser.current = true;
-        // Use default Prague location
         setFlyTo([50.0755, 14.4378]);
       }
-    }, 5000); // 5 second timeout
+    }, 15000);
  
     const wid = navigator.geolocation.watchPosition(
       (pos) => {
@@ -196,14 +204,35 @@ export default function Home() {
   }, []);
  
   const handleSaveSpot = async (data) => {
-    const spotData = {
-      ...data,
-      created_by: user?.email || 'anonymous'
-    };
-    const spot = await createSpot(spotData);
+    const spot = await createSpot(data);
     setSpots(prev => [spot, ...prev]);
     setPendingLatlng(null);
   };
+
+  // Deep-link: ?spot=<id> opens that spot detail
+  const deepLinkProcessed = React.useRef(false);
+  React.useEffect(() => {
+    if (deepLinkProcessed.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const spotId = params.get('spot');
+    if (!spotId) return;
+    deepLinkProcessed.current = true;
+    const tryOpen = (retries = 0) => {
+      setSpots(current => {
+        const found = current.find(s => s.id === spotId);
+        if (found) {
+          setSelectedSpot(found);
+          setFlyTo([found.lat, found.lng]);
+          setTimeout(() => setFlyTo(null), 1200);
+          window.history.replaceState({}, '', window.location.pathname);
+        } else if (retries < 10) {
+          setTimeout(() => tryOpen(retries + 1), 600);
+        }
+        return current;
+      });
+    };
+    setTimeout(() => tryOpen(), 800);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
  
   const handleDeleteSpot = async (spot) => {
     await deleteSpot(spot.id);
@@ -219,7 +248,7 @@ export default function Home() {
   };
  
   const handleNavigate = (spot) => {
-    if (!userPos) return alert('Location not available yet');
+    if (!userPos) return alert(t('home.locationUnavailable'));
     startNavTo({ lat: spot.lat, lng: spot.lng, label: spot.title || 'Spot' });
     setSelectedSpot(null);
   };
@@ -230,7 +259,7 @@ export default function Home() {
   };
  
   const showNearby = () => {
-    if (!userPos) return alert('Enable location to find nearby spots');
+    if (!userPos) return alert(t('home.enableLocation'));
     const nearby = spots
       .map(s => ({
         ...s,
@@ -259,7 +288,7 @@ export default function Home() {
  
   // Stable nav start — set both target and snapshot from-position together
   const startNavTo = (destination) => {
-    if (!userPos) return alert('Location not available yet');
+    if (!userPos) return alert(t('home.locationUnavailable'));
     setNavFrom({ lat: userPos[0], lng: userPos[1] });
     setNavTarget(destination);
   };
@@ -277,7 +306,7 @@ export default function Home() {
           style={{ cursor: 'crosshair' }}
         >
           <div className="bg-blue-600 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-lg animate-pulse top-20 absolute">
-            Tap on the map to place spot
+            {t('home.tapToPlace')}
           </div>
         </div>
       )}
@@ -286,9 +315,19 @@ export default function Home() {
       <MapContainer
         center={[mapCenter.lat, mapCenter.lng]}
         zoom={13}
+        minZoom={3}
+        maxZoom={20}
         style={{ width: '100%', height: '100%' }}
         zoomControl={false}
         attributionControl={false}
+        scrollWheelZoom={true}
+        wheelPxPerZoomLevel={80}
+        zoomSnap={0.5}
+        zoomDelta={0.5}
+        wheelDebounceTime={40}
+        touchZoom={true}
+        bounceAtZoomLimits={false}
+        preferCanvas={true}
       >
         {/* Base map tile */}
         <TileLayer
@@ -299,23 +338,38 @@ export default function Home() {
             ? '&copy; <a href="https://carto.com">CARTO</a> &copy; <a href="https://osm.org/copyright">OpenStreetMap</a>'
             : '&copy; <a href="https://mapy.com">Mapy.cz</a>'}
           maxZoom={20}
+          maxNativeZoom={useCartoTile ? 19 : 19}
+          keepBuffer={4}
+          updateWhenIdle={false}
+          updateWhenZooming={true}
+          crossOrigin="anonymous"
+          errorTileUrl="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
         />
  
         {/* TomTom real-time traffic flow overlay (only on traffic layer) */}
-        {mapLayer === 'traffic' && TRAFFIC_OVERLAY_URL && (
+        {mapLayer === 'traffic' && TRAFFIC_OVERLAY_URL_SUB && (
           <TileLayer
             key="traffic-overlay"
-            url={TRAFFIC_OVERLAY_URL}
+            url={TRAFFIC_OVERLAY_URL_SUB}
+            subdomains={['a','b','c','d']}
             tileSize={256}
-            opacity={0.55}
+            opacity={0.60}
             maxZoom={20}
+            maxNativeZoom={18}
             zIndex={200}
+            keepBuffer={4}
+            updateWhenIdle={false}
+            updateWhenZooming={true}
+            crossOrigin="anonymous"
+            errorTileUrl="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
           />
         )}
         {/* Road closure markers — shown on traffic layer when TomTom key is set */}
         <RoadClosureLayer
           apiKey={TOMTOM_API_KEY}
           enabled={mapLayer === 'traffic'}
+          lang={language}
+          t={t}
         />
  
         <MapController flyTo={flyTo} fitBoundsData={fitBoundsData} zoomToArea={zoomToArea} setMapRef={(m) => { mapRef.current = m; }} />
@@ -350,7 +404,7 @@ export default function Home() {
         showSpots={showSpots}
         onToggleSpots={() => setShowSpots(v => !v)}
         onNavigate={(destination) => {
-          if (!userPos) return alert('Location not available yet');
+          if (!userPos) return alert(t('home.locationUnavailable'));
           startNavTo(destination);
         }}
       />
@@ -380,7 +434,7 @@ export default function Home() {
         }}
         onFlyTo={(pos) => { setFlyTo(pos); setTimeout(() => setFlyTo(null), 1000); }}
         onNavigate={(spot) => {
-          if (!userPos) return alert('Location not available yet');
+          if (!userPos) return alert(t('home.locationUnavailable'));
           startNavTo({ lat: spot.lat, lng: spot.lng, label: spot.title || 'Spot' });
         }}
         onSelectSpot={setSelectedSpot}
@@ -396,7 +450,7 @@ export default function Home() {
         {/* FAB — green + floating above bar */}
         <div className="absolute left-1/2 -translate-x-1/2 z-10 pointer-events-none" style={{ bottom: '100%', marginBottom: '-36px' }}>
           <button
-            onClick={() => { if (!user) { setShowAuth(true); return; } setAddMode(a => !a); }}
+            onClick={() => setAddMode(a => !a)}
             className={`w-[72px] h-[72px] rounded-full shadow-2xl flex items-center justify-center transition-all active:scale-95 pointer-events-auto
               ${addMode ? 'bg-red-500 rotate-45 shadow-red-300' : 'bg-green-500 shadow-green-300'}`}
           >
@@ -461,6 +515,10 @@ export default function Home() {
           onNavigate={handleNavigate}
           onEdit={() => { setEditingSpot(selectedSpot); setSelectedSpot(null); }}
           onDelete={() => handleDeleteSpot(selectedSpot)}
+          onSpotUpdate={(updated) => {
+            setSpots(prev => prev.map(s => s.id === updated.id ? updated : s));
+            setSelectedSpot(updated);
+          }}
         />
       )}
 
@@ -513,22 +571,22 @@ export default function Home() {
               <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
                 <Trash2 className="w-5 h-5 text-red-600" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-foreground">Delete Account</h3>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-foreground">{t('home.deleteAccountTitle')}</h3>
             </div>
             
             <p className="text-gray-600 dark:text-muted-foreground text-sm mb-4">
-              This action cannot be undone. All your data will be permanently deleted.
+              {t('home.deleteAccountWarning')}
             </p>
             
             <p className="text-gray-500 dark:text-muted-foreground text-xs mb-4">
-              Type <span className="font-mono font-bold text-red-600">DELETE</span> to confirm:
+              {t('home.deleteAccountType')}
             </p>
             
             <input
               type="text"
               value={deleteInput}
               onChange={(e) => setDeleteInput(e.target.value)}
-              placeholder="Type DELETE"
+              placeholder={t('home.deleteAccountPlaceholder')}
               className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-border bg-white dark:bg-background text-gray-900 dark:text-foreground focus:outline-none focus:ring-2 focus:ring-red-300 text-sm mb-4"
             />
             
@@ -544,7 +602,7 @@ export default function Home() {
                 disabled={deleteInput !== 'DELETE'}
                 className="flex-1 py-3 rounded-2xl bg-red-500 text-white font-semibold text-sm hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Delete
+                {t('home.deleteAccountConfirm')}
               </button>
             </div>
           </div>

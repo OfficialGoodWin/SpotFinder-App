@@ -2,38 +2,22 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="https://base44.com/logo_v2.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="manifest" href="/manifest.json" />
     <title>SpotFinder</title>
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9210597135045895" crossorigin="anonymous"></script>
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-GC7D8SVBMV"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-GC7D8SVBMV');
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
-    <script type="module">
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-      import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-analytics.js";
-      const firebaseConfig = {
-       apiKey: "AIzaSyCJfu6SSuKJoDtLSJvNz491a8YtWznCDMk",
-       authDomain: "spotfinderapp-cdc7b.firebaseapp.com",
-       projectId: "spotfinderapp-cdc7b",
-       storageBucket: "spotfinderapp-cdc7b.firebasestorage.app",
-       messagingSenderId: "179466659021",
-       appId: "1:179466659021:web:f93b90b96948a264d23584"
-      };
-       const app = initializeApp(firebaseConfig);
-       const analytics = getAnalytics(app);
-    </script>
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-GC7D8SVBMV"></script>
-    <script>
-     window.dataLayer = window.dataLayer || [];
-     function gtag(){dataLayer.push(arguments);}
-     gtag('js', new Date());
- 
-     gtag('config', 'G-GC7D8SVBMV');
-    </script>
   </body>
 </html>
- 

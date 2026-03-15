@@ -1,4 +1,4 @@
-// Re-export from firebaseClient for backward compatibility
-// This allows existing code to import from '@/api/base44Client' without changes
+// base44 has been removed from this project.
+// All functionality now lives in firebaseClient.js
 export * from './firebaseClient';
 export { default } from './firebaseClient';
