@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronDown, ArrowLeft, MapPin, Star, Navigation, Layers, Share2, Mic, Car, Wifi, Lock, Trash2 } from 'lucide-react';
+import { ChevronDown, ArrowLeft, MapPin, Star, Navigation, Layers, Share2, Mic, Car, Wifi, Lock, Trash2, Send, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/lib/LanguageContext';
 
@@ -459,7 +459,24 @@ const SvgTrafficLayer = () => (
   </svg>
 );
 
-// ─── All FAQ content, fully translated, with step-by-step guides ──────────────
+// ─── All FAQ content, fully translated, identical question set in every language ─
+//
+// HOW TO ADD YOUR OWN IMAGES:
+//   1. Create the folder: /public/faq/  (next to /public/manifest.json)
+//   2. Drop your images there using EXACTLY these filenames (case-sensitive):
+//        plus-button.png    tap-map.png     fill-form.png
+//        add-photo.png      spot-appears.png open-detail.png
+//        rate-spot.png      navigate.png    route-modes.png
+//        voice.png          share.png       map-layers.png
+//        traffic-layer.png
+//   3. Recommended size: 600 × 338 px  (16:9, under 200 KB each)
+//      — wide enough to show context, tall enough to read UI details
+//      — PNG or JPEG both work fine
+//      — Screenshot directly from the app at 2× zoom if possible
+//   If an image file is missing, the built-in SVG illustration shows as fallback.
+//
+const FAQ_IMG_BASE = '/faq/';
+
 const FAQ_CONTENT = {
   en: {
     sections: [
@@ -469,14 +486,14 @@ const FAQ_CONTENT = {
           {
             q: 'What is SpotFinder?',
             a: 'SpotFinder is a free community map app for discovering and sharing useful spots — parking areas, scenic viewpoints, rest stops, and more. Everyone can add spots, rate them, and navigate directly from the app — no account required.',
-            steps: null
+            steps: null,
           },
           {
             q: 'Do I need an account?',
             a: 'No account needed! You can browse the map, add spots, and rate them as a guest. Creating an account (email or Google) lets you manage and track your own spots later.',
-            steps: null
+            steps: null,
           },
-        ]
+        ],
       },
       {
         category: 'Adding Spots',
@@ -485,21 +502,21 @@ const FAQ_CONTENT = {
             q: 'How do I add a spot?',
             a: 'Follow these 5 steps:',
             steps: [
-              { label: 'Tap the green + button at the bottom of the screen', svg: <SvgPlusButton /> },
-              { label: 'The map enters "add mode" — tap anywhere to place your spot', svg: <SvgTapMap /> },
-              { label: 'Fill in a description and set star ratings for Parking, Scenery, and Privacy', svg: <SvgFillForm /> },
-              { label: 'Optionally add a photo by tapping the camera area', svg: <SvgAddPhoto /> },
-              { label: 'Tap Save Spot — your spot immediately appears on the map for everyone', svg: <SvgSpotAppears /> },
-            ]
+              { label: 'Tap the green + button at the bottom of the screen', img: 'plus-button.png', svg: 'SvgPlusButton' },
+              { label: 'The map enters add mode — tap anywhere to place your spot', img: 'tap-map.png', svg: 'SvgTapMap' },
+              { label: 'Fill in a description and set star ratings for Parking, Scenery, and Privacy', img: 'fill-form.png', svg: 'SvgFillForm' },
+              { label: 'Optionally add a photo by tapping the camera area', img: 'add-photo.png', svg: 'SvgAddPhoto' },
+              { label: 'Tap Save Spot — your spot immediately appears on the map for everyone', img: 'spot-appears.png', svg: 'SvgSpotAppears' },
+            ],
           },
           {
             q: 'How do I use voice to write the description?',
-            a: 'Tap the Voice button next to the description field. The mic listens in whichever language you have set in Settings (Czech, English, German, etc.). Your words appear live in the field. Tap again to stop.',
+            a: 'Tap the Voice button next to the description field. The mic listens in whichever language you have set in Settings. Your words appear live in the field. Tap again to stop.',
             steps: [
-              { label: 'Tap the Voice / mic button next to the description field', svg: <SvgVoice /> },
-            ]
+              { label: 'Tap the Voice / mic button next to the description field', img: 'voice.png', svg: 'SvgVoice' },
+            ],
           },
-        ]
+        ],
       },
       {
         category: 'Rating Spots',
@@ -508,30 +525,30 @@ const FAQ_CONTENT = {
             q: 'How do I rate a spot?',
             a: 'Anyone can rate — including guests. Tap a spot on the map, then tap the stars in the detail panel. There is an overall rating plus individual ratings for Parking, Beauty, and Privacy.',
             steps: [
-              { label: 'Tap any spot marker to open its detail', svg: <SvgOpenDetail /> },
-              { label: 'Tap the stars to leave your rating — no account required', svg: <SvgRateSpot /> },
-            ]
+              { label: 'Tap any spot marker to open its detail', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+              { label: 'Tap the stars to leave your rating — no account required', img: 'rate-spot.png', svg: 'SvgRateSpot' },
+            ],
           },
-        ]
+        ],
       },
       {
         category: 'Navigation',
         items: [
           {
             q: 'How do I navigate to a spot?',
-            a: 'Open a spot\'s detail and tap Navigate Here. Choose your travel mode, then tap Start Navigation for turn-by-turn voice directions.',
+            a: 'Open a spot's detail and tap Navigate Here. Choose your travel mode, then tap Start Navigation for turn-by-turn voice directions.',
             steps: [
-              { label: 'Open any spot and tap the Navigate Here button', svg: <SvgOpenDetail /> },
-              { label: 'Choose Drive, Bike, or Walk — then tap Start Navigation', svg: <SvgNavigate /> },
-              { label: 'Switch between driving, cycling, and walking mode anytime', svg: <SvgRouteModes /> },
-            ]
+              { label: 'Open any spot and tap the Navigate Here button', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+              { label: 'Choose Drive, Bike, or Walk — then tap Start Navigation', img: 'navigate.png', svg: 'SvgNavigate' },
+              { label: 'Switch between driving, cycling, and walking mode anytime', img: 'route-modes.png', svg: 'SvgRouteModes' },
+            ],
           },
           {
             q: 'Will it reroute if I go off-route?',
             a: 'Yes. If you go more than 80 m off the planned route, SpotFinder automatically recalculates from your current position and announces "Rerouting" in your language.',
-            steps: null
+            steps: null,
           },
-        ]
+        ],
       },
       {
         category: 'Map & Traffic',
@@ -540,17 +557,17 @@ const FAQ_CONTENT = {
             q: 'How do I switch the map style?',
             a: 'Tap the Layers button in the bottom-left corner to choose between Basic, Outdoor, Satellite, Winter, or Traffic view.',
             steps: [
-              { label: 'Tap the Layers button to open the style picker', svg: <SvgMapLayers /> },
-            ]
+              { label: 'Tap the Layers button to open the style picker', img: 'map-layers.png', svg: 'SvgMapLayers' },
+            ],
           },
           {
             q: 'What does the Traffic layer show?',
             a: 'Real-time traffic flow (green = free, yellow = slow, red = heavy), plus road closure icons (⛔) and traffic jam icons (🚦) that appear automatically.',
             steps: [
-              { label: 'Switch to Traffic view to see live road conditions', svg: <SvgTrafficLayer /> },
-            ]
+              { label: 'Switch to Traffic view to see live road conditions', img: 'traffic-layer.png', svg: 'SvgTrafficLayer' },
+            ],
           },
-        ]
+        ],
       },
       {
         category: 'Sharing',
@@ -559,19 +576,19 @@ const FAQ_CONTENT = {
             q: 'How do I share a spot?',
             a: 'Open any spot detail and tap the Share button. On mobile the system share sheet opens. On desktop the link is copied. The recipient opens the map directly at that spot.',
             steps: [
-              { label: 'Open a spot and tap the Share (↑) button', svg: <SvgShare /> },
-            ]
+              { label: 'Open a spot and tap the Share (↑) button', img: 'share.png', svg: 'SvgShare' },
+            ],
           },
-        ]
+        ],
       },
     ],
     about: {
       title: 'About SpotFinder',
       desc: 'SpotFinder is a free, community-driven map app built to help people discover and share useful spots — from hidden parking to scenic viewpoints. Anyone can contribute.',
-      features: ['Free to use — no subscription', 'Works as a guest — no account needed', 'Add, rate, navigate, and share spots', 'Voice dictation in 12 languages', 'Real-time traffic & road closure overlay', 'Turn-by-turn navigation for car, bike, and foot'],
+      features: ['Free to use — no subscription', 'Works as a guest — no account needed', 'Add, rate, navigate, and share spots', 'Voice dictation in 13 languages', 'Real-time traffic & road closure overlay', 'Turn-by-turn navigation for car, bike, and foot'],
       built: 'Built with React, Leaflet, Firebase, and OSRM.',
       version: 'Version 2.1',
-    }
+    },
   },
 
   cs: {
@@ -579,92 +596,66 @@ const FAQ_CONTENT = {
       {
         category: 'Začínáme',
         items: [
-          { q: 'Co je SpotFinder?', a: 'SpotFinder je bezplatná komunitní mapová aplikace pro sdílení užitečných míst — parkovišť, výhledů, odpočívadel a dalšího. Kdokoli může přidávat spoty, hodnotit je a navigovat — bez nutnosti registrace.', steps: null },
+          { q: 'Co je SpotFinder?', a: 'SpotFinder je bezplatná komunitní mapová aplikace pro sdílení zajímavých míst — parkovišť, výhledů, odpočívadel a dalšího. Kdokoli může přidávat spoty, hodnotit je a navigovat — bez nutnosti registrace.', steps: null },
           { q: 'Potřebuji účet?', a: 'Nepotřebujete! Jako host můžete procházet mapu, přidávat spoty a hodnotit je. Účet (e-mail nebo Google) umožňuje spravovat vaše spoty.', steps: null },
-        ]
+        ],
       },
       {
         category: 'Přidávání spotů',
         items: [
-          {
-            q: 'Jak přidám spot?',
-            a: 'Postupujte podle těchto 5 kroků:',
-            steps: [
-              { label: 'Klepněte na zelené tlačítko + dole na obrazovce', svg: <SvgPlusButton /> },
-              { label: 'Mapa přejde do režimu přidávání — klepněte kdekoliv pro umístění spotu', svg: <SvgTapMap /> },
-              { label: 'Vyplňte popis a nastavte hvězdičkové hodnocení parkování, krásy a soukromí', svg: <SvgFillForm /> },
-              { label: 'Volitelně přidejte fotku klepnutím na oblast fotoaparátu', svg: <SvgAddPhoto /> },
-              { label: 'Klepněte na Uložit spot — váš spot se okamžitě zobrazí na mapě', svg: <SvgSpotAppears /> },
-            ]
-          },
-          {
-            q: 'Jak použít hlas pro popis?',
-            a: 'Klepněte na tlačítko Hlas vedle pole popisu. Mikrofon naslouchá v jazyce nastaveném v Nastavení. Vaše slova se živě zobrazují v poli. Klepněte znovu pro zastavení.',
-            steps: [{ label: 'Klepněte na tlačítko hlasu vedle pole popisu', svg: <SvgVoice /> }]
-          },
-        ]
+          { q: 'Jak přidám spot?', a: 'Postupujte podle 5 kroků:', steps: [
+            { label: 'Klepněte na zelené tlačítko + dole na obrazovce', img: 'plus-button.png', svg: 'SvgPlusButton' },
+            { label: 'Mapa přejde do režimu přidávání — klepněte kdekoliv pro umístění', img: 'tap-map.png', svg: 'SvgTapMap' },
+            { label: 'Vyplňte popis a nastavte hvězdičky pro Parkování, Krásu a Soukromí', img: 'fill-form.png', svg: 'SvgFillForm' },
+            { label: 'Volitelně přidejte fotku klepnutím na oblast fotoaparátu', img: 'add-photo.png', svg: 'SvgAddPhoto' },
+            { label: 'Klepněte na Uložit spot — okamžitě se zobrazí na mapě', img: 'spot-appears.png', svg: 'SvgSpotAppears' },
+          ]},
+          { q: 'Jak použít hlas pro popis?', a: 'Klepněte na tlačítko Hlas vedle pole popisu. Mikrofon naslouchá v jazyce nastaveném v Nastavení. Vaše slova se živě zobrazují. Klepněte znovu pro zastavení.', steps: [
+            { label: 'Klepněte na tlačítko Hlas vedle pole popisu', img: 'voice.png', svg: 'SvgVoice' },
+          ]},
+        ],
       },
       {
         category: 'Hodnocení spotů',
         items: [
-          {
-            q: 'Jak hodnotím spot?',
-            a: 'Hodnotit může kdokoli — i hosté. Klepněte na spot na mapě, poté klepněte na hvězdičky v detailu. Můžete hodnotit celkově i jednotlivě (parkování, krása, soukromí).',
-            steps: [
-              { label: 'Klepněte na značku spotu pro otevření detailu', svg: <SvgOpenDetail /> },
-              { label: 'Klepněte na hvězdičky — bez potřeby účtu', svg: <SvgRateSpot /> },
-            ]
-          },
-        ]
+          { q: 'Jak hodnotím spot?', a: 'Hodnotit může kdokoli — i hosté. Klepněte na spot na mapě, poté klepněte na hvězdičky v detailu. Celkové hodnocení i jednotlivé kategorie (Parkování, Krása, Soukromí).', steps: [
+            { label: 'Klepněte na značku spotu pro otevření detailu', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+            { label: 'Klepněte na hvězdičky — bez potřeby účtu', img: 'rate-spot.png', svg: 'SvgRateSpot' },
+          ]},
+        ],
       },
       {
         category: 'Navigace',
         items: [
-          {
-            q: 'Jak navigovat ke spotu?',
-            a: 'Otevřete detail spotu a klepněte na Navigovat sem. Vyberte způsob dopravy a klepněte na Spustit navigaci pro hlasové pokyny.',
-            steps: [
-              { label: 'Otevřete spot a klepněte na tlačítko Navigovat sem', svg: <SvgOpenDetail /> },
-              { label: 'Vyberte Auto, Kolo nebo Pěšky — pak klepněte na Spustit navigaci', svg: <SvgNavigate /> },
-              { label: 'Kdykoli přepínejte mezi režimy dopravy', svg: <SvgRouteModes /> },
-            ]
-          },
+          { q: 'Jak navigovat ke spotu?', a: 'Otevřete detail spotu a klepněte na Navigovat sem. Vyberte způsob dopravy a klepněte na Spustit navigaci pro hlasové pokyny.', steps: [
+            { label: 'Otevřete spot a klepněte na Navigovat sem', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+            { label: 'Vyberte Auto, Kolo nebo Pěšky — pak klepněte na Spustit navigaci', img: 'navigate.png', svg: 'SvgNavigate' },
+            { label: 'Kdykoli přepínejte mezi režimy dopravy', img: 'route-modes.png', svg: 'SvgRouteModes' },
+          ]},
           { q: 'Přepočítá trasu automaticky?', a: 'Ano. Odchýlíte-li se o více než 80 m, SpotFinder automaticky přepočítá z aktuální polohy a ohlásí "Přepočítávám trasu" ve vašem jazyce.', steps: null },
-        ]
+        ],
       },
       {
         category: 'Mapa a doprava',
         items: [
-          {
-            q: 'Jak přepnu styl mapy?',
-            a: 'Klepněte na tlačítko Vrstvy v levém dolním rohu pro výběr ze stylů Základní, Venkovní, Satelit, Zimní nebo Doprava.',
-            steps: [{ label: 'Klepněte na tlačítko Vrstvy pro výběr stylu', svg: <SvgMapLayers /> }]
-          },
-          {
-            q: 'Co zobrazuje vrstva Doprava?',
-            a: 'Provoz v reálném čase (zelená = volno, žlutá = pomalu, červená = zácpa) plus ikony uzavírek (⛔) a kolon (🚦), které se zobrazují automaticky.',
-            steps: [{ label: 'Přepněte na vrstvu Doprava pro zobrazení aktuálního provozu', svg: <SvgTrafficLayer /> }]
-          },
-        ]
+          { q: 'Jak přepnu styl mapy?', a: 'Klepněte na tlačítko Vrstvy v levém dolním rohu pro výběr ze stylů Základní, Venkovní, Satelit, Zimní nebo Doprava.', steps: [
+            { label: 'Klepněte na tlačítko Vrstvy pro výběr stylu', img: 'map-layers.png', svg: 'SvgMapLayers' },
+          ]},
+          { q: 'Co zobrazuje vrstva Doprava?', a: 'Provoz v reálném čase (zelená = volno, žlutá = pomalu, červená = zácpa) plus ikony uzavírek (⛔) a kolon (🚦) automaticky.', steps: [
+            { label: 'Přepněte na vrstvu Doprava pro zobrazení aktuálního provozu', img: 'traffic-layer.png', svg: 'SvgTrafficLayer' },
+          ]},
+        ],
       },
       {
         category: 'Sdílení',
         items: [
-          {
-            q: 'Jak sdílet spot?',
-            a: 'Otevřete detail spotu a klepněte na Sdílet. Na mobilu se otevře nativní sdílení, na desktopu se zkopíruje odkaz. Příjemce otevře mapu přímo na daném spotu.',
-            steps: [{ label: 'Otevřete spot a klepněte na tlačítko Sdílet (↑)', svg: <SvgShare /> }]
-          },
-        ]
+          { q: 'Jak sdílet spot?', a: 'Otevřete detail spotu a klepněte na Sdílet. Na mobilu se otevře nativní sdílení, na desktopu se zkopíruje odkaz. Příjemce otevře mapu přímo na daném spotu.', steps: [
+            { label: 'Otevřete spot a klepněte na tlačítko Sdílet (↑)', img: 'share.png', svg: 'SvgShare' },
+          ]},
+        ],
       },
     ],
-    about: {
-      title: 'O SpotFinderu',
-      desc: 'SpotFinder je bezplatná komunitní mapová aplikace, která pomáhá lidem objevovat a sdílet užitečná místa — od skrytých parkovišť po malebné výhledy. Přispět může kdokoli.',
-      features: ['Zdarma — žádné předplatné', 'Funguje jako host — bez účtu', 'Přidávání, hodnocení, navigace a sdílení spotů', 'Hlasové diktování ve 12 jazycích', 'Přehled dopravy a uzavírek v reálném čase', 'Navigace hlasovými pokyny pro auto, kolo i pěšky'],
-      built: 'Postaveno na React, Leaflet, Firebase a OSRM.',
-      version: 'Verze 2.1',
-    }
+    about: { title: 'O SpotFinderu', desc: 'SpotFinder je bezplatná komunitní mapová aplikace, která pomáhá lidem objevovat a sdílet užitečná místa. Přispět může kdokoli.', features: ['Zdarma — žádné předplatné', 'Funguje jako host — bez účtu', 'Přidávání, hodnocení, navigace a sdílení spotů', 'Hlasové diktování ve 13 jazycích', 'Přehled dopravy a uzavírek v reálném čase', 'Navigace hlasovými pokyny pro auto, kolo i pěšky'], built: 'Postaveno na React, Leaflet, Firebase a OSRM.', version: 'Verze 2.1' },
   },
 
   de: {
@@ -674,402 +665,669 @@ const FAQ_CONTENT = {
         items: [
           { q: 'Was ist SpotFinder?', a: 'SpotFinder ist eine kostenlose Community-Karten-App zum Entdecken nützlicher Spots — Parkplätze, Aussichtspunkte, Rastplätze und mehr. Jeder kann Spots hinzufügen, bewerten und direkt navigieren — ohne Konto.', steps: null },
           { q: 'Benötige ich ein Konto?', a: 'Nein! Als Gast können Sie die Karte durchsuchen, Spots hinzufügen und bewerten. Ein Konto ermöglicht die Verwaltung Ihrer eigenen Spots.', steps: null },
-        ]
+        ],
       },
       {
         category: 'Spots hinzufügen',
         items: [
-          {
-            q: 'Wie füge ich einen Spot hinzu?',
-            a: 'Folgen Sie diesen 5 Schritten:',
-            steps: [
-              { label: 'Tippen Sie auf die grüne +-Schaltfläche am unteren Bildschirmrand', svg: <SvgPlusButton /> },
-              { label: 'Die Karte wechselt in den Hinzufüge-Modus — tippen Sie irgendwo auf die Karte', svg: <SvgTapMap /> },
-              { label: 'Füllen Sie Beschreibung und Sternebewertungen für Parken, Landschaft und Privatsphäre aus', svg: <SvgFillForm /> },
-              { label: 'Optional: Tippen Sie auf den Kamerabereich, um ein Foto hinzuzufügen', svg: <SvgAddPhoto /> },
-              { label: 'Tippen Sie auf Spot speichern — Ihr Spot erscheint sofort auf der Karte', svg: <SvgSpotAppears /> },
-            ]
-          },
-          {
-            q: 'Wie nutze ich die Spracheingabe?',
-            a: 'Tippen Sie auf die Sprach-Schaltfläche neben dem Beschreibungsfeld. Das Mikrofon hört in der in den Einstellungen gewählten Sprache zu. Ihre Worte erscheinen live im Feld.',
-            steps: [{ label: 'Tippen Sie auf die Sprach-Schaltfläche neben dem Beschreibungsfeld', svg: <SvgVoice /> }]
-          },
-        ]
+          { q: 'Wie füge ich einen Spot hinzu?', a: 'Folgen Sie diesen 5 Schritten:', steps: [
+            { label: 'Tippen Sie auf die grüne +-Schaltfläche am unteren Bildschirmrand', img: 'plus-button.png', svg: 'SvgPlusButton' },
+            { label: 'Die Karte wechselt in den Hinzufüge-Modus — tippen Sie irgendwo', img: 'tap-map.png', svg: 'SvgTapMap' },
+            { label: 'Beschreibung und Sternebewertungen für Parken, Landschaft und Privatsphäre ausfüllen', img: 'fill-form.png', svg: 'SvgFillForm' },
+            { label: 'Optional: Tippen Sie auf den Kamerabereich, um ein Foto hinzuzufügen', img: 'add-photo.png', svg: 'SvgAddPhoto' },
+            { label: 'Tippen Sie auf Spot speichern — er erscheint sofort auf der Karte', img: 'spot-appears.png', svg: 'SvgSpotAppears' },
+          ]},
+          { q: 'Wie nutze ich Spracheingabe für die Beschreibung?', a: 'Tippen Sie auf die Sprach-Schaltfläche neben dem Beschreibungsfeld. Das Mikrofon hört in der in den Einstellungen gewählten Sprache zu. Ihre Worte erscheinen live. Tippen Sie erneut zum Stoppen.', steps: [
+            { label: 'Tippen Sie auf die Sprach-Schaltfläche neben dem Beschreibungsfeld', img: 'voice.png', svg: 'SvgVoice' },
+          ]},
+        ],
       },
       {
         category: 'Spots bewerten',
         items: [
-          {
-            q: 'Wie bewerte ich einen Spot?',
-            a: 'Jeder kann bewerten — auch Gäste. Tippen Sie auf einen Spot, dann auf die Sterne im Detailbereich.',
-            steps: [
-              { label: 'Tippen Sie auf einen Spot-Marker, um das Detail zu öffnen', svg: <SvgOpenDetail /> },
-              { label: 'Tippen Sie auf die Sterne — kein Konto erforderlich', svg: <SvgRateSpot /> },
-            ]
-          },
-        ]
+          { q: 'Wie bewerte ich einen Spot?', a: 'Jeder kann bewerten — auch Gäste. Tippen Sie auf einen Spot, dann auf die Sterne im Detailbereich. Gesamtbewertung plus Parken, Schönheit und Privatsphäre.', steps: [
+            { label: 'Tippen Sie auf einen Spot-Marker, um das Detail zu öffnen', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+            { label: 'Tippen Sie auf die Sterne — kein Konto erforderlich', img: 'rate-spot.png', svg: 'SvgRateSpot' },
+          ]},
+        ],
       },
       {
         category: 'Navigation',
         items: [
-          {
-            q: 'Wie navigiere ich zu einem Spot?',
-            a: 'Öffnen Sie das Detail eines Spots und tippen Sie auf Hierher navigieren. Wählen Sie den Fahrmodus und starten Sie die Navigation.',
-            steps: [
-              { label: 'Öffnen Sie einen Spot und tippen Sie auf Hierher navigieren', svg: <SvgOpenDetail /> },
-              { label: 'Wählen Sie Auto, Fahrrad oder Zu Fuß — dann Navigation starten', svg: <SvgNavigate /> },
-              { label: 'Wechseln Sie jederzeit den Fahrmodus', svg: <SvgRouteModes /> },
-            ]
-          },
-          { q: 'Berechnet es die Route neu?', a: 'Ja. Bei mehr als 80 m Abweichung berechnet SpotFinder automatisch neu und kündigt „Umleitung" in Ihrer Sprache an.', steps: null },
-        ]
+          { q: 'Wie navigiere ich zu einem Spot?', a: 'Öffnen Sie das Detail eines Spots und tippen Sie auf Hierher navigieren. Wählen Sie den Fahrmodus und starten Sie die Navigation.', steps: [
+            { label: 'Öffnen Sie einen Spot und tippen Sie auf Hierher navigieren', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+            { label: 'Wählen Sie Auto, Fahrrad oder Zu Fuß — dann Navigation starten', img: 'navigate.png', svg: 'SvgNavigate' },
+            { label: 'Fahrmodus jederzeit wechseln', img: 'route-modes.png', svg: 'SvgRouteModes' },
+          ]},
+          { q: 'Berechnet es die Route neu, wenn ich abweiche?', a: 'Ja. Bei mehr als 80 m Abweichung berechnet SpotFinder automatisch neu und kündigt "Umleitung" in Ihrer Sprache an.', steps: null },
+        ],
       },
       {
         category: 'Karte & Verkehr',
         items: [
-          {
-            q: 'Wie wechsle ich den Kartenstil?',
-            a: 'Tippen Sie auf die Ebenen-Schaltfläche unten links, um zwischen Grundkarte, Outdoor, Satellit, Winter und Verkehr zu wählen.',
-            steps: [{ label: 'Tippen Sie auf die Ebenen-Schaltfläche für den Stilwechsel', svg: <SvgMapLayers /> }]
-          },
-          {
-            q: 'Was zeigt die Verkehrsebene?',
-            a: 'Echtzeit-Verkehrsfluss (grün = frei, gelb = langsam, rot = Stau) plus Sperr-Icons (⛔) und Stau-Icons (🚦) automatisch.',
-            steps: [{ label: 'Wechseln Sie zur Verkehrsebene für Live-Straßenbedingungen', svg: <SvgTrafficLayer /> }]
-          },
-        ]
+          { q: 'Wie wechsle ich den Kartenstil?', a: 'Tippen Sie auf die Ebenen-Schaltfläche unten links, um zwischen Grundkarte, Outdoor, Satellit, Winter und Verkehr zu wählen.', steps: [
+            { label: 'Tippen Sie auf die Ebenen-Schaltfläche für den Stilwechsel', img: 'map-layers.png', svg: 'SvgMapLayers' },
+          ]},
+          { q: 'Was zeigt die Verkehrsebene?', a: 'Echtzeit-Verkehrsfluss (grün = frei, gelb = langsam, rot = Stau) plus Sperr-Icons (⛔) und Stau-Icons (🚦) automatisch.', steps: [
+            { label: 'Wechseln Sie zur Verkehrsebene für Live-Straßenbedingungen', img: 'traffic-layer.png', svg: 'SvgTrafficLayer' },
+          ]},
+        ],
       },
       {
         category: 'Teilen',
         items: [
-          {
-            q: 'Wie teile ich einen Spot?',
-            a: 'Öffnen Sie das Spot-Detail und tippen Sie auf Teilen. Auf dem Handy öffnet sich das native Teilen-Menü, am Desktop wird der Link kopiert.',
-            steps: [{ label: 'Öffnen Sie einen Spot und tippen Sie auf Teilen (↑)', svg: <SvgShare /> }]
-          },
-        ]
+          { q: 'Wie teile ich einen Spot?', a: 'Öffnen Sie das Spot-Detail und tippen Sie auf Teilen. Auf dem Handy öffnet sich das native Teilen-Menü, am Desktop wird der Link kopiert.', steps: [
+            { label: 'Öffnen Sie einen Spot und tippen Sie auf Teilen (↑)', img: 'share.png', svg: 'SvgShare' },
+          ]},
+        ],
       },
     ],
-    about: {
-      title: 'Über SpotFinder',
-      desc: 'SpotFinder ist eine kostenlose Community-App zum Entdecken nützlicher Orte — von versteckten Parkplätzen bis zu malerischen Aussichtspunkten. Jeder kann beitragen.',
-      features: ['Kostenlos — kein Abo', 'Als Gast nutzbar — kein Konto nötig', 'Spots hinzufügen, bewerten, navigieren und teilen', 'Spracheingabe in 12 Sprachen', 'Echtzeit-Verkehr & Straßensperren', 'Abbieg-Navigationsansagen für Auto, Fahrrad, Fußgänger'],
-      built: 'Entwickelt mit React, Leaflet, Firebase und OSRM.',
-      version: 'Version 2.1',
-    }
+    about: { title: 'Über SpotFinder', desc: 'SpotFinder ist eine kostenlose Community-App zum Entdecken nützlicher Orte. Jeder kann beitragen.', features: ['Kostenlos — kein Abo', 'Als Gast nutzbar — kein Konto nötig', 'Spots hinzufügen, bewerten, navigieren und teilen', 'Spracheingabe in 13 Sprachen', 'Echtzeit-Verkehr & Straßensperren', 'Abbieg-Navigation für Auto, Fahrrad, Fußgänger'], built: 'Entwickelt mit React, Leaflet, Firebase und OSRM.', version: 'Version 2.1' },
   },
 
   pl: {
     sections: [
-      { category: 'Pierwsze kroki', items: [
-        { q: 'Czym jest SpotFinder?', a: 'SpotFinder to bezpłatna aplikacja mapowa do odkrywania i udostępniania miejsc — parkingów, widoków, miejsc odpoczynku i nie tylko. Każdy może dodawać spoty bez konta.', steps: null },
-        { q: 'Czy potrzebuję konta?', a: 'Nie! Jako gość możesz przeglądać mapę, dodawać spoty i je oceniać. Konto pozwala zarządzać swoimi spotami.', steps: null },
-      ]},
-      { category: 'Dodawanie spotów', items: [
-        { q: 'Jak dodać spot?', a: 'Wykonaj 5 kroków:', steps: [
-          { label: 'Naciśnij zielony przycisk + na dole ekranu', svg: <SvgPlusButton /> },
-          { label: 'Mapa przechodzi w tryb dodawania — dotknij dowolnego miejsca na mapie', svg: <SvgTapMap /> },
-          { label: 'Wypełnij opis i ustaw oceny gwiazdkowe dla Parkingu, Scenerii i Prywatności', svg: <SvgFillForm /> },
-          { label: 'Opcjonalnie dodaj zdjęcie, dotykając obszaru aparatu', svg: <SvgAddPhoto /> },
-          { label: 'Naciśnij Zapisz spot — spot natychmiast pojawia się na mapie', svg: <SvgSpotAppears /> },
-        ]},
-        { q: 'Jak korzystać z dyktowania głosowego?', a: 'Naciśnij przycisk Głos obok pola opisu. Mikrofon słucha w języku ustawionym w Ustawieniach. Słowa pojawiają się na bieżąco.', steps: [{ label: 'Naciśnij przycisk głosu obok pola opisu', svg: <SvgVoice /> }]},
-      ]},
-      { category: 'Ocenianie spotów', items: [
-        { q: 'Jak ocenić spot?', a: 'Każdy może oceniać — w tym goście. Dotknij spotu, potem gwiazdek w panelu szczegółów.', steps: [
-          { label: 'Dotknij znacznika spotu, aby otworzyć szczegóły', svg: <SvgOpenDetail /> },
-          { label: 'Dotknij gwiazdek — konto nie jest wymagane', svg: <SvgRateSpot /> },
-        ]},
-      ]},
-      { category: 'Nawigacja', items: [
-        { q: 'Jak nawigować do spotu?', a: 'Otwórz szczegóły spotu i naciśnij Nawiguj tutaj. Wybierz tryb podróży i uruchom nawigację.', steps: [
-          { label: 'Otwórz spot i naciśnij Nawiguj tutaj', svg: <SvgOpenDetail /> },
-          { label: 'Wybierz Samochód, Rower lub Pieszo — potem Rozpocznij nawigację', svg: <SvgNavigate /> },
-          { label: 'Zmieniaj tryb transportu w dowolnym momencie', svg: <SvgRouteModes /> },
-        ]},
-        { q: 'Czy trasa jest przeliczana automatycznie?', a: 'Tak. Przy odchyleniu ponad 80 m SpotFinder automatycznie przelicza trasę i ogłasza "Przeliczam trasę" w Twoim języku.', steps: null },
-      ]},
-      { category: 'Udostępnianie', items: [
-        { q: 'Jak udostępnić spot?', a: 'Otwórz szczegóły spotu i naciśnij Udostępnij. Na telefonie otwiera się natywne menu udostępniania, na komputerze kopiowany jest link.', steps: [{ label: 'Otwórz spot i naciśnij Udostępnij (↑)', svg: <SvgShare /> }]},
-      ]},
+      {
+        category: 'Pierwsze kroki',
+        items: [
+          { q: 'Czym jest SpotFinder?', a: 'SpotFinder to bezpłatna aplikacja mapowa do odkrywania miejsc — parkingów, widoków, miejsc odpoczynku i więcej. Każdy może dodawać spoty bez konta.', steps: null },
+          { q: 'Czy potrzebuję konta?', a: 'Nie! Jako gość możesz przeglądać mapę, dodawać spoty i je oceniać. Konto pozwala zarządzać swoimi spotami.', steps: null },
+        ],
+      },
+      {
+        category: 'Dodawanie spotów',
+        items: [
+          { q: 'Jak dodać spot?', a: 'Wykonaj 5 kroków:', steps: [
+            { label: 'Naciśnij zielony przycisk + na dole ekranu', img: 'plus-button.png', svg: 'SvgPlusButton' },
+            { label: 'Mapa przechodzi w tryb dodawania — dotknij dowolnego miejsca', img: 'tap-map.png', svg: 'SvgTapMap' },
+            { label: 'Wypełnij opis i ustaw gwiazdki dla Parkingu, Scenerii i Prywatności', img: 'fill-form.png', svg: 'SvgFillForm' },
+            { label: 'Opcjonalnie dodaj zdjęcie, dotykając obszaru aparatu', img: 'add-photo.png', svg: 'SvgAddPhoto' },
+            { label: 'Naciśnij Zapisz spot — spot natychmiast pojawia się na mapie', img: 'spot-appears.png', svg: 'SvgSpotAppears' },
+          ]},
+          { q: 'Jak korzystać z dyktowania głosowego?', a: 'Naciśnij przycisk Głos obok pola opisu. Mikrofon słucha w języku ustawionym w Ustawieniach. Słowa pojawiają się na bieżąco. Naciśnij ponownie, aby zatrzymać.', steps: [
+            { label: 'Naciśnij przycisk głosu obok pola opisu', img: 'voice.png', svg: 'SvgVoice' },
+          ]},
+        ],
+      },
+      {
+        category: 'Ocenianie spotów',
+        items: [
+          { q: 'Jak ocenić spot?', a: 'Każdy może oceniać — w tym goście. Dotknij spotu, potem gwiazdek w panelu szczegółów. Ogólna ocena oraz Parking, Piękno i Prywatność oddzielnie.', steps: [
+            { label: 'Dotknij znacznika spotu, aby otworzyć szczegóły', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+            { label: 'Dotknij gwiazdek — konto nie jest wymagane', img: 'rate-spot.png', svg: 'SvgRateSpot' },
+          ]},
+        ],
+      },
+      {
+        category: 'Nawigacja',
+        items: [
+          { q: 'Jak nawigować do spotu?', a: 'Otwórz szczegóły spotu i naciśnij Nawiguj tutaj. Wybierz tryb podróży i uruchom nawigację z instrukcjami głosowymi.', steps: [
+            { label: 'Otwórz spot i naciśnij Nawiguj tutaj', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+            { label: 'Wybierz Samochód, Rower lub Pieszo — potem Rozpocznij nawigację', img: 'navigate.png', svg: 'SvgNavigate' },
+            { label: 'Zmieniaj tryb transportu w dowolnym momencie', img: 'route-modes.png', svg: 'SvgRouteModes' },
+          ]},
+          { q: 'Czy trasa jest przeliczana automatycznie?', a: 'Tak. Przy odchyleniu ponad 80 m SpotFinder automatycznie przelicza trasę i ogłasza "Przeliczam trasę" w Twoim języku.', steps: null },
+        ],
+      },
+      {
+        category: 'Mapa i ruch drogowy',
+        items: [
+          { q: 'Jak zmienić styl mapy?', a: 'Naciśnij przycisk Warstwy w lewym dolnym rogu. Dostępne: Podstawowa, Zewnętrzna, Satelita, Zimowa, Ruch.', steps: [
+            { label: 'Naciśnij przycisk Warstwy, aby otworzyć wybór stylu', img: 'map-layers.png', svg: 'SvgMapLayers' },
+          ]},
+          { q: 'Co pokazuje warstwa Ruchu?', a: 'Ruch w czasie rzeczywistym (zielony = swobodny, żółty = wolny, czerwony = korek) plus ikony zamkniętych dróg (⛔) i korków (🚦).', steps: [
+            { label: 'Przełącz na warstwę Ruchu, aby zobaczyć warunki na drogach', img: 'traffic-layer.png', svg: 'SvgTrafficLayer' },
+          ]},
+        ],
+      },
+      {
+        category: 'Udostępnianie',
+        items: [
+          { q: 'Jak udostępnić spot?', a: 'Otwórz szczegóły spotu i naciśnij Udostępnij. Na telefonie otwiera się natywne menu, na komputerze kopiowany jest link. Odbiorca otwiera mapę dokładnie w tym miejscu.', steps: [
+            { label: 'Otwórz spot i naciśnij Udostępnij (↑)', img: 'share.png', svg: 'SvgShare' },
+          ]},
+        ],
+      },
     ],
-    about: { title: 'O SpotFinderze', desc: 'SpotFinder to bezpłatna aplikacja mapowa do odkrywania miejsc — od ukrytych parkingów po malownicze widoki. Każdy może dodawać spoty bez konta.', features: ['Bezpłatna — bez subskrypcji', 'Działa jako gość — bez konta', 'Dodaj, oceń, nawiguj i udostępnij spoty', 'Dyktowanie głosowe w 12 językach', 'Ruch drogowy i zamknięcia dróg w czasie rzeczywistym', 'Nawigacja głosowa dla samochodu, roweru i pieszych'], built: 'Zbudowany z React, Leaflet, Firebase i OSRM.', version: 'Wersja 2.1' }
+    about: { title: 'O SpotFinderze', desc: 'SpotFinder to bezpłatna aplikacja mapowa do odkrywania miejsc. Każdy może dodawać spoty bez konta.', features: ['Bezpłatna — bez subskrypcji', 'Działa jako gość — bez konta', 'Dodaj, oceń, nawiguj i udostępnij spoty', 'Dyktowanie głosowe w 13 językach', 'Ruch drogowy i zamknięcia dróg w czasie rzeczywistym', 'Nawigacja głosowa dla samochodu, roweru i pieszych'], built: 'Zbudowany z React, Leaflet, Firebase i OSRM.', version: 'Wersja 2.1' },
   },
 
   sk: {
     sections: [
-      { category: 'Začíname', items: [
-        { q: 'Čo je SpotFinder?', a: 'SpotFinder je bezplatná komunitná mapová aplikácia na zdieľanie zaujímavých miest — parkovísk, výhľadov, oddychových miest a ďalšieho. Každý môže pridávať spoty bez účtu.', steps: null },
-        { q: 'Potrebujem účet?', a: 'Nie! Ako hosť môžete prezerať mapu, pridávať spoty a hodnotiť ich. Účet umožňuje spravovať vaše spoty.', steps: null },
-      ]},
-      { category: 'Pridávanie spotov', items: [
-        { q: 'Ako pridám spot?', a: 'Postupujte podľa 5 krokov:', steps: [
-          { label: 'Klepnite na zelené tlačidlo + dole na obrazovke', svg: <SvgPlusButton /> },
-          { label: 'Mapa prejde do režimu pridávania — klepnite kdekoľvek na mapu', svg: <SvgTapMap /> },
-          { label: 'Vyplňte popis a hodnotenia parkovania, krásy a súkromia', svg: <SvgFillForm /> },
-          { label: 'Voliteľne pridajte fotku klepnutím na oblasť fotoaparátu', svg: <SvgAddPhoto /> },
-          { label: 'Klepnite na Uložiť spot — okamžite sa zobrazí na mape', svg: <SvgSpotAppears /> },
-        ]},
-      ]},
-      { category: 'Hodnotenie spotov', items: [
-        { q: 'Ako hodnotím spot?', a: 'Hodnotiť môže kdokoľvek — aj hostia. Klepnite na spot a potom na hviezdy v detaile.', steps: [
-          { label: 'Klepnite na značku spotu pre otvorenie detailu', svg: <SvgOpenDetail /> },
-          { label: 'Klepnite na hviezdy — bez potreby účtu', svg: <SvgRateSpot /> },
-        ]},
-      ]},
-      { category: 'Navigácia', items: [
-        { q: 'Ako navigovať k spotu?', a: 'Otvorte detail spotu a klepnite na Navigovať sem. Vyberte spôsob dopravy a spustite navigáciu.', steps: [
-          { label: 'Otvorte spot a klepnite na Navigovať sem', svg: <SvgOpenDetail /> },
-          { label: 'Vyberte Auto, Bicykel alebo Pešo — potom Spustiť navigáciu', svg: <SvgNavigate /> },
-        ]},
-      ]},
-      { category: 'Zdieľanie', items: [
-        { q: 'Ako zdieľam spot?', a: 'Otvorte detail spotu a klepnite na Zdieľať. Na mobile sa otvorí natívne zdieľanie, na počítači sa skopíruje odkaz.', steps: [{ label: 'Otvorte spot a klepnite na Zdieľať (↑)', svg: <SvgShare /> }]},
-      ]},
+      {
+        category: 'Začíname',
+        items: [
+          { q: 'Čo je SpotFinder?', a: 'SpotFinder je bezplatná komunitná mapová aplikácia na zdieľanie zaujímavých miest — parkovísk, výhľadov, oddychových miest a ďalšieho. Každý môže pridávať spoty bez účtu.', steps: null },
+          { q: 'Potrebujem účet?', a: 'Nie! Ako hosť môžete prezerať mapu, pridávať spoty a hodnotiť ich. Účet umožňuje spravovať vaše spoty.', steps: null },
+        ],
+      },
+      {
+        category: 'Pridávanie spotov',
+        items: [
+          { q: 'Ako pridám spot?', a: 'Postupujte podľa 5 krokov:', steps: [
+            { label: 'Klepnite na zelené tlačidlo + dole na obrazovke', img: 'plus-button.png', svg: 'SvgPlusButton' },
+            { label: 'Mapa prejde do režimu pridávania — klepnite kdekoľvek', img: 'tap-map.png', svg: 'SvgTapMap' },
+            { label: 'Vyplňte popis a hodnotenia parkovania, krásy a súkromia', img: 'fill-form.png', svg: 'SvgFillForm' },
+            { label: 'Voliteľne pridajte fotku klepnutím na oblasť fotoaparátu', img: 'add-photo.png', svg: 'SvgAddPhoto' },
+            { label: 'Klepnite na Uložiť spot — okamžite sa zobrazí na mape', img: 'spot-appears.png', svg: 'SvgSpotAppears' },
+          ]},
+          { q: 'Ako použiť hlas pre popis?', a: 'Klepnite na tlačidlo Hlas vedľa poľa popisu. Mikrofón počúva v jazyku nastaveným v Nastaveniach. Slová sa živé zobrazujú. Klepnutím opäť zastavíte.', steps: [
+            { label: 'Klepnite na tlačidlo Hlas vedľa poľa popisu', img: 'voice.png', svg: 'SvgVoice' },
+          ]},
+        ],
+      },
+      {
+        category: 'Hodnotenie spotov',
+        items: [
+          { q: 'Ako hodnotím spot?', a: 'Hodnotiť môže každý — aj hostia. Klepnite na spot a potom na hviezdy v detaile. Celkové hodnotenie aj Parkovanie, Krása, Súkromie.', steps: [
+            { label: 'Klepnite na značku spotu pre otvorenie detailu', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+            { label: 'Klepnite na hviezdy — bez potreby účtu', img: 'rate-spot.png', svg: 'SvgRateSpot' },
+          ]},
+        ],
+      },
+      {
+        category: 'Navigácia',
+        items: [
+          { q: 'Ako navigovať k spotu?', a: 'Otvorte detail spotu a klepnite na Navigovať sem. Vyberte spôsob dopravy a spustite navigáciu s hlasovými pokynmi.', steps: [
+            { label: 'Otvorte spot a klepnite na Navigovať sem', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+            { label: 'Vyberte Auto, Bicykel alebo Pešo — potom Spustiť navigáciu', img: 'navigate.png', svg: 'SvgNavigate' },
+            { label: 'Kedykoľvek prepínajte medzi režimami dopravy', img: 'route-modes.png', svg: 'SvgRouteModes' },
+          ]},
+          { q: 'Prepočíta trasu automaticky?', a: 'Áno. Odchýlíte-li sa o viac ako 80 m, SpotFinder automaticky prepočíta z aktuálnej polohy a oznámi "Prepočítavam trasu" vo vašom jazyku.', steps: null },
+        ],
+      },
+      {
+        category: 'Mapa a doprava',
+        items: [
+          { q: 'Ako prepnem štýl mapy?', a: 'Klepnite na tlačidlo Vrstvy v ľavom dolnom rohu. Vyberte Základnú, Vonkajšiu, Satelit, Zimnú alebo Dopravu.', steps: [
+            { label: 'Klepnite na tlačidlo Vrstvy pre výber štýlu', img: 'map-layers.png', svg: 'SvgMapLayers' },
+          ]},
+          { q: 'Čo zobrazuje vrstva Doprava?', a: 'Doprava v reálnom čase (zelená = voľno, žltá = pomaly, červená = zácpa) plus ikony uzávierok (⛔) a kolón (🚦) automaticky.', steps: [
+            { label: 'Prepnite na vrstvu Doprava pre zobrazenie aktuálneho stavu', img: 'traffic-layer.png', svg: 'SvgTrafficLayer' },
+          ]},
+        ],
+      },
+      {
+        category: 'Zdieľanie',
+        items: [
+          { q: 'Ako zdieľam spot?', a: 'Otvorte detail spotu a klepnite na Zdieľať. Na mobile sa otvorí natívne zdieľanie, na počítači sa skopíruje odkaz.', steps: [
+            { label: 'Otvorte spot a klepnite na Zdieľať (↑)', img: 'share.png', svg: 'SvgShare' },
+          ]},
+        ],
+      },
     ],
-    about: { title: 'O SpotFinderi', desc: 'SpotFinder je bezplatná komunitná aplikácia na objavovanie miest — od skrytých parkovísk po malebné výhľady. Každý môže pridávať spoty bez účtu.', features: ['Zadarmo — bez predplatného', 'Funguje ako hosť — bez účtu', 'Pridávanie, hodnotenie, navigácia a zdieľanie spotov', 'Hlasové diktovanie v 12 jazykoch', 'Doprava a uzávierky ciest v reálnom čase', 'Hlasová navigácia pre auto, bicykel a pešo'], built: 'Postavené na React, Leaflet, Firebase a OSRM.', version: 'Verzia 2.1' }
+    about: { title: 'O SpotFinderi', desc: 'SpotFinder je bezplatná komunitná aplikácia na objavovanie miest. Každý môže pridávať spoty bez účtu.', features: ['Zadarmo — bez predplatného', 'Funguje ako hosť — bez účtu', 'Pridávanie, hodnotenie, navigácia a zdieľanie spotov', 'Hlasové diktovanie v 13 jazykoch', 'Doprava a uzávierky ciest v reálnom čase', 'Hlasová navigácia pre auto, bicykel a pešo'], built: 'Postavené na React, Leaflet, Firebase a OSRM.', version: 'Verzia 2.1' },
   },
 
   fr: {
     sections: [
-      { category: 'Premiers pas', items: [
-        { q: 'Qu\'est-ce que SpotFinder ?', a: 'SpotFinder est une application de carte communautaire gratuite pour découvrir des spots utiles — parkings, points de vue, aires de repos et plus. Tout le monde peut ajouter des spots sans compte.', steps: null },
-        { q: 'Ai-je besoin d\'un compte ?', a: 'Non ! En tant qu\'invité, vous pouvez parcourir la carte, ajouter des spots et les noter. Un compte permet de gérer vos spots.', steps: null },
-      ]},
-      { category: 'Ajouter des spots', items: [
-        { q: 'Comment ajouter un spot ?', a: 'Suivez ces 5 étapes :', steps: [
-          { label: 'Appuyez sur le bouton vert + en bas de l\'écran', svg: <SvgPlusButton /> },
-          { label: 'La carte passe en mode ajout — appuyez n\'importe où sur la carte', svg: <SvgTapMap /> },
-          { label: 'Remplissez la description et les étoiles pour Stationnement, Paysage et Confidentialité', svg: <SvgFillForm /> },
-          { label: 'Ajoutez optionnellement une photo en appuyant sur la zone appareil photo', svg: <SvgAddPhoto /> },
-          { label: 'Appuyez sur Enregistrer le spot — il apparaît immédiatement sur la carte', svg: <SvgSpotAppears /> },
-        ]},
-      ]},
-      { category: 'Noter des spots', items: [
-        { q: 'Comment noter un spot ?', a: 'Tout le monde peut noter — même les invités. Appuyez sur un spot, puis sur les étoiles dans le panneau de détail.', steps: [
-          { label: 'Appuyez sur un marqueur de spot pour ouvrir le détail', svg: <SvgOpenDetail /> },
-          { label: 'Appuyez sur les étoiles — aucun compte requis', svg: <SvgRateSpot /> },
-        ]},
-      ]},
-      { category: 'Navigation', items: [
-        { q: 'Comment naviguer vers un spot ?', a: 'Ouvrez le détail d\'un spot et appuyez sur Naviguer ici. Choisissez votre mode de déplacement et démarrez la navigation.', steps: [
-          { label: 'Ouvrez un spot et appuyez sur Naviguer ici', svg: <SvgOpenDetail /> },
-          { label: 'Choisissez Voiture, Vélo ou À pied — puis Démarrer la navigation', svg: <SvgNavigate /> },
-        ]},
-      ]},
-      { category: 'Partage', items: [
-        { q: 'Comment partager un spot ?', a: 'Ouvrez le détail d\'un spot et appuyez sur Partager. Sur mobile le menu natif s\'ouvre, sur ordinateur le lien est copié.', steps: [{ label: 'Ouvrez un spot et appuyez sur Partager (↑)', svg: <SvgShare /> }]},
-      ]},
+      {
+        category: 'Premiers pas',
+        items: [
+          { q: 'Qu'est-ce que SpotFinder ?', a: 'SpotFinder est une application de carte communautaire gratuite pour découvrir des spots utiles — parkings, points de vue, aires de repos et plus. Tout le monde peut ajouter des spots sans compte.', steps: null },
+          { q: 'Ai-je besoin d'un compte ?', a: 'Non ! En tant qu'invité, vous pouvez parcourir la carte, ajouter des spots et les noter. Un compte permet de gérer vos spots.', steps: null },
+        ],
+      },
+      {
+        category: 'Ajouter des spots',
+        items: [
+          { q: 'Comment ajouter un spot ?', a: 'Suivez ces 5 étapes :', steps: [
+            { label: 'Appuyez sur le bouton vert + en bas de l'écran', img: 'plus-button.png', svg: 'SvgPlusButton' },
+            { label: 'La carte passe en mode ajout — appuyez n'importe où', img: 'tap-map.png', svg: 'SvgTapMap' },
+            { label: 'Remplissez la description et les étoiles pour Stationnement, Paysage et Confidentialité', img: 'fill-form.png', svg: 'SvgFillForm' },
+            { label: 'Ajoutez optionnellement une photo en appuyant sur la zone appareil photo', img: 'add-photo.png', svg: 'SvgAddPhoto' },
+            { label: 'Appuyez sur Enregistrer le spot — il apparaît immédiatement sur la carte', img: 'spot-appears.png', svg: 'SvgSpotAppears' },
+          ]},
+          { q: 'Comment utiliser la voix pour la description ?', a: 'Appuyez sur le bouton Voix à côté du champ de description. Le micro écoute dans la langue définie dans les Paramètres. Vos mots apparaissent en direct. Appuyez à nouveau pour arrêter.', steps: [
+            { label: 'Appuyez sur le bouton Voix à côté du champ de description', img: 'voice.png', svg: 'SvgVoice' },
+          ]},
+        ],
+      },
+      {
+        category: 'Noter des spots',
+        items: [
+          { q: 'Comment noter un spot ?', a: 'Tout le monde peut noter — même les invités. Appuyez sur un spot, puis sur les étoiles dans le panneau de détail. Note globale plus Stationnement, Beauté et Confidentialité.', steps: [
+            { label: 'Appuyez sur un marqueur de spot pour ouvrir le détail', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+            { label: 'Appuyez sur les étoiles — aucun compte requis', img: 'rate-spot.png', svg: 'SvgRateSpot' },
+          ]},
+        ],
+      },
+      {
+        category: 'Navigation',
+        items: [
+          { q: 'Comment naviguer vers un spot ?', a: 'Ouvrez le détail d'un spot et appuyez sur Naviguer ici. Choisissez votre mode de déplacement, puis démarrez la navigation.', steps: [
+            { label: 'Ouvrez un spot et appuyez sur Naviguer ici', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+            { label: 'Choisissez Voiture, Vélo ou À pied — puis Démarrer la navigation', img: 'navigate.png', svg: 'SvgNavigate' },
+            { label: 'Changez de mode de transport à tout moment', img: 'route-modes.png', svg: 'SvgRouteModes' },
+          ]},
+          { q: 'Recalcule-t-il l'itinéraire automatiquement ?', a: 'Oui. En cas d'écart de plus de 80 m, SpotFinder recalcule automatiquement depuis votre position et annonce "Recalcul" dans votre langue.', steps: null },
+        ],
+      },
+      {
+        category: 'Carte & Trafic',
+        items: [
+          { q: 'Comment changer le style de carte ?', a: 'Appuyez sur le bouton Couches en bas à gauche. Choisissez entre Base, Extérieur, Satellite, Hiver ou Trafic.', steps: [
+            { label: 'Appuyez sur le bouton Couches pour ouvrir le sélecteur de style', img: 'map-layers.png', svg: 'SvgMapLayers' },
+          ]},
+          { q: 'Que montre la couche Trafic ?', a: 'Flux en temps réel (vert = fluide, jaune = ralenti, rouge = embouteillage) plus marqueurs de fermetures (⛔) et d'embouteillages (🚦).', steps: [
+            { label: 'Passez à la vue Trafic pour voir les conditions en direct', img: 'traffic-layer.png', svg: 'SvgTrafficLayer' },
+          ]},
+        ],
+      },
+      {
+        category: 'Partage',
+        items: [
+          { q: 'Comment partager un spot ?', a: 'Ouvrez le détail d'un spot et appuyez sur Partager. Sur mobile le menu natif s'ouvre, sur ordinateur le lien est copié.', steps: [
+            { label: 'Ouvrez un spot et appuyez sur Partager (↑)', img: 'share.png', svg: 'SvgShare' },
+          ]},
+        ],
+      },
     ],
-    about: { title: 'À propos de SpotFinder', desc: 'SpotFinder est une application de carte communautaire gratuite pour découvrir des endroits utiles — des parkings cachés aux points de vue panoramiques. Tout le monde peut contribuer.', features: ['Gratuit — sans abonnement', 'Utilisable en tant qu\'invité — sans compte', 'Ajouter, noter, naviguer et partager des spots', 'Dictée vocale en 12 langues', 'Trafic en temps réel et fermetures de routes', 'Navigation vocale pour voiture, vélo et piétons'], built: 'Développé avec React, Leaflet, Firebase et OSRM.', version: 'Version 2.1' }
+    about: { title: 'À propos de SpotFinder', desc: 'SpotFinder est une application de carte communautaire gratuite pour découvrir des endroits utiles. Tout le monde peut contribuer.', features: ['Gratuit — sans abonnement', 'Utilisable en tant qu'invité — sans compte', 'Ajouter, noter, naviguer et partager des spots', 'Dictée vocale en 13 langues', 'Trafic en temps réel et fermetures de routes', 'Navigation vocale pour voiture, vélo et piétons'], built: 'Développé avec React, Leaflet, Firebase et OSRM.', version: 'Version 2.1' },
   },
 
   it: {
     sections: [
-      { category: 'Per iniziare', items: [
-        { q: 'Cos\'è SpotFinder?', a: 'SpotFinder è un\'app di mappe comunitaria gratuita per scoprire e condividere spot utili — parcheggi, panorami, aree di sosta e altro. Chiunque può aggiungere spot senza account.', steps: null },
-        { q: 'Ho bisogno di un account?', a: 'No! Come ospite puoi sfogliare la mappa, aggiungere spot e valutarli. Un account permette di gestire i tuoi spot.', steps: null },
-      ]},
-      { category: 'Aggiungere spot', items: [
-        { q: 'Come aggiungo uno spot?', a: 'Segui questi 5 passaggi:', steps: [
-          { label: 'Tocca il pulsante verde + in basso sullo schermo', svg: <SvgPlusButton /> },
-          { label: 'La mappa entra in modalità aggiunta — tocca qualsiasi punto della mappa', svg: <SvgTapMap /> },
-          { label: 'Compila la descrizione e le stelle per Parcheggio, Paesaggio e Privacy', svg: <SvgFillForm /> },
-          { label: 'Aggiungi opzionalmente una foto toccando l\'area fotocamera', svg: <SvgAddPhoto /> },
-          { label: 'Tocca Salva spot — appare immediatamente sulla mappa', svg: <SvgSpotAppears /> },
-        ]},
-      ]},
-      { category: 'Valutare spot', items: [
-        { q: 'Come valuto uno spot?', a: 'Chiunque può valutare — anche gli ospiti. Tocca uno spot, poi tocca le stelle nel pannello dei dettagli.', steps: [
-          { label: 'Tocca un marcatore spot per aprire i dettagli', svg: <SvgOpenDetail /> },
-          { label: 'Tocca le stelle — nessun account richiesto', svg: <SvgRateSpot /> },
-        ]},
-      ]},
-      { category: 'Navigazione', items: [
-        { q: 'Come navigo verso uno spot?', a: 'Apri il dettaglio di uno spot e tocca Naviga qui. Scegli la modalità di trasporto e avvia la navigazione.', steps: [
-          { label: 'Apri uno spot e tocca Naviga qui', svg: <SvgOpenDetail /> },
-          { label: 'Scegli Auto, Bici o A piedi — poi Avvia navigazione', svg: <SvgNavigate /> },
-        ]},
-      ]},
-      { category: 'Condivisione', items: [
-        { q: 'Come condivido uno spot?', a: 'Apri il dettaglio di uno spot e tocca Condividi. Su mobile si apre il menu nativo, su desktop viene copiato un link.', steps: [{ label: 'Apri uno spot e tocca Condividi (↑)', svg: <SvgShare /> }]},
-      ]},
+      {
+        category: 'Per iniziare',
+        items: [
+          { q: 'Cos'è SpotFinder?', a: 'SpotFinder è un'app di mappe comunitaria gratuita per scoprire e condividere spot utili — parcheggi, panorami, aree di sosta e altro. Chiunque può aggiungere spot senza account.', steps: null },
+          { q: 'Ho bisogno di un account?', a: 'No! Come ospite puoi sfogliare la mappa, aggiungere spot e valutarli. Un account permette di gestire i tuoi spot.', steps: null },
+        ],
+      },
+      {
+        category: 'Aggiungere spot',
+        items: [
+          { q: 'Come aggiungo uno spot?', a: 'Segui questi 5 passaggi:', steps: [
+            { label: 'Tocca il pulsante verde + in basso sullo schermo', img: 'plus-button.png', svg: 'SvgPlusButton' },
+            { label: 'La mappa entra in modalità aggiunta — tocca qualsiasi punto', img: 'tap-map.png', svg: 'SvgTapMap' },
+            { label: 'Compila la descrizione e le stelle per Parcheggio, Paesaggio e Privacy', img: 'fill-form.png', svg: 'SvgFillForm' },
+            { label: 'Aggiungi opzionalmente una foto toccando l'area fotocamera', img: 'add-photo.png', svg: 'SvgAddPhoto' },
+            { label: 'Tocca Salva spot — appare immediatamente sulla mappa', img: 'spot-appears.png', svg: 'SvgSpotAppears' },
+          ]},
+          { q: 'Come usare la dettatura vocale per la descrizione?', a: 'Tocca il pulsante Voce accanto al campo descrizione. Il microfono ascolta nella lingua impostata nelle Impostazioni. Le parole appaiono in tempo reale. Tocca di nuovo per fermare.', steps: [
+            { label: 'Tocca il pulsante Voce accanto al campo descrizione', img: 'voice.png', svg: 'SvgVoice' },
+          ]},
+        ],
+      },
+      {
+        category: 'Valutare spot',
+        items: [
+          { q: 'Come valuto uno spot?', a: 'Chiunque può valutare — anche gli ospiti. Tocca uno spot, poi tocca le stelle nel pannello dei dettagli. Valutazione complessiva più Parcheggio, Bellezza e Privacy.', steps: [
+            { label: 'Tocca un marcatore spot per aprire i dettagli', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+            { label: 'Tocca le stelle — nessun account richiesto', img: 'rate-spot.png', svg: 'SvgRateSpot' },
+          ]},
+        ],
+      },
+      {
+        category: 'Navigazione',
+        items: [
+          { q: 'Come navigo verso uno spot?', a: 'Apri il dettaglio di uno spot e tocca Naviga qui. Scegli la modalità di trasporto, poi avvia la navigazione con istruzioni vocali.', steps: [
+            { label: 'Apri uno spot e tocca Naviga qui', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+            { label: 'Scegli Auto, Bici o A piedi — poi Avvia navigazione', img: 'navigate.png', svg: 'SvgNavigate' },
+            { label: 'Cambia modalità di trasporto in qualsiasi momento', img: 'route-modes.png', svg: 'SvgRouteModes' },
+          ]},
+          { q: 'Ricalcola automaticamente il percorso?', a: 'Sì. Se ti allontani di più di 80 m dal percorso, SpotFinder ricalcola automaticamente dalla tua posizione e annuncia "Ricalcolo" nella tua lingua.', steps: null },
+        ],
+      },
+      {
+        category: 'Mappa & Traffico',
+        items: [
+          { q: 'Come cambio lo stile della mappa?', a: 'Tocca il pulsante Livelli in basso a sinistra. Scegli tra Base, Outdoor, Satellite, Invernale o Traffico.', steps: [
+            { label: 'Tocca il pulsante Livelli per aprire il selettore di stile', img: 'map-layers.png', svg: 'SvgMapLayers' },
+          ]},
+          { q: 'Cosa mostra il livello Traffico?', a: 'Flusso in tempo reale (verde = libero, giallo = lento, rosso = congestionato) più marcatori di chiusure (⛔) e ingorghi (🚦).', steps: [
+            { label: 'Passa alla vista Traffico per vedere le condizioni in diretta', img: 'traffic-layer.png', svg: 'SvgTrafficLayer' },
+          ]},
+        ],
+      },
+      {
+        category: 'Condivisione',
+        items: [
+          { q: 'Come condivido uno spot?', a: 'Apri il dettaglio di uno spot e tocca Condividi. Su mobile si apre il menu nativo, su desktop viene copiato un link.', steps: [
+            { label: 'Apri uno spot e tocca Condividi (↑)', img: 'share.png', svg: 'SvgShare' },
+          ]},
+        ],
+      },
     ],
-    about: { title: 'Informazioni su SpotFinder', desc: 'SpotFinder è un\'app di mappe comunitaria gratuita per scoprire posti utili — dai parcheggi nascosti ai panorami mozzafiato. Tutti possono contribuire.', features: ['Gratuita — nessun abbonamento', 'Utilizzabile come ospite — senza account', 'Aggiungi, valuta, naviga e condividi spot', 'Dettatura vocale in 12 lingue', 'Traffico e chiusure stradali in tempo reale', 'Navigazione vocale per auto, bici e pedoni'], built: 'Sviluppato con React, Leaflet, Firebase e OSRM.', version: 'Versione 2.1' }
+    about: { title: 'Informazioni su SpotFinder', desc: 'SpotFinder è un'app di mappe comunitaria gratuita per scoprire posti utili. Tutti possono contribuire.', features: ['Gratuita — nessun abbonamento', 'Utilizzabile come ospite — senza account', 'Aggiungi, valuta, naviga e condividi spot', 'Dettatura vocale in 13 lingue', 'Traffico e chiusure stradali in tempo reale', 'Navigazione vocale per auto, bici e pedoni'], built: 'Sviluppato con React, Leaflet, Firebase e OSRM.', version: 'Versione 2.1' },
   },
 
   ru: {
     sections: [
-      { category: 'Начало работы', items: [
-        { q: 'Что такое SpotFinder?', a: 'SpotFinder — бесплатное сообщество карт для открытия полезных мест — парковок, смотровых площадок, мест отдыха и многого другого. Каждый может добавлять споты без регистрации.', steps: null },
-        { q: 'Нужна ли мне учётная запись?', a: 'Нет! Как гость вы можете просматривать карту, добавлять споты и оценивать их. Аккаунт позволяет управлять своими спотами.', steps: null },
-      ]},
-      { category: 'Добавление спотов', items: [
-        { q: 'Как добавить спот?', a: 'Следуйте 5 шагам:', steps: [
-          { label: 'Нажмите зелёную кнопку + внизу экрана', svg: <SvgPlusButton /> },
-          { label: 'Карта переходит в режим добавления — нажмите в любом месте', svg: <SvgTapMap /> },
-          { label: 'Заполните описание и выставьте звёзды за Парковку, Красоту и Приватность', svg: <SvgFillForm /> },
-          { label: 'Опционально добавьте фото, нажав на область камеры', svg: <SvgAddPhoto /> },
-          { label: 'Нажмите Сохранить спот — он сразу появится на карте', svg: <SvgSpotAppears /> },
-        ]},
-      ]},
-      { category: 'Оценка спотов', items: [
-        { q: 'Как оценить спот?', a: 'Оценивать может любой — включая гостей. Нажмите на спот, затем на звёзды в панели деталей.', steps: [
-          { label: 'Нажмите на маркер спота, чтобы открыть подробности', svg: <SvgOpenDetail /> },
-          { label: 'Нажмите на звёзды — без регистрации', svg: <SvgRateSpot /> },
-        ]},
-      ]},
-      { category: 'Навигация', items: [
-        { q: 'Как навигировать к споту?', a: 'Откройте подробности спота и нажмите Навигация сюда. Выберите режим транспорта и начните навигацию.', steps: [
-          { label: 'Откройте спот и нажмите Навигация сюда', svg: <SvgOpenDetail /> },
-          { label: 'Выберите Авто, Велосипед или Пешком — затем Начать навигацию', svg: <SvgNavigate /> },
-        ]},
-      ]},
-      { category: 'Совместный доступ', items: [
-        { q: 'Как поделиться спотом?', a: 'Откройте подробности спота и нажмите Поделиться. На мобильном откроется нативное меню, на десктопе скопируется ссылка.', steps: [{ label: 'Откройте спот и нажмите Поделиться (↑)', svg: <SvgShare /> }]},
-      ]},
+      {
+        category: 'Начало работы',
+        items: [
+          { q: 'Что такое SpotFinder?', a: 'SpotFinder — бесплатное сообщество карт для открытия полезных мест — парковок, смотровых площадок, мест отдыха и многого другого. Каждый может добавлять споты без регистрации.', steps: null },
+          { q: 'Нужна ли мне учётная запись?', a: 'Нет! Как гость вы можете просматривать карту, добавлять споты и оценивать их. Аккаунт позволяет управлять своими спотами.', steps: null },
+        ],
+      },
+      {
+        category: 'Добавление спотов',
+        items: [
+          { q: 'Как добавить спот?', a: 'Следуйте 5 шагам:', steps: [
+            { label: 'Нажмите зелёную кнопку + внизу экрана', img: 'plus-button.png', svg: 'SvgPlusButton' },
+            { label: 'Карта переходит в режим добавления — нажмите в любом месте', img: 'tap-map.png', svg: 'SvgTapMap' },
+            { label: 'Заполните описание и выставьте звёзды за Парковку, Красоту и Приватность', img: 'fill-form.png', svg: 'SvgFillForm' },
+            { label: 'Опционально добавьте фото, нажав на область камеры', img: 'add-photo.png', svg: 'SvgAddPhoto' },
+            { label: 'Нажмите Сохранить спот — он сразу появится на карте', img: 'spot-appears.png', svg: 'SvgSpotAppears' },
+          ]},
+          { q: 'Как использовать голос для описания?', a: 'Нажмите кнопку Голос рядом с полем описания. Микрофон слушает на языке, установленном в Настройках. Ваши слова появляются в реальном времени. Нажмите ещё раз для остановки.', steps: [
+            { label: 'Нажмите кнопку Голос рядом с полем описания', img: 'voice.png', svg: 'SvgVoice' },
+          ]},
+        ],
+      },
+      {
+        category: 'Оценка спотов',
+        items: [
+          { q: 'Как оценить спот?', a: 'Оценивать может любой — включая гостей. Нажмите на спот, затем на звёзды в панели деталей. Общая оценка плюс Парковка, Красота и Приватность.', steps: [
+            { label: 'Нажмите на маркер спота, чтобы открыть подробности', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+            { label: 'Нажмите на звёзды — без регистрации', img: 'rate-spot.png', svg: 'SvgRateSpot' },
+          ]},
+        ],
+      },
+      {
+        category: 'Навигация',
+        items: [
+          { q: 'Как навигировать к споту?', a: 'Откройте подробности спота и нажмите Навигация сюда. Выберите режим транспорта и начните навигацию с голосовыми инструкциями.', steps: [
+            { label: 'Откройте спот и нажмите Навигация сюда', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+            { label: 'Выберите Авто, Велосипед или Пешком — затем Начать навигацию', img: 'navigate.png', svg: 'SvgNavigate' },
+            { label: 'Переключайте режим транспорта в любое время', img: 'route-modes.png', svg: 'SvgRouteModes' },
+          ]},
+          { q: 'Пересчитывает ли маршрут автоматически?', a: 'Да. При отклонении более 80 м SpotFinder автоматически пересчитывает с текущей позиции и объявляет "Перестраиваю маршрут" на вашем языке.', steps: null },
+        ],
+      },
+      {
+        category: 'Карта и трафик',
+        items: [
+          { q: 'Как переключить стиль карты?', a: 'Нажмите кнопку Слои в левом нижнем углу. Выберите Базовую, Природную, Спутник, Зимнюю или Трафик.', steps: [
+            { label: 'Нажмите кнопку Слои для выбора стиля', img: 'map-layers.png', svg: 'SvgMapLayers' },
+          ]},
+          { q: 'Что показывает слой Трафик?', a: 'Поток движения в реальном времени (зелёный = свободно, жёлтый = медленно, красный = пробка) плюс иконки перекрытий (⛔) и пробок (🚦).', steps: [
+            { label: 'Переключитесь на вид Трафик для живых данных', img: 'traffic-layer.png', svg: 'SvgTrafficLayer' },
+          ]},
+        ],
+      },
+      {
+        category: 'Совместный доступ',
+        items: [
+          { q: 'Как поделиться спотом?', a: 'Откройте подробности спота и нажмите Поделиться. На мобильном откроется нативное меню, на десктопе скопируется ссылка.', steps: [
+            { label: 'Откройте спот и нажмите Поделиться (↑)', img: 'share.png', svg: 'SvgShare' },
+          ]},
+        ],
+      },
     ],
-    about: { title: 'О SpotFinder', desc: 'SpotFinder — бесплатное приложение-карта для открытия мест — от скрытых парковок до живописных площадок. Каждый может вносить вклад.', features: ['Бесплатно — без подписки', 'Работает как гость — без аккаунта', 'Добавляйте, оценивайте, навигируйте и делитесь спотами', 'Голосовое дiktоvание на 12 языках', 'Пробки и перекрытия дорог в реальном времени', 'Голосовая навигация для авто, велосипеда и пешеходов'], built: 'Создано на React, Leaflet, Firebase и OSRM.', version: 'Версия 2.1' }
+    about: { title: 'О SpotFinder', desc: 'SpotFinder — бесплатное приложение-карта для открытия полезных мест. Каждый может вносить вклад.', features: ['Бесплатно — без подписки', 'Работает как гость — без аккаунта', 'Добавляйте, оценивайте, навигируйте и делитесь спотами', 'Голосовое диктование на 13 языках', 'Пробки и перекрытия дорог в реальном времени', 'Голосовая навигация для авто, велосипеда и пешеходов'], built: 'Создано на React, Leaflet, Firebase и OSRM.', version: 'Версия 2.1' },
   },
 
   uk: {
     sections: [
-      { category: 'Початок роботи', items: [
-        { q: 'Що таке SpotFinder?', a: 'SpotFinder — безкоштовний спільнотний картографічний застосунок для відкриття корисних місць — паркінгів, видових майданчиків, місць відпочинку та іншого. Кожен може додавати споти без реєстрації.', steps: null },
-        { q: 'Чи потрібен мені обліковий запис?', a: 'Ні! Як гість ви можете переглядати карту, додавати споти та оцінювати їх. Акаунт дозволяє керувати своїми спотами.', steps: null },
-      ]},
-      { category: 'Додавання спотів', items: [
-        { q: 'Як додати спот?', a: 'Виконайте 5 кроків:', steps: [
-          { label: 'Натисніть зелену кнопку + внизу екрана', svg: <SvgPlusButton /> },
-          { label: 'Карта переходить у режим додавання — натисніть будь-де на карті', svg: <SvgTapMap /> },
-          { label: 'Заповніть опис і встановіть зірки за Паркінг, Красу та Приватність', svg: <SvgFillForm /> },
-          { label: 'За бажанням додайте фото, натиснувши на область камери', svg: <SvgAddPhoto /> },
-          { label: 'Натисніть Зберегти спот — він одразу з\'явиться на карті', svg: <SvgSpotAppears /> },
-        ]},
-      ]},
-      { category: 'Оцінка спотів', items: [
-        { q: 'Як оцінити спот?', a: 'Оцінювати може будь-хто — включно з гостями. Натисніть на спот, потім на зірки в панелі деталей.', steps: [
-          { label: 'Натисніть на маркер спота, щоб відкрити подробиці', svg: <SvgOpenDetail /> },
-          { label: 'Натисніть на зірки — без реєстрації', svg: <SvgRateSpot /> },
-        ]},
-      ]},
-      { category: 'Навігація', items: [
-        { q: 'Як навігувати до спота?', a: 'Відкрийте подробиці спота і натисніть Навігація сюди. Виберіть режим транспорту і розпочніть навігацію.', steps: [
-          { label: 'Відкрийте спот і натисніть Навігація сюди', svg: <SvgOpenDetail /> },
-          { label: 'Виберіть Авто, Велосипед або Пішки — потім Розпочати навігацію', svg: <SvgNavigate /> },
-        ]},
-      ]},
-      { category: 'Поширення', items: [
-        { q: 'Як поділитися спотом?', a: 'Відкрийте подробиці спота і натисніть Поділитися. На мобільному відкриється нативне меню, на десктопі скопіюється посилання.', steps: [{ label: 'Відкрийте спот і натисніть Поділитися (↑)', svg: <SvgShare /> }]},
-      ]},
+      {
+        category: 'Початок роботи',
+        items: [
+          { q: 'Що таке SpotFinder?', a: 'SpotFinder — безкоштовний спільнотний картографічний застосунок для відкриття корисних місць — паркінгів, видових майданчиків, місць відпочинку та іншого. Кожен може додавати споти без реєстрації.', steps: null },
+          { q: 'Чи потрібен мені обліковий запис?', a: 'Ні! Як гість ви можете переглядати карту, додавати споти та оцінювати їх. Акаунт дозволяє керувати своїми спотами.', steps: null },
+        ],
+      },
+      {
+        category: 'Додавання спотів',
+        items: [
+          { q: 'Як додати спот?', a: 'Виконайте 5 кроків:', steps: [
+            { label: 'Натисніть зелену кнопку + внизу екрана', img: 'plus-button.png', svg: 'SvgPlusButton' },
+            { label: 'Карта переходить у режим додавання — натисніть будь-де', img: 'tap-map.png', svg: 'SvgTapMap' },
+            { label: 'Заповніть опис і встановіть зірки за Паркінг, Красу та Приватність', img: 'fill-form.png', svg: 'SvgFillForm' },
+            { label: 'За бажанням додайте фото, натиснувши на область камери', img: 'add-photo.png', svg: 'SvgAddPhoto' },
+            { label: 'Натисніть Зберегти спот — він одразу з'явиться на карті', img: 'spot-appears.png', svg: 'SvgSpotAppears' },
+          ]},
+          { q: 'Як використовувати голос для опису?', a: 'Натисніть кнопку Голос поруч із полем опису. Мікрофон слухає мовою, встановленою в Налаштуваннях. Ваші слова з'являються в реальному часі. Натисніть ще раз для зупинки.', steps: [
+            { label: 'Натисніть кнопку Голос поруч із полем опису', img: 'voice.png', svg: 'SvgVoice' },
+          ]},
+        ],
+      },
+      {
+        category: 'Оцінка спотів',
+        items: [
+          { q: 'Як оцінити спот?', a: 'Оцінювати може будь-хто — включно з гостями. Натисніть на спот, потім на зірки в панелі деталей. Загальна оцінка плюс Паркінг, Краса та Приватність.', steps: [
+            { label: 'Натисніть на маркер спота, щоб відкрити подробиці', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+            { label: 'Натисніть на зірки — без реєстрації', img: 'rate-spot.png', svg: 'SvgRateSpot' },
+          ]},
+        ],
+      },
+      {
+        category: 'Навігація',
+        items: [
+          { q: 'Як навігувати до спота?', a: 'Відкрийте подробиці спота і натисніть Навігація сюди. Виберіть режим транспорту і розпочніть навігацію з голосовими інструкціями.', steps: [
+            { label: 'Відкрийте спот і натисніть Навігація сюди', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+            { label: 'Виберіть Авто, Велосипед або Пішки — потім Розпочати навігацію', img: 'navigate.png', svg: 'SvgNavigate' },
+            { label: 'Переключайте режим транспорту в будь-який момент', img: 'route-modes.png', svg: 'SvgRouteModes' },
+          ]},
+          { q: 'Чи перераховує маршрут автоматично?', a: 'Так. При відхиленні понад 80 м SpotFinder автоматично перераховує з поточної позиції і оголошує "Перераховую маршрут" вашою мовою.', steps: null },
+        ],
+      },
+      {
+        category: 'Карта і трафік',
+        items: [
+          { q: 'Як переключити стиль карти?', a: 'Натисніть кнопку Шари у лівому нижньому куті. Виберіть Базову, Природну, Супутник, Зимову або Трафік.', steps: [
+            { label: 'Натисніть кнопку Шари для вибору стилю', img: 'map-layers.png', svg: 'SvgMapLayers' },
+          ]},
+          { q: 'Що показує шар Трафік?', a: 'Потік руху в реальному часі (зелений = вільно, жовтий = повільно, червоний = затор) плюс іконки перекриттів (⛔) та заторів (🚦).', steps: [
+            { label: 'Переключіться на вид Трафік для живих даних', img: 'traffic-layer.png', svg: 'SvgTrafficLayer' },
+          ]},
+        ],
+      },
+      {
+        category: 'Поширення',
+        items: [
+          { q: 'Як поділитися спотом?', a: 'Відкрийте подробиці спота і натисніть Поділитися. На мобільному відкриється нативне меню, на десктопі скопіюється посилання.', steps: [
+            { label: 'Відкрийте спот і натисніть Поділитися (↑)', img: 'share.png', svg: 'SvgShare' },
+          ]},
+        ],
+      },
     ],
-    about: { title: 'Про SpotFinder', desc: 'SpotFinder — безкоштовний застосунок-карта для відкриття місць — від прихованих паркінгів до мальовничих майданчиків. Кожен може додавати споти.', features: ['Безкоштовно — без підписки', 'Працює як гість — без акаунта', 'Додавайте, оцінюйте, навігуйте та діліться спотами', 'Голосове диктування 12 мовами', 'Пробки та перекриття доріг у реальному часі', 'Голосова навігація для авто, велосипеда та пішоходів'], built: 'Створено на React, Leaflet, Firebase та OSRM.', version: 'Версія 2.1' }
+    about: { title: 'Про SpotFinder', desc: 'SpotFinder — безкоштовний застосунок-карта для відкриття корисних місць. Кожен може додавати споти.', features: ['Безкоштовно — без підписки', 'Працює як гість — без акаунта', 'Додавайте, оцінюйте, навігуйте та діліться спотами', 'Голосове диктування 13 мовами', 'Пробки та перекриття доріг у реальному часі', 'Голосова навігація для авто, велосипеда та пішоходів'], built: 'Створено на React, Leaflet, Firebase та OSRM.', version: 'Версія 2.1' },
   },
 
   hu: {
     sections: [
-      { category: 'Első lépések', items: [
-        { q: 'Mi az a SpotFinder?', a: 'A SpotFinder egy ingyenes közösségi térképalkalmazás hasznos helyek felfedezéséhez — parkolók, kilátópontok, pihenőhelyek és egyebek. Mindenki hozzáadhat spotokat regisztráció nélkül.', steps: null },
-        { q: 'Szükségem van fiókra?', a: 'Nem! Vendégként böngészheted a térképet, hozzáadhatsz spotokat és értékelheted őket. Fiók lehetővé teszi saját spotjaid kezelését.', steps: null },
-      ]},
-      { category: 'Spot hozzáadása', items: [
-        { q: 'Hogyan adok hozzá egy spotot?', a: 'Kövesd ezt az 5 lépést:', steps: [
-          { label: 'Koppints a zöld + gombra a képernyő alján', svg: <SvgPlusButton /> },
-          { label: 'A térkép hozzáadási módba vált — koppints bárhol a térképen', svg: <SvgTapMap /> },
-          { label: 'Töltsd ki a leírást és állítsd be a csillagokat Parkolás, Szépség és Magánszféra szerint', svg: <SvgFillForm /> },
-          { label: 'Opcionálisan adj hozzá fotót a kamera területre koppintva', svg: <SvgAddPhoto /> },
-          { label: 'Koppints a Spot mentése gombra — azonnal megjelenik a térképen', svg: <SvgSpotAppears /> },
-        ]},
-      ]},
-      { category: 'Spotok értékelése', items: [
-        { q: 'Hogyan értékelek egy spotot?', a: 'Bárki értékelhet — vendégek is. Koppints egy spotra, majd a csillagokra a részletek panelben.', steps: [
-          { label: 'Koppints egy spot jelölőre a részletek megnyitásához', svg: <SvgOpenDetail /> },
-          { label: 'Koppints a csillagokra — fiók nem szükséges', svg: <SvgRateSpot /> },
-        ]},
-      ]},
-      { category: 'Navigáció', items: [
-        { q: 'Hogyan navigálok egy spothoz?', a: 'Nyisd meg egy spot részleteit és koppints az Ide navigálás gombra. Válassz közlekedési módot és indítsd el a navigációt.', steps: [
-          { label: 'Nyisd meg a spotot és koppints az Ide navigálás gombra', svg: <SvgOpenDetail /> },
-          { label: 'Válassz Autó, Kerékpár vagy Gyalog módot — majd Navigáció indítása', svg: <SvgNavigate /> },
-        ]},
-      ]},
-      { category: 'Megosztás', items: [
-        { q: 'Hogyan osztok meg egy spotot?', a: 'Nyisd meg egy spot részleteit és koppints a Megosztás gombra. Mobilon a natív menü nyílik meg, asztali gépen a link másolódik.', steps: [{ label: 'Nyisd meg a spotot és koppints a Megosztás (↑) gombra', svg: <SvgShare /> }]},
-      ]},
+      {
+        category: 'Első lépések',
+        items: [
+          { q: 'Mi az a SpotFinder?', a: 'A SpotFinder egy ingyenes közösségi térképalkalmazás hasznos helyek felfedezéséhez — parkolók, kilátópontok, pihenőhelyek és egyebek. Mindenki hozzáadhat spotokat regisztráció nélkül.', steps: null },
+          { q: 'Szükségem van fiókra?', a: 'Nem! Vendégként böngészheted a térképet, hozzáadhatsz spotokat és értékelheted őket. Fiók lehetővé teszi saját spotjaid kezelését.', steps: null },
+        ],
+      },
+      {
+        category: 'Spot hozzáadása',
+        items: [
+          { q: 'Hogyan adok hozzá egy spotot?', a: 'Kövesd ezt az 5 lépést:', steps: [
+            { label: 'Koppints a zöld + gombra a képernyő alján', img: 'plus-button.png', svg: 'SvgPlusButton' },
+            { label: 'A térkép hozzáadási módba vált — koppints bárhol a térképen', img: 'tap-map.png', svg: 'SvgTapMap' },
+            { label: 'Töltsd ki a leírást és állítsd be a csillagokat Parkolás, Szépség és Magánszféra szerint', img: 'fill-form.png', svg: 'SvgFillForm' },
+            { label: 'Opcionálisan adj hozzá fotót a kamera területre koppintva', img: 'add-photo.png', svg: 'SvgAddPhoto' },
+            { label: 'Koppints a Spot mentése gombra — azonnal megjelenik a térképen', img: 'spot-appears.png', svg: 'SvgSpotAppears' },
+          ]},
+          { q: 'Hogyan használjam a hangbevitelt a leíráshoz?', a: 'Koppints a Hang gombra a leírás mező mellett. A mikrofon a Beállításokban kiválasztott nyelven hallgat. A szavak élőben jelennek meg. Érintsd meg újra a megállításhoz.', steps: [
+            { label: 'Koppints a Hang gombra a leírás mező mellett', img: 'voice.png', svg: 'SvgVoice' },
+          ]},
+        ],
+      },
+      {
+        category: 'Spotok értékelése',
+        items: [
+          { q: 'Hogyan értékelek egy spotot?', a: 'Bárki értékelhet — vendégek is. Koppints egy spotra, majd a csillagokra a részletek panelben. Összesített értékelés plusz Parkolás, Szépség és Magánszféra.', steps: [
+            { label: 'Koppints egy spot jelölőre a részletek megnyitásához', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+            { label: 'Koppints a csillagokra — fiók nem szükséges', img: 'rate-spot.png', svg: 'SvgRateSpot' },
+          ]},
+        ],
+      },
+      {
+        category: 'Navigáció',
+        items: [
+          { q: 'Hogyan navigálok egy spothoz?', a: 'Nyisd meg egy spot részleteit és koppints az Ide navigálás gombra. Válassz közlekedési módot, majd indítsd el a navigációt hangutasításokkal.', steps: [
+            { label: 'Nyisd meg a spotot és koppints az Ide navigálás gombra', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+            { label: 'Válassz Autó, Kerékpár vagy Gyalog módot — majd Navigáció indítása', img: 'navigate.png', svg: 'SvgNavigate' },
+            { label: 'Bármikor váltogasd a közlekedési módot', img: 'route-modes.png', svg: 'SvgRouteModes' },
+          ]},
+          { q: 'Újraszámítja automatikusan az útvonalat?', a: 'Igen. Ha több mint 80 m-rel eltérsz az útvonaltól, SpotFinder automatikusan újraszámítja a jelenlegi helyzetedtől és "Útvonal újraszámítása" jelzést ad a te nyelvedden.', steps: null },
+        ],
+      },
+      {
+        category: 'Térkép és forgalom',
+        items: [
+          { q: 'Hogyan váltom a térképstílust?', a: 'Koppints a Rétegek gombra bal alul. Válassz Alaptérkép, Természet, Műhold, Téli vagy Forgalom nézet közül.', steps: [
+            { label: 'Koppints a Rétegek gombra a stílusválasztóhoz', img: 'map-layers.png', svg: 'SvgMapLayers' },
+          ]},
+          { q: 'Mit mutat a Forgalom réteg?', a: 'Valós idejű forgalmi áramlás (zöld = szabad, sárga = lassú, piros = torlódás) plusz útlezárás-ikonok (⛔) és torlódás-ikonok (🚦) automatikusan.', steps: [
+            { label: 'Válts Forgalom nézetre az élő útviszonyokhoz', img: 'traffic-layer.png', svg: 'SvgTrafficLayer' },
+          ]},
+        ],
+      },
+      {
+        category: 'Megosztás',
+        items: [
+          { q: 'Hogyan osztok meg egy spotot?', a: 'Nyisd meg egy spot részleteit és koppints a Megosztás gombra. Mobilon a natív menü nyílik meg, asztali gépen a link másolódik.', steps: [
+            { label: 'Nyisd meg a spotot és koppints a Megosztás (↑) gombra', img: 'share.png', svg: 'SvgShare' },
+          ]},
+        ],
+      },
     ],
-    about: { title: 'A SpotFinderről', desc: 'A SpotFinder egy ingyenes közösségi térképalkalmazás hasznos helyek felfedezéséhez — rejtett parkolóktól festői kilátópontokig. Mindenki hozzájárulhat.', features: ['Ingyenes — nincs előfizetés', 'Vendégként használható — fiók nélkül', 'Spotok hozzáadása, értékelése, navigálása és megosztása', 'Hangbevitel 12 nyelven', 'Valós idejű forgalom és útlezárások', 'Hangos navigáció autóhoz, kerékpárhoz és gyalogosokhoz'], built: 'Fejlesztve React, Leaflet, Firebase és OSRM alapokon.', version: '2.1-es verzió' }
+    about: { title: 'A SpotFinderről', desc: 'A SpotFinder egy ingyenes közösségi térképalkalmazás hasznos helyek felfedezéséhez. Mindenki hozzájárulhat.', features: ['Ingyenes — nincs előfizetés', 'Vendégként használható — fiók nélkül', 'Spotok hozzáadása, értékelése, navigálása és megosztása', 'Hangbevitel 13 nyelven', 'Valós idejű forgalom és útlezárások', 'Hangos navigáció autóhoz, kerékpárhoz és gyalogosokhoz'], built: 'Fejlesztve React, Leaflet, Firebase és OSRM alapokon.', version: '2.1-es verzió' },
   },
 
   ro: {
     sections: [
-      { category: 'Noțiuni de bază', items: [
-        { q: 'Ce este SpotFinder?', a: 'SpotFinder este o aplicație de hartă comunitară gratuită pentru descoperirea locurilor utile — parcări, priveliști, locuri de odihnă și altele. Oricine poate adăuga spoturi fără cont.', steps: null },
-        { q: 'Am nevoie de un cont?', a: 'Nu! Ca vizitator poți naviga pe hartă, adăuga spoturi și le poți evalua. Un cont permite gestionarea spoturilor tale.', steps: null },
-      ]},
-      { category: 'Adăugarea spoturilor', items: [
-        { q: 'Cum adaug un spot?', a: 'Urmează acești 5 pași:', steps: [
-          { label: 'Atinge butonul verde + din josul ecranului', svg: <SvgPlusButton /> },
-          { label: 'Harta intră în modul de adăugare — atinge oriunde pe hartă', svg: <SvgTapMap /> },
-          { label: 'Completează descrierea și stele pentru Parcare, Peisaj și Intimitate', svg: <SvgFillForm /> },
-          { label: 'Opțional adaugă o fotografie atingând zona camerei', svg: <SvgAddPhoto /> },
-          { label: 'Atinge Salvează spot — apare imediat pe hartă', svg: <SvgSpotAppears /> },
-        ]},
-      ]},
-      { category: 'Evaluarea spoturilor', items: [
-        { q: 'Cum evaluez un spot?', a: 'Oricine poate evalua — inclusiv vizitatorii. Atinge un spot, apoi stelele din panoul de detalii.', steps: [
-          { label: 'Atinge un marker de spot pentru a deschide detaliile', svg: <SvgOpenDetail /> },
-          { label: 'Atinge stelele — cont neobligatoriu', svg: <SvgRateSpot /> },
-        ]},
-      ]},
-      { category: 'Navigare', items: [
-        { q: 'Cum navighez la un spot?', a: 'Deschide detaliile unui spot și atinge Navighează aici. Alege modul de transport și pornește navigarea.', steps: [
-          { label: 'Deschide un spot și atinge Navighează aici', svg: <SvgOpenDetail /> },
-          { label: 'Alege Mașină, Bicicletă sau Pe jos — apoi Pornire navigare', svg: <SvgNavigate /> },
-        ]},
-      ]},
-      { category: 'Partajare', items: [
-        { q: 'Cum partajez un spot?', a: 'Deschide detaliile unui spot și atinge Distribuie. Pe mobil se deschide meniul nativ, pe desktop se copiază linkul.', steps: [{ label: 'Deschide un spot și atinge Distribuie (↑)', svg: <SvgShare /> }]},
-      ]},
+      {
+        category: 'Noțiuni de bază',
+        items: [
+          { q: 'Ce este SpotFinder?', a: 'SpotFinder este o aplicație de hartă comunitară gratuită pentru descoperirea locurilor utile — parcări, priveliști, locuri de odihnă și altele. Oricine poate adăuga spoturi fără cont.', steps: null },
+          { q: 'Am nevoie de un cont?', a: 'Nu! Ca vizitator poți naviga pe hartă, adăuga spoturi și le poți evalua. Un cont permite gestionarea spoturilor tale.', steps: null },
+        ],
+      },
+      {
+        category: 'Adăugarea spoturilor',
+        items: [
+          { q: 'Cum adaug un spot?', a: 'Urmează acești 5 pași:', steps: [
+            { label: 'Atinge butonul verde + din josul ecranului', img: 'plus-button.png', svg: 'SvgPlusButton' },
+            { label: 'Harta intră în modul de adăugare — atinge oriunde pe hartă', img: 'tap-map.png', svg: 'SvgTapMap' },
+            { label: 'Completează descrierea și stelele pentru Parcare, Peisaj și Intimitate', img: 'fill-form.png', svg: 'SvgFillForm' },
+            { label: 'Opțional adaugă o fotografie atingând zona camerei', img: 'add-photo.png', svg: 'SvgAddPhoto' },
+            { label: 'Atinge Salvează spot — apare imediat pe hartă', img: 'spot-appears.png', svg: 'SvgSpotAppears' },
+          ]},
+          { q: 'Cum să folosesc vocea pentru descriere?', a: 'Atinge butonul Voce de lângă câmpul de descriere. Microfonul ascultă în limba setată în Setări. Cuvintele apar în timp real. Atinge din nou pentru a opri.', steps: [
+            { label: 'Atinge butonul Voce de lângă câmpul de descriere', img: 'voice.png', svg: 'SvgVoice' },
+          ]},
+        ],
+      },
+      {
+        category: 'Evaluarea spoturilor',
+        items: [
+          { q: 'Cum evaluez un spot?', a: 'Oricine poate evalua — inclusiv vizitatorii. Atinge un spot, apoi stelele din panoul de detalii. Evaluare generală plus Parcare, Frumusețe și Intimitate.', steps: [
+            { label: 'Atinge un marker de spot pentru a deschide detaliile', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+            { label: 'Atinge stelele — cont neobligatoriu', img: 'rate-spot.png', svg: 'SvgRateSpot' },
+          ]},
+        ],
+      },
+      {
+        category: 'Navigare',
+        items: [
+          { q: 'Cum navighez la un spot?', a: 'Deschide detaliile unui spot și atinge Navighează aici. Alege modul de transport și pornește navigarea cu instrucțiuni vocale.', steps: [
+            { label: 'Deschide un spot și atinge Navighează aici', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+            { label: 'Alege Mașină, Bicicletă sau Pe jos — apoi Pornire navigare', img: 'navigate.png', svg: 'SvgNavigate' },
+            { label: 'Schimbă modul de transport oricând', img: 'route-modes.png', svg: 'SvgRouteModes' },
+          ]},
+          { q: 'Recalculează ruta automat?', a: 'Da. La o abatere mai mare de 80 m, SpotFinder recalculează automat de la poziția ta și anunță "Recalculare rută" în limba ta.', steps: null },
+        ],
+      },
+      {
+        category: 'Hartă și trafic',
+        items: [
+          { q: 'Cum schimb stilul hărții?', a: 'Atinge butonul Straturi din colțul stânga jos. Alege între De bază, Exterior, Satelit, Iarnă sau Trafic.', steps: [
+            { label: 'Atinge butonul Straturi pentru selectorul de stil', img: 'map-layers.png', svg: 'SvgMapLayers' },
+          ]},
+          { q: 'Ce arată stratul Trafic?', a: 'Flux de trafic în timp real (verde = liber, galben = lent, roșu = congestionat) plus marcatori de închideri (⛔) și ambuteiaje (🚦).', steps: [
+            { label: 'Treci la vizualizarea Trafic pentru date live', img: 'traffic-layer.png', svg: 'SvgTrafficLayer' },
+          ]},
+        ],
+      },
+      {
+        category: 'Partajare',
+        items: [
+          { q: 'Cum partajez un spot?', a: 'Deschide detaliile unui spot și atinge Distribuie. Pe mobil se deschide meniul nativ, pe desktop se copiază un link.', steps: [
+            { label: 'Deschide un spot și atinge Distribuie (↑)', img: 'share.png', svg: 'SvgShare' },
+          ]},
+        ],
+      },
     ],
-    about: { title: 'Despre SpotFinder', desc: 'SpotFinder este o aplicație de hartă comunitară gratuită pentru descoperirea locurilor utile — de la parcări ascunse la priveliști panoramice. Oricine poate contribui.', features: ['Gratuit — fără abonament', 'Utilizabil ca vizitator — fără cont', 'Adaugă, evaluează, navighează și distribuie spoturi', 'Dictare vocală în 12 limbi', 'Trafic și închideri de drumuri în timp real', 'Navigare vocală pentru mașină, bicicletă și pietoni'], built: 'Construit cu React, Leaflet, Firebase și OSRM.', version: 'Versiunea 2.1' }
+    about: { title: 'Despre SpotFinder', desc: 'SpotFinder este o aplicație de hartă comunitară gratuită pentru descoperirea locurilor utile. Oricine poate contribui.', features: ['Gratuit — fără abonament', 'Utilizabil ca vizitator — fără cont', 'Adaugă, evaluează, navighează și distribuie spoturi', 'Dictare vocală în 13 limbi', 'Trafic și închideri de drumuri în timp real', 'Navigare vocală pentru mașină, bicicletă și pietoni'], built: 'Construit cu React, Leaflet, Firebase și OSRM.', version: 'Versiunea 2.1' },
   },
 
   es: {
     sections: [
-      { category: 'Primeros pasos', items: [
-        { q: '¿Qué es SpotFinder?', a: 'SpotFinder es una app de mapas comunitaria gratuita para descubrir lugares útiles — aparcamientos, miradores, áreas de descanso y más. Cualquiera puede añadir spots sin cuenta.', steps: null },
-        { q: '¿Necesito una cuenta?', a: '¡No! Como invitado puedes explorar el mapa, añadir spots y valorarlos. Una cuenta permite gestionar tus spots.', steps: null },
-      ]},
-      { category: 'Añadir spots', items: [
-        { q: '¿Cómo añado un spot?', a: 'Sigue estos 5 pasos:', steps: [
-          { label: 'Toca el botón verde + en la parte inferior de la pantalla', svg: <SvgPlusButton /> },
-          { label: 'El mapa entra en modo añadir — toca cualquier lugar del mapa', svg: <SvgTapMap /> },
-          { label: 'Rellena la descripción y las estrellas de Aparcamiento, Paisaje y Privacidad', svg: <SvgFillForm /> },
-          { label: 'Opcionalmente añade una foto tocando el área de la cámara', svg: <SvgAddPhoto /> },
-          { label: 'Toca Guardar spot — aparece inmediatamente en el mapa para todos', svg: <SvgSpotAppears /> },
-        ]},
-        { q: '¿Puedo usar voz para la descripción?', a: 'Sí. Toca el botón Voz junto al campo de descripción. El micrófono escucha en el idioma configurado en Ajustes. Toca de nuevo para detener.', steps: [{ label: 'Toca el botón Voz junto al campo de descripción', svg: <SvgVoice /> }]},
-      ]},
-      { category: 'Valorar spots', items: [
-        { q: '¿Cómo valoro un spot?', a: 'Cualquiera puede valorar — incluso invitados. Toca un spot, luego las estrellas en el panel de detalles.', steps: [
-          { label: 'Toca un marcador de spot para abrir los detalles', svg: <SvgOpenDetail /> },
-          { label: 'Toca las estrellas — no se requiere cuenta', svg: <SvgRateSpot /> },
-        ]},
-      ]},
-      { category: 'Navegación', items: [
-        { q: '¿Cómo navego a un spot?', a: 'Abre el detalle de un spot y toca Navegar aquí. Elige el modo de desplazamiento y toca Iniciar navegación.', steps: [
-          { label: 'Abre un spot y toca Navegar aquí', svg: <SvgOpenDetail /> },
-          { label: 'Elige Coche, Bici o A pie — luego Iniciar navegación', svg: <SvgNavigate /> },
-          { label: 'Cambia el modo de transporte en cualquier momento', svg: <SvgRouteModes /> },
-        ]},
-      ]},
-      { category: 'Compartir', items: [
-        { q: '¿Cómo comparto un spot?', a: 'Abre el detalle de un spot y toca Compartir. En móvil se abre el menú nativo, en escritorio se copia el enlace.', steps: [{ label: 'Abre un spot y toca Compartir (↑)', svg: <SvgShare /> }]},
-      ]},
+      {
+        category: 'Primeros pasos',
+        items: [
+          { q: '¿Qué es SpotFinder?', a: 'SpotFinder es una app de mapas comunitaria gratuita para descubrir lugares útiles — aparcamientos, miradores, áreas de descanso y más. Cualquiera puede añadir spots sin cuenta.', steps: null },
+          { q: '¿Necesito una cuenta?', a: '¡No! Como invitado puedes explorar el mapa, añadir spots y valorarlos. Una cuenta permite gestionar tus spots.', steps: null },
+        ],
+      },
+      {
+        category: 'Añadir spots',
+        items: [
+          { q: '¿Cómo añado un spot?', a: 'Sigue estos 5 pasos:', steps: [
+            { label: 'Toca el botón verde + en la parte inferior de la pantalla', img: 'plus-button.png', svg: 'SvgPlusButton' },
+            { label: 'El mapa entra en modo añadir — toca cualquier lugar del mapa', img: 'tap-map.png', svg: 'SvgTapMap' },
+            { label: 'Rellena la descripción y las estrellas de Aparcamiento, Paisaje y Privacidad', img: 'fill-form.png', svg: 'SvgFillForm' },
+            { label: 'Opcionalmente añade una foto tocando el área de la cámara', img: 'add-photo.png', svg: 'SvgAddPhoto' },
+            { label: 'Toca Guardar spot — aparece inmediatamente en el mapa para todos', img: 'spot-appears.png', svg: 'SvgSpotAppears' },
+          ]},
+          { q: '¿Puedo usar voz para la descripción?', a: 'Sí. Toca el botón Voz junto al campo de descripción. El micrófono escucha en el idioma configurado en Ajustes. Las palabras aparecen en directo. Toca de nuevo para detener.', steps: [
+            { label: 'Toca el botón Voz junto al campo de descripción', img: 'voice.png', svg: 'SvgVoice' },
+          ]},
+        ],
+      },
+      {
+        category: 'Valorar spots',
+        items: [
+          { q: '¿Cómo valoro un spot?', a: 'Cualquiera puede valorar — incluso invitados. Toca un spot, luego las estrellas en el panel de detalles. Valoración general más Aparcamiento, Belleza y Privacidad.', steps: [
+            { label: 'Toca un marcador de spot para abrir los detalles', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+            { label: 'Toca las estrellas — no se requiere cuenta', img: 'rate-spot.png', svg: 'SvgRateSpot' },
+          ]},
+        ],
+      },
+      {
+        category: 'Navegación',
+        items: [
+          { q: '¿Cómo navego a un spot?', a: 'Abre el detalle de un spot y toca Navegar aquí. Elige el modo de desplazamiento y toca Iniciar navegación con instrucciones de voz.', steps: [
+            { label: 'Abre un spot y toca Navegar aquí', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+            { label: 'Elige Coche, Bici o A pie — luego Iniciar navegación', img: 'navigate.png', svg: 'SvgNavigate' },
+            { label: 'Cambia el modo de transporte en cualquier momento', img: 'route-modes.png', svg: 'SvgRouteModes' },
+          ]},
+          { q: '¿Recalcula la ruta automáticamente?', a: 'Sí. Si te desvías más de 80 m, SpotFinder recalcula automáticamente desde tu posición y anuncia "Recalculando ruta" en tu idioma.', steps: null },
+        ],
+      },
+      {
+        category: 'Mapa y tráfico',
+        items: [
+          { q: '¿Cómo cambio el estilo del mapa?', a: 'Toca el botón Capas en la esquina inferior izquierda. Elige entre Básico, Exterior, Satélite, Invierno o Tráfico.', steps: [
+            { label: 'Toca el botón Capas para abrir el selector de estilo', img: 'map-layers.png', svg: 'SvgMapLayers' },
+          ]},
+          { q: '¿Qué muestra la capa de Tráfico?', a: 'Flujo de tráfico en tiempo real (verde = libre, amarillo = lento, rojo = atasco) más marcadores de cortes (⛔) y atascos (🚦).', steps: [
+            { label: 'Cambia a la vista Tráfico para ver las condiciones en directo', img: 'traffic-layer.png', svg: 'SvgTrafficLayer' },
+          ]},
+        ],
+      },
+      {
+        category: 'Compartir',
+        items: [
+          { q: '¿Cómo comparto un spot?', a: 'Abre el detalle de un spot y toca Compartir. En móvil se abre el menú nativo, en escritorio se copia el enlace.', steps: [
+            { label: 'Abre un spot y toca Compartir (↑)', img: 'share.png', svg: 'SvgShare' },
+          ]},
+        ],
+      },
     ],
-    about: { title: 'Acerca de SpotFinder', desc: 'SpotFinder es una app de mapas comunitaria gratuita para descubrir lugares útiles — desde aparcamientos ocultos hasta miradores panorámicos. Cualquiera puede contribuir.', features: ['Gratis — sin suscripción', 'Funciona como invitado — sin cuenta', 'Añade, valora, navega y comparte spots', 'Dictado por voz en 12 idiomas', 'Tráfico y cortes de carretera en tiempo real', 'Navegación por voz para coche, bici y peatones'], built: 'Desarrollado con React, Leaflet, Firebase y OSRM.', version: 'Versión 2.1' }
+    about: { title: 'Acerca de SpotFinder', desc: 'SpotFinder es una app de mapas comunitaria gratuita para descubrir lugares útiles. Cualquiera puede contribuir.', features: ['Gratis — sin suscripción', 'Funciona como invitado — sin cuenta', 'Añade, valora, navega y comparte spots', 'Dictado por voz en 13 idiomas', 'Tráfico y cortes de carretera en tiempo real', 'Navegación por voz para coche, bici y peatones'], built: 'Desarrollado con React, Leaflet, Firebase y OSRM.', version: 'Versión 2.1' },
   },
+
   bg: {
     sections: [
       {
@@ -1077,63 +1335,107 @@ const FAQ_CONTENT = {
         items: [
           { q: 'Какво е SpotFinder?', a: 'SpotFinder е безплатно приложение с карти за споделяне на полезни места — паркинги, гледки, места за почивка и още. Всеки може да добавя спотове без регистрация.', steps: null },
           { q: 'Нужен ли ми е акаунт?', a: 'Не! Като гост можете да разглеждате картата, да добавяте спотове и да ги оценявате. Акаунтът позволява управление на вашите спотове.', steps: null },
-        ]
+        ],
       },
       {
         category: 'Добавяне на спотове',
         items: [
           { q: 'Как да добавя спот?', a: 'Следвайте тези 5 стъпки:', steps: [
-            { label: 'Докоснете зеления бутон + в долната част на екрана', svg: <SvgPlusButton /> },
-            { label: 'Картата влиза в режим на добавяне — докоснете навсякъде на картата', svg: <SvgTapMap /> },
-            { label: 'Попълнете описание и задайте звезди за Паркинг, Красота и Уединение', svg: <SvgFillForm /> },
-            { label: 'По желание добавете снимка като докоснете зоната на камерата', svg: <SvgAddPhoto /> },
-            { label: 'Докоснете Запази спот — той веднага се появява на картата', svg: <SvgSpotAppears /> },
+            { label: 'Докоснете зеления бутон + в долната част на екрана', img: 'plus-button.png', svg: 'SvgPlusButton' },
+            { label: 'Картата влиза в режим на добавяне — докоснете навсякъде', img: 'tap-map.png', svg: 'SvgTapMap' },
+            { label: 'Попълнете описание и задайте звезди за Паркинг, Красота и Уединение', img: 'fill-form.png', svg: 'SvgFillForm' },
+            { label: 'По желание добавете снимка като докоснете зоната на камерата', img: 'add-photo.png', svg: 'SvgAddPhoto' },
+            { label: 'Докоснете Запази спот — той веднага се появява на картата', img: 'spot-appears.png', svg: 'SvgSpotAppears' },
           ]},
-          { q: 'Мога ли да използвам глас за описание?', a: 'Да! Докоснете бутона Глас до полето за описание. Микрофонът слуша на езика, зададен в Настройки. Докоснете отново за спиране.', steps: [{ label: 'Докоснете бутона за глас до полето за описание', svg: <SvgVoice /> }]},
-        ]
+          { q: 'Мога ли да използвам глас за описание?', a: 'Да! Докоснете бутона Глас до полето за описание. Микрофонът слуша на езика, зададен в Настройки. Думите ви се появяват в реално време. Докоснете отново за спиране.', steps: [
+            { label: 'Докоснете бутона Глас до полето за описание', img: 'voice.png', svg: 'SvgVoice' },
+          ]},
+        ],
       },
       {
         category: 'Оценяване',
         items: [
-          { q: 'Как да оценя спот?', a: 'Всеки може да оценява — включително гости. Докоснете спот на картата, после звездите в панела с детайли.', steps: [
-            { label: 'Докоснете маркер на спот за отваряне на детайлите', svg: <SvgOpenDetail /> },
-            { label: 'Докоснете звездите — не е нужен акаунт', svg: <SvgRateSpot /> },
+          { q: 'Как да оценя спот?', a: 'Всеки може да оценява — включително гости. Докоснете спот на картата, после звездите в панела с детайли. Обща оценка плюс Паркинг, Красота и Уединение.', steps: [
+            { label: 'Докоснете маркер на спот за отваряне на детайлите', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+            { label: 'Докоснете звездите — не е нужен акаунт', img: 'rate-spot.png', svg: 'SvgRateSpot' },
           ]},
-        ]
+        ],
       },
       {
         category: 'Навигация',
         items: [
-          { q: 'Как да навигирам до спот?', a: 'Отворете детайлите на спот и докоснете Навигирай тук. Изберете режим на транспорт и стартирайте навигацията.', steps: [
-            { label: 'Отворете спот и докоснете Навигирай тук', svg: <SvgOpenDetail /> },
-            { label: 'Изберете Кола, Велосипед или Пешком — след това Стартирай навигацията', svg: <SvgNavigate /> },
+          { q: 'Как да навигирам до спот?', a: 'Отворете детайлите на спот и докоснете Навигирай тук. Изберете режим на транспорт и стартирайте навигацията с гласови инструкции.', steps: [
+            { label: 'Отворете спот и докоснете Навигирай тук', img: 'open-detail.png', svg: 'SvgOpenDetail' },
+            { label: 'Изберете Кола, Велосипед или Пешком — след това Стартирай навигацията', img: 'navigate.png', svg: 'SvgNavigate' },
+            { label: 'Превключвайте режима на транспорт по всяко време', img: 'route-modes.png', svg: 'SvgRouteModes' },
           ]},
-        ]
+          { q: 'Преизчислява ли маршрута автоматично?', a: 'Да. При отклонение над 80 м, SpotFinder автоматично преизчислява от текущата позиция и обявява "Преизчислявам маршрута" на вашия език.', steps: null },
+        ],
       },
       {
         category: 'Карта и трафик',
         items: [
-          { q: 'Как да сменя стила на картата?', a: 'Докоснете бутона Слоеве в долния ляв ъгъл на картата. Изберете Основна, Природа, Сателит, Зимна или Трафик.', steps: [{ label: 'Докоснете бутона Слоеве за избор на стил', svg: <SvgMapLayers /> }]},
-          { q: 'Какво показва слоят Трафик?', a: 'Трафик в реално време (зелено = свободно, жълто = бавно, червено = задръстване) плюс икони за затворени пътища (⛔) и задръствания (🚦).', steps: [{ label: 'Превключете на слоя Трафик за живо показване', svg: <SvgTrafficLayer /> }]},
-        ]
+          { q: 'Как да сменя стила на картата?', a: 'Докоснете бутона Слоеве в долния ляв ъгъл. Изберете Основна, Природа, Сателит, Зимна или Трафик.', steps: [
+            { label: 'Докоснете бутона Слоеве за избор на стил', img: 'map-layers.png', svg: 'SvgMapLayers' },
+          ]},
+          { q: 'Какво показва слоят Трафик?', a: 'Трафик в реално време (зелено = свободно, жълто = бавно, червено = задръстване) плюс икони за затворени пътища (⛔) и задръствания (🚦).', steps: [
+            { label: 'Превключете на слоя Трафик за живо показване', img: 'traffic-layer.png', svg: 'SvgTrafficLayer' },
+          ]},
+        ],
       },
       {
         category: 'Споделяне',
         items: [
-          { q: 'Как да споделя спот?', a: 'Отворете детайлите на спот и докоснете Сподели. На мобилно устройство се отваря нативното меню за споделяне, на компютър се копира връзка.', steps: [{ label: 'Отворете спот и докоснете Сподели (↑)', svg: <SvgShare /> }]},
-        ]
+          { q: 'Как да споделя спот?', a: 'Отворете детайлите на спот и докоснете Сподели. На мобилно устройство се отваря нативното меню за споделяне, на компютър се копира връзка.', steps: [
+            { label: 'Отворете спот и докоснете Сподели (↑)', img: 'share.png', svg: 'SvgShare' },
+          ]},
+        ],
       },
     ],
-    about: {
-      title: 'За SpotFinder',
-      desc: 'SpotFinder е безплатно приложение за карти, което помага на хората да открият и споделят полезни места — от скрити паркинги до красиви гледки. Всеки може да добавя спотове без акаунт.',
-      features: ['Безплатно — без абонамент', 'Работи като гост — без акаунт', 'Добавяй, оценявай, навигирай и споделяй спотове', 'Гласово диктуване на 13 езика', 'Трафик и затворени пътища в реално време', 'Гласова навигация за кола, велосипед и пешеходци'],
-      built: 'Изградено с React, Leaflet, Firebase и OSRM.',
-      version: 'Версия 2.1',
-    }
+    about: { title: 'За SpotFinder', desc: 'SpotFinder е безплатно приложение за карти, което помага на хората да открият и споделят полезни места. Всеки може да добавя спотове без акаунт.', features: ['Безплатно — без абонамент', 'Работи като гост — без акаунт', 'Добавяй, оценявай, навигирай и споделяй спотове', 'Гласово диктуване на 13 езика', 'Трафик и затворени пътища в реално време', 'Гласова навигация за кола, велосипед и пешеходци'], built: 'Изградено с React, Leaflet, Firebase и OSRM.', version: 'Версия 2.1' },
   },
-
 };
+
+
+// SVG fallback components (shown when /public/faq/*.png images are not yet added)
+const SVG_FALLBACKS = { SvgPlusButton, SvgTapMap, SvgFillForm, SvgAddPhoto, SvgSpotAppears,
+  SvgOpenDetail, SvgRateSpot, SvgNavigate, SvgRouteModes, SvgVoice, SvgShare, SvgMapLayers, SvgTrafficLayer };
+
+function StepImage({ img, svgName }) {
+  const [useSvg, setUseSvg] = React.useState(false);
+  const Fallback = SVG_FALLBACKS[svgName];
+  if (useSvg || !img) return Fallback ? <Fallback /> : null;
+  return (
+    <img
+      src={`${FAQ_IMG_BASE}${img}`}
+      alt=""
+      className="w-full rounded-xl object-cover"
+      style={{ maxHeight: 220 }}
+      onError={() => setUseSvg(true)}
+    />
+  );
+}
+
+// ─── Reusable step-by-step guide component ───────────────────────────────────
+function StepGuide({ steps }) {
+  return (
+    <div className="mt-4 space-y-3">
+      {steps.map((step, i) => (
+        <div key={i} className="flex gap-3 items-start">
+          <div className="flex-shrink-0 w-7 h-7 rounded-full bg-blue-500 text-white text-xs font-bold flex items-center justify-center mt-0.5">
+            {i + 1}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-gray-800 dark:text-foreground mb-2">{step.label}</p>
+            <div className="rounded-2xl overflow-hidden border border-gray-100 dark:border-border bg-gray-50 dark:bg-accent/30">
+              <StepImage img={step.img} svgName={step.svg} />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // ─── Accordion item with step-by-step guide ───────────────────────────────────
 function AccordionItem({ q, a, steps }) {
@@ -1197,6 +1499,118 @@ function AboutSection({ data }) {
   );
 }
 
+// ─── Feedback section ─────────────────────────────────────────────────────────
+// Uses Web3Forms (https://web3forms.com) — free, no server needed, real delivery.
+// Access key is public by design (rate-limited per domain by Web3Forms).
+const WEB3FORMS_KEY = '0e1db307-3d53-43d8-9a87-c7c3f09be9b2';
+
+const FEEDBACK_LABELS = {
+  en:  { title: 'Send Feedback', emailLabel: 'Your email (optional)', emailPh: 'you@example.com', msgLabel: 'Your message', msgPh: 'Tell us what you think, report a bug, or suggest a feature…', send: 'Send Feedback', sending: 'Sending…', sent: 'Thank you! Message received.', error: 'Could not send — please email us directly at redm1234@outlook.cz', required: 'Please write a message first.' },
+  cs:  { title: 'Napsat zpětnou vazbu', emailLabel: 'Váš e-mail (volitelné)', emailPh: 'vy@priklad.cz', msgLabel: 'Vaše zpráva', msgPh: 'Řekněte nám co si myslíte, nahlaste chybu nebo navrhněte funkci…', send: 'Odeslat', sending: 'Odesílám…', sent: 'Děkujeme! Zpráva doručena.', error: 'Odesílání se nezdařilo — napište nám přímo na redm1234@outlook.cz', required: 'Nejprve napište zprávu.' },
+  de:  { title: 'Feedback senden', emailLabel: 'Ihre E-Mail (optional)', emailPh: 'sie@beispiel.de', msgLabel: 'Ihre Nachricht', msgPh: 'Was denken Sie? Fehler melden oder Funktion vorschlagen…', send: 'Senden', sending: 'Wird gesendet…', sent: 'Danke! Nachricht erhalten.', error: 'Senden fehlgeschlagen — schreiben Sie direkt an redm1234@outlook.cz', required: 'Bitte zuerst eine Nachricht schreiben.' },
+  pl:  { title: 'Wyślij opinię', emailLabel: 'Twój email (opcjonalnie)', emailPh: 'ty@przyklad.pl', msgLabel: 'Twoja wiadomość', msgPh: 'Co myślisz? Zgłoś błąd lub zaproponuj funkcję…', send: 'Wyślij', sending: 'Wysyłanie…', sent: 'Dziękujemy! Wiadomość odebrana.', error: 'Nie można wysłać — napisz bezpośrednio na redm1234@outlook.cz', required: 'Najpierw napisz wiadomość.' },
+  sk:  { title: 'Odoslať spätnú väzbu', emailLabel: 'Váš e-mail (voliteľné)', emailPh: 'vy@priklad.sk', msgLabel: 'Vaša správa', msgPh: 'Čo si myslíte? Nahláste chybu alebo navrhujte funkciu…', send: 'Odoslať', sending: 'Odosielam…', sent: 'Ďakujeme! Správa doručená.', error: 'Odoslanie zlyhalo — napíšte nám priamo na redm1234@outlook.cz', required: 'Najprv napíšte správu.' },
+  it:  { title: 'Invia feedback', emailLabel: 'La tua email (opzionale)', emailPh: 'tu@esempio.it', msgLabel: 'Il tuo messaggio', msgPh: 'Cosa pensi? Segnala un bug o suggerisci una funzione…', send: 'Invia', sending: 'Invio…', sent: 'Grazie! Messaggio ricevuto.', error: 'Invio non riuscito — scrivi direttamente a redm1234@outlook.cz', required: 'Scrivi prima un messaggio.' },
+  fr:  { title: 'Envoyer un retour', emailLabel: 'Votre e-mail (optionnel)', emailPh: 'vous@exemple.fr', msgLabel: 'Votre message', msgPh: 'Dites-nous ce que vous pensez, signalez un bug ou suggérez une fonction…', send: 'Envoyer', sending: 'Envoi…', sent: 'Merci ! Message reçu.', error: 'Envoi échoué — écrivez-nous directement à redm1234@outlook.cz', required: "Veuillez d'abord écrire un message." },
+  ru:  { title: 'Отправить отзыв', emailLabel: 'Ваш e-mail (необязательно)', emailPh: 'вы@пример.ру', msgLabel: 'Ваше сообщение', msgPh: 'Расскажите, что думаете, сообщите об ошибке или предложите функцию…', send: 'Отправить', sending: 'Отправка…', sent: 'Спасибо! Сообщение получено.', error: 'Не удалось отправить — напишите нам напрямую: redm1234@outlook.cz', required: 'Сначала напишите сообщение.' },
+  uk:  { title: 'Надіслати відгук', emailLabel: 'Ваш e-mail (необов'язково)', emailPh: 'ви@приклад.уа', msgLabel: 'Ваше повідомлення', msgPh: 'Розкажіть, що думаєте, повідомте про помилку або запропонуйте функцію…', send: 'Надіслати', sending: 'Надсилання…', sent: 'Дякуємо! Повідомлення отримано.', error: 'Не вдалося надіслати — напишіть нам: redm1234@outlook.cz', required: 'Спочатку напишіть повідомлення.' },
+  hu:  { title: 'Visszajelzés küldése', emailLabel: 'Az e-mail-ed (opcionális)', emailPh: 'te@pelda.hu', msgLabel: 'Az üzeneted', msgPh: 'Mit gondolsz? Jelents hibát vagy javasolj funkciót…', send: 'Küldés', sending: 'Küldés…', sent: 'Köszönjük! Üzenet megérkezett.', error: 'Küldés sikertelen — írj közvetlenül: redm1234@outlook.cz', required: 'Kérlek, írj előbb üzenetet.' },
+  ro:  { title: 'Trimite feedback', emailLabel: 'Email-ul tău (opțional)', emailPh: 'tu@exemplu.ro', msgLabel: 'Mesajul tău', msgPh: 'Spune-ne ce crezi, raportează un bug sau sugerează o funcție…', send: 'Trimite', sending: 'Se trimite…', sent: 'Mulțumim! Mesaj primit.', error: 'Trimitere eșuată — scrie-ne direct la redm1234@outlook.cz', required: 'Te rugăm să scrii mai întâi un mesaj.' },
+  es:  { title: 'Enviar comentarios', emailLabel: 'Tu email (opcional)', emailPh: 'tu@ejemplo.es', msgLabel: 'Tu mensaje', msgPh: '¿Qué opinas? Reporta un error o sugiere una función…', send: 'Enviar', sending: 'Enviando…', sent: '¡Gracias! Mensaje recibido.', error: 'No se pudo enviar — escríbenos directamente a redm1234@outlook.cz', required: 'Por favor escribe un mensaje primero.' },
+  bg:  { title: 'Изпрати обратна връзка', emailLabel: 'Вашият имейл (незадължително)', emailPh: 'вие@пример.бг', msgLabel: 'Вашето съобщение', msgPh: 'Споделете мнение, съобщете за грешка или предложете функция…', send: 'Изпрати', sending: 'Изпращане…', sent: 'Благодарим! Съобщението е получено.', error: 'Изпращането не успя — пишете ни директно на redm1234@outlook.cz', required: 'Моля напишете съобщение първо.' },
+};
+
+function FeedbackSection({ language }) {
+  const labels = FEEDBACK_LABELS[language] || FEEDBACK_LABELS.en;
+  const [email, setEmail] = useState('');
+  const [msg, setMsg] = useState('');
+  const [status, setStatus] = useState('idle'); // idle | sending | sent | error
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!msg.trim()) { setStatus('required'); return; }
+    setStatus('sending');
+    try {
+      const res = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          access_key: WEB3FORMS_KEY,
+          subject: 'SpotFinder Feedback',
+          from_name: 'SpotFinder User',
+          email: email || 'anonymous@spotfinder.app',
+          message: msg,
+        }),
+      });
+      const data = await res.json();
+      setStatus(data.success ? 'sent' : 'error');
+      if (data.success) { setEmail(''); setMsg(''); }
+    } catch (_) {
+      setStatus('error');
+    }
+  };
+
+  return (
+    <div className="rounded-2xl overflow-hidden border border-purple-100 dark:border-purple-900/40">
+      <div className="px-5 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 flex items-center gap-3">
+        <MessageSquare className="w-5 h-5 text-white flex-shrink-0" />
+        <h2 className="text-lg font-bold text-white">{labels.title}</h2>
+      </div>
+      <div className="px-5 py-4 bg-white dark:bg-card space-y-3">
+        {status === 'sent' && (
+          <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-xl text-green-700 dark:text-green-400 text-sm font-semibold">
+            <Send className="w-4 h-4 flex-shrink-0" />
+            {labels.sent}
+          </div>
+        )}
+        {status === 'error' && (
+          <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-xl text-red-600 dark:text-red-400 text-sm">
+            {labels.error}
+          </div>
+        )}
+        {status === 'required' && (
+          <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl text-amber-700 dark:text-amber-400 text-sm">
+            {labels.required}
+          </div>
+        )}
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 dark:text-muted-foreground mb-1">{labels.emailLabel}</label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder={labels.emailPh}
+              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-border bg-gray-50 dark:bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-purple-400"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 dark:text-muted-foreground mb-1">{labels.msgLabel}</label>
+            <textarea
+              value={msg}
+              onChange={e => { setMsg(e.target.value); if (status === 'required') setStatus('idle'); }}
+              placeholder={labels.msgPh}
+              rows={4}
+              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-border bg-gray-50 dark:bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={status === 'sending'}
+            className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors"
+          >
+            {status === 'sending'
+              ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />{labels.sending}</>
+              : <><Send className="w-4 h-4" />{labels.send}</>
+            }
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+
 // ─── Main FAQ page ────────────────────────────────────────────────────────────
 export default function FAQ() {
   const navigate = useNavigate();
@@ -1239,6 +1653,9 @@ export default function FAQ() {
 
         {/* About section */}
         <AboutSection data={content.about} />
+
+        {/* Feedback */}
+        <FeedbackSection language={language} />
       </div>
     </div>
   );

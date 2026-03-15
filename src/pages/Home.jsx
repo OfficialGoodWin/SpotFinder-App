@@ -36,12 +36,18 @@ const TOMTOM_API_KEY = import.meta.env.VITE_TOMTOM_API_KEY || '';
  
 // ── Base tile URLs ────────────────────────────────────────────────────────────
 // Light tiles (default)
+// Mapy.cz: use 512px tiles + zoomOffset=-1 for crisp HiDPI rendering.
+// Leaflet requests z-1 tiles at 512px and fills one 256-CSS-pixel slot,
+// meaning you always get richer detail (one zoom level ahead) downscaled
+// rather than coarser tiles upscaled — eliminates blur at every zoom level.
+const MAPY_TILE_PROPS = { tileSize: 512, zoomOffset: -1 };
+
 const LIGHT_TILES = {
-  basic:   `https://api.mapy.com/v1/maptiles/basic/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
-  outdoor: `https://api.mapy.com/v1/maptiles/outdoor/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
-  aerial:  `https://api.mapy.com/v1/maptiles/aerial/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
-  winter:  `https://api.mapy.com/v1/maptiles/winter/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
-  traffic: `https://api.mapy.com/v1/maptiles/basic/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
+  basic:   `https://api.mapy.com/v1/maptiles/basic/512/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
+  outdoor: `https://api.mapy.com/v1/maptiles/outdoor/512/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
+  aerial:  `https://api.mapy.com/v1/maptiles/aerial/512/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
+  winter:  `https://api.mapy.com/v1/maptiles/winter/512/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
+  traffic: `https://api.mapy.com/v1/maptiles/basic/512/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
 };
  
 // Dark tiles — CartoDB Dark Matter (free, no API key required)
@@ -49,8 +55,8 @@ const LIGHT_TILES = {
 const DARK_TILES = {
   basic:   'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
   outdoor: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-  aerial:  `https://api.mapy.com/v1/maptiles/aerial/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
-  winter:  `https://api.mapy.com/v1/maptiles/winter/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
+  aerial:  `https://api.mapy.com/v1/maptiles/aerial/512/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
+  winter:  `https://api.mapy.com/v1/maptiles/winter/512/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
   traffic: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
 };
  
@@ -340,11 +346,12 @@ export default function Home() {
           attribution={useCartoTile
             ? '&copy; <a href="https://carto.com">CARTO</a> &copy; <a href="https://osm.org/copyright">OpenStreetMap</a>'
             : '&copy; <a href="https://mapy.com">Mapy.cz</a>'}
+          {...(!useCartoTile ? MAPY_TILE_PROPS : {})}
           maxZoom={20}
-          maxNativeZoom={useCartoTile ? 19 : 19}
+          maxNativeZoom={useCartoTile ? 19 : 18}
           keepBuffer={4}
           updateWhenIdle={false}
-          updateWhenZooming={false}
+          updateWhenZooming={true}
           crossOrigin="anonymous"
           errorTileUrl="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
         />
@@ -362,7 +369,7 @@ export default function Home() {
             zIndex={200}
             keepBuffer={4}
             updateWhenIdle={false}
-            updateWhenZooming={false}
+            updateWhenZooming={true}
             crossOrigin="anonymous"
             errorTileUrl="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
           />
