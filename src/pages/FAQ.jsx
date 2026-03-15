@@ -536,7 +536,7 @@ const FAQ_CONTENT = {
         items: [
           {
             q: 'How do I navigate to a spot?',
-            a: 'Open a spot's detail and tap Navigate Here. Choose your travel mode, then tap Start Navigation for turn-by-turn voice directions.',
+            a: 'Open a spot\'s detail and tap Navigate Here. Choose your travel mode, then tap Start Navigation for turn-by-turn voice directions.',
             steps: [
               { label: 'Open any spot and tap the Navigate Here button', img: 'open-detail.png', svg: 'SvgOpenDetail' },
               { label: 'Choose Drive, Bike, or Walk — then tap Start Navigation', img: 'navigate.png', svg: 'SvgNavigate' },
@@ -864,16 +864,16 @@ const FAQ_CONTENT = {
       {
         category: 'Premiers pas',
         items: [
-          { q: 'Qu'est-ce que SpotFinder ?', a: 'SpotFinder est une application de carte communautaire gratuite pour découvrir des spots utiles — parkings, points de vue, aires de repos et plus. Tout le monde peut ajouter des spots sans compte.', steps: null },
-          { q: 'Ai-je besoin d'un compte ?', a: 'Non ! En tant qu'invité, vous pouvez parcourir la carte, ajouter des spots et les noter. Un compte permet de gérer vos spots.', steps: null },
+          { q: 'Qu\'est-ce que SpotFinder ?', a: 'SpotFinder est une application de carte communautaire gratuite pour découvrir des spots utiles — parkings, points de vue, aires de repos et plus. Tout le monde peut ajouter des spots sans compte.', steps: null },
+          { q: 'Ai-je besoin d\'un compte ?', a: 'Non ! En tant qu\'invité, vous pouvez parcourir la carte, ajouter des spots et les noter. Un compte permet de gérer vos spots.', steps: null },
         ],
       },
       {
         category: 'Ajouter des spots',
         items: [
           { q: 'Comment ajouter un spot ?', a: 'Suivez ces 5 étapes :', steps: [
-            { label: 'Appuyez sur le bouton vert + en bas de l'écran', img: 'plus-button.png', svg: 'SvgPlusButton' },
-            { label: 'La carte passe en mode ajout — appuyez n'importe où', img: 'tap-map.png', svg: 'SvgTapMap' },
+            { label: 'Appuyez sur le bouton vert + en bas de l\'écran', img: 'plus-button.png', svg: 'SvgPlusButton' },
+            { label: 'La carte passe en mode ajout — appuyez n\'importe où', img: 'tap-map.png', svg: 'SvgTapMap' },
             { label: 'Remplissez la description et les étoiles pour Stationnement, Paysage et Confidentialité', img: 'fill-form.png', svg: 'SvgFillForm' },
             { label: 'Ajoutez optionnellement une photo en appuyant sur la zone appareil photo', img: 'add-photo.png', svg: 'SvgAddPhoto' },
             { label: 'Appuyez sur Enregistrer le spot — il apparaît immédiatement sur la carte', img: 'spot-appears.png', svg: 'SvgSpotAppears' },
@@ -895,12 +895,12 @@ const FAQ_CONTENT = {
       {
         category: 'Navigation',
         items: [
-          { q: 'Comment naviguer vers un spot ?', a: 'Ouvrez le détail d'un spot et appuyez sur Naviguer ici. Choisissez votre mode de déplacement, puis démarrez la navigation.', steps: [
+          { q: 'Comment naviguer vers un spot ?', a: 'Ouvrez le détail d\'un spot et appuyez sur Naviguer ici. Choisissez votre mode de déplacement, puis démarrez la navigation.', steps: [
             { label: 'Ouvrez un spot et appuyez sur Naviguer ici', img: 'open-detail.png', svg: 'SvgOpenDetail' },
             { label: 'Choisissez Voiture, Vélo ou À pied — puis Démarrer la navigation', img: 'navigate.png', svg: 'SvgNavigate' },
             { label: 'Changez de mode de transport à tout moment', img: 'route-modes.png', svg: 'SvgRouteModes' },
           ]},
-          { q: 'Recalcule-t-il l'itinéraire automatiquement ?', a: 'Oui. En cas d'écart de plus de 80 m, SpotFinder recalcule automatiquement depuis votre position et annonce "Recalcul" dans votre langue.', steps: null },
+          { q: 'Recalcule-t-il l\'itinéraire automatiquement ?', a: 'Oui. En cas d\'écart de plus de 80 m, SpotFinder recalcule automatiquement depuis votre position et annonce "Recalcul" dans votre langue.', steps: null },
         ],
       },
       {
@@ -909,7 +909,7 @@ const FAQ_CONTENT = {
           { q: 'Comment changer le style de carte ?', a: 'Appuyez sur le bouton Couches en bas à gauche. Choisissez entre Base, Extérieur, Satellite, Hiver ou Trafic.', steps: [
             { label: 'Appuyez sur le bouton Couches pour ouvrir le sélecteur de style', img: 'map-layers.png', svg: 'SvgMapLayers' },
           ]},
-          { q: 'Que montre la couche Trafic ?', a: 'Flux en temps réel (vert = fluide, jaune = ralenti, rouge = embouteillage) plus marqueurs de fermetures (⛔) et d'embouteillages (🚦).', steps: [
+          { q: 'Que montre la couche Trafic ?', a: 'Flux en temps réel (vert = fluide, jaune = ralenti, rouge = embouteillage) plus marqueurs de fermetures (⛔) et d\'embouteillages (🚦).', steps: [
             { label: 'Passez à la vue Trafic pour voir les conditions en direct', img: 'traffic-layer.png', svg: 'SvgTrafficLayer' },
           ]},
         ],
@@ -917,13 +917,13 @@ const FAQ_CONTENT = {
       {
         category: 'Partage',
         items: [
-          { q: 'Comment partager un spot ?', a: 'Ouvrez le détail d'un spot et appuyez sur Partager. Sur mobile le menu natif s'ouvre, sur ordinateur le lien est copié.', steps: [
+          { q: 'Comment partager un spot ?', a: 'Ouvrez le détail d\'un spot et appuyez sur Partager. Sur mobile le menu natif s\'ouvre, sur ordinateur le lien est copié.', steps: [
             { label: 'Ouvrez un spot et appuyez sur Partager (↑)', img: 'share.png', svg: 'SvgShare' },
           ]},
         ],
       },
     ],
-    about: { title: 'À propos de SpotFinder', desc: 'SpotFinder est une application de carte communautaire gratuite pour découvrir des endroits utiles. Tout le monde peut contribuer.', features: ['Gratuit — sans abonnement', 'Utilisable en tant qu'invité — sans compte', 'Ajouter, noter, naviguer et partager des spots', 'Dictée vocale en 13 langues', 'Trafic en temps réel et fermetures de routes', 'Navigation vocale pour voiture, vélo et piétons'], built: 'Développé avec React, Leaflet, Firebase et OSRM.', version: 'Version 2.1' },
+    about: { title: 'À propos de SpotFinder', desc: 'SpotFinder est une application de carte communautaire gratuite pour découvrir des endroits utiles. Tout le monde peut contribuer.', features: ['Gratuit — sans abonnement', 'Utilisable en tant qu\'invité — sans compte', 'Ajouter, noter, naviguer et partager des spots', 'Dictée vocale en 13 langues', 'Trafic en temps réel et fermetures de routes', 'Navigation vocale pour voiture, vélo et piétons'], built: 'Développé avec React, Leaflet, Firebase et OSRM.', version: 'Version 2.1' },
   },
 
   it: {
@@ -931,7 +931,7 @@ const FAQ_CONTENT = {
       {
         category: 'Per iniziare',
         items: [
-          { q: 'Cos'è SpotFinder?', a: 'SpotFinder è un'app di mappe comunitaria gratuita per scoprire e condividere spot utili — parcheggi, panorami, aree di sosta e altro. Chiunque può aggiungere spot senza account.', steps: null },
+          { q: 'Cos\'è SpotFinder?', a: 'SpotFinder è un\'app di mappe comunitaria gratuita per scoprire e condividere spot utili — parcheggi, panorami, aree di sosta e altro. Chiunque può aggiungere spot senza account.', steps: null },
           { q: 'Ho bisogno di un account?', a: 'No! Come ospite puoi sfogliare la mappa, aggiungere spot e valutarli. Un account permette di gestire i tuoi spot.', steps: null },
         ],
       },
@@ -942,7 +942,7 @@ const FAQ_CONTENT = {
             { label: 'Tocca il pulsante verde + in basso sullo schermo', img: 'plus-button.png', svg: 'SvgPlusButton' },
             { label: 'La mappa entra in modalità aggiunta — tocca qualsiasi punto', img: 'tap-map.png', svg: 'SvgTapMap' },
             { label: 'Compila la descrizione e le stelle per Parcheggio, Paesaggio e Privacy', img: 'fill-form.png', svg: 'SvgFillForm' },
-            { label: 'Aggiungi opzionalmente una foto toccando l'area fotocamera', img: 'add-photo.png', svg: 'SvgAddPhoto' },
+            { label: 'Aggiungi opzionalmente una foto toccando l\'area fotocamera', img: 'add-photo.png', svg: 'SvgAddPhoto' },
             { label: 'Tocca Salva spot — appare immediatamente sulla mappa', img: 'spot-appears.png', svg: 'SvgSpotAppears' },
           ]},
           { q: 'Come usare la dettatura vocale per la descrizione?', a: 'Tocca il pulsante Voce accanto al campo descrizione. Il microfono ascolta nella lingua impostata nelle Impostazioni. Le parole appaiono in tempo reale. Tocca di nuovo per fermare.', steps: [
@@ -990,7 +990,7 @@ const FAQ_CONTENT = {
         ],
       },
     ],
-    about: { title: 'Informazioni su SpotFinder', desc: 'SpotFinder è un'app di mappe comunitaria gratuita per scoprire posti utili. Tutti possono contribuire.', features: ['Gratuita — nessun abbonamento', 'Utilizzabile come ospite — senza account', 'Aggiungi, valuta, naviga e condividi spot', 'Dettatura vocale in 13 lingue', 'Traffico e chiusure stradali in tempo reale', 'Navigazione vocale per auto, bici e pedoni'], built: 'Sviluppato con React, Leaflet, Firebase e OSRM.', version: 'Versione 2.1' },
+    about: { title: 'Informazioni su SpotFinder', desc: 'SpotFinder è un\'app di mappe comunitaria gratuita per scoprire posti utili. Tutti possono contribuire.', features: ['Gratuita — nessun abbonamento', 'Utilizzabile come ospite — senza account', 'Aggiungi, valuta, naviga e condividi spot', 'Dettatura vocale in 13 lingue', 'Traffico e chiusure stradali in tempo reale', 'Navigazione vocale per auto, bici e pedoni'], built: 'Sviluppato con React, Leaflet, Firebase e OSRM.', version: 'Versione 2.1' },
   },
 
   ru: {
@@ -1077,9 +1077,9 @@ const FAQ_CONTENT = {
             { label: 'Карта переходить у режим додавання — натисніть будь-де', img: 'tap-map.png', svg: 'SvgTapMap' },
             { label: 'Заповніть опис і встановіть зірки за Паркінг, Красу та Приватність', img: 'fill-form.png', svg: 'SvgFillForm' },
             { label: 'За бажанням додайте фото, натиснувши на область камери', img: 'add-photo.png', svg: 'SvgAddPhoto' },
-            { label: 'Натисніть Зберегти спот — він одразу з'явиться на карті', img: 'spot-appears.png', svg: 'SvgSpotAppears' },
+            { label: 'Натисніть Зберегти спот — він одразу з\'явиться на карті', img: 'spot-appears.png', svg: 'SvgSpotAppears' },
           ]},
-          { q: 'Як використовувати голос для опису?', a: 'Натисніть кнопку Голос поруч із полем опису. Мікрофон слухає мовою, встановленою в Налаштуваннях. Ваші слова з'являються в реальному часі. Натисніть ще раз для зупинки.', steps: [
+          { q: 'Як використовувати голос для опису?', a: 'Натисніть кнопку Голос поруч із полем опису. Мікрофон слухає мовою, встановленою в Налаштуваннях. Ваші слова з\'являються в реальному часі. Натисніть ще раз для зупинки.', steps: [
             { label: 'Натисніть кнопку Голос поруч із полем опису', img: 'voice.png', svg: 'SvgVoice' },
           ]},
         ],
@@ -1511,9 +1511,9 @@ const FEEDBACK_LABELS = {
   pl:  { title: 'Wyślij opinię', emailLabel: 'Twój email (opcjonalnie)', emailPh: 'ty@przyklad.pl', msgLabel: 'Twoja wiadomość', msgPh: 'Co myślisz? Zgłoś błąd lub zaproponuj funkcję…', send: 'Wyślij', sending: 'Wysyłanie…', sent: 'Dziękujemy! Wiadomość odebrana.', error: 'Nie można wysłać — napisz bezpośrednio na redm1234@outlook.cz', required: 'Najpierw napisz wiadomość.' },
   sk:  { title: 'Odoslať spätnú väzbu', emailLabel: 'Váš e-mail (voliteľné)', emailPh: 'vy@priklad.sk', msgLabel: 'Vaša správa', msgPh: 'Čo si myslíte? Nahláste chybu alebo navrhujte funkciu…', send: 'Odoslať', sending: 'Odosielam…', sent: 'Ďakujeme! Správa doručená.', error: 'Odoslanie zlyhalo — napíšte nám priamo na redm1234@outlook.cz', required: 'Najprv napíšte správu.' },
   it:  { title: 'Invia feedback', emailLabel: 'La tua email (opzionale)', emailPh: 'tu@esempio.it', msgLabel: 'Il tuo messaggio', msgPh: 'Cosa pensi? Segnala un bug o suggerisci una funzione…', send: 'Invia', sending: 'Invio…', sent: 'Grazie! Messaggio ricevuto.', error: 'Invio non riuscito — scrivi direttamente a redm1234@outlook.cz', required: 'Scrivi prima un messaggio.' },
-  fr:  { title: 'Envoyer un retour', emailLabel: 'Votre e-mail (optionnel)', emailPh: 'vous@exemple.fr', msgLabel: 'Votre message', msgPh: 'Dites-nous ce que vous pensez, signalez un bug ou suggérez une fonction…', send: 'Envoyer', sending: 'Envoi…', sent: 'Merci ! Message reçu.', error: 'Envoi échoué — écrivez-nous directement à redm1234@outlook.cz', required: "Veuillez d'abord écrire un message." },
+  fr:  { title: 'Envoyer un retour', emailLabel: 'Votre e-mail (optionnel)', emailPh: 'vous@exemple.fr', msgLabel: 'Votre message', msgPh: 'Dites-nous ce que vous pensez, signalez un bug ou suggérez une fonction…', send: 'Envoyer', sending: 'Envoi…', sent: 'Merci ! Message reçu.', error: 'Envoi échoué — écrivez-nous directement à redm1234@outlook.cz', required: "Veuillez d\'abord écrire un message." },
   ru:  { title: 'Отправить отзыв', emailLabel: 'Ваш e-mail (необязательно)', emailPh: 'вы@пример.ру', msgLabel: 'Ваше сообщение', msgPh: 'Расскажите, что думаете, сообщите об ошибке или предложите функцию…', send: 'Отправить', sending: 'Отправка…', sent: 'Спасибо! Сообщение получено.', error: 'Не удалось отправить — напишите нам напрямую: redm1234@outlook.cz', required: 'Сначала напишите сообщение.' },
-  uk:  { title: 'Надіслати відгук', emailLabel: 'Ваш e-mail (необов'язково)', emailPh: 'ви@приклад.уа', msgLabel: 'Ваше повідомлення', msgPh: 'Розкажіть, що думаєте, повідомте про помилку або запропонуйте функцію…', send: 'Надіслати', sending: 'Надсилання…', sent: 'Дякуємо! Повідомлення отримано.', error: 'Не вдалося надіслати — напишіть нам: redm1234@outlook.cz', required: 'Спочатку напишіть повідомлення.' },
+  uk:  { title: 'Надіслати відгук', emailLabel: 'Ваш e-mail (необов\'язково)', emailPh: 'ви@приклад.уа', msgLabel: 'Ваше повідомлення', msgPh: 'Розкажіть, що думаєте, повідомте про помилку або запропонуйте функцію…', send: 'Надіслати', sending: 'Надсилання…', sent: 'Дякуємо! Повідомлення отримано.', error: 'Не вдалося надіслати — напишіть нам: redm1234@outlook.cz', required: 'Спочатку напишіть повідомлення.' },
   hu:  { title: 'Visszajelzés küldése', emailLabel: 'Az e-mail-ed (opcionális)', emailPh: 'te@pelda.hu', msgLabel: 'Az üzeneted', msgPh: 'Mit gondolsz? Jelents hibát vagy javasolj funkciót…', send: 'Küldés', sending: 'Küldés…', sent: 'Köszönjük! Üzenet megérkezett.', error: 'Küldés sikertelen — írj közvetlenül: redm1234@outlook.cz', required: 'Kérlek, írj előbb üzenetet.' },
   ro:  { title: 'Trimite feedback', emailLabel: 'Email-ul tău (opțional)', emailPh: 'tu@exemplu.ro', msgLabel: 'Mesajul tău', msgPh: 'Spune-ne ce crezi, raportează un bug sau sugerează o funcție…', send: 'Trimite', sending: 'Se trimite…', sent: 'Mulțumim! Mesaj primit.', error: 'Trimitere eșuată — scrie-ne direct la redm1234@outlook.cz', required: 'Te rugăm să scrii mai întâi un mesaj.' },
   es:  { title: 'Enviar comentarios', emailLabel: 'Tu email (opcional)', emailPh: 'tu@ejemplo.es', msgLabel: 'Tu mensaje', msgPh: '¿Qué opinas? Reporta un error o sugiere una función…', send: 'Enviar', sending: 'Enviando…', sent: '¡Gracias! Mensaje recibido.', error: 'No se pudo enviar — escríbenos directamente a redm1234@outlook.cz', required: 'Por favor escribe un mensaje primero.' },
