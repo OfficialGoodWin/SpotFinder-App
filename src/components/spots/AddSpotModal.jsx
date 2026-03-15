@@ -23,6 +23,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
   const [interimText, setInterimText] = useState('');
+  const [micError, setMicError] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const recognitionRef = useRef(null);
   const committedRef = useRef(''); // tracks already-committed final transcript
@@ -36,7 +37,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   };
 
   // Voice dictation
-  const toggleVoice = () => {
+  const toggleVoice = async () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       alert(t('addSpot.voiceNotSupported'));
@@ -46,6 +47,25 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
     if (listening) {
       recognitionRef.current?.stop();
       setListening(false);
+      return;
+    }
+
+    // Check microphone availability before starting
+    setMicError('');
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const hasMic = devices.some(d => d.kind === 'audioinput');
+      if (!hasMic) {
+        setMicError('Error: no microphone detected');
+        return;
+      }
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        setMicError('Error: no microphone detected');
+      } else {
+        setMicError('Error: microphone permission was not allowed');
+      }
       return;
     }
 
@@ -80,7 +100,16 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
       // Show live interim preview (doesn't modify committed text)
       setInterimText(interim);
     };
-    rec.onerror = () => { setListening(false); setInterimText(''); };
+    rec.onerror = (e) => {
+      setListening(false);
+      setInterimText('');
+      if (e.error === 'no-speech') return;
+      if (e.error === 'audio-capture' || e.error === 'not-allowed') {
+        setMicError(e.error === 'not-allowed'
+          ? 'Error: microphone permission was not allowed'
+          : 'Error: no microphone detected');
+      }
+    };
     rec.onend = () => { setListening(false); setInterimText(''); };
     rec.start();
     recognitionRef.current = rec;
@@ -163,6 +192,9 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
                 {listening ? t('addSpot.listening') : t('addSpot.voice')}
               </button>
             </div>
+            {micError && (
+              <p className="text-xs text-red-500 dark:text-red-400 mb-1 px-1">{micError}</p>
+            )}
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}

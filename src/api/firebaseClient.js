@@ -217,7 +217,7 @@ export const updateSpotDetailRating = async (spotId, field, newVal, count) => {
 export const submitCategoryRatings = async (spotId, currentSpot, ratings) => {
   const { db } = getFirebaseServices();
   const updates = {};
- 
+
   const recalc = (field, countField, newVal) => {
     if (!newVal) return null;
     const oldCount = currentSpot[countField] || 0;
@@ -228,32 +228,32 @@ export const submitCategoryRatings = async (spotId, currentSpot, ratings) => {
     updates[countField] = newCount;
     return newAvg;
   };
- 
-  const p = recalc('parking_rating', 'parking_rating_count', ratings.parking);
-  const b = recalc('beauty_rating',  'beauty_rating_count',  ratings.beauty);
-  const v = recalc('privacy_rating', 'privacy_rating_count', ratings.privacy);
- 
-  // Recalculate overall as average of all three updated categories
-  const cats = [
-    p ?? (currentSpot.parking_rating || 0),
-    b ?? (currentSpot.beauty_rating  || 0),
-    v ?? (currentSpot.privacy_rating || 0),
-  ].filter(x => x > 0);
- 
-  if (cats.length > 0) {
-    const newOverall = Math.round(cats.reduce((s, x) => s + x, 0) / cats.length * 10) / 10;
-    // overall_count = sum of all category counts
-    const totalCount = (updates.parking_rating_count ?? (currentSpot.parking_rating_count || 0))
-                     + (updates.beauty_rating_count  ?? (currentSpot.beauty_rating_count  || 0))
-                     + (updates.privacy_rating_count ?? (currentSpot.privacy_rating_count || 0));
-    updates.rating       = newOverall;
-    updates.rating_count = totalCount;
+
+  recalc('parking_rating', 'parking_rating_count', ratings.parking);
+  recalc('beauty_rating',  'beauty_rating_count',  ratings.beauty);
+  recalc('privacy_rating', 'privacy_rating_count', ratings.privacy);
+
+  // This review's overall = average of the categories rated in THIS submission only
+  const submittedValues = [
+    ratings.parking > 0 ? ratings.parking : null,
+    ratings.beauty  > 0 ? ratings.beauty  : null,
+    ratings.privacy > 0 ? ratings.privacy : null,
+  ].filter(x => x !== null);
+
+  if (submittedValues.length > 0) {
+    const reviewOverall   = submittedValues.reduce((s, x) => s + x, 0) / submittedValues.length;
+    const oldOverallCount = currentSpot.rating_count || 0;
+    const oldOverall      = currentSpot.rating       || 0;
+    const newOverallCount = oldOverallCount + 1;
+    const newOverall      = Math.round(((oldOverall * oldOverallCount) + reviewOverall) / newOverallCount * 10) / 10;
+    updates.rating        = newOverall;
+    updates.rating_count  = newOverallCount;
   }
- 
+
   if (Object.keys(updates).length > 0) {
     await updateDoc(doc(db, SPOTS_COLLECTION, spotId), updates);
   }
- 
+
   return { ...currentSpot, ...updates };
 };
  
@@ -289,4 +289,3 @@ export const base44 = {
 };
  
 export default base44;
- 

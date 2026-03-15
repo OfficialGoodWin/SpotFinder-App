@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ChevronDown, ArrowLeft, MapPin, Star, Navigation, Layers, Share2, Mic, Car, Wifi, Lock, Trash2, Send, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/lib/LanguageContext';
+import { getFirebaseServices } from '@/api/firebaseClient';
 
 // ─── SVG Illustrations ────────────────────────────────────────────────────────
 
@@ -1477,11 +1478,6 @@ function AboutSection({ data }) {
 }
 
 // ─── Feedback section ─────────────────────────────────────────────────────────
-// Feedback submission
-// OPTION A (recommended): Sign up free at https://web3forms.com, get your access key,
-//   replace the empty string below with your key — messages go straight to your inbox.
-// OPTION B (current fallback): opens the user's email client via mailto:
-const WEB3FORMS_KEY = import.meta.env.VITE_WEB3FORMS_KEY || '';
 
 const FEEDBACK_LABELS = {
   en:  { title: 'Send Feedback', emailLabel: 'Your email (optional)', emailPh: 'you@example.com', msgLabel: 'Your message', msgPh: 'Tell us what you think, report a bug, or suggest a feature…', send: 'Send Feedback', sending: 'Sending…', sent: 'Thank you! Message received.', error: 'Could not send — please email us directly at redm1234@outlook.cz', required: 'Please write a message first.' },
@@ -1510,33 +1506,22 @@ function FeedbackSection({ language }) {
     if (!msg.trim()) { setStatus('required'); return; }
     setStatus('sending');
 
-    // If a Web3Forms key is configured, use it (set VITE_WEB3FORMS_KEY in .env)
-    if (WEB3FORMS_KEY) {
-      try {
-        const res = await fetch('https://api.web3forms.com/submit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({
-            access_key: WEB3FORMS_KEY,
-            subject: 'SpotFinder Feedback',
-            from_name: 'SpotFinder User',
-            email: email || 'anonymous@spotfinder.app',
-            message: msg,
-          }),
-        });
-        const data = await res.json();
-        if (data.success) { setStatus('sent'); setEmail(''); setMsg(''); return; }
-      } catch (_) {}
+    try {
+      const { db } = getFirebaseServices();
+      const { collection, addDoc } = await import('firebase/firestore');
+      await addDoc(collection(db, 'feedback'), {
+        email: email.trim() || null,
+        message: msg.trim(),
+        language,
+        created_at: new Date().toISOString(),
+      });
+      setStatus('sent');
+      setEmail('');
+      setMsg('');
+    } catch (err) {
+      console.error('Feedback save failed:', err);
+      setStatus('error');
     }
-
-    // Fallback: open mailto: in user's email client — always works, no API needed
-    const subject = encodeURIComponent('SpotFinder Feedback');
-    const body = encodeURIComponent((email ? `From: ${email}\n\n` : '') + msg);
-    // Open in new tab so user stays on the page
-    window.open(`mailto:redm1234@outlook.cz?subject=${subject}&body=${body}`, '_blank');
-    setStatus('sent');
-    setEmail('');
-    setMsg('');
   };
 
   return (

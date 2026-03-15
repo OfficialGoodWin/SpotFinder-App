@@ -24,6 +24,9 @@ export default function AdBanner() {
  
   useEffect(() => {
     if (!CLIENT || !SLOT || pushed.current) return;
+    // Guard: AdSense horizontal format requires at least 250px width
+    const width = adRef.current?.offsetWidth ?? 0;
+    if (width < 250) return;
     try {
       // adsbygoogle is injected by the script tag in index.html
       (window.adsbygoogle = window.adsbygoogle || []).push({});
@@ -55,7 +58,7 @@ export default function AdBanner() {
         style={{ display: 'block', width: '100%', height: '100%', minHeight: 40 }}
         data-ad-client={CLIENT}
         data-ad-slot={SLOT}
-        data-ad-format="horizontal"
+        data-ad-format="auto"
         data-full-width-responsive="true"
       />
     </div>

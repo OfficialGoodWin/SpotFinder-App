@@ -30,6 +30,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState(false);
   const [listening, setListening] = useState(false);
+  const [micError, setMicError] = useState('');
   const debounce = useRef(null);
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -61,10 +62,26 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
     inputRef.current?.blur();
   };
 
-  const startListening = useCallback(() => {
+  const startListening = useCallback(async () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) { alert(t('addSpot.voiceNotSupported')); return; }
     if (recognitionRef.current) recognitionRef.current.abort();
+
+    // Check microphone availability before starting
+    setMicError('');
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const hasMic = devices.some(d => d.kind === 'audioinput');
+      if (!hasMic) { setMicError('Error: no microphone detected'); return; }
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        setMicError('Error: no microphone detected');
+      } else {
+        setMicError('Error: microphone permission was not allowed');
+      }
+      return;
+    }
 
     const rec = new SpeechRecognition();
     // KEY FIX: use current language locale, not hardcoded en-US
@@ -74,7 +91,15 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
     rec.continuous = false;
     rec.onstart = () => setListening(true);
     rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
+    rec.onerror = (e) => {
+      setListening(false);
+      if (e.error === 'no-speech') return;
+      if (e.error === 'audio-capture' || e.error === 'not-allowed') {
+        setMicError(e.error === 'not-allowed'
+          ? 'Error: microphone permission was not allowed'
+          : 'Error: no microphone detected');
+      }
+    };
     rec.onresult = (e) => {
       let transcript = '';
       for (let i = e.resultIndex; i < e.results.length; i++) transcript += e.results[i][0].transcript;
@@ -129,6 +154,11 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
               ))}
             </span>
             <span className="text-xs text-red-500 font-medium">{t('search.listening')}</span>
+          </div>
+        )}
+        {micError && !listening && (
+          <div className="px-4 py-1.5 border-t border-gray-100 dark:border-border rounded-b-2xl">
+            <span className="text-xs text-red-500 font-medium">{micError}</span>
           </div>
         )}
 

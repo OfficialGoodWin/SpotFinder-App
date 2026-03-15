@@ -1,81 +1,74 @@
 import React, { useState, useEffect } from 'react';
 import { X, Navigation, MapPin, Edit2, Trash2, Share2, Check } from 'lucide-react';
 import StarRating from './StarRating';
-import { rateSpot, updateSpotRating, updateSpotDetailRating } from '@/api/firebaseClient';
+import { submitCategoryRatings } from '@/api/firebaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 
 const RATED_KEY = (spotId) => `sf_rated_${spotId}`;
 
 export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdit, onDelete, onSpotUpdate }) {
   const { t } = useLanguage();
-  const [userRating, setUserRating] = useState(0);
-  const [ratingSubmitted, setRatingSubmitted] = useState(false);
   const [localSpot, setLocalSpot] = useState(spot);
   const [shareTooltip, setShareTooltip] = useState(false);
 
-  // Detailed category ratings
   const [pendingParking, setPendingParking] = useState(0);
-  const [pendingBeauty, setPendingBeauty] = useState(0);
+  const [pendingBeauty,  setPendingBeauty]  = useState(0);
   const [pendingPrivacy, setPendingPrivacy] = useState(0);
-  const [detailRatingSubmitted, setDetailRatingSubmitted] = useState(false);
+  const [ratingSubmitted, setRatingSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const isOwner = user && spot.created_by === user.email;
+  const isOwner      = user && spot.created_by === user.email;
   const isSuperAdmin = user && user.email === 'superadmin@spotfinder.cz';
 
   useEffect(() => {
-    // Check localStorage if already rated this spot
     try {
-      const stored = localStorage.getItem(RATED_KEY(spot.id));
-      if (stored) setRatingSubmitted(true);
+      if (localStorage.getItem(RATED_KEY(spot.id))) setRatingSubmitted(true);
     } catch (_) {}
   }, [spot.id]);
 
-  const handleRate = async (val) => {
-    if (ratingSubmitted || isOwner) return;
-    setUserRating(val);
-    const newCount = (localSpot.rating_count || 0) + 1;
-    const newRating = (((localSpot.rating || 0) * (localSpot.rating_count || 0)) + val) / newCount;
-    const rounded = Math.round(newRating * 10) / 10;
-    await rateSpot(spot.id, val);
-    await updateSpotRating(spot.id, rounded, newCount);
-    const updated = { ...localSpot, rating: rounded, rating_count: newCount };
-    setLocalSpot(updated);
-    onSpotUpdate?.(updated);
-    try { localStorage.setItem(RATED_KEY(spot.id), '1'); } catch (_) {}
-    setRatingSubmitted(true);
-  };
+  const overallRating = localSpot.rating || 0;
+  const overallCount  = localSpot.rating_count || 0;
 
-  const handleDetailRatings = async () => {
-    if (!pendingParking && !pendingBeauty && !pendingPrivacy) return;
-    
-    const updates = {};
-    
-    if (pendingParking > 0) {
-      const cnt = (localSpot.parking_rating_count || 0) + 1;
-      const avg = (((localSpot.parking_rating || 0) * (localSpot.parking_rating_count || 0)) + pendingParking) / cnt;
-      updates.parking_rating = Math.round(avg * 10) / 10;
-      updates.parking_rating_count = cnt;
-      await updateSpotDetailRating(spot.id, 'parking_rating', updates.parking_rating, cnt);
+  const catRows = [
+    { key: 'parking', label: t('spotDetail.parkingQuality'), val: localSpot.parking_rating || 0, count: localSpot.parking_rating_count || 0 },
+    { key: 'beauty',  label: t('spotDetail.beauty'),         val: localSpot.beauty_rating  || 0, count: localSpot.beauty_rating_count  || 0 },
+    { key: 'privacy', label: t('spotDetail.privacy'),        val: localSpot.privacy_rating || 0, count: localSpot.privacy_rating_count || 0 },
+  ];
+
+  const hasCategoryRatings = catRows.some(r => r.val > 0);
+
+  // Fractional star display for overall
+  const renderOverallStars = (value) =>
+    [1, 2, 3, 4, 5].map(star => {
+      const fill = Math.min(Math.max(value - (star - 1), 0), 1);
+      return (
+        <span key={star} className="relative inline-block text-2xl leading-none">
+          <span className="text-gray-200 dark:text-gray-600">★</span>
+          <span className="absolute inset-0 overflow-hidden text-yellow-400" style={{ width: `${fill * 100}%` }}>★</span>
+        </span>
+      );
+    });
+
+  const canSubmit = (pendingParking > 0 || pendingBeauty > 0 || pendingPrivacy > 0) && !submitting;
+
+  const handleSubmitRatings = async () => {
+    if (!canSubmit) return;
+    setSubmitting(true);
+    try {
+      const updated = await submitCategoryRatings(spot.id, localSpot, {
+        parking: pendingParking,
+        beauty:  pendingBeauty,
+        privacy: pendingPrivacy,
+      });
+      setLocalSpot(updated);
+      onSpotUpdate?.(updated);
+      try { localStorage.setItem(RATED_KEY(spot.id), '1'); } catch (_) {}
+      setRatingSubmitted(true);
+    } catch (err) {
+      console.error('Rating submit failed:', err);
+    } finally {
+      setSubmitting(false);
     }
-    if (pendingBeauty > 0) {
-      const cnt = (localSpot.beauty_rating_count || 0) + 1;
-      const avg = (((localSpot.beauty_rating || 0) * (localSpot.beauty_rating_count || 0)) + pendingBeauty) / cnt;
-      updates.beauty_rating = Math.round(avg * 10) / 10;
-      updates.beauty_rating_count = cnt;
-      await updateSpotDetailRating(spot.id, 'beauty_rating', updates.beauty_rating, cnt);
-    }
-    if (pendingPrivacy > 0) {
-      const cnt = (localSpot.privacy_rating_count || 0) + 1;
-      const avg = (((localSpot.privacy_rating || 0) * (localSpot.privacy_rating_count || 0)) + pendingPrivacy) / cnt;
-      updates.privacy_rating = Math.round(avg * 10) / 10;
-      updates.privacy_rating_count = cnt;
-      await updateSpotDetailRating(spot.id, 'privacy_rating', updates.privacy_rating, cnt);
-    }
-    
-    const updated = { ...localSpot, ...updates };
-    setLocalSpot(updated);
-    onSpotUpdate?.(updated);
-    setDetailRatingSubmitted(true);
   };
 
   const handleShare = async () => {
@@ -88,21 +81,19 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
         setShareTooltip(true);
         setTimeout(() => setShareTooltip(false), 2000);
       }
-    } catch (err) {
+    } catch {
       await navigator.clipboard.writeText(url).catch(() => {});
       setShareTooltip(true);
       setTimeout(() => setShareTooltip(false), 2000);
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return '';
-    return new Date(dateString).toLocaleDateString();
-  };
+  const formatDate = (d) => d ? new Date(d).toLocaleDateString() : '';
 
   return (
     <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white dark:bg-card w-full max-w-lg rounded-t-3xl shadow-2xl max-h-[85vh] overflow-y-auto">
+
         {/* Header */}
         <div className="sticky top-0 bg-white dark:bg-card px-6 pt-5 pb-3 border-b border-gray-100 dark:border-border">
           <div className="flex items-start justify-between">
@@ -135,97 +126,132 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
             <p className="text-gray-600 dark:text-muted-foreground text-sm leading-relaxed">{localSpot.description}</p>
           )}
 
-          {/* Overall Rating */}
+          {/* Overall Rating — read-only, derived from category reviews */}
           <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-accent rounded-2xl">
             <div className="flex-1">
               <p className="text-xs text-gray-500 dark:text-muted-foreground mb-1">{t('spotDetail.overallRating')}</p>
-              <div className="flex items-center gap-2">
-                <StarRating value={Math.round(localSpot.rating || 0)} readOnly size="md" />
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex gap-0.5">{renderOverallStars(overallRating)}</div>
                 <span className="text-gray-700 dark:text-foreground font-semibold">
-                  {localSpot.rating ? localSpot.rating.toFixed(1) : '–'}
+                  {overallRating ? overallRating.toFixed(1) : '–'}
                 </span>
-                <span className="text-gray-400 dark:text-muted-foreground text-sm">
-                  ({localSpot.rating_count || 0} {t('spotDetail.ratings')})
+                <span className="text-gray-400 dark:text-muted-foreground text-xs">
+                  ({overallCount} {t('spotDetail.ratings')})
                 </span>
               </div>
+              {overallCount > 0 && (
+                <p className="text-xs text-gray-400 dark:text-muted-foreground mt-0.5 italic">
+                  {t('spotDetail.calculatedFromCategories') || 'Calculated from category ratings'}
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Displayed Category Ratings */}
-          {(localSpot.parking_rating > 0 || localSpot.beauty_rating > 0 || localSpot.privacy_rating > 0) && (
-            <div className="space-y-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-200 dark:border-blue-800">
-              <p className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-2">{t('spotDetail.detailedRatings')}</p>
-              {localSpot.parking_rating > 0 && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-700 dark:text-foreground">{t('spotDetail.parkingQuality')}</span>
-                  <div className="flex items-center gap-2">
-                    <StarRating value={Math.round(localSpot.parking_rating)} readOnly size="sm" />
-                    <span className="text-sm font-semibold text-gray-700 dark:text-foreground w-8">{localSpot.parking_rating.toFixed(1)}</span>
+          {/* Category averages display */}
+          {hasCategoryRatings && (
+            <div className="space-y-2 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800">
+              <p className="text-xs font-bold uppercase tracking-wide text-blue-700 dark:text-blue-300 mb-3">
+                {t('spotDetail.detailedRatings')}
+              </p>
+              {catRows.filter(r => r.val > 0).map(row => (
+                <div key={row.key} className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-gray-700 dark:text-foreground w-28 flex-shrink-0">{row.label}</span>
+                  <div className="flex items-center gap-1.5 flex-1 justify-end">
+                    {/* Fractional stars for category averages too */}
+                    <div className="flex gap-0.5">
+                      {[1,2,3,4,5].map(star => {
+                        const fill = Math.min(Math.max(row.val - (star - 1), 0), 1);
+                        return (
+                          <span key={star} className="relative inline-block text-lg leading-none">
+                            <span className="text-gray-200 dark:text-gray-600">★</span>
+                            <span className="absolute inset-0 overflow-hidden text-yellow-400" style={{ width: `${fill * 100}%` }}>★</span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <span className="text-sm font-semibold text-gray-700 dark:text-foreground w-8 text-right">
+                      {row.val.toFixed(1)}
+                    </span>
+                    <span className="text-xs text-gray-400 dark:text-muted-foreground w-16 text-right">
+                      ({row.count} {t('spotDetail.ratings')})
+                    </span>
                   </div>
                 </div>
-              )}
-              {localSpot.beauty_rating > 0 && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-700 dark:text-foreground">{t('spotDetail.beauty')}</span>
-                  <div className="flex items-center gap-2">
-                    <StarRating value={Math.round(localSpot.beauty_rating)} readOnly size="sm" />
-                    <span className="text-sm font-semibold text-gray-700 dark:text-foreground w-8">{localSpot.beauty_rating.toFixed(1)}</span>
-                  </div>
-                </div>
-              )}
-              {localSpot.privacy_rating > 0 && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-700 dark:text-foreground">{t('spotDetail.privacy')}</span>
-                  <div className="flex items-center gap-2">
-                    <StarRating value={Math.round(localSpot.privacy_rating)} readOnly size="sm" />
-                    <span className="text-sm font-semibold text-gray-700 dark:text-foreground w-8">{localSpot.privacy_rating.toFixed(1)}</span>
-                  </div>
-                </div>
-              )}
+              ))}
             </div>
           )}
 
-          {/* Rate this spot – overall (anyone can rate) */}
-          {!ratingSubmitted && !isOwner && (
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl">
-              <p className="text-sm font-semibold text-blue-700 dark:text-blue-400 mb-2">{t('spotDetail.rateOverall')}</p>
-              <StarRating value={userRating} onChange={handleRate} size="lg" />
-            </div>
-          )}
-          {ratingSubmitted && (
-            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-2xl text-center text-green-700 dark:text-green-400 text-sm font-semibold">
-              ✓ {t('spotDetail.thanksRating')}
-            </div>
-          )}
-
-          {/* Rate category details – available to all */}
-          {!detailRatingSubmitted && !isOwner && (
+          {/* Rate by categories — the only way to rate */}
+          {!isOwner && !ratingSubmitted && (
             <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-2xl border border-purple-200 dark:border-purple-800 space-y-3">
-              <p className="text-sm font-semibold text-purple-800 dark:text-purple-300">{t('spotDetail.rateCategories')}</p>
-              <div>
-                <p className="text-xs text-gray-500 dark:text-muted-foreground mb-1">{t('spotDetail.parkingQuality')}</p>
-                <StarRating value={pendingParking} onChange={setPendingParking} size="md" />
+              <div className="mb-1">
+                <p className="text-sm font-semibold text-purple-800 dark:text-purple-300">
+                  {t('spotDetail.rateCategories')}
+                </p>
+                <p className="text-xs text-purple-500 dark:text-purple-400 mt-0.5">
+                  {t('spotDetail.overallAutoCalc') || 'Overall score is automatically calculated from your ratings'}
+                </p>
               </div>
-              <div>
-                <p className="text-xs text-gray-500 dark:text-muted-foreground mb-1">{t('spotDetail.beauty')}</p>
-                <StarRating value={pendingBeauty} onChange={setPendingBeauty} size="md" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 dark:text-muted-foreground mb-1">{t('spotDetail.privacy')}</p>
-                <StarRating value={pendingPrivacy} onChange={setPendingPrivacy} size="md" />
-              </div>
+
+              {[
+                { label: t('spotDetail.parkingQuality'), val: pendingParking, set: setPendingParking },
+                { label: t('spotDetail.beauty'),         val: pendingBeauty,  set: setPendingBeauty  },
+                { label: t('spotDetail.privacy'),        val: pendingPrivacy, set: setPendingPrivacy },
+              ].map(({ label, val, set }) => (
+                <div key={label} className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-gray-700 dark:text-foreground w-28 flex-shrink-0">{label}</span>
+                  <div className="flex items-center gap-2">
+                    <StarRating value={val} onChange={set} size="md" />
+                    {val > 0 && (
+                      <span className="text-sm font-bold text-purple-700 dark:text-purple-300 w-4">{val}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* Live preview of this review's overall */}
+              {(pendingParking > 0 || pendingBeauty > 0 || pendingPrivacy > 0) && (() => {
+                const vals = [pendingParking, pendingBeauty, pendingPrivacy].filter(x => x > 0);
+                const preview = vals.reduce((s, x) => s + x, 0) / vals.length;
+                return (
+                  <div className="flex items-center justify-between pt-2 border-t border-purple-200 dark:border-purple-700 mt-1">
+                    <span className="text-xs font-semibold text-purple-600 dark:text-purple-400">
+                      {t('spotDetail.yourOverall') || 'Your overall'}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {[1,2,3,4,5].map(star => {
+                        const fill = Math.min(Math.max(preview - (star - 1), 0), 1);
+                        return (
+                          <span key={star} className="relative inline-block text-lg leading-none">
+                            <span className="text-gray-200 dark:text-gray-600">★</span>
+                            <span className="absolute inset-0 overflow-hidden text-yellow-400" style={{ width: `${fill * 100}%` }}>★</span>
+                          </span>
+                        );
+                      })}
+                      <span className="text-sm font-bold text-purple-700 dark:text-purple-300 ml-1">
+                        {preview.toFixed(1)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <button
-                onClick={handleDetailRatings}
-                disabled={!pendingParking && !pendingBeauty && !pendingPrivacy}
-                className="w-full py-2 rounded-xl bg-purple-600 text-white font-semibold text-sm disabled:opacity-40 hover:bg-purple-700 transition-colors"
+                onClick={handleSubmitRatings}
+                disabled={!canSubmit}
+                className="w-full py-2.5 rounded-xl bg-purple-600 text-white font-semibold text-sm disabled:opacity-40 hover:bg-purple-700 active:scale-95 transition-all flex items-center justify-center gap-2 mt-1"
               >
-                {t('spotDetail.submitRatings')}
+                {submitting
+                  ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving…</>
+                  : t('spotDetail.submitRatings')
+                }
               </button>
             </div>
           )}
-          {detailRatingSubmitted && (
+
+          {ratingSubmitted && (
             <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-2xl text-center text-green-700 dark:text-green-400 text-sm font-semibold">
-              ✓ {t('spotDetail.thanksCategoryRating')}
+              ✓ {t('spotDetail.thanksCategoryRating') || t('spotDetail.thanksRating')}
             </div>
           )}
 
@@ -236,7 +262,7 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
           </div>
         </div>
 
-        {/* Footer Buttons */}
+        {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-100 dark:border-border flex gap-3 flex-wrap">
           {(isOwner || isSuperAdmin) && (
             <>
@@ -251,7 +277,6 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
             </>
           )}
 
-          {/* Share button */}
           <div className="relative">
             <button
               onClick={handleShare}
