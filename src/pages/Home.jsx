@@ -20,7 +20,7 @@ import RouteOverlay from '../components/navigation/RouteOverlay';
 import RoadClosureLayer from '../components/map/RoadClosureLayer';
 import AuthModal from '../components/auth/AuthModal';
 import MySpotsPanel from '../components/spots/MySpotsPanel';
-import AdBanner from '../components/AdBanner';
+
 import SpotsPanel from '../components/spots/SpotsPanel';
 import SettingsModal from '../components/SettingsModal';
 import ProfileMenu from '../components/ProfileMenu';
@@ -456,14 +456,6 @@ export default function Home() {
           >
             <Plus className="w-9 h-9 text-white" />
           </button>
-        </div>
-
-        {/* Ad strip — full width, isolated row so iframe can't expand the controls */}
-        <div
-          className="w-full bg-background/95 backdrop-blur-md border-t border overflow-hidden"
-          style={{ height: 50, lineHeight: 0 }}
-        >
-          <AdBanner />
         </div>
 
         {/* Controls row */}
