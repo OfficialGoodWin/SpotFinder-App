@@ -181,8 +181,18 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
             </div>
           )}
 
-          {/* Rate by categories — the only way to rate */}
-          {!isOwner && !ratingSubmitted && (
+          {/* Rate by categories — account required */}
+          {!user && !ratingSubmitted && (
+            <div className="p-4 bg-gray-50 dark:bg-accent/40 rounded-2xl border border-gray-200 dark:border-border text-center space-y-1">
+              <p className="text-sm font-semibold text-gray-700 dark:text-foreground">
+                {t('spotDetail.rateCategories')}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-muted-foreground">
+                {t('spotDetail.loginToRate') || 'Sign in to leave a rating'}
+              </p>
+            </div>
+          )}
+          {user && !isOwner && !ratingSubmitted && (
             <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-2xl border border-purple-200 dark:border-purple-800 space-y-3">
               <div className="mb-1">
                 <p className="text-sm font-semibold text-purple-800 dark:text-purple-300">

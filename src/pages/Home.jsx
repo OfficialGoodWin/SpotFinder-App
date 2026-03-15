@@ -458,8 +458,16 @@ export default function Home() {
           </button>
         </div>
 
-        {/* Bar row — fixed height so the ad can never expand it */}
-        <div className="flex items-center px-4 gap-2 bg-background/95 backdrop-blur-md border-t border" style={{ height: 64, paddingBottom: 'env(safe-area-inset-bottom, 8px)' }}>
+        {/* Ad strip — full width, isolated row so iframe can't expand the controls */}
+        <div
+          className="w-full bg-background/95 backdrop-blur-md border-t border overflow-hidden"
+          style={{ height: 50, lineHeight: 0 }}
+        >
+          <AdBanner />
+        </div>
+
+        {/* Controls row */}
+        <div className="flex items-center px-4 gap-2 bg-background/95 backdrop-blur-md border-t border" style={{ height: 56, paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
           {/* Left: Layers + Location */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <MapLayerSwitcher activeLayer={mapLayer} onLayerChange={setMapLayer} />
@@ -472,10 +480,8 @@ export default function Home() {
             </button>
           </div>
 
-          {/* Center: Ad banner — hard-capped at 50px tall */}
-          <div className="flex-1 min-w-0 mx-1 overflow-hidden" style={{ height: 50, maxHeight: 50 }}>
-            <AdBanner />
-          </div>
+          {/* Spacer for FAB */}
+          <div className="flex-1" />
 
           {/* Right: FAQ + Settings */}
           <div className="flex items-center gap-2 flex-shrink-0">
