@@ -2,69 +2,116 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 
-// ─── Icons ────────────────────────────────────────────────────────────────────
-const CLOSED_ICON = L.divIcon({
-  html: `<div style="filter:drop-shadow(0 1px 3px rgba(0,0,0,.5));line-height:0">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="22" height="22">
-      <circle cx="50" cy="50" r="49" fill="white"/>
-      <circle cx="50" cy="50" r="44" fill="#CC1111"/>
-      <rect x="16" y="38" width="68" height="24" rx="4" fill="white"/>
-    </svg></div>`,
-  className: '', iconSize: [22,22], iconAnchor: [11,11], popupAnchor: [0,-14],
-});
+// ─── Helper: build a standard red-triangle warning sign SVG ──────────────────
+// All European road warning signs share this shape: white triangle, red border.
+const triSign = (innerSVG, w = 26, h = 24) => `
+  <div style="filter:drop-shadow(0 2px 4px rgba(0,0,0,.55));line-height:0">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 100" width="${w}" height="${h}">
+      <!-- Red filled triangle -->
+      <polygon points="55,4 107,96 3,96" fill="#CC1111"/>
+      <!-- White inner area -->
+      <polygon points="55,17 97,88 13,88" fill="white"/>
+      ${innerSVG}
+    </svg>
+  </div>`;
 
+// ─── Icon 1: Traffic Jam — red triangle, 3 cars queuing (matches real sign) ──
+// Rear-view cars stacked smaller-to-bigger left-to-right
 const JAM_ICON = L.divIcon({
-  html: `<div style="filter:drop-shadow(0 1px 3px rgba(0,0,0,.5));line-height:0">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 98" width="23" height="21">
-      <polygon points="55,6 104,92 6,92" fill="white" stroke="#E07000" stroke-width="9" stroke-linejoin="round"/>
-      <g transform="translate(22,68) scale(0.55)">
-        <rect x="0" y="10" width="26" height="13" rx="2" fill="#111"/><rect x="3" y="4" width="20" height="10" rx="2" fill="#111"/>
-        <rect x="1" y="22" width="5" height="3" rx="1" fill="#444"/><rect x="20" y="22" width="5" height="3" rx="1" fill="#444"/>
-      </g>
-      <g transform="translate(37,60) scale(0.65)">
-        <rect x="0" y="10" width="28" height="14" rx="2" fill="#111"/><rect x="3" y="4" width="22" height="10" rx="2" fill="#111"/>
-        <rect x="1" y="23" width="6" height="4" rx="1.5" fill="#444"/><rect x="21" y="23" width="6" height="4" rx="1.5" fill="#444"/>
-      </g>
-      <g transform="translate(54,50) scale(0.78)">
-        <rect x="0" y="12" width="32" height="16" rx="2.5" fill="#111"/><rect x="3" y="4" width="26" height="12" rx="2.5" fill="#111"/>
-        <rect x="1" y="27" width="7" height="5" rx="2" fill="#444"/><rect x="24" y="27" width="7" height="5" rx="2" fill="#444"/>
-        <rect x="12" y="25" width="9" height="3" rx="1" fill="#cc2222"/>
-      </g>
-    </svg></div>`,
-  className: '', iconSize: [23,21], iconAnchor: [11,10], popupAnchor: [0,-13],
+  html: triSign(`
+    <!-- 3 cars from back (small) to front (large), rear view, stacked -->
+    <!-- Car 3 (back, smallest) -->
+    <g transform="translate(16,52) scale(0.52)">
+      <rect x="2" y="12" width="28" height="16" rx="3" fill="#111"/>
+      <rect x="5" y="4"  width="18" height="12" rx="2" fill="#111"/>
+      <rect x="1" y="27" width="7"  height="5"  rx="2" fill="#333"/>
+      <rect x="22" y="27" width="7" height="5"  rx="2" fill="#333"/>
+      <rect x="6" y="6"  width="16" height="8"  rx="1" fill="white" opacity=".85"/>
+    </g>
+    <!-- Car 2 (middle) -->
+    <g transform="translate(29,44) scale(0.65)">
+      <rect x="2" y="12" width="32" height="18" rx="3" fill="#111"/>
+      <rect x="5" y="4"  width="22" height="12" rx="2" fill="#111"/>
+      <rect x="1" y="29" width="8"  height="5"  rx="2" fill="#333"/>
+      <rect x="25" y="29" width="8" height="5"  rx="2" fill="#333"/>
+      <rect x="6" y="6"  width="20" height="8"  rx="1" fill="white" opacity=".85"/>
+    </g>
+    <!-- Car 1 (front, largest) -->
+    <g transform="translate(43,34) scale(0.80)">
+      <rect x="2" y="14" width="38" height="20" rx="3.5" fill="#111"/>
+      <rect x="5" y="4"  width="28" height="14" rx="3"   fill="#111"/>
+      <rect x="1" y="33" width="9"  height="6"  rx="2.5" fill="#333"/>
+      <rect x="30" y="33" width="9" height="6"  rx="2.5" fill="#333"/>
+      <rect x="6" y="6"  width="26" height="10" rx="1.5" fill="white" opacity=".85"/>
+    </g>
+  `, 26, 24),
+  className: '', iconSize: [26,24], iconAnchor: [13,12], popupAnchor: [0,-14],
 });
 
+// ─── Icon 2: Road Works — red triangle, worker digging (matches real sign) ───
 const WORKS_ICON = L.divIcon({
-  html: `<div style="filter:drop-shadow(0 1px 3px rgba(0,0,0,.5));line-height:0">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="22" height="22">
-      <rect x="8" y="8" width="84" height="84" rx="8" fill="#FF8C00" transform="rotate(45 50 50)"/>
-      <rect x="12" y="12" width="76" height="76" rx="6" fill="#FFB300" transform="rotate(45 50 50)"/>
-      <circle cx="50" cy="28" r="9" fill="#111"/><rect x="39" y="20" width="22" height="6" rx="3" fill="#FF8C00"/>
-      <rect x="44" y="37" width="12" height="20" rx="3" fill="#111"/>
-      <line x1="44" y1="44" x2="28" y2="52" stroke="#111" stroke-width="5" stroke-linecap="round"/>
-      <line x1="56" y1="44" x2="68" y2="38" stroke="#111" stroke-width="5" stroke-linecap="round"/>
-      <line x1="28" y1="52" x2="24" y2="68" stroke="#888" stroke-width="4" stroke-linecap="round"/>
-      <ellipse cx="22" cy="72" rx="6" ry="4" fill="#888"/>
-      <line x1="50" y1="57" x2="44" y2="72" stroke="#111" stroke-width="5" stroke-linecap="round"/>
-      <line x1="50" y1="57" x2="58" y2="72" stroke="#111" stroke-width="5" stroke-linecap="round"/>
-    </svg></div>`,
-  className: '', iconSize: [22,22], iconAnchor: [11,11], popupAnchor: [0,-14],
+  html: triSign(`
+    <!-- Worker figure digging, same pose as standard road-works sign -->
+    <!-- Head -->
+    <circle cx="62" cy="30" r="7" fill="#111"/>
+    <!-- Hard hat -->
+    <path d="M55 30 Q55 22 62 22 Q69 22 69 30 Z" fill="#111"/>
+    <rect x="52" y="28" width="20" height="4" rx="2" fill="#111"/>
+    <!-- Torso leaning forward -->
+    <line x1="62" y1="37" x2="50" y2="55" stroke="#111" stroke-width="5.5" stroke-linecap="round"/>
+    <!-- Left arm holding shovel handle -->
+    <line x1="58" y1="43" x2="42" y2="50" stroke="#111" stroke-width="4.5" stroke-linecap="round"/>
+    <!-- Right arm raised -->
+    <line x1="58" y1="43" x2="70" y2="35" stroke="#111" stroke-width="4.5" stroke-linecap="round"/>
+    <!-- Legs -->
+    <line x1="50" y1="55" x2="42" y2="72" stroke="#111" stroke-width="5" stroke-linecap="round"/>
+    <line x1="50" y1="55" x2="58" y2="72" stroke="#111" stroke-width="5" stroke-linecap="round"/>
+    <!-- Shovel: handle down to blade -->
+    <line x1="42" y1="50" x2="32" y2="72" stroke="#111" stroke-width="4" stroke-linecap="round"/>
+    <!-- Shovel blade -->
+    <path d="M27 70 Q22 78 30 80 Q38 82 38 74 Z" fill="#111"/>
+    <!-- Dirt mound -->
+    <ellipse cx="75" cy="78" rx="18" ry="9" fill="#111"/>
+    <path d="M57 78 Q66 60 75 60 Q84 60 93 78 Z" fill="#111"/>
+  `, 26, 24),
+  className: '', iconSize: [26,24], iconAnchor: [13,12], popupAnchor: [0,-14],
 });
 
-// ─── TomTom category helpers ─────────────────────────────────────────────────
-const isClosure = cat => [8, 14].includes(cat);
-const isJam     = cat => [1, 6, 7, 13].includes(cat);
-const isWorks   = cat => [9].includes(cat);
+// ─── Icon 3: Lane Closed — red triangle, right lane narrows (matches real sign)
+const LANE_CLOSED_ICON = L.divIcon({
+  html: triSign(`
+    <!-- Two lanes: left stays straight, right narrows into left -->
+    <!-- Left lane (straight, stays vertical) -->
+    <rect x="38" y="28" width="10" height="48" rx="2" fill="#111"/>
+    <!-- Right lane (curves left to merge) -->
+    <path d="M72 28 L72 52 Q72 72 53 76" stroke="#111" stroke-width="10" 
+          fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Arrow tip on merge end -->
+    <polygon points="48,70 53,82 58,70" fill="#111"/>
+  `, 26, 24),
+  className: '', iconSize: [26,24], iconAnchor: [13,12], popupAnchor: [0,-14],
+});
 
-// Minimum zoom level before we even attempt to fetch (TomTom 400s on huge bboxes)
-const MIN_ZOOM = 10;
+// ─── Icon 4: Road Closed — no-entry circle (red circle with white bar) ────────
+const CLOSED_ICON = L.divIcon({
+  html: `<div style="filter:drop-shadow(0 2px 4px rgba(0,0,0,.55));line-height:0">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="24" height="24">
+      <circle cx="50" cy="50" r="48" fill="white"/>
+      <circle cx="50" cy="50" r="43" fill="#CC1111"/>
+      <rect x="14" y="38" width="72" height="24" rx="5" fill="white"/>
+    </svg></div>`,
+  className: '', iconSize: [24,24], iconAnchor: [12,12], popupAnchor: [0,-14],
+});
 
-// ─── TomTom event-code → translation key ─────────────────────────────────────
-// TomTom returns English phrases in the `events[].description` field.
-// We map the event's iconCategory code to a translation key instead.
+// ─── TomTom category → incident type ─────────────────────────────────────────
 // iconCategory codes: 1=Accident 2=Fog 3=Dangerous 4=Rain 5=Ice 6=Jam
 // 7=LaneClosed 8=RoadClosed 9=RoadWorks 10=Wind 11=Flooding
 // 13=BrokenDown 14=RoadClosed
+const isClosure    = cat => [8, 14].includes(cat);
+const isJam        = cat => [1, 6, 13].includes(cat);   // accidents + stationary + broken down
+const isWorks      = cat => [9].includes(cat);           // road works
+const isLaneClosed = cat => [7].includes(cat);           // lane closed (was wrongly in isJam)
+
 const EVENT_CODE_TO_KEY = {
   1:  'traffic.eventAccident',
   2:  'traffic.eventFog',
@@ -102,8 +149,6 @@ function debounce(fn, ms) {
 
 async function fetchTomTomIncidents(bounds, apiKey, signal) {
   const { _southWest: sw, _northEast: ne } = bounds;
-
-  // TomTom v5 has a hard bbox limit. Clamp to ~2° on each axis to avoid 400.
   const maxDelta = 2.0;
   const latDelta = Math.min(ne.lat - sw.lat, maxDelta);
   const lngDelta = Math.min(ne.lng - sw.lng, maxDelta);
@@ -123,7 +168,7 @@ async function fetchTomTomIncidents(bounds, apiKey, signal) {
   const data = await res.json();
   return (data.incidents || []).filter(i => {
     const cat = i.properties?.iconCategory;
-    return isClosure(cat) || isJam(cat) || isWorks(cat);
+    return isClosure(cat) || isJam(cat) || isWorks(cat) || isLaneClosed(cat);
   });
 }
 
@@ -147,68 +192,80 @@ async function fetchOverpassClosures(bounds, signal) {
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function RoadClosureLayer({ apiKey, enabled, lang, t }) {
   const map = useMap();
-  const markersRef   = useRef([]);
-  const abortRef     = useRef(null);
-  const loadingRef   = useRef(false);
+  const markersRef    = useRef([]);
+  const abortRef      = useRef(null);
+  const loadingRef    = useRef(false);
   const lastBoundsRef = useRef(null);
-  const cacheRef     = useRef([]);
+  const cacheRef      = useRef([]);
 
   const clearMarkers = useCallback(() => {
     markersRef.current.forEach(m => { try { map.removeLayer(m); } catch (_) {} });
     markersRef.current = [];
   }, [map]);
 
-  // Translate a TomTom event's iconCategory code into the current language
   const translateEventCode = useCallback((code) => {
     if (!t || !code) return null;
     const key = EVENT_CODE_TO_KEY[code];
     if (!key) return null;
     const translated = t(key);
-    // t() returns the key itself if missing — don't show raw key
     return translated !== key ? translated : null;
   }, [t]);
 
+  // Detect dark mode from the document
+  const isDark = () => document.documentElement.classList.contains('dark') ||
+    (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
   const makePopupHTML = useCallback((inc) => {
-    const titleKey = inc.type === 'closure' ? 'traffic.roadClosed'
-                   : inc.type === 'works'   ? 'traffic.roadWorks'
-                   : 'traffic.trafficJam';
-    const title     = t ? t(titleKey) : inc.title || '—';
+    const titleKey = inc.type === 'closure'    ? 'traffic.roadClosed'
+                   : inc.type === 'works'      ? 'traffic.roadWorks'
+                   : inc.type === 'lane'       ? 'traffic.eventLaneClosed'
+                   :                             'traffic.trafficJam';
+    const title     = t ? t(titleKey) : '—';
     const fromLabel = t ? t('traffic.roadFrom') : 'From';
     const toLabel   = t ? t('traffic.roadTo')   : 'To';
-
-    // Translate the event description via its iconCategory code,
-    // fall back to the raw English text TomTom sent
     const eventDesc = inc.eventCode
       ? (translateEventCode(inc.eventCode) || inc.desc || '')
       : (inc.desc || '');
 
-    return `<div style="font-size:13px;line-height:1.5;max-width:210px">
-      <strong style="color:#CC1111;font-size:14px">${title}</strong>
-      ${inc.road ? `<div style="margin-top:5px">🛣️ ${inc.road}</div>` : ''}
-      ${inc.from ? `<div style="margin-top:2px">${fromLabel}: ${inc.from}</div>` : ''}
-      ${inc.to   ? `<div style="margin-top:2px">${toLabel}: ${inc.to}</div>` : ''}
-      ${eventDesc ? `<div style="margin-top:5px;color:#555;font-size:12px">${eventDesc}</div>` : ''}
+    const dark = isDark();
+    const bg       = dark ? '#1e293b' : '#ffffff';
+    const fg       = dark ? '#f1f5f9' : '#1e293b';
+    const subColor = dark ? '#94a3b8' : '#555555';
+    const border   = dark ? '#334155' : '#e2e8f0';
+
+    return `<div style="font-size:13px;line-height:1.6;max-width:220px;padding:2px;
+                        background:${bg};color:${fg};border-radius:4px;">
+      <strong style="color:#CC1111;font-size:14px;display:block;margin-bottom:3px">${title}</strong>
+      ${inc.road ? `<div style="border-top:1px solid ${border};padding-top:4px;margin-top:3px">🛣️ ${inc.road}</div>` : ''}
+      ${inc.from ? `<div style="color:${subColor}">${fromLabel}: ${inc.from}</div>` : ''}
+      ${inc.to   ? `<div style="color:${subColor}">${toLabel}: ${inc.to}</div>` : ''}
+      ${eventDesc ? `<div style="margin-top:4px;color:${subColor};font-size:12px;font-style:italic">${eventDesc}</div>` : ''}
     </div>`;
   }, [t, translateEventCode]);
 
   const renderMarkers = useCallback((incidents) => {
     clearMarkers();
     requestAnimationFrame(() => {
+      const newMarkers = [];
       incidents.forEach(inc => {
         const icon = inc.type === 'closure' ? CLOSED_ICON
-                   : inc.type === 'works'   ? WORKS_ICON
-                   : JAM_ICON;
-        L.marker([inc.lat, inc.lng], { icon, zIndexOffset: 3000, riseOnHover: false, keyboard: false })
-          .bindPopup(makePopupHTML(inc), { maxWidth: 220 })
+                   : inc.type === 'works'  ? WORKS_ICON
+                   : inc.type === 'lane'   ? LANE_CLOSED_ICON
+                   :                         JAM_ICON;
+        const marker = L.marker([inc.lat, inc.lng], {
+          icon,
+          zIndexOffset: 5000,   // always above map tiles
+          riseOnHover: true,    // pop to front on hover
+          keyboard: false,
+        })
+          .bindPopup(makePopupHTML(inc), {
+            maxWidth: 240,
+            className: 'traffic-popup',   // hook for CSS if needed
+          })
           .addTo(map);
+        newMarkers.push(marker);
       });
-      // Capture newly added markers (all markers added since clearMarkers)
-      markersRef.current = [];
-      map.eachLayer(layer => {
-        if (layer instanceof L.Marker && layer.options.zIndexOffset === 3000) {
-          markersRef.current.push(layer);
-        }
-      });
+      markersRef.current = newMarkers;
     });
   }, [map, clearMarkers, makePopupHTML]);
 
@@ -216,14 +273,15 @@ export default function RoadClosureLayer({ apiKey, enabled, lang, t }) {
     if (!enabled) { clearMarkers(); return; }
     if (loadingRef.current) return;
 
-    // Don't fetch when zoomed too far out — causes TomTom 400 and is useless
     const zoom = map.getZoom();
-    if (zoom < MIN_ZOOM) { clearMarkers(); return; }
+    // Lower MIN_ZOOM so icons appear even at very close zoom (was 10, now 7)
+    if (zoom < 7) { clearMarkers(); return; }
 
     const bounds = map.getBounds();
 
-    // Skip refetch if we haven't moved much and have cached data
-    if (lastBoundsRef.current && cacheRef.current.length > 0) {
+    // Cache skip: only if map moved less than 15% of view size
+    // At high zoom this threshold is intentionally small so we always refresh
+    if (lastBoundsRef.current && cacheRef.current.length > 0 && zoom < 16) {
       const prev = lastBoundsRef.current;
       const dist = haversineM(
         [prev.getCenter().lat, prev.getCenter().lng],
@@ -233,7 +291,7 @@ export default function RoadClosureLayer({ apiKey, enabled, lang, t }) {
         [prev._southWest.lat, prev._southWest.lng],
         [prev._northEast.lat, prev._northEast.lng]
       );
-      if (dist < viewSize * 0.2) {
+      if (dist < viewSize * 0.15) {
         renderMarkers(cacheRef.current);
         return;
       }
@@ -255,7 +313,11 @@ export default function RoadClosureLayer({ apiKey, enabled, lang, t }) {
           const p   = inc.properties || {};
           const cat = p.iconCategory;
           const eventCode = p.events?.[0]?.iconCategory ?? null;
-          const type = isClosure(cat) ? 'closure' : isWorks(cat) ? 'works' : 'jam';
+          // Fix: lane closed (cat 7) gets its own type instead of being 'jam'
+          const type = isClosure(cat)    ? 'closure'
+                     : isWorks(cat)      ? 'works'
+                     : isLaneClosed(cat) ? 'lane'
+                     :                    'jam';
           return {
             lat, lng, type, eventCode,
             road: (p.roadNumbers || []).join(', '),
@@ -266,7 +328,6 @@ export default function RoadClosureLayer({ apiKey, enabled, lang, t }) {
         }).filter(Boolean);
       } catch (err) {
         if (err.name === 'AbortError') { loadingRef.current = false; return; }
-        // Silently suppress — Overpass fallback below
       }
     }
 
@@ -285,9 +346,8 @@ export default function RoadClosureLayer({ apiKey, enabled, lang, t }) {
     renderMarkers(incidents);
   }, [map, apiKey, enabled, clearMarkers, renderMarkers]);
 
-  // 1200ms debounce — prevents hammering TomTom while user is zooming
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const loadDebounced = useCallback(debounce(load, 1200), [load]);
+  const loadDebounced = useCallback(debounce(load, 1000), [load]);
 
   useEffect(() => {
     load();

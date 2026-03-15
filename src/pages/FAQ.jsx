@@ -1532,7 +1532,8 @@ function FeedbackSection({ language }) {
     // Fallback: open mailto: in user's email client — always works, no API needed
     const subject = encodeURIComponent('SpotFinder Feedback');
     const body = encodeURIComponent((email ? `From: ${email}\n\n` : '') + msg);
-    window.location.href = `mailto:redm1234@outlook.cz?subject=${subject}&body=${body}`;
+    // Open in new tab so user stays on the page
+    window.open(`mailto:redm1234@outlook.cz?subject=${subject}&body=${body}`, '_blank');
     setStatus('sent');
     setEmail('');
     setMsg('');
