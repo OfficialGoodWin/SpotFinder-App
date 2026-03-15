@@ -37,21 +37,23 @@ const TOMTOM_API_KEY = import.meta.env.VITE_TOMTOM_API_KEY || '';
 // ── Base tile URLs ────────────────────────────────────────────────────────────
 // Light tiles (default)
 const LIGHT_TILES = {
-  basic:   `https://api.mapy.com/v1/maptiles/basic/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
-  outdoor: `https://api.mapy.com/v1/maptiles/outdoor/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
-  aerial:  `https://api.mapy.com/v1/maptiles/aerial/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
-  winter:  `https://api.mapy.com/v1/maptiles/winter/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
-  traffic: `https://api.mapy.com/v1/maptiles/basic/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
+  basic:        `https://api.mapy.com/v1/maptiles/basic/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
+  outdoor:      `https://api.mapy.com/v1/maptiles/outdoor/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
+  aerial:       `https://api.mapy.com/v1/maptiles/aerial/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
+  winter:       `https://api.mapy.com/v1/maptiles/winter/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
+  traffic:      `https://api.mapy.com/v1/maptiles/basic/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
+  mapy_traffic: `https://api.mapy.com/v1/maptiles/traffic/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
 };
  
 // Dark tiles — CartoDB Dark Matter (free, no API key required)
 // aerial stays as Mapy.cz (inverted satellite looks terrible), winter keeps its own style
 const DARK_TILES = {
-  basic:   'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-  outdoor: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-  aerial:  `https://api.mapy.com/v1/maptiles/aerial/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
-  winter:  `https://api.mapy.com/v1/maptiles/winter/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
-  traffic: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  basic:        'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  outdoor:      'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  aerial:       `https://api.mapy.com/v1/maptiles/aerial/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
+  winter:       `https://api.mapy.com/v1/maptiles/winter/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
+  traffic:      'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  mapy_traffic: `https://api.mapy.com/v1/maptiles/traffic/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
 };
  
 // ── TomTom traffic flow overlay ───────────────────────────────────────────────
@@ -113,7 +115,7 @@ export default function Home() {
   const tileUrls = isDark ? DARK_TILES : LIGHT_TILES;
   // CartoDB needs subdomains; Mapy.cz does not
   const cartoDomains = ['a', 'b', 'c', 'd'];
-  const useCartoTile = isDark && mapLayer !== 'aerial' && mapLayer !== 'winter';
+  const useCartoTile = isDark && mapLayer !== 'aerial' && mapLayer !== 'winter' && mapLayer !== 'mapy_traffic';
   const [userPos, setUserPos] = useState(null);
   const [userAccuracy, setUserAccuracy] = useState(null);
   const [addMode, setAddMode] = useState(false);
@@ -367,7 +369,7 @@ export default function Home() {
         {/* Road closure markers — shown on traffic layer when TomTom key is set */}
         <RoadClosureLayer
           apiKey={TOMTOM_API_KEY}
-          enabled={mapLayer === 'traffic'}
+          enabled={mapLayer === 'traffic' || mapLayer === 'mapy_traffic'}
           lang={language}
           t={t}
         />
