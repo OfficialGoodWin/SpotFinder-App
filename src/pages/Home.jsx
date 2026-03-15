@@ -136,7 +136,6 @@ export default function Home() {
   const [deleteInput, setDeleteInput] = useState('');
   const mapRef = useRef(null);
  
-  console.log('[Home] Component mounted');
  
   // Load spots
   useEffect(() => {
@@ -151,15 +150,13 @@ export default function Home() {
   useEffect(() => {
     if (!navigator.geolocation) return;
  
-    // Set timeout to allow app to work without geolocation (e.g., if permission denied on mobile)
+    // Fallback center after 15s if geolocation is slow or denied
     geolocationTimeoutRef.current = setTimeout(() => {
-      console.warn('Geolocation timeout - proceeding without location');
       if (!hasCenteredToUser.current) {
         hasCenteredToUser.current = true;
-        // Use default Prague location
         setFlyTo([50.0755, 14.4378]);
       }
-    }, 5000); // 5 second timeout
+    }, 15000);
  
     const wid = navigator.geolocation.watchPosition(
       (pos) => {

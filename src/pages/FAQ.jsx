@@ -1477,9 +1477,11 @@ function AboutSection({ data }) {
 }
 
 // ─── Feedback section ─────────────────────────────────────────────────────────
-// Uses Web3Forms (https://web3forms.com) — free, no server needed, real delivery.
-// Access key is public by design (rate-limited per domain by Web3Forms).
-const WEB3FORMS_KEY = '0e1db307-3d53-43d8-9a87-c7c3f09be9b2';
+// Feedback submission
+// OPTION A (recommended): Sign up free at https://web3forms.com, get your access key,
+//   replace the empty string below with your key — messages go straight to your inbox.
+// OPTION B (current fallback): opens the user's email client via mailto:
+const WEB3FORMS_KEY = import.meta.env.VITE_WEB3FORMS_KEY || '';
 
 const FEEDBACK_LABELS = {
   en:  { title: 'Send Feedback', emailLabel: 'Your email (optional)', emailPh: 'you@example.com', msgLabel: 'Your message', msgPh: 'Tell us what you think, report a bug, or suggest a feature…', send: 'Send Feedback', sending: 'Sending…', sent: 'Thank you! Message received.', error: 'Could not send — please email us directly at redm1234@outlook.cz', required: 'Please write a message first.' },
@@ -1507,24 +1509,33 @@ function FeedbackSection({ language }) {
     e.preventDefault();
     if (!msg.trim()) { setStatus('required'); return; }
     setStatus('sending');
-    try {
-      const res = await fetch('https://api.web3forms.com/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({
-          access_key: WEB3FORMS_KEY,
-          subject: 'SpotFinder Feedback',
-          from_name: 'SpotFinder User',
-          email: email || 'anonymous@spotfinder.app',
-          message: msg,
-        }),
-      });
-      const data = await res.json();
-      setStatus(data.success ? 'sent' : 'error');
-      if (data.success) { setEmail(''); setMsg(''); }
-    } catch (_) {
-      setStatus('error');
+
+    // If a Web3Forms key is configured, use it (set VITE_WEB3FORMS_KEY in .env)
+    if (WEB3FORMS_KEY) {
+      try {
+        const res = await fetch('https://api.web3forms.com/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            access_key: WEB3FORMS_KEY,
+            subject: 'SpotFinder Feedback',
+            from_name: 'SpotFinder User',
+            email: email || 'anonymous@spotfinder.app',
+            message: msg,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) { setStatus('sent'); setEmail(''); setMsg(''); return; }
+      } catch (_) {}
     }
+
+    // Fallback: open mailto: in user's email client — always works, no API needed
+    const subject = encodeURIComponent('SpotFinder Feedback');
+    const body = encodeURIComponent((email ? `From: ${email}\n\n` : '') + msg);
+    window.location.href = `mailto:redm1234@outlook.cz?subject=${subject}&body=${body}`;
+    setStatus('sent');
+    setEmail('');
+    setMsg('');
   };
 
   return (
