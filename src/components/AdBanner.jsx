@@ -36,26 +36,23 @@ export default function AdBanner() {
     }
   }, []);
  
-  // Placeholder shown when no AdSense credentials are configured
   if (!CLIENT || !SLOT) {
     return (
       <div
-        className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-accent/40 rounded-lg border border-dashed border-gray-300 dark:border-border"
-        style={{ minHeight: 40 }}
+        className="w-full flex items-center justify-center bg-gray-100 dark:bg-accent/40 rounded-lg border border-dashed border-gray-300 dark:border-border"
+        style={{ height: 50 }}
       >
-        <span className="text-[10px] text-gray-400 dark:text-muted-foreground text-center leading-tight px-1">
-          Ad
-        </span>
+        <span className="text-[10px] text-gray-400 dark:text-muted-foreground">Ad</span>
       </div>
     );
   }
  
   return (
-    <div className="w-full h-full overflow-hidden rounded-lg" style={{ minHeight: 40 }}>
+    <div className="w-full overflow-hidden rounded-lg" style={{ height: 50 }}>
       <ins
         ref={adRef}
         className="adsbygoogle"
-        style={{ display: 'block', width: '100%', height: '100%', minHeight: 40 }}
+        style={{ display: 'block', width: '100%', height: '50px' }}
         data-ad-client={CLIENT}
         data-ad-slot={SLOT}
         data-ad-format="auto"

@@ -458,8 +458,8 @@ export default function Home() {
           </button>
         </div>
 
-        {/* Bar row */}
-        <div className="flex items-center px-4 pt-2 pb-5 bg-background/95 backdrop-blur-md border-t border gap-2">
+        {/* Bar row — fixed height so the ad can never expand it */}
+        <div className="flex items-center px-4 gap-2 bg-background/95 backdrop-blur-md border-t border" style={{ height: 64, paddingBottom: 'env(safe-area-inset-bottom, 8px)' }}>
           {/* Left: Layers + Location */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <MapLayerSwitcher activeLayer={mapLayer} onLayerChange={setMapLayer} />
@@ -472,8 +472,8 @@ export default function Home() {
             </button>
           </div>
 
-          {/* Center: Ad banner */}
-          <div className="flex-1 min-w-0 mx-1">
+          {/* Center: Ad banner — hard-capped at 50px tall */}
+          <div className="flex-1 min-w-0 mx-1 overflow-hidden" style={{ height: 50, maxHeight: 50 }}>
             <AdBanner />
           </div>
 
