@@ -12,6 +12,7 @@ import SpotMarker from '../components/map/SpotMarker';
 import UserLocationMarker from '../components/map/UserLocationMarker';
 import MapLayerSwitcher from '../components/map/MapLayerSwitcher';
 import SearchBar from '../components/map/SearchBar';
+import POILayer from '../components/map/POILayer';
 import AddSpotModal from '../components/spots/AddSpotModal';
 import EditSpotModal from '../components/spots/EditSpotModal';
 import SpotDetailModal from '../components/spots/SpotDetailModal';
@@ -134,6 +135,7 @@ export default function Home() {
   const [fitBoundsData, setFitBoundsData] = useState(null);
   const [zoomToArea, setZoomToArea] = useState(null);
   const [deleteInput, setDeleteInput] = useState('');
+  const [selectedPOICategory, setSelectedPOICategory] = useState(null);
   const mapRef = useRef(null);
  
  
@@ -395,6 +397,15 @@ export default function Home() {
             currentStep={navRouteData.currentStep}
           />
         )}
+
+        {/* POI Layer - shows category-based POIs */}
+        <POILayer 
+          category={selectedPOICategory}
+          onNavigate={(destination) => {
+            if (!userPos) return alert(t('home.locationUnavailable'));
+            startNavTo(destination);
+          }}
+        />
       </MapContainer>
  
       {/* Search bar */}
@@ -406,6 +417,14 @@ export default function Home() {
         onNavigate={(destination) => {
           if (!userPos) return alert(t('home.locationUnavailable'));
           startNavTo(destination);
+        }}
+        onSelectCategory={(category) => {
+          setSelectedPOICategory(category);
+          // Zoom out to show 30km radius
+          const center = mapRef.current?.getCenter();
+          if (center && mapRef.current) {
+            mapRef.current.setView(center, Math.max(12, category.minZoom - 2), { animate: true });
+          }
         }}
       />
  

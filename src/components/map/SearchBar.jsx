@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, X, Navigation, Mic, MicOff } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
+import { filterCategories } from '@/lib/POICategories';
 
 const MAPY_API_KEY = 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
 
@@ -23,10 +24,11 @@ const SpotsBtnIcon = () => (
   </svg>
 );
 
-export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, onToggleSpots }) {
+export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, onToggleSpots, onSelectCategory }) {
   const { t, language } = useLanguage();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
+  const [poiCategories, setPoiCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState(false);
   const [listening, setListening] = useState(false);
@@ -39,7 +41,16 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
   const bcp47 = LANG_TO_BCP47[language] || 'en-US';
 
   useEffect(() => {
-    if (!query.trim()) { setResults([]); return; }
+    if (!query.trim()) { 
+      setResults([]); 
+      setPoiCategories([]);
+      return; 
+    }
+    
+    // Filter POI categories
+    const filteredPOI = filterCategories(query);
+    setPoiCategories(filteredPOI);
+    
     clearTimeout(debounce.current);
     debounce.current = setTimeout(async () => {
       setLoading(true);
@@ -59,7 +70,18 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
     if (pos) onSelect({ lat: pos.lat, lng: pos.lon || pos.lng, label: item.name || item.label });
     setQuery(item.name || item.label || '');
     setResults([]);
+    setPoiCategories([]);
     inputRef.current?.blur();
+  };
+
+  const handleSelectCategory = (category) => {
+    if (onSelectCategory) {
+      onSelectCategory(category);
+      setQuery(category.name);
+      setResults([]);
+      setPoiCategories([]);
+      inputRef.current?.blur();
+    }
   };
 
   const startListening = useCallback(async () => {
@@ -128,7 +150,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
             className="flex-1 py-3 text-sm outline-none bg-transparent text-gray-800 dark:text-foreground placeholder-gray-400 dark:placeholder-muted-foreground min-w-0"
           />
           {query && (
-            <button onClick={() => { setQuery(''); setResults([]); }} className="p-1 flex-shrink-0">
+            <button onClick={() => { setQuery(''); setResults([]); setPoiCategories([]); }} className="p-1 flex-shrink-0">
               <X className="w-3.5 h-3.5 text-gray-400 dark:text-muted-foreground" />
             </button>
           )}
@@ -162,12 +184,31 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
           </div>
         )}
 
-        {results.length > 0 && (
+        {(poiCategories.length > 0 || results.length > 0) && (
           <div className="border-t border-gray-100 dark:border-border max-h-64 overflow-y-auto rounded-b-2xl">
+            {/* POI Categories */}
+            {poiCategories.map((cat, i) => (
+              <div key={`cat-${i}`} className="flex items-center hover:bg-gray-50 dark:hover:bg-accent transition-colors">
+                <button onMouseDown={() => handleSelectCategory(cat)} className="flex-1 text-left px-4 py-2.5 flex items-center gap-3">
+                  <div 
+                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ background: `${cat.color}20`, color: cat.color }}
+                  >
+                    <span className="text-lg">{cat.icon}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-800 dark:text-foreground truncate">{cat.name}</p>
+                    <p className="text-xs text-gray-400 dark:text-muted-foreground truncate">{cat.desc}</p>
+                  </div>
+                </button>
+              </div>
+            ))}
+            
+            {/* Geocoding Results */}
             {results.map((item, i) => {
               const pos = item.position || item.regionalStructure?.[0];
               return (
-                <div key={i} className="flex items-center hover:bg-gray-50 dark:hover:bg-accent transition-colors">
+                <div key={`geo-${i}`} className="flex items-center hover:bg-gray-50 dark:hover:bg-accent transition-colors">
                   <button onMouseDown={() => handleSelect(item)} className="flex-1 text-left px-4 py-2.5">
                     <p className="text-sm font-medium text-gray-800 dark:text-foreground truncate">{item.name || item.label}</p>
                     <p className="text-xs text-gray-400 dark:text-muted-foreground truncate">
