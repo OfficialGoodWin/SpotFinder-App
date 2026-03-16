@@ -305,3 +305,9 @@ export function filterCategories(query) {
     cat.name.toLowerCase().includes(q)
   );
 }
+
+// Returns the display name for a category (with optional language support)
+export function getCategoryName(category, language) {
+  if (!category) return '';
+  return category.name || '';
+}
