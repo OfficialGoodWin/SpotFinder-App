@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, X, Navigation, Mic, MicOff } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
-import { filterCategories, getCategoryName, getCategoryDesc, POI_ICON_MAP } from '@/lib/POICategories';
+import { filterCategories, getCategoryName, getCategoryDesc } from '@/lib/POICategories';
 
 const MAPY_API_KEY = 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
 
@@ -189,7 +189,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
           <div className="border-t border-gray-100 dark:border-border max-h-64 overflow-y-auto rounded-b-2xl">
             {/* POI Categories */}
             {poiCategories.map((cat, i) => {
-              const IconComponent = LucideIcons[POI_ICON_MAP[cat.icon]] || LucideIcons.MapPin;
+              const IconComponent = cat.icon || LucideIcons.MapPin;
               const catName = getCategoryName(cat, language);
               const catDesc = getCategoryDesc(cat, language);
               
