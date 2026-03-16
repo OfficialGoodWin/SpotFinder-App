@@ -4,7 +4,7 @@ import StarRating from './StarRating';
 import { submitCategoryRatings } from '@/api/firebaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 
-const RATED_KEY = (spotId) => `sf_rated_${spotId}`;
+const RATED_KEY = (spotId, userId) => `sf_rated_${spotId}_${userId || 'guest'}`;
 
 export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdit, onDelete, onSpotUpdate }) {
   const { t } = useLanguage();
@@ -22,7 +22,7 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
 
   useEffect(() => {
     try {
-      if (localStorage.getItem(RATED_KEY(spot.id))) setRatingSubmitted(true);
+      if (localStorage.getItem(RATED_KEY(spot.id, user?.uid || user?.email))) setRatingSubmitted(true);
     } catch (_) {}
   }, [spot.id]);
 
@@ -62,7 +62,7 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
       });
       setLocalSpot(updated);
       onSpotUpdate?.(updated);
-      try { localStorage.setItem(RATED_KEY(spot.id), '1'); } catch (_) {}
+      try { localStorage.setItem(RATED_KEY(spot.id, user?.uid || user?.email), '1'); } catch (_) {}
       setRatingSubmitted(true);
     } catch (err) {
       console.error('Rating submit failed:', err);

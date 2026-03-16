@@ -347,6 +347,7 @@ export default function RoadClosureLayer({ apiKey, enabled, lang, t }) {
       abortRef.current?.abort();
       clearMarkers();
       cacheRef.current = [];
+      lastFetchedBoundsRef.current = null; // force fresh fetch when re-enabled
     }
   }, [enabled, clearMarkers]);
 
