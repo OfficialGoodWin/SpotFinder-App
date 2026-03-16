@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, X, Navigation, Mic, MicOff } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
-import { filterCategories, getCategoryName, getCategoryDesc } from '@/lib/POICategories';
+import { filterCategories, getCategoryName } from '@/lib/POICategories';
 
 const MAPY_API_KEY = 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
 
