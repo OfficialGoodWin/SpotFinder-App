@@ -23,6 +23,7 @@ import AuthModal from '../components/auth/AuthModal';
 import MySpotsPanel from '../components/spots/MySpotsPanel';
 
 import SpotsPanel from '../components/spots/SpotsPanel';
+import POIPanel from '../components/spots/POIPanel';
 import SettingsModal from '../components/SettingsModal';
 import ProfileMenu from '../components/ProfileMenu';
  
@@ -136,6 +137,8 @@ export default function Home() {
   const [zoomToArea, setZoomToArea] = useState(null);
   const [deleteInput, setDeleteInput] = useState('');
   const [selectedPOICategory, setSelectedPOICategory] = useState(null);
+  const [currentPOIs, setCurrentPOIs] = useState([]);
+  const [showPOIPanel, setShowPOIPanel] = useState(false);
   const mapRef = useRef(null);
  
  
@@ -405,6 +408,7 @@ export default function Home() {
             if (!userPos) return alert(t('home.locationUnavailable'));
             startNavTo(destination);
           }}
+          onPOIsLoaded={(pois) => setCurrentPOIs(pois)}
         />
       </MapContainer>
  
@@ -420,10 +424,11 @@ export default function Home() {
         }}
         onSelectCategory={(category) => {
           setSelectedPOICategory(category);
-          // Zoom out to show 30km radius
-          const center = mapRef.current?.getCenter();
-          if (center && mapRef.current) {
-            mapRef.current.setView(center, Math.max(12, category.minZoom - 2), { animate: true });
+          setShowPOIPanel(true);
+          // Zoom to level 9 to show ~30km radius
+          if (mapRef.current) {
+            const center = mapRef.current.getCenter();
+            mapRef.current.setView(center, 9, { animate: true, duration: 1 });
           }
         }}
       />
@@ -573,6 +578,20 @@ export default function Home() {
           user={user}
           onClose={() => setShowMySpots(false)}
           onFlyTo={(pos) => setFlyTo(pos)}
+        />
+      )}
+
+      {showPOIPanel && selectedPOICategory && (
+        <POIPanel
+          pois={currentPOIs}
+          category={selectedPOICategory}
+          userPos={userPos}
+          onFlyTo={(pos) => setFlyTo(pos)}
+          onNavigate={(poi) => {
+            if (!userPos) return alert(t('home.locationUnavailable'));
+            startNavTo({ lat: poi.lat, lng: poi.lon, label: poi.name });
+          }}
+          onClose={() => setShowPOIPanel(false)}
         />
       )}
  
