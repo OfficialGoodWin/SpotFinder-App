@@ -130,12 +130,19 @@ export default function POILayer({ category, onNavigate, onPOIsLoaded }) {
         return;
       }
 
+      // Build correct Overpass filter from osmTag (e.g. "amenity=school" → ["amenity"="school"])
+      const osmTag = category.osmTag;
+      const eqIdx = osmTag.indexOf('=');
+      const tagFilter = eqIdx !== -1
+        ? `["${osmTag.slice(0, eqIdx)}"="${osmTag.slice(eqIdx + 1)}"]`
+        : `["${osmTag}"]`;
+
       // Overpass API query with timeout and limit
       const query = `
         [out:json][timeout:15];
         (
-          node["${category.osmTag}"](${south},${west},${north},${east});
-          way["${category.osmTag}"](${south},${west},${north},${east});
+          node${tagFilter}(${south},${west},${north},${east});
+          way${tagFilter}(${south},${west},${north},${east});
         );
         out center 200;
       `;
