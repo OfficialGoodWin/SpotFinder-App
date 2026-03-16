@@ -115,6 +115,21 @@ function debounce(fn, ms) {
   return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
 }
 
+// Returns true when the new bounds have shifted enough to warrant a fresh fetch
+// (centre moved > 40% of the current viewport diagonal).
+function boundsChangedSignificantly(prev, next) {
+  if (!prev) return true;
+  const latSpan = next._northEast.lat - next._southWest.lat;
+  const lngSpan = next._northEast.lng - next._southWest.lng;
+  const threshold = Math.sqrt(latSpan * latSpan + lngSpan * lngSpan) * 0.40;
+  const prevCLat = (prev._northEast.lat + prev._southWest.lat) / 2;
+  const prevCLng = (prev._northEast.lng + prev._southWest.lng) / 2;
+  const nextCLat = (next._northEast.lat + next._southWest.lat) / 2;
+  const nextCLng = (next._northEast.lng + next._southWest.lng) / 2;
+  const dist = Math.sqrt((nextCLat - prevCLat) ** 2 + (nextCLng - prevCLng) ** 2);
+  return dist > threshold;
+}
+
 async function fetchTomTomIncidents(bounds, apiKey, signal) {
   const { _southWest: sw, _northEast: ne } = bounds;
   const maxDelta = 2.0;
@@ -140,14 +155,23 @@ async function fetchTomTomIncidents(bounds, apiKey, signal) {
   });
 }
 
+let overpassBackoffUntil = 0; // timestamp ms — don't call Overpass before this
+
 async function fetchOverpassClosures(bounds, signal) {
+  if (Date.now() < overpassBackoffUntil) throw new Error('Overpass rate-limited (backoff)');
   const { _southWest: sw, _northEast: ne } = bounds;
   const bbox = `${sw.lat},${sw.lng},${ne.lat},${ne.lng}`;
   const query = `[out:json][timeout:8];(way["access"="no"]["highway"](${bbox});way["motor_vehicle"="no"]["highway"](${bbox}););out center 15;`;
   const res = await fetch('https://overpass-api.de/api/interpreter', {
     method: 'POST', body: 'data=' + encodeURIComponent(query), signal,
   });
-  if (!res.ok) throw new Error('Overpass error');
+  if (!res.ok) {
+    if (res.status === 429) {
+      const retryAfter = parseInt(res.headers.get('Retry-After') || '60', 10);
+      overpassBackoffUntil = Date.now() + retryAfter * 1000;
+    }
+    throw new Error('Overpass error');
+  }
   const data = await res.json();
   return (data.elements || []).slice(0, 15).map(el => ({
     type: 'closure',
@@ -164,6 +188,7 @@ export default function RoadClosureLayer({ apiKey, enabled, lang, t }) {
   const abortRef   = useRef(null);
   const fetchingRef = useRef(false);
   const cacheRef   = useRef([]);
+  const lastFetchedBoundsRef = useRef(null);
 
   const clearMarkers = useCallback(() => {
     markersRef.current.forEach(m => { try { map.removeLayer(m); } catch (_) {} });
@@ -211,15 +236,14 @@ export default function RoadClosureLayer({ apiKey, enabled, lang, t }) {
     </div>`;
   }, [t, translateEventCode]);
 
-  // renderMarkers: applies zoom-based visibility filtering
+  // renderMarkers: add new markers FIRST, then remove old ones — eliminates stutter
   const renderMarkers = useCallback((incidents) => {
-    clearMarkers();
     const zoom = map.getZoom();
     const newMarkers = [];
 
     incidents.forEach(inc => {
       const threshold = ZOOM[inc.type] ?? 0;
-      if (zoom <= threshold) return;  // hide below threshold zoom
+      if (zoom <= threshold) return;
 
       const icon = inc.type === 'closure'  ? CLOSED_ICON
                  : inc.type === 'works'    ? WORKS_ICON
@@ -238,8 +262,10 @@ export default function RoadClosureLayer({ apiKey, enabled, lang, t }) {
       newMarkers.push(marker);
     });
 
+    // Swap: remove old only after new are already painted
+    markersRef.current.forEach(m => { try { map.removeLayer(m); } catch (_) {} });
     markersRef.current = newMarkers;
-  }, [map, clearMarkers, makePopupHTML]);
+  }, [map, makePopupHTML]);
 
   // load: fetch fresh data from TomTom/Overpass and render
   const load = useCallback(async () => {
@@ -247,6 +273,12 @@ export default function RoadClosureLayer({ apiKey, enabled, lang, t }) {
     if (fetchingRef.current) return;
 
     const bounds = map.getBounds();
+
+    // Skip fetch if the map hasn't moved significantly since last fetch
+    if (!boundsChangedSignificantly(lastFetchedBoundsRef.current, bounds)) return;
+
+    // Skip Overpass fallback entirely when zoomed out too far
+    const zoom = map.getZoom();
 
     abortRef.current?.abort();
     const ctrl = new AbortController();
@@ -281,7 +313,8 @@ export default function RoadClosureLayer({ apiKey, enabled, lang, t }) {
       }
     }
 
-    if (incidents.length === 0 && !ctrl.signal.aborted) {
+    // Only call Overpass when zoomed in enough (zoom ≥ 11) to keep bbox small
+    if (incidents.length === 0 && !ctrl.signal.aborted && zoom >= 11) {
       try {
         const ov = await fetchOverpassClosures(bounds, ctrl.signal);
         incidents = ov.map(o => ({ ...o, from:'', to:'', desc:'', eventCode: null }));
@@ -290,20 +323,21 @@ export default function RoadClosureLayer({ apiKey, enabled, lang, t }) {
 
     fetchingRef.current = false;
     if (ctrl.signal.aborted) return;
+    lastFetchedBoundsRef.current = bounds;
     cacheRef.current = incidents;
     renderMarkers(incidents);
   }, [map, apiKey, enabled, clearMarkers, renderMarkers]);
 
   // onZoom: re-render cached data immediately with new zoom thresholds applied.
-  // Also trigger a fresh fetch (debounced) since bbox may now cover a different area.
   const onZoom = useCallback(() => {
-    if (!enabled) { clearMarkers(); return; }   // ← fix: don't flash icons on other layers
+    if (!enabled) { clearMarkers(); return; }
     if (cacheRef.current.length > 0) {
       renderMarkers(cacheRef.current);
     }
   }, [enabled, clearMarkers, renderMarkers]);
 
-  const loadDebounced = useCallback(debounce(load, 900), [load]);
+  // moveend debounce raised to 1800ms — reduces Overpass calls dramatically
+  const loadDebounced = useCallback(debounce(load, 1800), [load]);
   const onZoomDebounced = useCallback(debounce(() => { onZoom(); loadDebounced(); }, 200), [onZoom, loadDebounced]);
 
   // Clear markers immediately and synchronously when disabled (layer switch)
