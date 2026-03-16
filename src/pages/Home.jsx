@@ -425,10 +425,11 @@ export default function Home() {
         onSelectCategory={(category) => {
           setSelectedPOICategory(category);
           setShowPOIPanel(true);
-          // Zoom to level 9 to show ~30km radius
+          // Zoom to level 14 so POILayer's minZoom check passes and the
+          // Overpass bounding box is small enough to return results
           if (mapRef.current) {
             const center = mapRef.current.getCenter();
-            mapRef.current.setView(center, 9, { animate: true, duration: 1 });
+            mapRef.current.setView(center, 14, { animate: true, duration: 1 });
           }
         }}
       />

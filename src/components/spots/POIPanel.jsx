@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Navigation, X } from 'lucide-react';
-import * as LucideIcons from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { getCategoryName } from '@/lib/POICategories';
 
@@ -16,19 +15,17 @@ const HEADER_H = 56;
 const SHEET_VH = 0.60;
 const PEEK_SHOW = HEADER_H + 8;
 
-function POIRow({ poi, category, onFlyTo, onNavigate, onClose, language }) {
-  const IconComponent = spot.icon || LucideIcons.MapPin;
-  
+function POIRow({ poi, category, onFlyTo, onNavigate, onClose }) {
   return (
     <div
       className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 dark:border-border/40 hover:bg-gray-50 dark:hover:bg-accent/60 active:bg-gray-100 dark:active:bg-accent transition-colors cursor-pointer"
       onClick={() => { onFlyTo?.([poi.lat, poi.lon]); onClose(); }}
     >
-      <div 
-        className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center"
-        style={{ background: `${category.color}20`, color: category.color }}
+      <div
+        className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-lg"
+        style={{ background: `${category.color}20` }}
       >
-        <IconComponent className="w-5 h-5" />
+        {category.icon}
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-foreground truncate">{poi.name}</p>
@@ -156,7 +153,7 @@ function MobileSheet({ children, header, onClose, bottomOffset }) {
 
 export default function POIPanel({ pois, category, userPos, onFlyTo, onNavigate, onClose }) {
   const { language } = useLanguage();
-  
+
   const sortedPOIs = useMemo(() => {
     if (!userPos || !pois) return pois || [];
     return pois.map(poi => ({
@@ -167,33 +164,62 @@ export default function POIPanel({ pois, category, userPos, onFlyTo, onNavigate,
 
   const categoryName = getCategoryName(category, language);
 
+  const header = (
+    <h2 className="text-lg font-bold text-foreground pt-3 flex items-center gap-2">
+      <span>{category?.icon}</span>
+      {categoryName} ({sortedPOIs.length})
+    </h2>
+  );
+
+  const listContent = sortedPOIs.length === 0 ? (
+    <div className="px-4 py-12 text-center text-muted-foreground">
+      No {categoryName.toLowerCase()} found in this area
+    </div>
+  ) : (
+    sortedPOIs.map(poi => (
+      <POIRow
+        key={poi.id}
+        poi={poi}
+        category={category}
+        onFlyTo={onFlyTo}
+        onNavigate={onNavigate}
+        onClose={onClose}
+      />
+    ))
+  );
+
   return (
-    <MobileSheet
-      header={
-        <h2 className="text-lg font-bold text-foreground pt-3">
-          {categoryName} ({sortedPOIs.length})
-        </h2>
-      }
-      onClose={onClose}
-      bottomOffset={56}
-    >
-      {sortedPOIs.length === 0 ? (
-        <div className="px-4 py-12 text-center text-muted-foreground">
-          No {categoryName.toLowerCase()} found in this area
+    <>
+      {/* ── MOBILE ── */}
+      <div className="md:hidden">
+        <MobileSheet header={header} onClose={onClose} bottomOffset={56}>
+          {listContent}
+        </MobileSheet>
+      </div>
+
+      {/* ── DESKTOP — left side panel, matching SpotsPanel ── */}
+      <div
+        className="hidden md:block absolute z-[1002] rounded-2xl shadow-2xl border border-gray-100 dark:border-border bg-white dark:bg-card overflow-hidden"
+        style={{ top: '5rem', left: '1rem', width: 340 }}
+      >
+        <div className="border-b border-gray-100 dark:border-border px-4 py-3 flex items-center justify-between">
+          {header}
+          <button
+            onClick={onClose}
+            className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-100 dark:bg-accent flex items-center justify-center"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
-      ) : (
-        sortedPOIs.map(poi => (
-          <POIRow
-            key={poi.id}
-            poi={poi}
-            category={category}
-            onFlyTo={onFlyTo}
-            onNavigate={onNavigate}
-            onClose={onClose}
-            language={language}
-          />
-        ))
-      )}
-    </MobileSheet>
+        <div style={{
+          maxHeight: 'calc(100vh - 220px)',
+          overflowY: 'scroll',
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'contain',
+        }}>
+          {listContent}
+        </div>
+      </div>
+    </>
   );
 }

@@ -7,6 +7,15 @@ const MAPY_API_KEY = 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
 
 // BCP-47 locale for each supported app language
 const LANG_TO_BCP47 = {
+ import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Search, X, Navigation, Mic, MicOff } from 'lucide-react';
+import { useLanguage } from '@/lib/LanguageContext';
+import { filterCategories } from '@/lib/POICategories';
+
+const MAPY_API_KEY = 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
+
+// BCP-47 locale for each supported app language
+const LANG_TO_BCP47 = {
   en: 'en-US', cs: 'cs-CZ', pl: 'pl-PL', de: 'de-DE', sk: 'sk-SK',
   it: 'it-IT', fr: 'fr-FR', ru: 'ru-RU', uk: 'uk-UA', hu: 'hu-HU',
   ro: 'ro-RO', es: 'es-ES', bg: 'bg-BG',
@@ -77,7 +86,8 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
   const handleSelectCategory = (category) => {
     if (onSelectCategory) {
       onSelectCategory(category);
-      setQuery(category.name);
+      // Clear query so geocoding API doesn't fire and fill in a nearby place name
+      setQuery('');
       setResults([]);
       setPoiCategories([]);
       inputRef.current?.blur();

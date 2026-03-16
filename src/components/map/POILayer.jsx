@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { POI_ICON_MAP } from '@/lib/POICategories';
+// POI_ICON_MAP import removed — icons are resolved via getIconSVG()
 
 // Helper function to get SVG paths for icons (no emoji, pure SVG)
 function getIconSVG(iconName) {

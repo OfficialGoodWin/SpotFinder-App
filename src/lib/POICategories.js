@@ -7,7 +7,7 @@ export const POI_CATEGORIES = [
     icon: '🏫', 
     color: '#4A90E2',
     osmTag: 'amenity=school',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Elementary, high schools, universities'
   },
   { 
@@ -16,7 +16,7 @@ export const POI_CATEGORIES = [
     icon: '🍽️', 
     color: '#E74C3C',
     osmTag: 'amenity=restaurant',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Dining and food places'
   },
   { 
@@ -25,7 +25,7 @@ export const POI_CATEGORIES = [
     icon: '☕', 
     color: '#8B4513',
     osmTag: 'amenity=cafe',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Coffee shops and cafes'
   },
   { 
@@ -34,7 +34,7 @@ export const POI_CATEGORIES = [
     icon: '🛍️', 
     color: '#9B59B6',
     osmTag: 'shop',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Retail stores and shops'
   },
   { 
@@ -43,7 +43,7 @@ export const POI_CATEGORIES = [
     icon: '🏪', 
     color: '#27AE60',
     osmTag: 'shop=supermarket',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Grocery stores'
   },
   { 
@@ -52,7 +52,7 @@ export const POI_CATEGORIES = [
     icon: '🚻', 
     color: '#3498DB',
     osmTag: 'amenity=toilets',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Public restrooms'
   },
   { 
@@ -61,7 +61,7 @@ export const POI_CATEGORIES = [
     icon: '🏦', 
     color: '#F39C12',
     osmTag: 'amenity=bank',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Banking services'
   },
   { 
@@ -70,7 +70,7 @@ export const POI_CATEGORIES = [
     icon: '💳', 
     color: '#16A085',
     osmTag: 'amenity=atm',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Cash machines'
   },
   { 
@@ -79,7 +79,7 @@ export const POI_CATEGORIES = [
     icon: '💊', 
     color: '#E67E22',
     osmTag: 'amenity=pharmacy',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Medicine and healthcare'
   },
   { 
@@ -88,7 +88,7 @@ export const POI_CATEGORIES = [
     icon: '🏥', 
     color: '#C0392B',
     osmTag: 'amenity=hospital',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Medical centers'
   },
   { 
@@ -97,7 +97,7 @@ export const POI_CATEGORIES = [
     icon: '📚', 
     color: '#8E44AD',
     osmTag: 'amenity=library',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Public libraries'
   },
   { 
@@ -106,7 +106,7 @@ export const POI_CATEGORIES = [
     icon: '🎮', 
     color: '#F1C40F',
     osmTag: 'leisure=playground',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Children play areas'
   },
   { 
@@ -115,7 +115,7 @@ export const POI_CATEGORIES = [
     icon: '🏨', 
     color: '#2980B9',
     osmTag: 'tourism=hotel',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Hotels and lodging'
   },
   { 
@@ -124,7 +124,7 @@ export const POI_CATEGORIES = [
     icon: '🏛️', 
     color: '#34495E',
     osmTag: 'tourism=museum',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Art and history museums'
   },
   { 
@@ -133,7 +133,7 @@ export const POI_CATEGORIES = [
     icon: '🏰', 
     color: '#95A5A6',
     osmTag: 'historic=castle',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Historic castles and fortresses'
   },
   { 
@@ -142,7 +142,7 @@ export const POI_CATEGORIES = [
     icon: '⛪', 
     color: '#7F8C8D',
     osmTag: 'amenity=place_of_worship',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Places of worship'
   },
   { 
@@ -151,7 +151,7 @@ export const POI_CATEGORIES = [
     icon: '💪', 
     color: '#E74C3C',
     osmTag: 'leisure=fitness_centre',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Fitness centers'
   },
   { 
@@ -160,7 +160,7 @@ export const POI_CATEGORIES = [
     icon: '🎬', 
     color: '#9B59B6',
     osmTag: 'amenity=cinema',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Movie theaters'
   },
   { 
@@ -169,7 +169,7 @@ export const POI_CATEGORIES = [
     icon: '🔧', 
     color: '#E67E22',
     osmTag: 'shop=car_repair',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Auto repair shops'
   },
   { 
@@ -178,7 +178,7 @@ export const POI_CATEGORIES = [
     icon: '📮', 
     color: '#F39C12',
     osmTag: 'amenity=post_office',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Postal services'
   },
   { 
@@ -187,7 +187,7 @@ export const POI_CATEGORIES = [
     icon: '🍺', 
     color: '#D68910',
     osmTag: 'amenity=bar',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Bars and pubs'
   },
   { 
@@ -196,7 +196,7 @@ export const POI_CATEGORIES = [
     icon: '👮', 
     color: '#2C3E50',
     osmTag: 'amenity=police',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Police stations'
   },
   { 
@@ -205,7 +205,7 @@ export const POI_CATEGORIES = [
     icon: '🚒', 
     color: '#E74C3C',
     osmTag: 'amenity=fire_station',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Fire departments'
   },
   { 
@@ -214,7 +214,7 @@ export const POI_CATEGORIES = [
     icon: '🦷', 
     color: '#16A085',
     osmTag: 'amenity=dentist',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Dental clinics'
   },
   { 
@@ -223,7 +223,7 @@ export const POI_CATEGORIES = [
     icon: '🐾', 
     color: '#27AE60',
     osmTag: 'amenity=veterinary',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Animal hospitals'
   },
   { 
@@ -232,7 +232,7 @@ export const POI_CATEGORIES = [
     icon: '🥖', 
     color: '#D4A574',
     osmTag: 'shop=bakery',
-    minZoom: 18,
+    minZoom: 14,
     desc: 'Bakeries and bread shops'
   },
   
@@ -306,7 +306,10 @@ export function filterCategories(query) {
   );
 }
 
-// Returns the display name for a category (with optional language support)
+// Stub icon map (kept for import compatibility with POILayer)
+export const POI_ICON_MAP = {};
+
+// Returns the display name for a category
 export function getCategoryName(category, language) {
   if (!category) return '';
   return category.name || '';
