@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, X, Navigation, Mic, MicOff } from 'lucide-react';
-import * as LucideIcons from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
-import { filterCategories, getCategoryName } from '@/lib/POICategories';
+import { filterCategories } from '@/lib/POICategories';
 
 const MAPY_API_KEY = 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
 
@@ -48,8 +47,8 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
       return; 
     }
     
-    // Filter POI categories with language support
-    const filteredPOI = filterCategories(query, language);
+    // Filter POI categories
+    const filteredPOI = filterCategories(query);
     setPoiCategories(filteredPOI);
     
     clearTimeout(debounce.current);
@@ -64,7 +63,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
       } catch { setResults([]); }
       setLoading(false);
     }, 300);
-  }, [query, language, mapCenter]);
+  }, [query]);
 
   const handleSelect = (item) => {
     const pos = item.position || item.regionalStructure?.[0];
@@ -188,28 +187,22 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
         {(poiCategories.length > 0 || results.length > 0) && (
           <div className="border-t border-gray-100 dark:border-border max-h-64 overflow-y-auto rounded-b-2xl">
             {/* POI Categories */}
-            {poiCategories.map((cat, i) => {
-              const IconComponent = cat.icon || LucideIcons.MapPin;
-              const catName = getCategoryName(cat, language);
-              const catDesc = cat.desc?.[language] || ''
-              
-              return (
-                <div key={`cat-${i}`} className="flex items-center hover:bg-gray-50 dark:hover:bg-accent transition-colors">
-                  <button onMouseDown={() => handleSelectCategory(cat)} className="flex-1 text-left px-4 py-2.5 flex items-center gap-3">
-                    <div 
-                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{ background: `${cat.color}20`, color: cat.color }}
-                    >
-                      <IconComponent className="w-4 h-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-800 dark:text-foreground truncate">{catName}</p>
-                      <p className="text-xs text-gray-400 dark:text-muted-foreground truncate">{catDesc}</p>
-                    </div>
-                  </button>
-                </div>
-              );
-            })}
+            {poiCategories.map((cat, i) => (
+              <div key={`cat-${i}`} className="flex items-center hover:bg-gray-50 dark:hover:bg-accent transition-colors">
+                <button onMouseDown={() => handleSelectCategory(cat)} className="flex-1 text-left px-4 py-2.5 flex items-center gap-3">
+                  <div 
+                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ background: `${cat.color}20`, color: cat.color }}
+                  >
+                    <span className="text-lg">{cat.icon}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-800 dark:text-foreground truncate">{cat.name}</p>
+                    <p className="text-xs text-gray-400 dark:text-muted-foreground truncate">{cat.desc}</p>
+                  </div>
+                </button>
+              </div>
+            ))}
             
             {/* Geocoding Results */}
             {results.map((item, i) => {
