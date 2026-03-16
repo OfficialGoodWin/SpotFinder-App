@@ -191,7 +191,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
             {poiCategories.map((cat, i) => {
               const IconComponent = cat.icon || LucideIcons.MapPin;
               const catName = getCategoryName(cat, language);
-              const catDesc = getCategoryDesc(cat, language);
+              const catDesc = cat.desc?.[language] || ''
               
               return (
                 <div key={`cat-${i}`} className="flex items-center hover:bg-gray-50 dark:hover:bg-accent transition-colors">
