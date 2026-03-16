@@ -2,7 +2,7 @@ import {
   GraduationCap, Utensils, Coffee, ShoppingBag, ShoppingCart, 
   Toilet, Building2, CreditCard, Pill, Hospital, BookOpen, 
   Gamepad2, Hotel, Landmark, Castle, Church, Dumbbell, Film,
-  Wrench, Mail, Beer, ShieldAlert, Flame, Cross, Paw, Sandwich,
+  Wrench, Mail, Beer, ShieldAlert, Flame, Cross, PawPrint, Sandwich,
   ParkingCircle, Fuel, Plug, Camera, Train, Bus
 } from 'lucide-react';
 
