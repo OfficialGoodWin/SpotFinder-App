@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Navigation, X } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
-import { getCategoryName, POI_ICON_MAP } from '@/lib/POICategories';
+import { getCategoryName } from '@/lib/POICategories';
 
 function haversineKm([lat1, lng1], [lat2, lng2]) {
   const R = 6371;
@@ -17,7 +17,7 @@ const SHEET_VH = 0.60;
 const PEEK_SHOW = HEADER_H + 8;
 
 function POIRow({ poi, category, onFlyTo, onNavigate, onClose, language }) {
-  const IconComponent = LucideIcons[POI_ICON_MAP[category.icon]] || LucideIcons.MapPin;
+  const IconComponent = spot.icon || LucideIcons.MapPin;
   
   return (
     <div
