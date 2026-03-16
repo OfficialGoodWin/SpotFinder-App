@@ -453,7 +453,7 @@ export const POI_CATEGORIES = [
       pl: 'Weterynarz'
     },
     keywords: ['vet', 'veterinary', 'veterinář', 'tierarzt', 'vétérinaire', 'veterinario', 'weterynarz'],
-    icon: Paw,
+    icon: PawPrint,
     color: '#27AE60',
     osmTag: 'amenity=veterinary',
     minZoom: 18,
