@@ -346,10 +346,10 @@ export default function Home() {
             ? '&copy; <a href="https://carto.com">CARTO</a> &copy; <a href="https://osm.org/copyright">OpenStreetMap</a>'
             : '&copy; <a href="https://mapy.com">Mapy.cz</a>'}
           maxZoom={20}
-          maxNativeZoom={useCartoTile ? 19 : 19}
-          keepBuffer={4}
+          maxNativeZoom={19}
+          keepBuffer={6}
           updateWhenIdle={false}
-          updateWhenZooming={true}
+          updateWhenZooming={false}
           crossOrigin="anonymous"
           errorTileUrl="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
         />
@@ -599,7 +599,7 @@ export default function Home() {
             startNavTo({ lat: poi.lat, lng: poi.lon, label: poi.name });
           }}
           onSelect={(poi) => setSelectedPOI(poi)}
-          onClose={() => { setShowPOIPanel(false); setSelectedPOI(null); }}
+          onClose={() => { setShowPOIPanel(false); setSelectedPOICategory(null); setSelectedPOI(null); }}
         />
       )}
 

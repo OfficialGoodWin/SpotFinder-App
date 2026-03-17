@@ -2,74 +2,110 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Navigation, Share2, Camera, Star, Phone, Mail, Globe, MapPin, ChevronUp, Clock } from 'lucide-react';
 import { getPOIPhotos, getPOIRatings, addPOIPhoto, addPOIRating, uploadSpotImage, makePOIId } from '@/api/firebaseClient';
 
-// ─── OSM tag helpers ─────────────────────────────────────────────────────────
-// Extract contact + hours directly from the OSM tags already loaded by Overpass
-// (no extra API calls needed — this data is already in poi.tags)
+const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY || '';
 
-function getPhone(tags = {}) {
-  return tags.phone || tags['contact:phone'] || tags['contact:mobile'] || null;
-}
-function getWebsite(tags = {}) {
-  return tags.website || tags['contact:website'] || tags.url || null;
-}
-function getEmail(tags = {}) {
-  return tags.email || tags['contact:email'] || null;
-}
-function getHours(tags = {}) {
-  return tags.opening_hours || null;
-}
-function getDescription(tags = {}) {
-  return tags.description || tags.note || null;
-}
+// ─── OSM tag helpers ──────────────────────────────────────────────────────────
+function getPhone(tags = {}) { return tags.phone || tags['contact:phone'] || tags['contact:mobile'] || null; }
+function getWebsite(tags = {}) { return tags.website || tags['contact:website'] || tags.url || null; }
+function getEmail(tags = {}) { return tags.email || tags['contact:email'] || null; }
+function getHours(tags = {}) { return tags.opening_hours || null; }
+function getDescription(tags = {}) { return tags.description || tags.note || null; }
 
-// Parse opening_hours string into open/closed status
-// Supports simple "Mo-Fr 08:00-18:00" style strings
 function parseOpenStatus(ohString) {
   if (!ohString) return null;
   if (ohString.toLowerCase().includes('24/7')) return { isOpen: true, label: 'Open 24/7' };
-
   try {
     const now = new Date();
     const days = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
     const today = days[now.getDay()];
     const timeNow = now.getHours() * 60 + now.getMinutes();
-
-    // Match patterns like "Mo-Fr 08:00-18:00" or "Mo,Tu 09:00-17:00"
     const rules = ohString.split(';').map(s => s.trim());
     for (const rule of rules) {
       const match = rule.match(/^([A-Za-z,\-\s]+)\s+(\d{2}:\d{2})-(\d{2}:\d{2})$/);
       if (!match) continue;
       const [, dayPart, open, close] = match;
-
-      // Check if today matches
       let todayMatches = false;
       const segments = dayPart.split(',').map(s => s.trim());
       for (const seg of segments) {
         const range = seg.match(/^([A-Z][a-z])-([A-Z][a-z])$/);
         if (range) {
-          const start = days.indexOf(range[1]);
-          const end   = days.indexOf(range[2]);
-          const cur   = days.indexOf(today);
-          if (start !== -1 && end !== -1 && cur >= start && cur <= end) todayMatches = true;
-        } else if (seg === today) {
-          todayMatches = true;
-        }
+          const s = days.indexOf(range[1]), e = days.indexOf(range[2]), c = days.indexOf(today);
+          if (s !== -1 && e !== -1 && c >= s && c <= e) todayMatches = true;
+        } else if (seg === today) todayMatches = true;
       }
-
       if (!todayMatches) continue;
-
       const [oh, om] = open.split(':').map(Number);
       const [ch, cm] = close.split(':').map(Number);
-      const openMin  = oh * 60 + om;
-      const closeMin = ch * 60 + cm;
-      const isOpen   = timeNow >= openMin && timeNow < closeMin;
+      const isOpen = timeNow >= oh * 60 + om && timeNow < ch * 60 + cm;
       return { isOpen, label: `${isOpen ? 'Open' : 'Closed'} · ${open}–${close}` };
     }
   } catch {}
   return null;
 }
 
-// ─── Stars ───────────────────────────────────────────────────────────────────
+// ─── Google Places photo fetch ────────────────────────────────────────────────
+async function fetchGooglePhotos(name, lat, lon) {
+  if (!GOOGLE_API_KEY) return [];
+  try {
+    // Find place
+    const findUrl = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(name)}&inputtype=textquery&locationbias=circle:200@${lat},${lon}&fields=place_id,photos&key=${GOOGLE_API_KEY}`;
+    const res = await fetch(findUrl);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const placeId = data.candidates?.[0]?.place_id;
+    const photosFromFind = data.candidates?.[0]?.photos || [];
+
+    // Get details for more photos if needed
+    let photos = photosFromFind;
+    if (!photos.length && placeId) {
+      const detailUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=photos&key=${GOOGLE_API_KEY}`;
+      const dr = await fetch(detailUrl);
+      if (dr.ok) {
+        const dd = await dr.json();
+        photos = dd.result?.photos || [];
+      }
+    }
+
+    return photos.slice(0, 6).map(p =>
+      `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${p.photo_reference}&key=${GOOGLE_API_KEY}`
+    );
+  } catch {
+    return [];
+  }
+}
+
+// ─── Fallback: fetch photos from Wikimedia/OpenStreetMap ─────────────────────
+async function fetchOpenPhotos(name, lat, lon) {
+  try {
+    // Try Wikimedia Commons geoSearch
+    const url = `https://commons.wikimedia.org/w/api.php?action=query&list=geosearch&gscoord=${lat}|${lon}&gsradius=100&gslimit=5&gsnamespace=6&format=json&origin=*`;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const pages = data.query?.geosearch || [];
+    if (!pages.length) return [];
+
+    const titles = pages.map(p => `File:${p.title.replace('File:', '')}`).join('|');
+    const imgUrl = `https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(titles)}&prop=imageinfo&iiprop=url&iiurlwidth=800&format=json&origin=*`;
+    const ir = await fetch(imgUrl);
+    if (!ir.ok) return [];
+    const id = await ir.json();
+    return Object.values(id.query?.pages || {})
+      .map(p => p.imageinfo?.[0]?.thumburl)
+      .filter(Boolean)
+      .slice(0, 4);
+  } catch {
+    return [];
+  }
+}
+
+async function tryFetchPhotos(name, lat, lon) {
+  const google = await fetchGooglePhotos(name, lat, lon);
+  if (google.length) return google;
+  return fetchOpenPhotos(name, lat, lon);
+}
+
+// ─── Stars ────────────────────────────────────────────────────────────────────
 function Stars({ value = 0, size = 14, interactive = false, onRate }) {
   const [hover, setHover] = useState(0);
   return (
@@ -94,7 +130,6 @@ function Stars({ value = 0, size = 14, interactive = false, onRate }) {
   );
 }
 
-// ─── Action button ────────────────────────────────────────────────────────────
 function ActionBtn({ icon: Icon, label, onClick, color, disabled }) {
   return (
     <button onClick={onClick} disabled={disabled}
@@ -105,7 +140,6 @@ function ActionBtn({ icon: Icon, label, onClick, color, disabled }) {
   );
 }
 
-// ─── Contact row ──────────────────────────────────────────────────────────────
 function ContactRow({ icon: Icon, value, href }) {
   const inner = (
     <div className="flex items-center gap-3 py-2.5">
@@ -121,8 +155,8 @@ function ContactRow({ icon: Icon, value, href }) {
 }
 
 // ─── Mini bar ─────────────────────────────────────────────────────────────────
-function MiniBar({ poi, category, sfRating, mapyPhoto, onExpand, onClose, onNavigate, onShare, onAddPhoto, user }) {
-  const avg   = sfRating?.count > 0 ? sfRating.avg : 0;
+function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavigate, onShare, onAddPhoto, user }) {
+  const avg = sfRating?.count > 0 ? sfRating.avg : 0;
   const count = sfRating?.count || 0;
 
   return (
@@ -133,16 +167,15 @@ function MiniBar({ poi, category, sfRating, mapyPhoto, onExpand, onClose, onNavi
       </button>
       <button onClick={onClose}
         className="absolute top-3 right-3 w-7 h-7 rounded-full bg-gray-100 dark:bg-accent flex items-center justify-center z-10">
-        <X className="w-3.5 h-3.5" />
+        <X className="w-3.5 h-3.5 text-foreground" />
       </button>
 
-      {/* Info row */}
       <div className="flex items-center gap-3 px-4 pt-2 pb-3 cursor-pointer" onClick={onExpand}>
         <div className="w-14 h-14 rounded-full flex-shrink-0 overflow-hidden border-2 flex items-center justify-center"
           style={{ borderColor: category.color, background: `${category.color}18` }}>
-          {mapyPhoto
-            ? <img src={mapyPhoto} alt={poi.name} className="w-full h-full object-cover"
-                onError={e => { e.target.style.display = 'none'; e.target.parentNode.innerHTML = `<span style="font-size:24px">${category.icon}</span>`; }} />
+          {photoUrl
+            ? <img src={photoUrl} alt={poi.name} className="w-full h-full object-cover"
+                onError={e => { e.target.style.display = 'none'; }} />
             : <span className="text-2xl">{category.icon}</span>}
         </div>
         <div className="flex-1 min-w-0">
@@ -161,34 +194,32 @@ function MiniBar({ poi, category, sfRating, mapyPhoto, onExpand, onClose, onNavi
 
       <div className="flex items-center gap-2 px-4 pb-4">
         <ActionBtn icon={Navigation} label="Navigate" onClick={onNavigate} color={category.color} />
-        <ActionBtn icon={Share2}     label="Share"    onClick={onShare} />
-        <ActionBtn icon={Camera}     label="Add Photo" onClick={onAddPhoto} disabled={!user} />
+        <ActionBtn icon={Share2} label="Share" onClick={onShare} />
+        <ActionBtn icon={Camera} label="Add Photo" onClick={onAddPhoto} disabled={!user} />
       </div>
     </div>
   );
 }
 
 // ─── Full sheet ───────────────────────────────────────────────────────────────
-function FullSheet({ poi, category, sfPhotos, sfRating, mapyPhotos, onClose, onNavigate, onShare, onAddPhoto, onSubmitRating, user }) {
-  const [ratingVal, setRatingVal]         = useState(0);
+function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavigate, onShare, onAddPhoto, onSubmitRating, user }) {
+  const [ratingVal, setRatingVal] = useState(0);
   const [ratingComment, setRatingComment] = useState('');
-  const [submitting, setSubmitting]       = useState(false);
-  const [ratingDone, setRatingDone]       = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [ratingDone, setRatingDone] = useState(false);
 
-  const tags    = poi.tags || {};
-  const phone   = getPhone(tags);
+  const tags = poi.tags || {};
+  const phone = getPhone(tags);
   const website = getWebsite(tags);
-  const email   = getEmail(tags);
-  const ohRaw   = getHours(tags);
-  const desc    = getDescription(tags);
-  const status  = parseOpenStatus(ohRaw);
-
-  const avg   = sfRating?.count > 0 ? sfRating.avg : 0;
+  const email = getEmail(tags);
+  const ohRaw = getHours(tags);
+  const desc = getDescription(tags);
+  const status = parseOpenStatus(ohRaw);
+  const avg = sfRating?.count > 0 ? sfRating.avg : 0;
   const count = sfRating?.count || 0;
 
-  // Combine Mapy.cz photos + SpotFinder photos
   const allPhotos = [
-    ...mapyPhotos.map(u => ({ url: u, source: 'mapy' })),
+    ...photos.map(u => ({ url: u, source: 'remote' })),
     ...sfPhotos.map(p => ({ url: p.image || p.photo, source: 'sf' })),
   ];
 
@@ -221,11 +252,8 @@ function FullSheet({ poi, category, sfPhotos, sfRating, mapyPhotos, onClose, onN
           </button>
         </div>
 
-        {/* Scrollable body */}
         <div className="overflow-y-auto overscroll-contain" style={{ maxHeight: 'calc(92vh - 200px)' }}>
           <div className="px-5 pt-4 pb-10">
-
-            {/* Name + category badge */}
             <h1 className="text-xl font-bold text-foreground leading-tight">{poi.name}</h1>
             <div className="mt-1.5 mb-4">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-white"
@@ -234,16 +262,14 @@ function FullSheet({ poi, category, sfPhotos, sfRating, mapyPhotos, onClose, onN
               </span>
             </div>
 
-            {/* Action buttons */}
             <div className="flex gap-2 mb-5">
               <ActionBtn icon={Navigation} label="Navigate" onClick={onNavigate} color={category.color} />
-              <ActionBtn icon={Share2}     label="Share"    onClick={onShare} />
-              <ActionBtn icon={Camera}     label="Add Photo" onClick={onAddPhoto} disabled={!user} />
+              <ActionBtn icon={Share2} label="Share" onClick={onShare} />
+              <ActionBtn icon={Camera} label="Add Photo" onClick={onAddPhoto} disabled={!user} />
             </div>
 
             <div className="h-px bg-gray-100 dark:bg-border mb-4" />
 
-            {/* Opening hours */}
             {status && (
               <div className="flex items-center gap-2 mb-4">
                 <Clock className="w-4 h-4 text-muted-foreground flex-shrink-0" />
@@ -259,7 +285,6 @@ function FullSheet({ poi, category, sfPhotos, sfRating, mapyPhotos, onClose, onN
               </div>
             )}
 
-            {/* Ratings */}
             <div className="mb-4">
               {avg > 0 ? (
                 <div className="flex items-center gap-2 mb-3">
@@ -270,7 +295,6 @@ function FullSheet({ poi, category, sfPhotos, sfRating, mapyPhotos, onClose, onN
               ) : (
                 <p className="text-sm text-muted-foreground mb-3">No ratings yet — be the first!</p>
               )}
-
               {!ratingDone ? (
                 <div className="bg-gray-50 dark:bg-accent/40 rounded-2xl p-4">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Rate this place</p>
@@ -304,7 +328,6 @@ function FullSheet({ poi, category, sfPhotos, sfRating, mapyPhotos, onClose, onN
 
             <div className="h-px bg-gray-100 dark:bg-border mb-4" />
 
-            {/* Description */}
             {desc && (
               <>
                 <p className="text-sm text-foreground leading-relaxed mb-4">{desc}</p>
@@ -312,20 +335,18 @@ function FullSheet({ poi, category, sfPhotos, sfRating, mapyPhotos, onClose, onN
               </>
             )}
 
-            {/* Contact info — sourced directly from OSM tags, instant, no extra API */}
             {(phone || email || website || poi.lat) && (
               <>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Contact & Info</p>
-                {phone   && <ContactRow icon={Phone}  value={phone}   href={`tel:${phone}`} />}
-                {email   && <ContactRow icon={Mail}   value={email}   href={`mailto:${email}`} />}
-                {website && <ContactRow icon={Globe}  value={website} href={website.startsWith('http') ? website : `https://${website}`} />}
+                {phone && <ContactRow icon={Phone} value={phone} href={`tel:${phone}`} />}
+                {email && <ContactRow icon={Mail} value={email} href={`mailto:${email}`} />}
+                {website && <ContactRow icon={Globe} value={website} href={website.startsWith('http') ? website : `https://${website}`} />}
                 <ContactRow icon={MapPin} value={`${poi.lat.toFixed(6)}, ${poi.lon.toFixed(6)}`}
                   href={`https://maps.google.com/?q=${poi.lat},${poi.lon}`} />
                 <div className="h-px bg-gray-100 dark:bg-border mt-2 mb-4" />
               </>
             )}
 
-            {/* Photo gallery */}
             {allPhotos.length > 0 && (
               <>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
@@ -335,7 +356,8 @@ function FullSheet({ poi, category, sfPhotos, sfRating, mapyPhotos, onClose, onN
                 <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
                   {allPhotos.map((p, i) => (
                     <div key={i} className="flex-shrink-0 w-28 h-20 rounded-xl overflow-hidden bg-gray-100 dark:bg-accent relative">
-                      <img src={p.url} alt="" className="w-full h-full object-cover" />
+                      <img src={p.url} alt="" className="w-full h-full object-cover"
+                        onError={e => { e.target.parentNode.style.display = 'none'; }} />
                       {p.source === 'sf' && <div className="absolute bottom-1 right-1 bg-green-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">SF</div>}
                     </div>
                   ))}
@@ -350,7 +372,6 @@ function FullSheet({ poi, category, sfPhotos, sfRating, mapyPhotos, onClose, onN
               </>
             )}
 
-            {/* If no photos yet, still show add button */}
             {allPhotos.length === 0 && user && (
               <button onClick={onAddPhoto}
                 className="w-full h-20 rounded-xl border-2 border-dashed border-gray-300 dark:border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-gray-400 transition-colors mb-4">
@@ -359,7 +380,6 @@ function FullSheet({ poi, category, sfPhotos, sfRating, mapyPhotos, onClose, onN
               </button>
             )}
 
-            {/* SpotFinder reviews */}
             {sfRating?.ratings?.length > 0 && (
               <>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">SpotFinder Reviews</p>
@@ -376,7 +396,6 @@ function FullSheet({ poi, category, sfPhotos, sfRating, mapyPhotos, onClose, onN
                 </div>
               </>
             )}
-
           </div>
         </div>
       </div>
@@ -384,64 +403,18 @@ function FullSheet({ poi, category, sfPhotos, sfRating, mapyPhotos, onClose, onN
   );
 }
 
-// ─── Main export ─────────────────────────────────────────────────────────────
-
-const MAPY_API_KEY = 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
-
-/** Try to fetch Mapy.cz photos for a POI — non-blocking, fails silently */
-async function tryFetchMapyPhotos(name, lat, lon) {
-  try {
-    const near = `&preferNear=${lon},${lat}&preferNearPrecision=500`;
-    const url  = `https://api.mapy.com/v1/suggest?apikey=${MAPY_API_KEY}&query=${encodeURIComponent(name)}&lang=en&limit=5${near}`;
-    const res  = await fetch(url);
-    if (!res.ok) return [];
-
-    const data  = await res.json();
-    const items = data.items || [];
-
-    // Find closest match within ~500m
-    let best = null, bestDist = Infinity;
-    for (const item of items) {
-      const pos = item.position;
-      if (!pos) continue;
-      const d = Math.hypot(pos.lat - lat, pos.lon - lon);
-      if (d < bestDist) { bestDist = d; best = item; }
-    }
-    if (!best || bestDist > 0.005) return [];
-
-    // Extract source + id — Mapy.cz uses userData for this
-    const ud     = best.userData || {};
-    // source can be in userData.source, or in best.source, or parsed from best.id
-    const source = ud.source || best.source || (typeof best.id === 'string' && best.id.includes(':') ? best.id.split(':')[0] : null);
-    const id     = ud.id     || (typeof best.id === 'string' && best.id.includes(':') ? best.id.split(':').slice(1).join(':') : best.id);
-    if (!source || !id) return [];
-
-    // Try the /place/ endpoint — photos array lives here
-    const detailRes = await fetch(
-      `https://api.mapy.com/v1/place/${encodeURIComponent(source)}:${encodeURIComponent(id)}?apikey=${MAPY_API_KEY}&lang=en`
-    );
-    if (!detailRes.ok) return [];
-
-    const detail = await detailRes.json();
-    // photos is an array of {url, ...} — fall back to panoramas or mark images
-    const photos = (detail.photos || detail.panoramas || []).map(p => p.url || p).filter(u => typeof u === 'string');
-    return photos;
-  } catch {
-    return [];
-  }
-}
-
+// ─── Main export ──────────────────────────────────────────────────────────────
 export default function POIDetailPanel({ poi, category, onClose, onNavigate, user }) {
-  const [expanded, setExpanded]   = useState(false);
-  const [sfPhotos, setSfPhotos]   = useState([]);
-  const [sfRating, setSfRating]   = useState({ ratings: [], avg: 0, count: 0 });
-  const [mapyPhotos, setMapyPhotos] = useState([]);
+  const [expanded, setExpanded] = useState(false);
+  const [sfPhotos, setSfPhotos] = useState([]);
+  const [sfRating, setSfRating] = useState({ ratings: [], avg: 0, count: 0 });
+  const [photos, setPhotos] = useState([]);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (!poi) return;
     setExpanded(false);
-    setMapyPhotos([]);
+    setPhotos([]);
 
     const poiId = makePOIId(poi.lat, poi.lon, poi.name);
     getPOIPhotos(poiId).then(setSfPhotos);
@@ -451,18 +424,26 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
         : (r || { ratings: [], avg: 0, count: 0 })
     ));
 
-    // Fetch Mapy.cz photos in background — non-blocking
-    tryFetchMapyPhotos(poi.name, poi.lat, poi.lon).then(urls => {
-      if (urls.length) setMapyPhotos(urls);
+    tryFetchPhotos(poi.name, poi.lat, poi.lon).then(urls => {
+      if (urls.length) setPhotos(urls);
     });
   }, [poi?.id]);
 
   const handleShare = async () => {
     const url = `https://maps.google.com/?q=${poi.lat},${poi.lon}`;
+    const shareText = `${poi.name}\n${url}`;
     try {
-      if (navigator.share) await navigator.share({ title: poi.name, url });
-      else await navigator.clipboard.writeText(`${poi.name}\n${url}`);
-    } catch {}
+      if (navigator.share) {
+        await navigator.share({ title: poi.name, text: poi.address || poi.name, url });
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(shareText);
+        alert('Link copied to clipboard!');
+      } else {
+        window.open(url, '_blank');
+      }
+    } catch (e) {
+      if (e.name !== 'AbortError') window.open(url, '_blank');
+    }
   };
 
   const handleAddPhoto = () => { if (user) fileInputRef.current?.click(); };
@@ -494,7 +475,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
   if (!poi) return null;
 
   const sharedProps = {
-    poi, category, sfPhotos, sfRating, mapyPhotos,
+    poi, category, sfPhotos, sfRating, photos,
     onClose, onNavigate: handleNavigate, onShare: handleShare, onAddPhoto: handleAddPhoto, user,
   };
 
@@ -503,7 +484,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
       {expanded
         ? <FullSheet {...sharedProps} onSubmitRating={handleSubmitRating} />
-        : <MiniBar {...sharedProps} mapyPhoto={mapyPhotos[0] || null} onExpand={() => setExpanded(true)} />}
+        : <MiniBar {...sharedProps} photoUrl={photos[0] || null} onExpand={() => setExpanded(true)} />}
     </>
   );
 }
