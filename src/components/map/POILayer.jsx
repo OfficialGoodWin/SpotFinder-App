@@ -1,9 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-// POI_ICON_MAP import removed — icons are resolved via getIconSVG()
 
-// Helper function to get SVG paths for icons (no emoji, pure SVG)
 function getIconSVG(iconName) {
   const paths = {
     school: '<path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path>',
@@ -24,37 +22,19 @@ function getIconSVG(iconName) {
   return paths[iconName] || '<circle cx="12" cy="12" r="10"></circle><path d="M12 8v8"></path><path d="M8 12h8"></path>';
 }
 
-// Create custom icon for POI markers using pure SVG (no emojis)
 const createPOIIcon = (iconName, color) => {
   const svgPath = getIconSVG(iconName);
-  
   return L.divIcon({
     className: 'custom-poi-marker',
-    html: `
-      <div style="
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        background: ${color};
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border: 2px solid white;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        cursor: pointer;
-      ">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          ${svgPath}
-        </svg>
-      </div>
-    `,
+    html: `<div style="width:32px;height:32px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);cursor:pointer;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svgPath}</svg>
+    </div>`,
     iconSize: [32, 32],
     iconAnchor: [16, 32],
     popupAnchor: [0, -32]
   });
 };
 
-// Cache for POI data to reduce API calls
 const poiCache = new Map();
 const CACHE_DURATION = 300000; // 5 minutes
 
@@ -64,11 +44,10 @@ function getCacheKey(bounds, osmTag) {
   return `${osmTag}-${lat}-${lng}`;
 }
 
-// Multiple Overpass mirrors — tried in order, fallback on 5xx/network error
 const OVERPASS_MIRRORS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
-  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
 ];
 
 async function fetchOverpass(queryStr, signal) {
@@ -79,6 +58,7 @@ async function fetchOverpass(queryStr, signal) {
         headers: { 'Content-Type': 'text/plain' },
       });
       if (res.ok) return res;
+      // 429 = rate limited, 403 = blocked — try next mirror
       console.warn(`Overpass ${endpoint} → ${res.status}, trying next`);
     } catch (err) {
       if (err.name === 'AbortError') throw err;
@@ -90,7 +70,6 @@ async function fetchOverpass(queryStr, signal) {
 
 export default function POILayer({ category, onNavigate, onPOIsLoaded, onLoadingChange, onSelectPOI }) {
   const [pois, setPois] = useState([]);
-  const [loading, setLoading] = useState(false);
   const map = useMap();
   const loadTimeoutRef = useRef(null);
   const lastRequestRef = useRef(0);
@@ -99,146 +78,94 @@ export default function POILayer({ category, onNavigate, onPOIsLoaded, onLoading
   useEffect(() => {
     if (!category) {
       setPois([]);
-      if (onPOIsLoaded) onPOIsLoaded([]);
+      onPOIsLoaded?.([]);
+      onLoadingChange?.(false);
       return;
     }
 
     const loadPOIs = async () => {
       const zoom = map.getZoom();
-      
-      // Check if current zoom level is appropriate for this category
-      if (zoom < category.minZoom) {
-        setPois([]);
-        if (onPOIsLoaded) onPOIsLoaded([]);
-        onLoadingChange?.(false);
-        return;
-      }
 
-      // Rate limiting: minimum 2 seconds between requests
+      // Scale result count + bbox by zoom level — all zooms work, just fewer results when zoomed out
+      const resultLimit = zoom >= 16 ? 200 : zoom >= 14 ? 100 : zoom >= 12 ? 40 : zoom >= 10 ? 15 : 6;
+      const maxDelta    = zoom >= 14 ? 0.50 : zoom >= 12 ? 0.30 : zoom >= 10 ? 0.15 : 0.07;
+
+      // Rate-limit: 2s min between requests to avoid burning through Overpass mirrors
       const now = Date.now();
-      if (now - lastRequestRef.current < 500) {
-        return;
-      }
+      if (now - lastRequestRef.current < 2000) return;
 
-      const bounds = map.getBounds();
-      const cacheKey = getCacheKey(bounds, category.osmTag);
-      
-      // Check cache first
+      const rawBounds = map.getBounds();
+      const mapCenter = rawBounds.getCenter();
+
+      // Clamp bbox to maxDelta around map centre
+      const latHalf = Math.min((rawBounds.getNorth() - rawBounds.getSouth()) / 2, maxDelta / 2);
+      const lngHalf = Math.min((rawBounds.getEast()  - rawBounds.getWest())  / 2, maxDelta / 2);
+      const south = mapCenter.lat - latHalf;
+      const north = mapCenter.lat + latHalf;
+      const west  = mapCenter.lng - lngHalf;
+      const east  = mapCenter.lng + lngHalf;
+
+      const cacheKey = `${category.osmTag}-${south.toFixed(3)}-${west.toFixed(3)}-z${Math.floor(zoom)}`;
+
+      // Serve from cache immediately if fresh
       const cached = poiCache.get(cacheKey);
       if (cached && now - cached.timestamp < CACHE_DURATION) {
         setPois(cached.data);
-        if (onPOIsLoaded) onPOIsLoaded(cached.data);
-        return;
-      }
-
-      // Cancel previous request if still pending
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-
-      setLoading(true);
-      onLoadingChange?.(true);
-      lastRequestRef.current = now;
-
-      const south = bounds.getSouth();
-      const west = bounds.getWest();
-      const north = bounds.getNorth();
-      const east = bounds.getEast();
-
-      // Limit bounding box size to reduce load (max 0.5 degrees)
-      const maxDelta = 0.5;
-      const latDelta = north - south;
-      const lngDelta = east - west;
-      
-      if (latDelta > maxDelta || lngDelta > maxDelta) {
-        setLoading(false);
+        onPOIsLoaded?.(cached.data);
         onLoadingChange?.(false);
         return;
       }
 
-      // Build correct Overpass filter from osmTag (e.g. "amenity=school" → ["amenity"="school"])
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+      abortControllerRef.current = new AbortController();
+
+      onLoadingChange?.(true);
+      lastRequestRef.current = now;
+
       const osmTag = category.osmTag;
       const eqIdx = osmTag.indexOf('=');
       const tagFilter = eqIdx !== -1
         ? `["${osmTag.slice(0, eqIdx)}"="${osmTag.slice(eqIdx + 1)}"]`
         : `["${osmTag}"]`;
 
-      // Overpass API query with timeout and limit
-      const query = `
-        [out:json][timeout:15];
-        (
-          node${tagFilter}(${south},${west},${north},${east});
-          way${tagFilter}(${south},${west},${north},${east});
-        );
-        out center 200;
-      `;
-
-      abortControllerRef.current = new AbortController();
+      const query = `[out:json][timeout:15];(node${tagFilter}(${south},${west},${north},${east});way${tagFilter}(${south},${west},${north},${east}););out center ${resultLimit};`;
 
       try {
         const response = await fetchOverpass(query, abortControllerRef.current.signal);
-
         const text = await response.text();
-        
-        // Check if response is JSON
-        if (!text.trim().startsWith('{')) {
-          throw new Error('Invalid response format');
-        }
+        if (!text.trim().startsWith('{')) throw new Error('Invalid response format');
 
         const data = JSON.parse(text);
-        
-        const poiList = data.elements.map(element => {
-          const lat = element.lat || element.center?.lat;
-          const lon = element.lon || element.center?.lon;
-          
-          if (lat && lon) {
-            return {
-              id: element.id,
-              lat,
-              lon,
-              name: element.tags?.name || category.name,
-              address: element.tags?.['addr:street'] 
-                ? `${element.tags['addr:street']} ${element.tags['addr:housenumber'] || ''}` 
-                : '',
-              tags: element.tags
-            };
-          }
-          return null;
+        const poiList = data.elements.map(el => {
+          const lat = el.lat || el.center?.lat;
+          const lon = el.lon || el.center?.lon;
+          if (!lat || !lon) return null;
+          return {
+            id: el.id,
+            lat, lon,
+            name: el.tags?.name || category.name,
+            address: el.tags?.['addr:street']
+              ? `${el.tags['addr:street']} ${el.tags['addr:housenumber'] || ''}`.trim()
+              : '',
+            tags: el.tags,
+          };
         }).filter(Boolean);
 
-        // Cache the results
-        poiCache.set(cacheKey, {
-          data: poiList,
-          timestamp: now
-        });
-
+        poiCache.set(cacheKey, { data: poiList, timestamp: now }); // keyed by zoom bucket
         setPois(poiList);
-        if (onPOIsLoaded) onPOIsLoaded(poiList);
-        setLoading(false);
+        onPOIsLoaded?.(poiList);
         onLoadingChange?.(false);
-      } catch (error) {
-        if (error.name === 'AbortError') {
-          // Request was cancelled, ignore
-          return;
-        }
-        
-        console.error('Error loading POIs:', error.message);
-        setLoading(false);
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        console.error('Error loading POIs:', err.message);
         onLoadingChange?.(false);
-        
-        // Don't clear existing POIs on error, just don't update
-        if (pois.length === 0) {
-          setPois([]);
-          if (onPOIsLoaded) onPOIsLoaded([]);
-        }
       }
     };
 
-    // Debounce POI loading to avoid too many requests (longer delay)
+    // Fast initial load, moderate move debounce
     clearTimeout(loadTimeoutRef.current);
     loadTimeoutRef.current = setTimeout(loadPOIs, 200);
 
-    // Reload POIs when map moves or zooms (with longer debounce)
     const handleMoveEnd = () => {
       clearTimeout(loadTimeoutRef.current);
       loadTimeoutRef.current = setTimeout(loadPOIs, 400);
@@ -251,9 +178,7 @@ export default function POILayer({ category, onNavigate, onPOIsLoaded, onLoading
       map.off('moveend', handleMoveEnd);
       map.off('zoomend', handleMoveEnd);
       clearTimeout(loadTimeoutRef.current);
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
+      abortControllerRef.current?.abort();
     };
   }, [category, map]);
 
@@ -262,39 +187,20 @@ export default function POILayer({ category, onNavigate, onPOIsLoaded, onLoading
   return (
     <>
       {pois.map(poi => (
-        <Marker 
-          key={poi.id} 
+        <Marker
+          key={poi.id}
           position={[poi.lat, poi.lon]}
           icon={createPOIIcon(category.icon, category.color)}
           eventHandlers={{ click: () => onSelectPOI?.(poi) }}
         >
           <Popup>
-            <div style={{ minWidth: '200px' }}>
-              <h3 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: 600 }}>
-                {poi.name}
-              </h3>
-              {poi.address && (
-                <p style={{ margin: '4px 0', fontSize: '13px', color: '#666' }}>
-                  📍 {poi.address}
-                </p>
-              )}
+            <div style={{ minWidth: '180px' }}>
+              <h3 style={{ margin: '0 0 6px 0', fontSize: '15px', fontWeight: 600 }}>{poi.name}</h3>
+              {poi.address && <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#666' }}>📍 {poi.address}</p>}
               <button
                 onClick={() => onNavigate({ lat: poi.lat, lng: poi.lon, label: poi.name })}
-                style={{
-                  marginTop: '10px',
-                  padding: '8px 16px',
-                  background: category.color,
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  width: '100%'
-                }}
-              >
-                Navigate Here
-              </button>
+                style={{ padding: '7px 14px', background: category.color, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, width: '100%' }}
+              >Navigate</button>
             </div>
           </Popup>
         </Marker>
