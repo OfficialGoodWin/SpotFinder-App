@@ -1,354 +1,526 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Marker, Popup, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import { Navigation, Image, Star, Clock, Phone, Globe, ChevronRight } from 'lucide-react';
-import { smartPOISearch, enrichPOIWithDetails, getPlaceDetails } from '@/api/mapyPOIService';
+/**
+ * Mapy.cz POI Service
+ * Fetches POIs with images and descriptions from Mapy.cz API
+ * Handles smart zoom-based filtering for "main" vs all POIs
+ */
 
-// Create custom icon for POI markers
-const createPOIIcon = (emoji, color, size = 32) => {
-  return L.divIcon({
-    className: 'custom-poi-marker',
-    html: `
-      <div style="
-        width: ${size}px;
-        height: ${size}px;
-        border-radius: 50%;
-        background: ${color};
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: ${size * 0.56}px;
-        border: 2px solid white;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        cursor: pointer;
-        transition: transform 0.15s ease;
-      " class="poi-marker">
-        ${emoji}
-      </div>
-    `,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size],
-    popupAnchor: [0, -size]
-  });
+const MAPY_API_KEY = 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
+
+// Mapy.cz POI category IDs (these are Mapy's internal category codes)
+// https://api.mapy.com/doc/#api-Places
+export const MAPY_POI_CATEGORIES = {
+  // Food & Dining
+  restaurants: 101,
+  cafes: 102,
+  bars: 103,
+  fastFood: 104,
+  pubs: 105,
+  
+  // Accommodation
+  hotels: 201,
+  hostels: 202,
+  camping: 203,
+  
+  // Shopping
+  supermarkets: 301,
+  shops: 302,
+  malls: 303,
+  bakeries: 304,
+  
+  // Services
+  banks: 401,
+  atms: 402,
+  postOffices: 403,
+  pharmacies: 404,
+  
+  // Healthcare
+  hospitals: 501,
+  clinics: 502,
+  dentists: 503,
+  veterinarians: 504,
+  
+  // Education
+  schools: 601,
+  universities: 602,
+  libraries: 603,
+  kindergartens: 604,
+  
+  // Transport
+  gasStations: 701,
+  parking: 702,
+  evCharging: 703,
+  trainStations: 704,
+  busStops: 705,
+  airports: 706,
+  
+  // Tourism
+  museums: 801,
+  castles: 802,
+  churches: 803,
+  monuments: 804,
+  viewpoints: 805,
+  
+  // Leisure
+  parks: 901,
+  playgrounds: 902,
+  gyms: 903,
+  cinemas: 904,
+  swimmingPools: 905,
+  
+  // Emergency
+  police: 1001,
+  fireStations: 1002,
+  
+  // Facilities
+  toilets: 1101,
+  
+  // Other
+  carRepair: 1201,
+  speedCameras: 1202,
 };
 
-// Create larger icon for important POIs at low zoom
-const createImportantPOIIcon = (emoji, color) => {
-  return createPOIIcon(emoji, color, 40);
-};
-
-export default function POILayer({ category, onNavigate }) {
-  const [pois, setPois] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedPOI, setSelectedPOI] = useState(null);
-  const [poiDetails, setPoiDetails] = useState(null);
-  const [loadingDetails, setLoadingDetails] = useState(false);
-  const map = useMap();
-  const abortControllerRef = useRef(null);
-  const lastSearchRef = useRef(null);
-
-  // Load POIs with smart zoom handling
-  const loadPOIs = useCallback(async (forceRefresh = false) => {
-    if (!category) {
-      setPois([]);
-      return;
+/**
+ * Search for POIs in a bounding box using Mapy.cz Places API
+ * @param {Object} bounds - { south, west, north, east }
+ * @param {number} category - Mapy.cz category ID
+ * @param {number} limit - Max results (auto-adjusted by zoom)
+ * @param {string} lang - Language code
+ */
+export async function searchPOIsInBounds(bounds, category, limit = 100, lang = 'en') {
+  const { south, west, north, east } = bounds;
+  
+  // Mapy.cz Places API endpoint
+  const url = `https://api.mapy.com/v1/places?apikey=${MAPY_API_KEY}&bbox=${west},${south},${east},${north}&limit=${limit}&lang=${lang}`;
+  
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Mapy.cz API error: ${response.status}`);
     }
-
-    const zoom = map.getZoom();
-    
-    // Check if current zoom level is appropriate for this category
-    if (zoom < category.minZoom) {
-      setPois([]);
-      return;
-    }
-
-    // Create a search key to avoid duplicate searches
-    const bounds = map.getBounds();
-    const searchKey = `${category.name}-${zoom.toFixed(0)}-${bounds.toBBoxString()}`;
-    
-    // Skip if same search was just made
-    if (!forceRefresh && lastSearchRef.current === searchKey) {
-      return;
-    }
-    lastSearchRef.current = searchKey;
-
-    // Cancel previous request
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
-
-    setLoading(true);
-
-    try {
-      const center = map.getCenter();
-      
-      // Use smart POI search that adapts to zoom level
-      const results = await smartPOISearch({
-        bounds: {
-          south: bounds.getSouth(),
-          west: bounds.getWest(),
-          north: bounds.getNorth(),
-          east: bounds.getEast()
-        },
-        center: { lat: center.lat, lng: center.lng },
-        zoom,
-        category,
-        lang: 'en' // Could be dynamic based on user language
-      });
-
-      // Only update if this request wasn't aborted
-      if (!abortControllerRef.current.signal.aborted) {
-        setPois(results);
-      }
-    } catch (error) {
-      if (error.name !== 'AbortError') {
-        console.error('Error loading POIs:', error);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [category, map]);
-
-  // Initial load and category change
-  useEffect(() => {
-    if (!category) {
-      setPois([]);
-      return;
-    }
-
-    loadPOIs(true);
-
-    // Debounced reload on map movement
-    let debounceTimer;
-    const handleMoveEnd = () => {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => loadPOIs(), 300);
-    };
-
-    map.on('moveend', handleMoveEnd);
-    map.on('zoomend', handleMoveEnd);
-
-    return () => {
-      clearTimeout(debounceTimer);
-      map.off('moveend', handleMoveEnd);
-      map.off('zoomend', handleMoveEnd);
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, [category, map, loadPOIs]);
-
-  // Fetch POI details when selected
-  const handlePOIClick = useCallback(async (poi) => {
-    setSelectedPOI(poi);
-    setPoiDetails(null);
-    setLoadingDetails(true);
-
-    try {
-      const details = await enrichPOIWithDetails(poi);
-      setPoiDetails(details);
-    } catch (error) {
-      console.warn('Could not load POI details:', error);
-      setPoiDetails(poi); // Fall back to basic info
-    } finally {
-      setLoadingDetails(false);
-    }
-  }, []);
-
-  // Determine icon size based on zoom
-  const getIconForZoom = useCallback((poi) => {
-    const zoom = map.getZoom();
-    const isImportant = poi.rating || poi.photo || poi.description;
-    
-    // Use larger icons for important POIs at low zoom
-    if (zoom < 14 && isImportant) {
-      return createImportantPOIIcon(category.icon, category.color);
-    }
-    
-    return createPOIIcon(category.icon, category.color);
-  }, [category, map]);
-
-  if (!category) return null;
-
-  const zoom = map.getZoom();
-  const showPOIs = zoom >= category.minZoom;
-
-  return (
-    <>
-      {/* Loading indicator */}
-      {loading && (
-        <div className="absolute top-20 right-4 z-[1001] bg-white dark:bg-card px-3 py-1.5 rounded-full shadow-lg text-xs font-medium text-gray-600 dark:text-muted-foreground flex items-center gap-2">
-          <div className="w-3 h-3 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
-          Loading {category.name}...
-        </div>
-      )}
-
-      {/* Zoom hint when below minimum zoom */}
-      {!showPOIs && category && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-[1001] bg-black/80 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg">
-          🔍 Zoom in to see {category.name}
-        </div>
-      )}
-
-      {/* POI Markers */}
-      {showPOIs && pois.map(poi => (
-        <Marker 
-          key={poi.id} 
-          position={[poi.lat, poi.lon || poi.lng]}
-          icon={getIconForZoom(poi)}
-          eventHandlers={{
-            click: () => handlePOIClick(poi)
-          }}
-        >
-          <Popup maxWidth={320} minWidth={280}>
-            <div className="p-1">
-              {/* Photo */}
-              {(poiDetails?.photo || poi.photo) && (
-                <div className="relative w-full h-32 -mt-1 -mx-1 mb-2 rounded-t-lg overflow-hidden">
-                  <img 
-                    src={poiDetails?.photo || poi.photo} 
-                    alt={poi.name}
-                    className="w-full h-full object-cover"
-                    onError={(e) => e.target.style.display = 'none'}
-                  />
-                  {poiDetails?.rating && (
-                    <div className="absolute bottom-2 right-2 bg-white/95 backdrop-blur-sm px-2 py-0.5 rounded-full text-sm font-semibold flex items-center gap-1">
-                      <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
-                      {typeof poiDetails.rating === 'number' ? poiDetails.rating.toFixed(1) : poiDetails.rating}
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {/* Title */}
-              <h3 className="text-base font-semibold text-gray-900 dark:text-foreground mb-1 line-clamp-2">
-                {poi.name}
-              </h3>
-              
-              {/* Category badge */}
-              <div className="flex items-center gap-2 mb-2">
-                <span 
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                  style={{ background: `${category.color}20`, color: category.color }}
-                >
-                  <span>{category.icon}</span>
-                  {category.name}
-                </span>
-                {poiDetails?.priceLevel && (
-                  <span className="text-xs text-gray-500">
-                    {'💰'.repeat(poiDetails.priceLevel)}
-                  </span>
-                )}
-              </div>
-
-              {/* Address */}
-              {poi.address && (
-                <p className="text-sm text-gray-600 dark:text-muted-foreground mb-2 flex items-start gap-1.5">
-                  <span className="text-base">📍</span>
-                  <span className="line-clamp-2">{poi.address}</span>
-                </p>
-              )}
-
-              {/* Description */}
-              {(poiDetails?.description || poi.description) && (
-                <p className="text-sm text-gray-600 dark:text-muted-foreground mb-2 line-clamp-3">
-                  {poiDetails?.description || poi.description}
-                </p>
-              )}
-
-              {/* Details */}
-              {loadingDetails && (
-                <div className="flex items-center justify-center py-3">
-                  <div className="w-5 h-5 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
-                </div>
-              )}
-
-              {/* Additional info */}
-              {poiDetails && !loadingDetails && (
-                <div className="space-y-1.5 mb-3">
-                  {/* Opening hours */}
-                  {poiDetails.openingHours && (
-                    <p className="text-xs text-gray-500 dark:text-muted-foreground flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span className="truncate">{poiDetails.openingHours}</span>
-                    </p>
-                  )}
-                  
-                  {/* Phone */}
-                  {poiDetails.phone && (
-                    <p className="text-xs text-gray-500 dark:text-muted-foreground flex items-center gap-1.5">
-                      <Phone className="w-3.5 h-3.5" />
-                      <a href={`tel:${poiDetails.phone}`} className="text-blue-500 hover:underline truncate">
-                        {poiDetails.phone}
-                      </a>
-                    </p>
-                  )}
-                  
-                  {/* Website */}
-                  {poiDetails.website && (
-                    <p className="text-xs text-gray-500 dark:text-muted-foreground flex items-center gap-1.5">
-                      <Globe className="w-3.5 h-3.5" />
-                      <a 
-                        href={poiDetails.website} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-blue-500 hover:underline truncate max-w-[200px]"
-                      >
-                        {poiDetails.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}
-                      </a>
-                    </p>
-                  )}
-
-                  {/* Rating */}
-                  {poiDetails?.rating && !poiDetails.photo && (
-                    <p className="text-sm text-gray-700 dark:text-foreground flex items-center gap-1.5">
-                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                      <span className="font-medium">
-                        {typeof poiDetails.rating === 'number' ? poiDetails.rating.toFixed(1) : poiDetails.rating}
-                      </span>
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Navigate button */}
-              <button
-                onClick={() => {
-                  onNavigate({ lat: poi.lat, lng: poi.lon || poi.lng, label: poi.name });
-                }}
-                className="w-full mt-1 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors"
-              >
-                <Navigation className="w-4 h-4" />
-                Navigate Here
-              </button>
-
-
-            </div>
-          </Popup>
-        </Marker>
-      ))}
-
-      {/* Empty state */}
-      {showPOIs && !loading && pois.length === 0 && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1001] bg-white dark:bg-card px-4 py-3 rounded-xl shadow-lg text-center">
-          <span className="text-2xl mb-1 block">{category.icon}</span>
-          <p className="text-sm text-gray-600 dark:text-muted-foreground">
-            No {category.name.toLowerCase()} found in this area
-          </p>
-          <p className="text-xs text-gray-400 dark:text-muted-foreground mt-1">
-            Try zooming out or moving the map
-          </p>
-        </div>
-      )}
-
-      {/* Count indicator */}
-      {showPOIs && !loading && pois.length > 0 && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-[1001] bg-white/95 dark:bg-card/95 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg text-xs font-medium text-gray-600 dark:text-muted-foreground flex items-center gap-2">
-          <span style={{ color: category.color }}>{category.icon}</span>
-          {pois.length} {category.name.toLowerCase()} found
-        </div>
-      )}
-    </>
-  );
+    const data = await response.json();
+    return data.items || [];
+  } catch (error) {
+    console.error('Error fetching POIs from Mapy.cz:', error);
+    return [];
+  }
 }
+
+/**
+ * Search for POIs near a point using Mapy.cz Suggest API (better for large areas)
+ * @param {Object} center - { lat, lng }
+ * @param {string} query - Search query (e.g., "school", "restaurant")
+ * @param {number} radius - Search radius in meters
+ * @param {number} limit - Max results
+ * @param {string} lang - Language code
+ */
+export async function searchPOIsNearPoint(center, query, radius = 50000, limit = 50, lang = 'en') {
+  const url = `https://api.mapy.com/v1/suggest?apikey=${MAPY_API_KEY}&query=${encodeURIComponent(query)}&lat=${center.lat}&lon=${center.lng}&radius=${radius}&limit=${limit}&lang=${lang}&category=poi`;
+  
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Mapy.cz API error: ${response.status}`);
+    }
+    const data = await response.json();
+    return data.items || [];
+  } catch (error) {
+    console.error('Error fetching POIs from Mapy.cz:', error);
+    return [];
+  }
+}
+
+/**
+ * Get detailed information about a place including images
+ * @param {string} placeId - Mapy.cz place ID
+ * @param {string} lang - Language code
+ */
+export async function getPlaceDetails(placeId, lang = 'en') {
+  const url = `https://api.mapy.com/v1/places/${placeId}?apikey=${MAPY_API_KEY}&lang=${lang}`;
+  
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Mapy.cz API error: ${response.status}`);
+    }
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching place details from Mapy.cz:', error);
+    return null;
+  }
+}
+
+/**
+ * Get photos for a place from Mapy.cz
+ * @param {string} placeId - Mapy.cz place ID
+ */
+export async function getPlacePhotos(placeId) {
+  const url = `https://api.mapy.com/v1/places/${placeId}/photos?apikey=${MAPY_API_KEY}`;
+  
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Mapy.cz API error: ${response.status}`);
+    }
+    const data = await response.json();
+    return data.photos || [];
+  } catch (error) {
+    console.error('Error fetching place photos from Mapy.cz:', error);
+    return [];
+  }
+}
+
+/**
+ * Smart POI search that adapts to zoom level
+ * At low zoom: fetches "main" POIs using wide-area search
+ * At high zoom: fetches all POIs in bounds
+ * 
+ * @param {Object} params - Search parameters
+ * @param {Object} params.bounds - Map bounds { south, west, north, east }
+ * @param {Object} params.center - Map center { lat, lng }
+ * @param {number} params.zoom - Current zoom level
+ * @param {Object} params.category - Category object from POICategories
+ * @param {string} params.lang - Language code
+ */
+export async function smartPOISearch({ bounds, center, zoom, category, lang = 'en' }) {
+  const { south, west, north, east } = bounds;
+  const { minZoom, detailZoom, importance, name } = category;
+  
+  // Don't search if below minimum zoom
+  if (zoom < minZoom) {
+    return [];
+  }
+  
+  // Calculate the visible area in km²
+  const latDiff = north - south;
+  const lngDiff = east - west;
+  const areaSize = latDiff * lngDiff * 111 * 111; // Rough km² estimate
+  
+  // Determine search strategy based on zoom and area
+  const isLowZoom = zoom < detailZoom;
+  const isLargeArea = areaSize > 10000; // More than 10,000 km²
+  
+  let pois = [];
+  
+  if (isLargeArea || zoom < 12) {
+    // STRATEGY 1: For very large areas, use point-based search with multiple centers
+    // This ensures POIs are distributed across the visible area
+    pois = await searchDistributedPOIs(bounds, category, zoom, lang);
+  } else if (isLowZoom) {
+    // STRATEGY 2: For medium zoom, use bounds search with importance filter
+    pois = await searchPOIsInBoundsFiltered(bounds, category, zoom, lang);
+  } else {
+    // STRATEGY 3: For high zoom, get all POIs in bounds
+    pois = await searchPOIsInBounds(bounds, null, getMaxPOIsForZoom(zoom), lang);
+  }
+  
+  // Filter and enhance results
+  return pois
+    .filter(poi => filterPOIByImportance(poi, category, zoom))
+    .slice(0, getMaxPOIsForZoom(zoom));
+}
+
+/**
+ * Search POIs distributed across the visible area
+ * Uses a grid-based approach to ensure coverage
+ */
+async function searchDistributedPOIs(bounds, category, zoom, lang) {
+  const { south, west, north, east } = bounds;
+  const pois = [];
+  const seen = new Set();
+  
+  // Create a 3x3 grid of search points
+  const latStep = (north - south) / 3;
+  const lngStep = (east - west) / 3;
+  
+  const searchPoints = [
+    { lat: south + latStep, lng: west + lngStep },
+    { lat: south + latStep, lng: west + 2 * lngStep },
+    { lat: south + 2 * latStep, lng: west + lngStep },
+    { lat: south + 2 * latStep, lng: west + 2 * lngStep },
+    { lat: (north + south) / 2, lng: (east + west) / 2 }, // Center
+  ];
+  
+  // Calculate radius to cover the grid cell
+  const radius = Math.max(50000, Math.min(200000, (north - south) * 111000 / 3));
+  
+  // Search from each point
+  const queries = getCategorySearchQueries(category);
+  const limit = Math.max(5, Math.min(20, getMaxPOIsForZoom(zoom) / searchPoints.length));
+  
+  // Use Promise.all for parallel requests
+  const results = await Promise.all(
+    searchPoints.flatMap(point => 
+      queries.map(query => 
+        searchPOIsNearPoint(point, query, radius, limit, lang)
+          .catch(() => [])
+      )
+    )
+  );
+  
+  // Merge and deduplicate
+  results.flat().forEach(poi => {
+    const id = poi.id || `${poi.position?.lat}-${poi.position?.lon}`;
+    if (id && !seen.has(id)) {
+      seen.add(id);
+      pois.push(normalizeMapyPOI(poi, category));
+    }
+  });
+  
+  return pois;
+}
+
+/**
+ * Search POIs in bounds with importance filtering
+ */
+async function searchPOIsInBoundsFiltered(bounds, category, zoom, lang) {
+  const queries = getCategorySearchQueries(category);
+  const limit = getMaxPOIsForZoom(zoom);
+  
+  const results = await Promise.all(
+    queries.map(query => 
+      searchPOIsNearPoint(
+        { lat: (bounds.north + bounds.south) / 2, lng: (bounds.east + bounds.west) / 2 },
+        query,
+        50000,
+        limit,
+        lang
+      ).catch(() => [])
+    )
+  );
+  
+  const pois = [];
+  const seen = new Set();
+  
+  results.flat().forEach(poi => {
+    const id = poi.id || `${poi.position?.lat}-${poi.position?.lon}`;
+    if (id && !seen.has(id)) {
+      seen.add(id);
+      pois.push(normalizeMapyPOI(poi, category));
+    }
+  });
+  
+  return pois;
+}
+
+/**
+ * Get search queries for a category
+ * Returns multiple query variations for better coverage
+ */
+function getCategorySearchQueries(category) {
+  // Use keywords for search
+  const keywords = category.keywords || [];
+  
+  // Prioritize the first few keywords
+  const queries = keywords.slice(0, 3);
+  
+  // Always include the category name
+  if (!queries.includes(category.name.toLowerCase())) {
+    queries.unshift(category.name.toLowerCase());
+  }
+  
+  return queries;
+}
+
+/**
+ * Normalize Mapy.cz POI to standard format
+ */
+function normalizeMapyPOI(poi, category) {
+  const pos = poi.position || poi.regionalStructure?.[0] || {};
+  
+  return {
+    id: poi.id || `${pos.lat}-${pos.lon}`,
+    lat: pos.lat,
+    lon: pos.lon || pos.lng,
+    lng: pos.lon || pos.lng,
+    name: poi.name || poi.label || category.name,
+    address: poi.location || poi.regionalStructure?.map(r => r.name).join(', ') || '',
+    category: category.name,
+    icon: category.icon,
+    color: category.color,
+    // Mapy.cz specific fields
+    mapyId: poi.id,
+    source: poi.source,
+    types: poi.types,
+    // Photos and description if available
+    photo: poi.photo || null,
+    description: poi.description || null,
+    rating: poi.rating || null,
+    // Raw data for additional processing
+    rawData: poi
+  };
+}
+
+/**
+ * Filter POI by importance based on zoom level
+ */
+function filterPOIByImportance(poi, category, zoom) {
+  // At detail zoom, show everything
+  if (zoom >= (category.detailZoom || 16)) return true;
+  
+  // Check if POI has importance indicators
+  const poiData = poi.rawData || poi;
+  
+  // POIs with ratings are usually more popular
+  if (poiData.rating || poi.rating) return true;
+  
+  // POIs with photos are usually notable
+  if (poiData.photo || poi.photo) return true;
+  
+  // POIs with types indicating importance
+  if (poiData.types) {
+    const types = Array.isArray(poiData.types) ? poiData.types : [poiData.types];
+    if (types.some(t => ['major', 'popular', 'featured'].includes(t?.toLowerCase?.()))) {
+      return true;
+    }
+  }
+  
+  // At medium zoom, include based on category importance
+  if (zoom >= 14 && category.importance === 'high') return true;
+  if (zoom >= 15 && category.importance === 'medium') return true;
+  
+  // At low zoom, only high importance
+  if (zoom < 14 && category.importance === 'high') return true;
+  
+  return category.importance === 'high';
+}
+
+/**
+ * Get maximum number of POIs for a zoom level
+ */
+function getMaxPOIsForZoom(zoom) {
+  if (zoom < 8) return 20;
+  if (zoom < 10) return 30;
+  if (zoom < 12) return 50;
+  if (zoom < 14) return 100;
+  if (zoom < 16) return 200;
+  return 500;
+}
+
+/**
+ * Fetch place image and description from Mapy.cz detail API
+ * @param {Object} poi - POI object
+ * @param {string} lang - Language code
+ */
+export async function enrichPOIWithDetails(poi, lang = 'en') {
+  if (!poi.mapyId && !poi.id) return poi;
+  
+  try {
+    const placeId = poi.mapyId || poi.id;
+    
+    // Fetch place details
+    const details = await getPlaceDetails(placeId, lang);
+    
+    if (details) {
+      return {
+        ...poi,
+        description: details.description || poi.description,
+        photo: details.photo || details.image || poi.photo,
+        photos: details.photos || [],
+        rating: details.rating || poi.rating,
+        openingHours: details.openingHours,
+        phone: details.phone,
+        website: details.website,
+        email: details.email,
+        priceLevel: details.priceLevel,
+        // Additional amenities
+        amenities: details.amenities || {},
+      };
+    }
+    
+    // Try to fetch photos separately
+    const photos = await getPlacePhotos(placeId);
+    if (photos.length > 0) {
+      return {
+        ...poi,
+        photos,
+        photo: photos[0]?.url || photos[0]?.thumbnail || poi.photo,
+      };
+    }
+  } catch (error) {
+    console.warn('Could not enrich POI details:', error);
+  }
+  
+  return poi;
+}
+
+/**
+ * Search for places using Mapy.cz suggest API with POI focus
+ * This is useful for getting photos and descriptions
+ */
+export async function searchPlacesWithDetails(query, center, lang = 'en', limit = 10) {
+  const near = center ? `&lat=${center.lat}&lon=${center.lng}&radius=50000` : '';
+  const url = `https://api.mapy.com/v1/suggest?apikey=${MAPY_API_KEY}&query=${encodeURIComponent(query)}&lang=${lang}&limit=${limit}${near}&category=poi`;
+  
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Mapy.cz API error: ${response.status}`);
+    }
+    const data = await response.json();
+    
+    // Enrich results with details
+    const enrichedResults = await Promise.all(
+      (data.items || []).map(async (item) => {
+        const pos = item.position || item.regionalStructure?.[0] || {};
+        
+        // Try to get additional details
+        if (item.id) {
+          try {
+            const details = await getPlaceDetails(item.id, lang);
+            return {
+              id: item.id,
+              name: item.name || item.label,
+              lat: pos.lat,
+              lon: pos.lon || pos.lng,
+              lng: pos.lon || pos.lng,
+              address: item.location || '',
+              description: details?.description || '',
+              photo: details?.photo || details?.image || item.photo || null,
+              photos: details?.photos || [],
+              rating: details?.rating || null,
+              openingHours: details?.openingHours,
+              phone: details?.phone,
+              website: details?.website,
+            };
+          } catch {
+            // Return basic info if details fail
+            return {
+              id: item.id,
+              name: item.name || item.label,
+              lat: pos.lat,
+              lon: pos.lon || pos.lng,
+              lng: pos.lon || pos.lng,
+              address: item.location || '',
+            };
+          }
+        }
+        
+        return {
+          id: item.id,
+          name: item.name || item.label,
+          lat: pos.lat,
+          lon: pos.lon || pos.lng,
+          lng: pos.lon || pos.lng,
+          address: item.location || '',
+        };
+      })
+    );
+    
+    return enrichedResults;
+  } catch (error) {
+    console.error('Error searching places:', error);
+    return [];
+  }
+}
+
+export default {
+  searchPOIsInBounds,
+  searchPOIsNearPoint,
+  getPlaceDetails,
+  getPlacePhotos,
+  smartPOISearch,
+  enrichPOIWithDetails,
+  searchPlacesWithDetails,
+  MAPY_POI_CATEGORIES,
+};
