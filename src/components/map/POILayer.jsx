@@ -1,354 +1,274 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { Navigation, Image, Star, Clock, Phone, Globe, ChevronRight } from 'lucide-react';
-import { smartPOISearch, enrichPOIWithDetails, getPlaceDetails } from '@/api/mapyPOIService';
 
-// Create custom icon for POI markers
-const createPOIIcon = (emoji, color, size = 32) => {
+// ─── Icon SVGs ────────────────────────────────────────────────────────────────
+function getIconSVG(iconName) {
+  const paths = {
+    school: '<path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path>',
+    restaurant: '<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"></path><path d="M7 2v20"></path><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"></path>',
+    cafe: '<path d="M17 8h1a4 4 0 1 1 0 8h-1"></path><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"></path><line x1="6" x2="6" y1="2" y2="4"></line><line x1="10" x2="10" y1="2" y2="4"></line><line x1="14" x2="14" y1="2" y2="4"></line>',
+    shop: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"></path><path d="M3 6h18"></path><path d="M16 10a4 4 0 0 1-8 0"></path>',
+    supermarket: '<circle cx="8" cy="21" r="1"></circle><circle cx="19" cy="21" r="1"></circle><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"></path>',
+    wc: '<rect width="14" height="6" x="5" y="16" rx="2"></rect><rect width="10" height="6" x="7" y="2" rx="2"></rect><path d="M22 12h-2"></path><path d="M4 12H2"></path>',
+    bank: '<path d="m16 6 4 14"></path><path d="M12 6v14"></path><path d="M8 8v12"></path><path d="M4 4v16"></path>',
+    atm: '<rect width="20" height="14" x="2" y="5" rx="2"></rect><line x1="2" x2="22" y1="10" y2="10"></line>',
+    pharmacy: '<path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"></path><path d="m8.5 8.5 7 7"></path>',
+    hospital: '<path d="M12 6v4"></path><path d="M14 14h-4"></path><path d="M14 18h-4"></path><path d="M14 8h-4"></path><path d="M18 12h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"></path><path d="M18 22V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v18"></path>',
+    parking: '<circle cx="12" cy="12" r="10"></circle><path d="M9 17V7h4a3 3 0 0 1 0 6H9"></path>',
+    fuel: '<path d="M3 22h12"></path><path d="M4 9h10"></path><path d="M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18"></path><path d="m14 13 5.5-5.5a2.12 2.12 0 0 1 3 3L17 16v6"></path><path d="M14 13h6"></path>',
+    charging: '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"></path>',
+    camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle>',
+  };
+  return paths[iconName] || '<circle cx="12" cy="12" r="10"></circle><path d="M12 8v8"></path><path d="M8 12h8"></path>';
+}
+
+const createPOIIcon = (iconName, color) => {
+  const svgPath = getIconSVG(iconName);
   return L.divIcon({
     className: 'custom-poi-marker',
-    html: `
-      <div style="
-        width: ${size}px;
-        height: ${size}px;
-        border-radius: 50%;
-        background: ${color};
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: ${size * 0.56}px;
-        border: 2px solid white;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        cursor: pointer;
-        transition: transform 0.15s ease;
-      " class="poi-marker">
-        ${emoji}
-      </div>
-    `,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size],
-    popupAnchor: [0, -size]
+    html: `<div style="width:32px;height:32px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);cursor:pointer;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svgPath}</svg>
+    </div>`,
+    iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -32],
   });
 };
 
-// Create larger icon for important POIs at low zoom
-const createImportantPOIIcon = (emoji, color) => {
-  return createPOIIcon(emoji, color, 40);
-};
+// ─── Spatial grid distribution ────────────────────────────────────────────────
+// Divides the bbox into a GRID_SIZE × GRID_SIZE grid and keeps at most
+// SLOTS_PER_CELL POIs per cell, then caps the total at MAX_DISPLAY.
+// This spreads results evenly across the visible map instead of clustering.
+const GRID_SIZE    = 5;   // 5×5 = 25 cells
+const SLOTS_PER_CELL = 2; // max 2 per cell → max 50 candidates, capped at 30
+const MAX_DISPLAY  = 30;
 
-export default function POILayer({ category, onNavigate }) {
-  const [pois, setPois] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedPOI, setSelectedPOI] = useState(null);
-  const [poiDetails, setPoiDetails] = useState(null);
-  const [loadingDetails, setLoadingDetails] = useState(false);
-  const map = useMap();
-  const abortControllerRef = useRef(null);
-  const lastSearchRef = useRef(null);
+function distributeEvenly(pois, south, west, north, east) {
+  if (pois.length <= MAX_DISPLAY) return pois;
 
-  // Load POIs with smart zoom handling
-  const loadPOIs = useCallback(async (forceRefresh = false) => {
-    if (!category) {
-      setPois([]);
-      return;
+  const latStep = (north - south) / GRID_SIZE;
+  const lngStep = (east  - west)  / GRID_SIZE;
+  const grid    = new Map(); // "row_col" → [poi, ...]
+
+  for (const poi of pois) {
+    const row = Math.min(Math.floor((poi.lat - south) / latStep), GRID_SIZE - 1);
+    const col = Math.min(Math.floor((poi.lon - west)  / lngStep), GRID_SIZE - 1);
+    const key = `${row}_${col}`;
+    const cell = grid.get(key) || [];
+    if (cell.length < SLOTS_PER_CELL) {
+      cell.push(poi);
+      grid.set(key, cell);
     }
+  }
 
-    const zoom = map.getZoom();
-    
-    // Check if current zoom level is appropriate for this category
-    if (zoom < category.minZoom) {
-      setPois([]);
-      return;
-    }
+  const result = [];
+  for (const cell of grid.values()) result.push(...cell);
+  return result.slice(0, MAX_DISPLAY);
+}
 
-    // Create a search key to avoid duplicate searches
-    const bounds = map.getBounds();
-    const searchKey = `${category.name}-${zoom.toFixed(0)}-${bounds.toBBoxString()}`;
-    
-    // Skip if same search was just made
-    if (!forceRefresh && lastSearchRef.current === searchKey) {
-      return;
-    }
-    lastSearchRef.current = searchKey;
+// ─── Geoapify Places API ──────────────────────────────────────────────────────
+const GEOAPIFY_KEY = import.meta.env.VITE_GEOAPIFY_KEY || '';
 
-    // Cancel previous request
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
+async function fetchGeoapify(category, south, west, north, east, limit, signal) {
+  if (!GEOAPIFY_KEY) throw new Error('VITE_GEOAPIFY_KEY not set');
+  const url = `https://api.geoapify.com/v2/places?categories=${encodeURIComponent(category)}&filter=rect:${west},${south},${east},${north}&limit=${limit}&apiKey=${GEOAPIFY_KEY}`;
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new Error(`Geoapify ${res.status}`);
+  const data = await res.json();
+  return (data.features || []).map(f => {
+    const p = f.properties;
+    const [lon, lat] = f.geometry.coordinates;
+    return {
+      id: p.place_id || `geo_${lat}_${lon}`,
+      lat, lon,
+      name: p.name || p.address_line1 || category,
+      address: p.address_line2 || p.formatted || '',
+      tags: {
+        phone:         p.phone       || p.contact?.phone,
+        website:       p.website     || p.contact?.website,
+        email:         p.email       || p.contact?.email,
+        opening_hours: p.opening_hours,
+        description:   p.description || p.details?.description,
+      },
+    };
+  });
+}
 
-    setLoading(true);
+// ─── Overpass fallback (for categories with no Geoapify equivalent) ───────────
+const OVERPASS_MIRRORS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+];
 
+async function fetchOverpass(queryStr, signal) {
+  for (const endpoint of OVERPASS_MIRRORS) {
     try {
-      const center = map.getCenter();
-      
-      // Use smart POI search that adapts to zoom level
-      const results = await smartPOISearch({
-        bounds: {
-          south: bounds.getSouth(),
-          west: bounds.getWest(),
-          north: bounds.getNorth(),
-          east: bounds.getEast()
-        },
-        center: { lat: center.lat, lng: center.lng },
-        zoom,
-        category,
-        lang: 'en' // Could be dynamic based on user language
+      const res = await fetch(endpoint, {
+        method: 'POST', body: queryStr, signal,
+        headers: { 'Content-Type': 'text/plain' },
       });
-
-      // Only update if this request wasn't aborted
-      if (!abortControllerRef.current.signal.aborted) {
-        setPois(results);
-      }
-    } catch (error) {
-      if (error.name !== 'AbortError') {
-        console.error('Error loading POIs:', error);
-      }
-    } finally {
-      setLoading(false);
+      if (res.ok) return res;
+      console.warn(`Overpass ${endpoint} → ${res.status}, trying next`);
+    } catch (err) {
+      if (err.name === 'AbortError') throw err;
+      console.warn(`Overpass ${endpoint} failed: ${err.message}, trying next`);
     }
-  }, [category, map]);
+  }
+  throw new Error('All Overpass mirrors failed');
+}
 
-  // Initial load and category change
+// ─── Cache ────────────────────────────────────────────────────────────────────
+const poiCache = new Map();
+const CACHE_DURATION = 600000; // 10 minutes
+
+// ─── Component ────────────────────────────────────────────────────────────────
+export default function POILayer({ category, onNavigate, onPOIsLoaded, onLoadingChange, onSelectPOI }) {
+  const [pois, setPois] = useState([]);
+  const map = useMap();
+  const loadTimeoutRef    = useRef(null);
+  const lastRequestRef    = useRef(0);
+  const abortControllerRef = useRef(null);
+
   useEffect(() => {
     if (!category) {
       setPois([]);
+      onPOIsLoaded?.([]);
+      onLoadingChange?.(false);
       return;
     }
 
-    loadPOIs(true);
+    const loadPOIs = async () => {
+      const zoom = map.getZoom();
+      // Fetch more at high zoom, fewer at low zoom
+      const fetchLimit = zoom >= 16 ? 200 : zoom >= 14 ? 80 : zoom >= 12 ? 40 : 20;
 
-    // Debounced reload on map movement
-    let debounceTimer;
+      // 2s cooldown between requests
+      const now = Date.now();
+      if (now - lastRequestRef.current < 2000) return;
+
+      const rawBounds = map.getBounds();
+      const mc = rawBounds.getCenter();
+      // Clamp bbox by zoom so queries stay fast
+      const maxDelta = zoom >= 14 ? 0.50 : zoom >= 12 ? 0.30 : zoom >= 10 ? 0.15 : 0.07;
+      const latH = Math.min((rawBounds.getNorth() - rawBounds.getSouth()) / 2, maxDelta / 2);
+      const lngH = Math.min((rawBounds.getEast()  - rawBounds.getWest())  / 2, maxDelta / 2);
+      const south = mc.lat - latH, north = mc.lat + latH;
+      const west  = mc.lng - lngH, east  = mc.lng + lngH;
+
+      const cacheKey = `${category.osmTag}-${south.toFixed(3)}-${west.toFixed(3)}-z${Math.floor(zoom)}`;
+      const cached = poiCache.get(cacheKey);
+      if (cached && now - cached.timestamp < CACHE_DURATION) {
+        setPois(cached.data);
+        onPOIsLoaded?.(cached.data);
+        onLoadingChange?.(false);
+        return;
+      }
+
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+      abortControllerRef.current = new AbortController();
+
+      onLoadingChange?.(true);
+      lastRequestRef.current = now;
+
+      // Hard 20s timeout
+      const timeoutId = setTimeout(() => {
+        abortControllerRef.current?.abort();
+        onLoadingChange?.(false);
+      }, 20000);
+
+      try {
+        let poiList = [];
+
+        if (category.geoapifyCategory && GEOAPIFY_KEY) {
+          // ── Geoapify path (fast, reliable) ──────────────────────────────
+          poiList = await fetchGeoapify(
+            category.geoapifyCategory, south, west, north, east,
+            fetchLimit, abortControllerRef.current.signal
+          );
+        } else {
+          // ── Overpass fallback (speed cameras etc.) ───────────────────────
+          const osmTag = category.osmTag;
+          const eqIdx  = osmTag.indexOf('=');
+          const tagFilter = eqIdx !== -1
+            ? `["${osmTag.slice(0, eqIdx)}"="${osmTag.slice(eqIdx + 1)}"]`
+            : `["${osmTag}"]`;
+          const query = `[out:json][timeout:15];(node${tagFilter}(${south},${west},${north},${east});way${tagFilter}(${south},${west},${north},${east}););out center ${fetchLimit};`;
+          const res   = await fetchOverpass(query, abortControllerRef.current.signal);
+          const text  = await res.text();
+          if (!text.trim().startsWith('{')) throw new Error('Invalid Overpass response');
+          const data  = JSON.parse(text);
+          poiList = data.elements.map(el => {
+            const lat = el.lat || el.center?.lat;
+            const lon = el.lon || el.center?.lon;
+            if (!lat || !lon) return null;
+            return {
+              id: el.id, lat, lon,
+              name: el.tags?.name || category.name,
+              address: el.tags?.['addr:street']
+                ? `${el.tags['addr:street']} ${el.tags['addr:housenumber'] || ''}`.trim() : '',
+              tags: el.tags || {},
+            };
+          }).filter(Boolean);
+        }
+
+        // Spread results evenly across visible map
+        const distributed = distributeEvenly(poiList, south, west, north, east);
+
+        clearTimeout(timeoutId);
+        poiCache.set(cacheKey, { data: distributed, timestamp: now });
+        setPois(distributed);
+        onPOIsLoaded?.(distributed);
+        onLoadingChange?.(false);
+      } catch (err) {
+        clearTimeout(timeoutId);
+        if (err.name === 'AbortError') return;
+        console.error('Error loading POIs:', err.message);
+        onLoadingChange?.(false);
+      }
+    };
+
+    clearTimeout(loadTimeoutRef.current);
+    loadTimeoutRef.current = setTimeout(loadPOIs, 300);
+
     const handleMoveEnd = () => {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => loadPOIs(), 300);
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = setTimeout(loadPOIs, 600);
     };
 
     map.on('moveend', handleMoveEnd);
     map.on('zoomend', handleMoveEnd);
 
     return () => {
-      clearTimeout(debounceTimer);
       map.off('moveend', handleMoveEnd);
       map.off('zoomend', handleMoveEnd);
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
+      clearTimeout(loadTimeoutRef.current);
+      abortControllerRef.current?.abort();
     };
-  }, [category, map, loadPOIs]);
-
-  // Fetch POI details when selected
-  const handlePOIClick = useCallback(async (poi) => {
-    setSelectedPOI(poi);
-    setPoiDetails(null);
-    setLoadingDetails(true);
-
-    try {
-      const details = await enrichPOIWithDetails(poi);
-      setPoiDetails(details);
-    } catch (error) {
-      console.warn('Could not load POI details:', error);
-      setPoiDetails(poi); // Fall back to basic info
-    } finally {
-      setLoadingDetails(false);
-    }
-  }, []);
-
-  // Determine icon size based on zoom
-  const getIconForZoom = useCallback((poi) => {
-    const zoom = map.getZoom();
-    const isImportant = poi.rating || poi.photo || poi.description;
-    
-    // Use larger icons for important POIs at low zoom
-    if (zoom < 14 && isImportant) {
-      return createImportantPOIIcon(category.icon, category.color);
-    }
-    
-    return createPOIIcon(category.icon, category.color);
   }, [category, map]);
 
   if (!category) return null;
 
-  const zoom = map.getZoom();
-  const showPOIs = zoom >= category.minZoom;
-
   return (
     <>
-      {/* Loading indicator */}
-      {loading && (
-        <div className="absolute top-20 right-4 z-[1001] bg-white dark:bg-card px-3 py-1.5 rounded-full shadow-lg text-xs font-medium text-gray-600 dark:text-muted-foreground flex items-center gap-2">
-          <div className="w-3 h-3 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
-          Loading {category.name}...
-        </div>
-      )}
-
-      {/* Zoom hint when below minimum zoom */}
-      {!showPOIs && category && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-[1001] bg-black/80 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg">
-          🔍 Zoom in to see {category.name}
-        </div>
-      )}
-
-      {/* POI Markers */}
-      {showPOIs && pois.map(poi => (
-        <Marker 
-          key={poi.id} 
-          position={[poi.lat, poi.lon || poi.lng]}
-          icon={getIconForZoom(poi)}
-          eventHandlers={{
-            click: () => handlePOIClick(poi)
-          }}
+      {pois.map(poi => (
+        <Marker
+          key={poi.id}
+          position={[poi.lat, poi.lon]}
+          icon={createPOIIcon(category.icon, category.color)}
+          eventHandlers={{ click: () => onSelectPOI?.(poi) }}
         >
-          <Popup maxWidth={320} minWidth={280}>
-            <div className="p-1">
-              {/* Photo */}
-              {(poiDetails?.photo || poi.photo) && (
-                <div className="relative w-full h-32 -mt-1 -mx-1 mb-2 rounded-t-lg overflow-hidden">
-                  <img 
-                    src={poiDetails?.photo || poi.photo} 
-                    alt={poi.name}
-                    className="w-full h-full object-cover"
-                    onError={(e) => e.target.style.display = 'none'}
-                  />
-                  {poiDetails?.rating && (
-                    <div className="absolute bottom-2 right-2 bg-white/95 backdrop-blur-sm px-2 py-0.5 rounded-full text-sm font-semibold flex items-center gap-1">
-                      <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
-                      {typeof poiDetails.rating === 'number' ? poiDetails.rating.toFixed(1) : poiDetails.rating}
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {/* Title */}
-              <h3 className="text-base font-semibold text-gray-900 dark:text-foreground mb-1 line-clamp-2">
-                {poi.name}
-              </h3>
-              
-              {/* Category badge */}
-              <div className="flex items-center gap-2 mb-2">
-                <span 
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                  style={{ background: `${category.color}20`, color: category.color }}
-                >
-                  <span>{category.icon}</span>
-                  {category.name}
-                </span>
-                {poiDetails?.priceLevel && (
-                  <span className="text-xs text-gray-500">
-                    {'💰'.repeat(poiDetails.priceLevel)}
-                  </span>
-                )}
-              </div>
-
-              {/* Address */}
-              {poi.address && (
-                <p className="text-sm text-gray-600 dark:text-muted-foreground mb-2 flex items-start gap-1.5">
-                  <span className="text-base">📍</span>
-                  <span className="line-clamp-2">{poi.address}</span>
-                </p>
-              )}
-
-              {/* Description */}
-              {(poiDetails?.description || poi.description) && (
-                <p className="text-sm text-gray-600 dark:text-muted-foreground mb-2 line-clamp-3">
-                  {poiDetails?.description || poi.description}
-                </p>
-              )}
-
-              {/* Details */}
-              {loadingDetails && (
-                <div className="flex items-center justify-center py-3">
-                  <div className="w-5 h-5 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
-                </div>
-              )}
-
-              {/* Additional info */}
-              {poiDetails && !loadingDetails && (
-                <div className="space-y-1.5 mb-3">
-                  {/* Opening hours */}
-                  {poiDetails.openingHours && (
-                    <p className="text-xs text-gray-500 dark:text-muted-foreground flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span className="truncate">{poiDetails.openingHours}</span>
-                    </p>
-                  )}
-                  
-                  {/* Phone */}
-                  {poiDetails.phone && (
-                    <p className="text-xs text-gray-500 dark:text-muted-foreground flex items-center gap-1.5">
-                      <Phone className="w-3.5 h-3.5" />
-                      <a href={`tel:${poiDetails.phone}`} className="text-blue-500 hover:underline truncate">
-                        {poiDetails.phone}
-                      </a>
-                    </p>
-                  )}
-                  
-                  {/* Website */}
-                  {poiDetails.website && (
-                    <p className="text-xs text-gray-500 dark:text-muted-foreground flex items-center gap-1.5">
-                      <Globe className="w-3.5 h-3.5" />
-                      <a 
-                        href={poiDetails.website} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-blue-500 hover:underline truncate max-w-[200px]"
-                      >
-                        {poiDetails.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}
-                      </a>
-                    </p>
-                  )}
-
-                  {/* Rating */}
-                  {poiDetails?.rating && !poiDetails.photo && (
-                    <p className="text-sm text-gray-700 dark:text-foreground flex items-center gap-1.5">
-                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                      <span className="font-medium">
-                        {typeof poiDetails.rating === 'number' ? poiDetails.rating.toFixed(1) : poiDetails.rating}
-                      </span>
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Navigate button */}
-              <button
-                onClick={() => {
-                  onNavigate({ lat: poi.lat, lng: poi.lon || poi.lng, label: poi.name });
-                }}
-                className="w-full mt-1 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors"
-              >
-                <Navigation className="w-4 h-4" />
-                Navigate Here
+          <Popup>
+            <div style={{ minWidth: '180px' }}>
+              <h3 style={{ margin: '0 0 6px 0', fontSize: '15px', fontWeight: 600 }}>{poi.name}</h3>
+              {poi.address && <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#666' }}>📍 {poi.address}</p>}
+              <button onClick={() => onNavigate({ lat: poi.lat, lng: poi.lon, label: poi.name })}
+                style={{ padding: '7px 14px', background: category.color, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, width: '100%' }}>
+                Navigate
               </button>
-
-
             </div>
           </Popup>
         </Marker>
       ))}
-
-      {/* Empty state */}
-      {showPOIs && !loading && pois.length === 0 && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1001] bg-white dark:bg-card px-4 py-3 rounded-xl shadow-lg text-center">
-          <span className="text-2xl mb-1 block">{category.icon}</span>
-          <p className="text-sm text-gray-600 dark:text-muted-foreground">
-            No {category.name.toLowerCase()} found in this area
-          </p>
-          <p className="text-xs text-gray-400 dark:text-muted-foreground mt-1">
-            Try zooming out or moving the map
-          </p>
-        </div>
-      )}
-
-      {/* Count indicator */}
-      {showPOIs && !loading && pois.length > 0 && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-[1001] bg-white/95 dark:bg-card/95 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg text-xs font-medium text-gray-600 dark:text-muted-foreground flex items-center gap-2">
-          <span style={{ color: category.color }}>{category.icon}</span>
-          {pois.length} {category.name.toLowerCase()} found
-        </div>
-      )}
     </>
   );
 }
