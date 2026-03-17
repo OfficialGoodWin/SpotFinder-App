@@ -42,25 +42,114 @@ function parseOpenStatus(ohString) {
 }
 
 // ─── Photo fetching ───────────────────────────────────────────────────────────
-// Google Places: strict radius=50m + name match to avoid nearby-place bleed
+
+const MAPY_API_KEY = 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
+
+// 1. OSM tags — instant, exact, no API call needed
+function getTagPhotos(tags = {}) {
+  const urls = [];
+  if (tags.image && tags.image.startsWith('http')) urls.push(tags.image);
+  if (tags.wikimedia_commons?.startsWith('File:')) {
+    const file = tags.wikimedia_commons.replace('File:', '');
+    urls.push(`https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}?width=1200`);
+  }
+  return urls;
+}
+
+// 2. Mapy.cz internal detail API (XML-RPC → JSON)
+// Flow: suggest by name+coords → get source+id → call pro.mapy.cz detail → extract photos
+// source=firm means Firmy.cz business listing (has the best photos)
+// source=osm/base/pubt also work but rarely have photos
+async function fetchMapyPhotos(name, lat, lon) {
+  try {
+    // Step 1: suggest to find the place and get its source+id
+    const suggestUrl = `https://api.mapy.com/v1/suggest?apikey=${MAPY_API_KEY}&query=${encodeURIComponent(name)}&lat=${lat}&lon=${lon}&limit=5&lang=cs`;
+    const suggestRes = await fetch(suggestUrl);
+    if (!suggestRes.ok) return [];
+    const suggestData = await suggestRes.json();
+    const items = suggestData.items || [];
+
+    // Find the closest result that is actually a firm/place (not just an address)
+    let best = null;
+    let bestDist = Infinity;
+    for (const item of items) {
+      const pos = item.position;
+      if (!pos) continue;
+      const dist = Math.hypot(pos.lat - lat, pos.lon - lon);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = item;
+      }
+    }
+
+    // Reject if more than ~100m away (0.0009 deg ≈ 100m)
+    if (!best || bestDist > 0.0009) return [];
+
+    const ud = best.userData || {};
+    const source = ud.source || best.source;
+    const id = ud.id || best.id;
+    if (!source || !id) return [];
+
+    // Step 2: call the internal Mapy.cz XML-RPC detail endpoint
+    // This is the same endpoint the Mapy.cz website uses internally
+    // We send XML-RPC but request JSON response via Accept header
+    const xmlBody = `<?xml version="1.0"?>
+<methodCall>
+  <methodName>detail.getById</methodName>
+  <params>
+    <param><value><string>${source}</string></value></param>
+    <param><value><int>${id}</int></value></param>
+    <param><value><struct>
+      <member><name>fetchPhoto</name><value><boolean>1</boolean></value></member>
+      <member><name>photoMax</name><value><int>8</int></value></member>
+    </struct></value></param>
+  </params>
+</methodCall>`;
+
+    const detailRes = await fetch('https://pro.mapy.cz/detail', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/xml',
+        'Accept': 'application/json',
+      },
+      body: xmlBody,
+    });
+
+    if (!detailRes.ok) return [];
+    const detail = await detailRes.json();
+
+    // Navigate the response — photos live at result.photo[] or result.photos[]
+    const result = detail?.result || detail?.data || detail;
+    const photoArr = result?.photo || result?.photos || [];
+
+    return photoArr
+      .map(p => {
+        // Each photo object has various size keys: url, thumb, big, original
+        return p.url || p.big || p.original || p.thumb || null;
+      })
+      .filter(Boolean)
+      .slice(0, 8);
+  } catch {
+    return [];
+  }
+}
+
+// 3. Google Places fallback — strict name + distance guard
 async function fetchGooglePhotos(name, lat, lon) {
   if (!GOOGLE_API_KEY) return [];
   try {
-    const findUrl = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(name)}&inputtype=textquery&locationbias=circle:50@${lat},${lon}&fields=place_id,name,geometry,photos&key=${GOOGLE_API_KEY}`;
+    const findUrl = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(name)}&inputtype=textquery&locationbias=circle:30@${lat},${lon}&fields=place_id,name,geometry,photos&key=${GOOGLE_API_KEY}`;
     const res = await fetch(findUrl);
     if (!res.ok) return [];
-    const data = await res.json();
-    const candidate = data.candidates?.[0];
+    const candidate = (await res.json()).candidates?.[0];
     if (!candidate) return [];
-
-    // Verify the returned place is actually close (within ~100m)
     const cLat = candidate.geometry?.location?.lat;
     const cLon = candidate.geometry?.location?.lng;
-    if (cLat && cLon) {
-      const distDeg = Math.hypot(cLat - lat, cLon - lon);
-      if (distDeg > 0.001) return []; // ~111m — reject if too far
-    }
-
+    if (!cLat || !cLon || Math.hypot(cLat - lat, cLon - lon) > 0.0007) return [];
+    // Name word match guard
+    const norm = s => s.toLowerCase().replace(/[^a-z0-9 ]/g, '');
+    const qWords = norm(name).split(' ').filter(w => w.length > 2);
+    if (qWords.length > 0 && !qWords.some(w => norm(candidate.name || '').includes(w))) return [];
     let photos = candidate.photos || [];
     if (!photos.length && candidate.place_id) {
       const dr = await fetch(`https://maps.googleapis.com/maps/api/place/details/json?place_id=${candidate.place_id}&fields=photos&key=${GOOGLE_API_KEY}`);
@@ -72,26 +161,20 @@ async function fetchGooglePhotos(name, lat, lon) {
   } catch { return []; }
 }
 
-// Wikimedia Commons: tight 50m radius
-async function fetchOpenPhotos(name, lat, lon) {
-  try {
-    const url = `https://commons.wikimedia.org/w/api.php?action=query&list=geosearch&gscoord=${lat}|${lon}&gsradius=50&gslimit=6&gsnamespace=6&format=json&origin=*`;
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const pages = (await res.json()).query?.geosearch || [];
-    if (!pages.length) return [];
-    const titles = pages.map(p => `File:${p.title.replace('File:', '')}`).join('|');
-    const ir = await fetch(`https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(titles)}&prop=imageinfo&iiprop=url&iiurlwidth=1200&format=json&origin=*`);
-    if (!ir.ok) return [];
-    return Object.values((await ir.json()).query?.pages || {})
-      .map(p => p.imageinfo?.[0]?.thumburl).filter(Boolean).slice(0, 4);
-  } catch { return []; }
-}
+// Main: OSM tags → Mapy.cz → Google → nothing
+async function tryFetchPhotos(name, lat, lon, tags = {}) {
+  const tagPhotos = getTagPhotos(tags);
+  if (tagPhotos.length) return tagPhotos;
 
-async function tryFetchPhotos(name, lat, lon) {
-  const google = await fetchGooglePhotos(name, lat, lon);
-  if (google.length) return google;
-  return fetchOpenPhotos(name, lat, lon);
+  const mapy = await fetchMapyPhotos(name, lat, lon);
+  if (mapy.length) return mapy;
+
+  if (GOOGLE_API_KEY) {
+    const google = await fetchGooglePhotos(name, lat, lon);
+    if (google.length) return google;
+  }
+
+  return [];
 }
 
 // ─── Lightbox ─────────────────────────────────────────────────────────────────
@@ -522,7 +605,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
         ? { ratings: r, avg: r.length ? Math.round(r.reduce((s, x) => s + x.rating, 0) / r.length * 10) / 10 : 0, count: r.length }
         : (r || { ratings: [], avg: 0, count: 0 })
     ));
-    tryFetchPhotos(poi.name, poi.lat, poi.lon).then(urls => { if (urls.length) setPhotos(urls); });
+    tryFetchPhotos(poi.name, poi.lat, poi.lon, poi.tags || {}).then(urls => { if (urls.length) setPhotos(urls); });
   }, [poi?.id]);
 
   const handleShare = async () => {
