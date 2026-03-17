@@ -64,7 +64,31 @@ function getCacheKey(bounds, osmTag) {
   return `${osmTag}-${lat}-${lng}`;
 }
 
-export default function POILayer({ category, onNavigate, onPOIsLoaded }) {
+// Multiple Overpass mirrors — tried in order, fallback on 5xx/network error
+const OVERPASS_MIRRORS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+];
+
+async function fetchOverpass(queryStr, signal) {
+  for (const endpoint of OVERPASS_MIRRORS) {
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST', body: queryStr, signal,
+        headers: { 'Content-Type': 'text/plain' },
+      });
+      if (res.ok) return res;
+      console.warn(`Overpass ${endpoint} → ${res.status}, trying next`);
+    } catch (err) {
+      if (err.name === 'AbortError') throw err;
+      console.warn(`Overpass ${endpoint} failed: ${err.message}, trying next`);
+    }
+  }
+  throw new Error('All Overpass mirrors failed');
+}
+
+export default function POILayer({ category, onNavigate, onPOIsLoaded, onLoadingChange, onSelectPOI }) {
   const [pois, setPois] = useState([]);
   const [loading, setLoading] = useState(false);
   const map = useMap();
@@ -86,12 +110,13 @@ export default function POILayer({ category, onNavigate, onPOIsLoaded }) {
       if (zoom < category.minZoom) {
         setPois([]);
         if (onPOIsLoaded) onPOIsLoaded([]);
+        onLoadingChange?.(false);
         return;
       }
 
       // Rate limiting: minimum 2 seconds between requests
       const now = Date.now();
-      if (now - lastRequestRef.current < 2000) {
+      if (now - lastRequestRef.current < 500) {
         return;
       }
 
@@ -112,6 +137,7 @@ export default function POILayer({ category, onNavigate, onPOIsLoaded }) {
       }
 
       setLoading(true);
+      onLoadingChange?.(true);
       lastRequestRef.current = now;
 
       const south = bounds.getSouth();
@@ -125,8 +151,8 @@ export default function POILayer({ category, onNavigate, onPOIsLoaded }) {
       const lngDelta = east - west;
       
       if (latDelta > maxDelta || lngDelta > maxDelta) {
-        // Area too large, skip loading
         setLoading(false);
+        onLoadingChange?.(false);
         return;
       }
 
@@ -150,18 +176,7 @@ export default function POILayer({ category, onNavigate, onPOIsLoaded }) {
       abortControllerRef.current = new AbortController();
 
       try {
-        const response = await fetch('https://overpass-api.de/api/interpreter', {
-          method: 'POST',
-          body: query,
-          signal: abortControllerRef.current.signal,
-          headers: {
-            'Content-Type': 'text/plain'
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
+        const response = await fetchOverpass(query, abortControllerRef.current.signal);
 
         const text = await response.text();
         
@@ -181,7 +196,7 @@ export default function POILayer({ category, onNavigate, onPOIsLoaded }) {
               id: element.id,
               lat,
               lon,
-              name: element.tags?.name || category.name.en,
+              name: element.tags?.name || category.name,
               address: element.tags?.['addr:street'] 
                 ? `${element.tags['addr:street']} ${element.tags['addr:housenumber'] || ''}` 
                 : '',
@@ -200,6 +215,7 @@ export default function POILayer({ category, onNavigate, onPOIsLoaded }) {
         setPois(poiList);
         if (onPOIsLoaded) onPOIsLoaded(poiList);
         setLoading(false);
+        onLoadingChange?.(false);
       } catch (error) {
         if (error.name === 'AbortError') {
           // Request was cancelled, ignore
@@ -208,6 +224,7 @@ export default function POILayer({ category, onNavigate, onPOIsLoaded }) {
         
         console.error('Error loading POIs:', error.message);
         setLoading(false);
+        onLoadingChange?.(false);
         
         // Don't clear existing POIs on error, just don't update
         if (pois.length === 0) {
@@ -219,12 +236,12 @@ export default function POILayer({ category, onNavigate, onPOIsLoaded }) {
 
     // Debounce POI loading to avoid too many requests (longer delay)
     clearTimeout(loadTimeoutRef.current);
-    loadTimeoutRef.current = setTimeout(loadPOIs, 1000);
+    loadTimeoutRef.current = setTimeout(loadPOIs, 200);
 
     // Reload POIs when map moves or zooms (with longer debounce)
     const handleMoveEnd = () => {
       clearTimeout(loadTimeoutRef.current);
-      loadTimeoutRef.current = setTimeout(loadPOIs, 1500);
+      loadTimeoutRef.current = setTimeout(loadPOIs, 400);
     };
 
     map.on('moveend', handleMoveEnd);
@@ -249,6 +266,7 @@ export default function POILayer({ category, onNavigate, onPOIsLoaded }) {
           key={poi.id} 
           position={[poi.lat, poi.lon]}
           icon={createPOIIcon(category.icon, category.color)}
+          eventHandlers={{ click: () => onSelectPOI?.(poi) }}
         >
           <Popup>
             <div style={{ minWidth: '200px' }}>

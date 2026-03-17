@@ -11,15 +11,27 @@ function haversineKm([lat1, lng1], [lat2, lng2]) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function Spinner({ color }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-14 gap-3">
+      <div
+        className="w-10 h-10 rounded-full border-4 border-gray-200 dark:border-border animate-spin"
+        style={{ borderTopColor: color || '#3b82f6' }}
+      />
+      <span className="text-sm text-muted-foreground">Loading nearby places…</span>
+    </div>
+  );
+}
+
 const HEADER_H = 56;
 const SHEET_VH = 0.60;
 const PEEK_SHOW = HEADER_H + 8;
 
-function POIRow({ poi, category, onFlyTo, onNavigate, onClose }) {
+function POIRow({ poi, category, onFlyTo, onNavigate, onSelect, onClose }) {
   return (
     <div
       className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 dark:border-border/40 hover:bg-gray-50 dark:hover:bg-accent/60 active:bg-gray-100 dark:active:bg-accent transition-colors cursor-pointer"
-      onClick={() => { onFlyTo?.([poi.lat, poi.lon]); onClose(); }}
+      onClick={() => { onSelect ? onSelect(poi) : (onFlyTo?.([poi.lat, poi.lon])); }}
     >
       <div
         className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-lg"
@@ -151,7 +163,7 @@ function MobileSheet({ children, header, onClose, bottomOffset }) {
   );
 }
 
-export default function POIPanel({ pois, category, userPos, onFlyTo, onNavigate, onClose }) {
+export default function POIPanel({ pois, category, userPos, loading, onFlyTo, onNavigate, onSelect, onClose }) {
   const { language } = useLanguage();
 
   const sortedPOIs = useMemo(() => {
@@ -167,11 +179,13 @@ export default function POIPanel({ pois, category, userPos, onFlyTo, onNavigate,
   const header = (
     <h2 className="text-lg font-bold text-foreground pt-3 flex items-center gap-2">
       <span>{category?.icon}</span>
-      {categoryName} ({sortedPOIs.length})
+      {categoryName} {!loading && `(${sortedPOIs.length})`}
     </h2>
   );
 
-  const listContent = sortedPOIs.length === 0 ? (
+  const listContent = loading ? (
+    <Spinner color={category?.color} />
+  ) : sortedPOIs.length === 0 ? (
     <div className="px-4 py-12 text-center text-muted-foreground">
       No {categoryName.toLowerCase()} found in this area
     </div>
@@ -183,6 +197,7 @@ export default function POIPanel({ pois, category, userPos, onFlyTo, onNavigate,
         category={category}
         onFlyTo={onFlyTo}
         onNavigate={onNavigate}
+        onSelect={onSelect}
         onClose={onClose}
       />
     ))

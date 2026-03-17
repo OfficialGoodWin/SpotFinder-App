@@ -24,6 +24,7 @@ import MySpotsPanel from '../components/spots/MySpotsPanel';
 
 import SpotsPanel from '../components/spots/SpotsPanel';
 import POIPanel from '../components/spots/POIPanel';
+import POIDetailPanel from '../components/spots/POIDetailPanel';
 import SettingsModal from '../components/SettingsModal';
 import ProfileMenu from '../components/ProfileMenu';
  
@@ -139,6 +140,8 @@ export default function Home() {
   const [selectedPOICategory, setSelectedPOICategory] = useState(null);
   const [currentPOIs, setCurrentPOIs] = useState([]);
   const [showPOIPanel, setShowPOIPanel] = useState(false);
+  const [selectedPOI, setSelectedPOI] = useState(null);
+  const [poiLoading, setPoiLoading] = useState(false);
   const mapRef = useRef(null);
  
  
@@ -409,6 +412,8 @@ export default function Home() {
             startNavTo(destination);
           }}
           onPOIsLoaded={(pois) => setCurrentPOIs(pois)}
+          onLoadingChange={(loading) => setPoiLoading(loading)}
+          onSelectPOI={(poi) => setSelectedPOI(poi)}
         />
       </MapContainer>
  
@@ -587,12 +592,27 @@ export default function Home() {
           pois={currentPOIs}
           category={selectedPOICategory}
           userPos={userPos}
+          loading={poiLoading}
           onFlyTo={(pos) => setFlyTo(pos)}
           onNavigate={(poi) => {
             if (!userPos) return alert(t('home.locationUnavailable'));
             startNavTo({ lat: poi.lat, lng: poi.lon, label: poi.name });
           }}
-          onClose={() => setShowPOIPanel(false)}
+          onSelect={(poi) => setSelectedPOI(poi)}
+          onClose={() => { setShowPOIPanel(false); setSelectedPOI(null); }}
+        />
+      )}
+
+      {selectedPOI && selectedPOICategory && (
+        <POIDetailPanel
+          poi={selectedPOI}
+          category={selectedPOICategory}
+          user={user}
+          onClose={() => setSelectedPOI(null)}
+          onNavigate={(destination) => {
+            if (!userPos) return alert(t('home.locationUnavailable'));
+            startNavTo(destination);
+          }}
         />
       )}
  
