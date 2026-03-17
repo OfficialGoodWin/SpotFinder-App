@@ -3,6 +3,7 @@ export const POI_CATEGORIES = [
   // Zoom 18+ (local amenities)
   { 
     name: 'Schools', 
+    geoapifyCategory: 'education.school',
     keywords: ['school', 'škola', 'schule', 'école', 'escuela', 'scuola', 'szkoła'],
     icon: '🏫', 
     color: '#4A90E2',
@@ -12,6 +13,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Restaurants', 
+    geoapifyCategory: 'catering.restaurant',
     keywords: ['restaurant', 'restaurace', 'food', 'jídlo', 'essen', 'nourriture', 'comida', 'ristorante'],
     icon: '🍽️', 
     color: '#E74C3C',
@@ -21,6 +23,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Cafes', 
+    geoapifyCategory: 'catering.cafe',
     keywords: ['cafe', 'coffee', 'kavárna', 'kaffee', 'café', 'caffè', 'kawa'],
     icon: '☕', 
     color: '#8B4513',
@@ -30,6 +33,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Shops', 
+    geoapifyCategory: 'commercial',
     keywords: ['shop', 'store', 'obchod', 'geschäft', 'magasin', 'tienda', 'negozio', 'sklep'],
     icon: '🛍️', 
     color: '#9B59B6',
@@ -39,6 +43,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Supermarkets', 
+    geoapifyCategory: 'commercial.supermarket',
     keywords: ['supermarket', 'grocery', 'potraviny', 'lebensmittel', 'alimentación', 'spożywczy'],
     icon: '🏪', 
     color: '#27AE60',
@@ -48,6 +53,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Toilets', 
+    geoapifyCategory: 'service.toilets',
     keywords: ['toilet', 'wc', 'restroom', 'záchod', 'toilette', 'baño', 'bagno', 'toaleta'],
     icon: '🚻', 
     color: '#3498DB',
@@ -57,6 +63,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Banks', 
+    geoapifyCategory: 'service.financial.bank',
     keywords: ['bank', 'banka', 'banco', 'banque', 'banca'],
     icon: '🏦', 
     color: '#F39C12',
@@ -66,6 +73,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'ATMs', 
+    geoapifyCategory: 'service.financial.atm',
     keywords: ['atm', 'bankomat', 'cash', 'geldautomat', 'cajero', 'bancomat'],
     icon: '💳', 
     color: '#16A085',
@@ -75,6 +83,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Pharmacies', 
+    geoapifyCategory: 'healthcare.pharmacy',
     keywords: ['pharmacy', 'lékárna', 'apotheke', 'farmacia', 'pharmacie', 'apteka'],
     icon: '💊', 
     color: '#E67E22',
@@ -84,6 +93,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Hospitals', 
+    geoapifyCategory: 'healthcare.hospital',
     keywords: ['hospital', 'nemocnice', 'krankenhaus', 'hôpital', 'ospedale', 'szpital'],
     icon: '🏥', 
     color: '#C0392B',
@@ -93,6 +103,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Libraries', 
+    geoapifyCategory: 'education.library',
     keywords: ['library', 'knihovna', 'bibliothek', 'bibliothèque', 'biblioteca', 'biblioteka'],
     icon: '📚', 
     color: '#8E44AD',
@@ -102,6 +113,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Playgrounds', 
+    geoapifyCategory: 'leisure.playground',
     keywords: ['playground', 'hřiště', 'spielplatz', 'aire de jeux', 'parque infantil', 'plac zabaw'],
     icon: '🎮', 
     color: '#F1C40F',
@@ -111,6 +123,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Hotels', 
+    geoapifyCategory: 'accommodation.hotel',
     keywords: ['hotel', 'accommodation', 'ubytování', 'unterkunft', 'hébergement', 'alojamiento', 'nocleg'],
     icon: '🏨', 
     color: '#2980B9',
@@ -120,6 +133,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Museums', 
+    geoapifyCategory: 'entertainment.museum',
     keywords: ['museum', 'muzeum', 'musée', 'museo', 'muzeum'],
     icon: '🏛️', 
     color: '#34495E',
@@ -129,6 +143,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Castles', 
+    geoapifyCategory: 'heritage.castle',
     keywords: ['castle', 'hrad', 'schloss', 'château', 'castello', 'castillo', 'zamek'],
     icon: '🏰', 
     color: '#95A5A6',
@@ -138,6 +153,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Churches', 
+    geoapifyCategory: 'religion',
     keywords: ['church', 'kostel', 'kirche', 'église', 'iglesia', 'chiesa', 'kościół'],
     icon: '⛪', 
     color: '#7F8C8D',
@@ -147,6 +163,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Gyms', 
+    geoapifyCategory: 'sport.fitness',
     keywords: ['gym', 'fitness', 'posilovna', 'fitnessstudio', 'gimnasio', 'palestra', 'siłownia'],
     icon: '💪', 
     color: '#E74C3C',
@@ -156,6 +173,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Cinemas', 
+    geoapifyCategory: 'entertainment.cinema',
     keywords: ['cinema', 'movie', 'kino', 'cine', 'film'],
     icon: '🎬', 
     color: '#9B59B6',
@@ -165,6 +183,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Car Service', 
+    geoapifyCategory: 'service.vehicle.car_repair',
     keywords: ['car service', 'repair', 'autoservis', 'werkstatt', 'taller', 'officina', 'warsztat'],
     icon: '🔧', 
     color: '#E67E22',
@@ -174,6 +193,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Post Office', 
+    geoapifyCategory: 'service.post_office',
     keywords: ['post', 'pošta', 'correos', 'bureau de poste', 'ufficio postale', 'poczta'],
     icon: '📮', 
     color: '#F39C12',
@@ -183,6 +203,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Bars', 
+    geoapifyCategory: 'catering.bar',
     keywords: ['bar', 'pub', 'hospoda', 'kneipe', 'bar'],
     icon: '🍺', 
     color: '#D68910',
@@ -192,6 +213,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Police', 
+    geoapifyCategory: 'service.police',
     keywords: ['police', 'policie', 'polizei', 'policía', 'polizia', 'policja'],
     icon: '👮', 
     color: '#2C3E50',
@@ -201,6 +223,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Fire Station', 
+    geoapifyCategory: 'service.fire_station',
     keywords: ['fire station', 'hasičská', 'feuerwehr', 'bomberos', 'pompieri', 'straż pożarna'],
     icon: '🚒', 
     color: '#E74C3C',
@@ -210,6 +233,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Dentist', 
+    geoapifyCategory: 'healthcare.dentist',
     keywords: ['dentist', 'zubař', 'zahnarzt', 'dentiste', 'dentista', 'dentysta'],
     icon: '🦷', 
     color: '#16A085',
@@ -219,6 +243,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Veterinary', 
+    geoapifyCategory: 'healthcare.vet',
     keywords: ['vet', 'veterinary', 'veterinář', 'tierarzt', 'veterinario', 'weterynarz'],
     icon: '🐾', 
     color: '#27AE60',
@@ -228,6 +253,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Bakery', 
+    geoapifyCategory: 'commercial.food_and_drink.bakery',
     keywords: ['bakery', 'pekárna', 'bäckerei', 'boulangerie', 'panadería', 'panetteria', 'piekarnia'],
     icon: '🥖', 
     color: '#D4A574',
@@ -239,6 +265,7 @@ export const POI_CATEGORIES = [
   // Zoom 15+ (parking)
   { 
     name: 'Parking', 
+    geoapifyCategory: 'parking',
     keywords: ['parking', 'parkování', 'parken', 'estacionamiento', 'parcheggio', 'parkowanie'],
     icon: '🅿️', 
     color: '#3498DB',
@@ -250,6 +277,7 @@ export const POI_CATEGORIES = [
   // Zoom 13+ (travel/infrastructure)
   { 
     name: 'Gas Stations', 
+    geoapifyCategory: 'service.vehicle.fuel',
     keywords: ['gas', 'fuel', 'petrol', 'benzín', 'tankstelle', 'essence', 'gasolina', 'benzina', 'stacja paliw'],
     icon: '⛽', 
     color: '#E74C3C',
@@ -259,6 +287,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'EV Charging', 
+    geoapifyCategory: 'service.vehicle.charging_station',
     keywords: ['charging', 'electric', 'ev', 'nabíjení', 'ladestation', 'recarga', 'ładowanie'],
     icon: '🔌', 
     color: '#27AE60',
@@ -268,6 +297,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Speed Cameras', 
+    geoapifyCategory: null,
     keywords: ['speed camera', 'radar', 'rychlost', 'geschwindigkeit', 'velocidad', 'velocità', 'prędkość'],
     icon: '📷', 
     color: '#C0392B',
@@ -277,6 +307,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Train Stations', 
+    geoapifyCategory: 'public_transport.train',
     keywords: ['train', 'railway', 'vlak', 'bahnhof', 'gare', 'estación', 'stazione', 'dworzec'],
     icon: '🚆', 
     color: '#34495E',
@@ -286,6 +317,7 @@ export const POI_CATEGORIES = [
   },
   { 
     name: 'Bus Stops', 
+    geoapifyCategory: 'public_transport.bus',
     keywords: ['bus', 'autobus', 'bushaltestelle', 'arrêt de bus', 'fermata'],
     icon: '🚌', 
     color: '#F39C12',

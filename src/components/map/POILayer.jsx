@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 
+// ─── Icon SVGs ────────────────────────────────────────────────────────────────
 function getIconSVG(iconName) {
   const paths = {
     school: '<path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path>',
@@ -29,21 +30,70 @@ const createPOIIcon = (iconName, color) => {
     html: `<div style="width:32px;height:32px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);cursor:pointer;">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svgPath}</svg>
     </div>`,
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -32]
+    iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -32],
   });
 };
 
-const poiCache = new Map();
-const CACHE_DURATION = 300000; // 5 minutes
+// ─── Spatial grid distribution ────────────────────────────────────────────────
+// Divides the bbox into a GRID_SIZE × GRID_SIZE grid and keeps at most
+// SLOTS_PER_CELL POIs per cell, then caps the total at MAX_DISPLAY.
+// This spreads results evenly across the visible map instead of clustering.
+const GRID_SIZE    = 5;   // 5×5 = 25 cells
+const SLOTS_PER_CELL = 2; // max 2 per cell → max 50 candidates, capped at 30
+const MAX_DISPLAY  = 30;
 
-function getCacheKey(bounds, osmTag) {
-  const lat = ((bounds.getNorth() + bounds.getSouth()) / 2).toFixed(3);
-  const lng = ((bounds.getEast() + bounds.getWest()) / 2).toFixed(3);
-  return `${osmTag}-${lat}-${lng}`;
+function distributeEvenly(pois, south, west, north, east) {
+  if (pois.length <= MAX_DISPLAY) return pois;
+
+  const latStep = (north - south) / GRID_SIZE;
+  const lngStep = (east  - west)  / GRID_SIZE;
+  const grid    = new Map(); // "row_col" → [poi, ...]
+
+  for (const poi of pois) {
+    const row = Math.min(Math.floor((poi.lat - south) / latStep), GRID_SIZE - 1);
+    const col = Math.min(Math.floor((poi.lon - west)  / lngStep), GRID_SIZE - 1);
+    const key = `${row}_${col}`;
+    const cell = grid.get(key) || [];
+    if (cell.length < SLOTS_PER_CELL) {
+      cell.push(poi);
+      grid.set(key, cell);
+    }
+  }
+
+  const result = [];
+  for (const cell of grid.values()) result.push(...cell);
+  return result.slice(0, MAX_DISPLAY);
 }
 
+// ─── Geoapify Places API ──────────────────────────────────────────────────────
+const GEOAPIFY_KEY = import.meta.env.VITE_GEOAPIFY_KEY || '';
+
+async function fetchGeoapify(category, south, west, north, east, limit, signal) {
+  if (!GEOAPIFY_KEY) throw new Error('VITE_GEOAPIFY_KEY not set');
+  const url = `https://api.geoapify.com/v2/places?categories=${encodeURIComponent(category)}&filter=rect:${west},${south},${east},${north}&limit=${limit}&apiKey=${GEOAPIFY_KEY}`;
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new Error(`Geoapify ${res.status}`);
+  const data = await res.json();
+  return (data.features || []).map(f => {
+    const p = f.properties;
+    const [lon, lat] = f.geometry.coordinates;
+    return {
+      id: p.place_id || `geo_${lat}_${lon}`,
+      lat, lon,
+      name: p.name || p.address_line1 || category,
+      address: p.address_line2 || p.formatted || '',
+      tags: {
+        phone:         p.phone       || p.contact?.phone,
+        website:       p.website     || p.contact?.website,
+        email:         p.email       || p.contact?.email,
+        opening_hours: p.opening_hours,
+        description:   p.description || p.details?.description,
+      },
+    };
+  });
+}
+
+// ─── Overpass fallback (for categories with no Geoapify equivalent) ───────────
 const OVERPASS_MIRRORS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
@@ -58,7 +108,6 @@ async function fetchOverpass(queryStr, signal) {
         headers: { 'Content-Type': 'text/plain' },
       });
       if (res.ok) return res;
-      // 429 = rate limited, 403 = blocked — try next mirror
       console.warn(`Overpass ${endpoint} → ${res.status}, trying next`);
     } catch (err) {
       if (err.name === 'AbortError') throw err;
@@ -68,11 +117,16 @@ async function fetchOverpass(queryStr, signal) {
   throw new Error('All Overpass mirrors failed');
 }
 
+// ─── Cache ────────────────────────────────────────────────────────────────────
+const poiCache = new Map();
+const CACHE_DURATION = 600000; // 10 minutes
+
+// ─── Component ────────────────────────────────────────────────────────────────
 export default function POILayer({ category, onNavigate, onPOIsLoaded, onLoadingChange, onSelectPOI }) {
   const [pois, setPois] = useState([]);
   const map = useMap();
-  const loadTimeoutRef = useRef(null);
-  const lastRequestRef = useRef(0);
+  const loadTimeoutRef    = useRef(null);
+  const lastRequestRef    = useRef(0);
   const abortControllerRef = useRef(null);
 
   useEffect(() => {
@@ -85,29 +139,23 @@ export default function POILayer({ category, onNavigate, onPOIsLoaded, onLoading
 
     const loadPOIs = async () => {
       const zoom = map.getZoom();
+      // Fetch more at high zoom, fewer at low zoom
+      const fetchLimit = zoom >= 16 ? 200 : zoom >= 14 ? 80 : zoom >= 12 ? 40 : 20;
 
-      // Scale result count + bbox by zoom level — all zooms work, just fewer results when zoomed out
-      const resultLimit = zoom >= 16 ? 200 : zoom >= 14 ? 100 : zoom >= 12 ? 40 : zoom >= 10 ? 15 : 6;
-      const maxDelta    = zoom >= 14 ? 0.50 : zoom >= 12 ? 0.30 : zoom >= 10 ? 0.15 : 0.07;
-
-      // Rate-limit: 2s min between requests to avoid burning through Overpass mirrors
+      // 2s cooldown between requests
       const now = Date.now();
       if (now - lastRequestRef.current < 2000) return;
 
       const rawBounds = map.getBounds();
-      const mapCenter = rawBounds.getCenter();
-
-      // Clamp bbox to maxDelta around map centre
-      const latHalf = Math.min((rawBounds.getNorth() - rawBounds.getSouth()) / 2, maxDelta / 2);
-      const lngHalf = Math.min((rawBounds.getEast()  - rawBounds.getWest())  / 2, maxDelta / 2);
-      const south = mapCenter.lat - latHalf;
-      const north = mapCenter.lat + latHalf;
-      const west  = mapCenter.lng - lngHalf;
-      const east  = mapCenter.lng + lngHalf;
+      const mc = rawBounds.getCenter();
+      // Clamp bbox by zoom so queries stay fast
+      const maxDelta = zoom >= 14 ? 0.50 : zoom >= 12 ? 0.30 : zoom >= 10 ? 0.15 : 0.07;
+      const latH = Math.min((rawBounds.getNorth() - rawBounds.getSouth()) / 2, maxDelta / 2);
+      const lngH = Math.min((rawBounds.getEast()  - rawBounds.getWest())  / 2, maxDelta / 2);
+      const south = mc.lat - latH, north = mc.lat + latH;
+      const west  = mc.lng - lngH, east  = mc.lng + lngH;
 
       const cacheKey = `${category.osmTag}-${south.toFixed(3)}-${west.toFixed(3)}-z${Math.floor(zoom)}`;
-
-      // Serve from cache immediately if fresh
       const cached = poiCache.get(cacheKey);
       if (cached && now - cached.timestamp < CACHE_DURATION) {
         setPois(cached.data);
@@ -122,45 +170,54 @@ export default function POILayer({ category, onNavigate, onPOIsLoaded, onLoading
       onLoadingChange?.(true);
       lastRequestRef.current = now;
 
-      const osmTag = category.osmTag;
-      const eqIdx = osmTag.indexOf('=');
-      const tagFilter = eqIdx !== -1
-        ? `["${osmTag.slice(0, eqIdx)}"="${osmTag.slice(eqIdx + 1)}"]`
-        : `["${osmTag}"]`;
-
-      const query = `[out:json][timeout:15];(node${tagFilter}(${south},${west},${north},${east});way${tagFilter}(${south},${west},${north},${east}););out center ${resultLimit};`;
-
-      // Hard 20s timeout — prevents hanging forever if Overpass is unresponsive
+      // Hard 20s timeout
       const timeoutId = setTimeout(() => {
         abortControllerRef.current?.abort();
         onLoadingChange?.(false);
       }, 20000);
 
       try {
-        const response = await fetchOverpass(query, abortControllerRef.current.signal);
-        const text = await response.text();
-        if (!text.trim().startsWith('{')) throw new Error('Invalid response format');
+        let poiList = [];
 
-        const data = JSON.parse(text);
-        const poiList = data.elements.map(el => {
-          const lat = el.lat || el.center?.lat;
-          const lon = el.lon || el.center?.lon;
-          if (!lat || !lon) return null;
-          return {
-            id: el.id,
-            lat, lon,
-            name: el.tags?.name || category.name,
-            address: el.tags?.['addr:street']
-              ? `${el.tags['addr:street']} ${el.tags['addr:housenumber'] || ''}`.trim()
-              : '',
-            tags: el.tags,
-          };
-        }).filter(Boolean);
+        if (category.geoapifyCategory && GEOAPIFY_KEY) {
+          // ── Geoapify path (fast, reliable) ──────────────────────────────
+          poiList = await fetchGeoapify(
+            category.geoapifyCategory, south, west, north, east,
+            fetchLimit, abortControllerRef.current.signal
+          );
+        } else {
+          // ── Overpass fallback (speed cameras etc.) ───────────────────────
+          const osmTag = category.osmTag;
+          const eqIdx  = osmTag.indexOf('=');
+          const tagFilter = eqIdx !== -1
+            ? `["${osmTag.slice(0, eqIdx)}"="${osmTag.slice(eqIdx + 1)}"]`
+            : `["${osmTag}"]`;
+          const query = `[out:json][timeout:15];(node${tagFilter}(${south},${west},${north},${east});way${tagFilter}(${south},${west},${north},${east}););out center ${fetchLimit};`;
+          const res   = await fetchOverpass(query, abortControllerRef.current.signal);
+          const text  = await res.text();
+          if (!text.trim().startsWith('{')) throw new Error('Invalid Overpass response');
+          const data  = JSON.parse(text);
+          poiList = data.elements.map(el => {
+            const lat = el.lat || el.center?.lat;
+            const lon = el.lon || el.center?.lon;
+            if (!lat || !lon) return null;
+            return {
+              id: el.id, lat, lon,
+              name: el.tags?.name || category.name,
+              address: el.tags?.['addr:street']
+                ? `${el.tags['addr:street']} ${el.tags['addr:housenumber'] || ''}`.trim() : '',
+              tags: el.tags || {},
+            };
+          }).filter(Boolean);
+        }
+
+        // Spread results evenly across visible map
+        const distributed = distributeEvenly(poiList, south, west, north, east);
 
         clearTimeout(timeoutId);
-        poiCache.set(cacheKey, { data: poiList, timestamp: now }); // keyed by zoom bucket
-        setPois(poiList);
-        onPOIsLoaded?.(poiList);
+        poiCache.set(cacheKey, { data: distributed, timestamp: now });
+        setPois(distributed);
+        onPOIsLoaded?.(distributed);
         onLoadingChange?.(false);
       } catch (err) {
         clearTimeout(timeoutId);
@@ -170,13 +227,12 @@ export default function POILayer({ category, onNavigate, onPOIsLoaded, onLoading
       }
     };
 
-    // Fast initial load, moderate move debounce
     clearTimeout(loadTimeoutRef.current);
-    loadTimeoutRef.current = setTimeout(loadPOIs, 200);
+    loadTimeoutRef.current = setTimeout(loadPOIs, 300);
 
     const handleMoveEnd = () => {
       clearTimeout(loadTimeoutRef.current);
-      loadTimeoutRef.current = setTimeout(loadPOIs, 400);
+      loadTimeoutRef.current = setTimeout(loadPOIs, 600);
     };
 
     map.on('moveend', handleMoveEnd);
@@ -205,10 +261,10 @@ export default function POILayer({ category, onNavigate, onPOIsLoaded, onLoading
             <div style={{ minWidth: '180px' }}>
               <h3 style={{ margin: '0 0 6px 0', fontSize: '15px', fontWeight: 600 }}>{poi.name}</h3>
               {poi.address && <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#666' }}>📍 {poi.address}</p>}
-              <button
-                onClick={() => onNavigate({ lat: poi.lat, lng: poi.lon, label: poi.name })}
-                style={{ padding: '7px 14px', background: category.color, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, width: '100%' }}
-              >Navigate</button>
+              <button onClick={() => onNavigate({ lat: poi.lat, lng: poi.lon, label: poi.name })}
+                style={{ padding: '7px 14px', background: category.color, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, width: '100%' }}>
+                Navigate
+              </button>
             </div>
           </Popup>
         </Marker>
