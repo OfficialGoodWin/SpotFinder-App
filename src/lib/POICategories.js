@@ -429,3 +429,29 @@ export function shouldShowPOI(zoom, category, poi) {
   
   return false;
 }
+
+// === UTILITY FUNCTIONS ===
+
+// Get category name by key or id
+export function getCategoryName(categoryId) {
+  if (!categoryId) return '';
+  
+  // If it's already a name, find the category
+  const category = POI_CATEGORIES.find(cat => 
+    cat.name.toLowerCase() === categoryId.toLowerCase() ||
+    cat.osmTag === categoryId
+  );
+  
+  return category?.name || categoryId;
+}
+
+// Get category by name or id
+export function getCategoryById(categoryId) {
+  if (!categoryId) return null;
+
+  return POI_CATEGORIES.find(cat => 
+    cat.name.toLowerCase() === categoryId.toLowerCase() ||
+    cat.osmTag === categoryId
+  ) || null;
+}
+
