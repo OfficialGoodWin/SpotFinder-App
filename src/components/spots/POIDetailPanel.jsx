@@ -6,7 +6,7 @@ import {
 import { fetchPOIDetails } from '@/api/mapyClient';
 import {
   getPOIPhotos, getPOIRatings, addPOIPhoto, addPOIRating,
-  uploadSpotImage
+  uploadSpotImage, makePOIId
 } from '@/api/firebaseClient';
 
 // ─── Stars ───────────────────────────────────────────────────────────────────
@@ -138,7 +138,7 @@ function FullSheet({ poi, category, detail, sfPhotos, sfRating, onClose, onNavig
 
   const allPhotos = [
     ...mapyPhotos.map(p => ({ url: p.url, source: 'mapy' })),
-    ...sfPhotos.map(p => ({ url: p.photo, source: 'sf' })),
+    ...sfPhotos.map(p => ({ url: p.image || p.photo, source: 'sf' })),
   ];
 
   const combinedAvg = (() => {
@@ -337,9 +337,14 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
     if (!poi) return;
     setDetail(null);
     setExpanded(false);
+    const poiId = makePOIId(poi.lat, poi.lon, poi.name);
     fetchPOIDetails(poi.name, poi.lat, poi.lon).then(d => setDetail(d || null));
-    getPOIPhotos(poi.id).then(setSfPhotos);
-    getPOIRatings(poi.id).then(setSfRating);
+    getPOIPhotos(poiId).then(setSfPhotos);
+    getPOIRatings(poiId).then(r => setSfRating(
+      Array.isArray(r)
+        ? { ratings: r, avg: r.length ? Math.round(r.reduce((s,x)=>s+x.rating,0)/r.length*10)/10 : 0, count: r.length }
+        : r
+    ));
   }, [poi?.id]);
 
   const handleShare = async () => {
@@ -355,17 +360,23 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const poiId = makePOIId(poi.lat, poi.lon, poi.name);
     try {
       const dataUrl = await uploadSpotImage(file);
-      await addPOIPhoto(poi.id, dataUrl, user.email);
-      setSfPhotos(prev => [{ id: Date.now(), photo: dataUrl, created_by: user.email }, ...prev]);
+      await addPOIPhoto(poiId, dataUrl, user.email);
+      setSfPhotos(prev => [{ id: Date.now(), image: dataUrl, created_by: user.email }, ...prev]);
     } catch (err) { console.error('Photo upload failed:', err); }
     e.target.value = '';
   };
 
   const handleSubmitRating = async (rating, comment) => {
-    await addPOIRating(poi.id, rating, comment, user?.email);
-    getPOIRatings(poi.id).then(setSfRating);
+    const poiId = makePOIId(poi.lat, poi.lon, poi.name);
+    await addPOIRating(poiId, rating, comment, user?.email);
+    getPOIRatings(poiId).then(r => setSfRating(
+      Array.isArray(r)
+        ? { ratings: r, avg: r.length ? Math.round(r.reduce((s,x)=>s+x.rating,0)/r.length*10)/10 : 0, count: r.length }
+        : r
+    ));
   };
 
   const handleNavigate = () => { onNavigate?.({ lat: poi.lat, lng: poi.lon, label: poi.name }); onClose(); };
