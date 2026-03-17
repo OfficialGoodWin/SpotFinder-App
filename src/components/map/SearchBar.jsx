@@ -71,16 +71,17 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
     setQuery(item.name || item.label || '');
     setResults([]);
     setPoiCategories([]);
+    setFocused(false);
     inputRef.current?.blur();
   };
 
   const handleSelectCategory = (category) => {
     if (onSelectCategory) {
       onSelectCategory(category);
-      // Clear query so geocoding API doesn't fire and fill in a nearby place name
       setQuery('');
       setResults([]);
       setPoiCategories([]);
+      setFocused(false);
       inputRef.current?.blur();
     }
   };
@@ -146,7 +147,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
           <input ref={inputRef} value={query}
             onChange={e => setQuery(e.target.value)}
             onFocus={() => setFocused(true)}
-            onBlur={() => setTimeout(() => setFocused(false), 150)}
+            onBlur={() => setTimeout(() => setFocused(false), 200)}
             placeholder={t('search.placeholder')}
             className="flex-1 py-3 text-sm outline-none bg-transparent text-gray-800 dark:text-foreground placeholder-gray-400 dark:placeholder-muted-foreground min-w-0"
           />

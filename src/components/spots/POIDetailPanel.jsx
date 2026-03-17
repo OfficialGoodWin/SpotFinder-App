@@ -399,7 +399,7 @@ async function tryFetchMapyPhotos(name, lat, lon) {
     const data  = await res.json();
     const items = data.items || [];
 
-    // Find closest match
+    // Find closest match within ~500m
     let best = null, bestDist = Infinity;
     for (const item of items) {
       const pos = item.position;
@@ -409,20 +409,23 @@ async function tryFetchMapyPhotos(name, lat, lon) {
     }
     if (!best || bestDist > 0.005) return [];
 
-    // Extract source + id from userData
+    // Extract source + id — Mapy.cz uses userData for this
     const ud     = best.userData || {};
-    const source = ud.source || best.source;
-    const id     = ud.id     || best.id;
+    // source can be in userData.source, or in best.source, or parsed from best.id
+    const source = ud.source || best.source || (typeof best.id === 'string' && best.id.includes(':') ? best.id.split(':')[0] : null);
+    const id     = ud.id     || (typeof best.id === 'string' && best.id.includes(':') ? best.id.split(':').slice(1).join(':') : best.id);
     if (!source || !id) return [];
 
+    // Try the /place/ endpoint — photos array lives here
     const detailRes = await fetch(
-      `https://api.mapy.com/v1/place/${encodeURIComponent(`${source}:${id}`)}?apikey=${MAPY_API_KEY}&lang=en`
+      `https://api.mapy.com/v1/place/${encodeURIComponent(source)}:${encodeURIComponent(id)}?apikey=${MAPY_API_KEY}&lang=en`
     );
     if (!detailRes.ok) return [];
 
     const detail = await detailRes.json();
-    // photos is an array of {url, ...} objects
-    return (detail.photos || []).map(p => p.url).filter(Boolean);
+    // photos is an array of {url, ...} — fall back to panoramas or mark images
+    const photos = (detail.photos || detail.panoramas || []).map(p => p.url || p).filter(u => typeof u === 'string');
+    return photos;
   } catch {
     return [];
   }

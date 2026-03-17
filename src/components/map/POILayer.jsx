@@ -147,13 +147,11 @@ export default function POILayer({ category, onNavigate, onPOIsLoaded, onLoading
       if (now - lastRequestRef.current < 2000) return;
 
       const rawBounds = map.getBounds();
-      const mc = rawBounds.getCenter();
-      // Clamp bbox by zoom so queries stay fast
-      const maxDelta = zoom >= 14 ? 0.50 : zoom >= 12 ? 0.30 : zoom >= 10 ? 0.15 : 0.07;
-      const latH = Math.min((rawBounds.getNorth() - rawBounds.getSouth()) / 2, maxDelta / 2);
-      const lngH = Math.min((rawBounds.getEast()  - rawBounds.getWest())  / 2, maxDelta / 2);
-      const south = mc.lat - latH, north = mc.lat + latH;
-      const west  = mc.lng - lngH, east  = mc.lng + lngH;
+      // Use actual visible map bounds — no artificial clamping that clusters results at center
+      const south = rawBounds.getSouth();
+      const north = rawBounds.getNorth();
+      const west  = rawBounds.getWest();
+      const east  = rawBounds.getEast();
 
       const cacheKey = `${category.osmTag}-${south.toFixed(3)}-${west.toFixed(3)}-z${Math.floor(zoom)}`;
       const cached = poiCache.get(cacheKey);
