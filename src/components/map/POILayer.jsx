@@ -130,6 +130,12 @@ export default function POILayer({ category, onNavigate, onPOIsLoaded, onLoading
 
       const query = `[out:json][timeout:15];(node${tagFilter}(${south},${west},${north},${east});way${tagFilter}(${south},${west},${north},${east}););out center ${resultLimit};`;
 
+      // Hard 20s timeout — prevents hanging forever if Overpass is unresponsive
+      const timeoutId = setTimeout(() => {
+        abortControllerRef.current?.abort();
+        onLoadingChange?.(false);
+      }, 20000);
+
       try {
         const response = await fetchOverpass(query, abortControllerRef.current.signal);
         const text = await response.text();
@@ -151,11 +157,13 @@ export default function POILayer({ category, onNavigate, onPOIsLoaded, onLoading
           };
         }).filter(Boolean);
 
+        clearTimeout(timeoutId);
         poiCache.set(cacheKey, { data: poiList, timestamp: now }); // keyed by zoom bucket
         setPois(poiList);
         onPOIsLoaded?.(poiList);
         onLoadingChange?.(false);
       } catch (err) {
+        clearTimeout(timeoutId);
         if (err.name === 'AbortError') return;
         console.error('Error loading POIs:', err.message);
         onLoadingChange?.(false);

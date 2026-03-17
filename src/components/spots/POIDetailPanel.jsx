@@ -1,16 +1,75 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  X, Navigation, Share2, Camera, Star, Phone, Mail, Globe,
-  MapPin, ChevronUp, Clock
-} from 'lucide-react';
-import { fetchPOIDetails } from '@/api/mapyClient';
-import {
-  getPOIPhotos, getPOIRatings, addPOIPhoto, addPOIRating,
-  uploadSpotImage, makePOIId
-} from '@/api/firebaseClient';
+import { X, Navigation, Share2, Camera, Star, Phone, Mail, Globe, MapPin, ChevronUp, Clock } from 'lucide-react';
+import { getPOIPhotos, getPOIRatings, addPOIPhoto, addPOIRating, uploadSpotImage, makePOIId } from '@/api/firebaseClient';
+
+// ─── OSM tag helpers ─────────────────────────────────────────────────────────
+// Extract contact + hours directly from the OSM tags already loaded by Overpass
+// (no extra API calls needed — this data is already in poi.tags)
+
+function getPhone(tags = {}) {
+  return tags.phone || tags['contact:phone'] || tags['contact:mobile'] || null;
+}
+function getWebsite(tags = {}) {
+  return tags.website || tags['contact:website'] || tags.url || null;
+}
+function getEmail(tags = {}) {
+  return tags.email || tags['contact:email'] || null;
+}
+function getHours(tags = {}) {
+  return tags.opening_hours || null;
+}
+function getDescription(tags = {}) {
+  return tags.description || tags.note || null;
+}
+
+// Parse opening_hours string into open/closed status
+// Supports simple "Mo-Fr 08:00-18:00" style strings
+function parseOpenStatus(ohString) {
+  if (!ohString) return null;
+  if (ohString.toLowerCase().includes('24/7')) return { isOpen: true, label: 'Open 24/7' };
+
+  try {
+    const now = new Date();
+    const days = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+    const today = days[now.getDay()];
+    const timeNow = now.getHours() * 60 + now.getMinutes();
+
+    // Match patterns like "Mo-Fr 08:00-18:00" or "Mo,Tu 09:00-17:00"
+    const rules = ohString.split(';').map(s => s.trim());
+    for (const rule of rules) {
+      const match = rule.match(/^([A-Za-z,\-\s]+)\s+(\d{2}:\d{2})-(\d{2}:\d{2})$/);
+      if (!match) continue;
+      const [, dayPart, open, close] = match;
+
+      // Check if today matches
+      let todayMatches = false;
+      const segments = dayPart.split(',').map(s => s.trim());
+      for (const seg of segments) {
+        const range = seg.match(/^([A-Z][a-z])-([A-Z][a-z])$/);
+        if (range) {
+          const start = days.indexOf(range[1]);
+          const end   = days.indexOf(range[2]);
+          const cur   = days.indexOf(today);
+          if (start !== -1 && end !== -1 && cur >= start && cur <= end) todayMatches = true;
+        } else if (seg === today) {
+          todayMatches = true;
+        }
+      }
+
+      if (!todayMatches) continue;
+
+      const [oh, om] = open.split(':').map(Number);
+      const [ch, cm] = close.split(':').map(Number);
+      const openMin  = oh * 60 + om;
+      const closeMin = ch * 60 + cm;
+      const isOpen   = timeNow >= openMin && timeNow < closeMin;
+      return { isOpen, label: `${isOpen ? 'Open' : 'Closed'} · ${open}–${close}` };
+    }
+  } catch {}
+  return null;
+}
 
 // ─── Stars ───────────────────────────────────────────────────────────────────
-
 function Stars({ value = 0, size = 14, interactive = false, onRate }) {
   const [hover, setHover] = useState(0);
   return (
@@ -36,14 +95,10 @@ function Stars({ value = 0, size = 14, interactive = false, onRate }) {
 }
 
 // ─── Action button ────────────────────────────────────────────────────────────
-
 function ActionBtn({ icon: Icon, label, onClick, color, disabled }) {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className="flex flex-col items-center gap-1 px-4 py-2.5 rounded-2xl bg-gray-100 dark:bg-accent/60 hover:bg-gray-200 dark:hover:bg-accent active:scale-95 transition-all disabled:opacity-40 flex-1"
-    >
+    <button onClick={onClick} disabled={disabled}
+      className="flex flex-col items-center gap-1 px-3 py-2.5 rounded-2xl bg-gray-100 dark:bg-accent/60 hover:bg-gray-200 dark:hover:bg-accent active:scale-95 transition-all disabled:opacity-40 flex-1">
       <Icon className="w-5 h-5" style={{ color: color || undefined }} />
       <span className="text-[11px] font-medium text-gray-700 dark:text-foreground whitespace-nowrap">{label}</span>
     </button>
@@ -51,14 +106,13 @@ function ActionBtn({ icon: Icon, label, onClick, color, disabled }) {
 }
 
 // ─── Contact row ──────────────────────────────────────────────────────────────
-
 function ContactRow({ icon: Icon, value, href }) {
   const inner = (
     <div className="flex items-center gap-3 py-2.5">
       <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-accent/60 flex items-center justify-center flex-shrink-0">
         <Icon className="w-4 h-4 text-gray-500 dark:text-muted-foreground" />
       </div>
-      <span className="text-sm text-foreground truncate">{value}</span>
+      <span className="text-sm text-foreground break-all">{value}</span>
     </div>
   );
   return href
@@ -67,27 +121,18 @@ function ContactRow({ icon: Icon, value, href }) {
 }
 
 // ─── Mini bar ─────────────────────────────────────────────────────────────────
-
-function MiniBar({ poi, category, detail, sfRating, onExpand, onClose, onNavigate, onShare, onAddPhoto, user }) {
-  const photo = detail?.photos?.[0]?.url || null;
-  const mr = detail?.rating;
-  const combinedAvg = (() => {
-    const mc = mr?.count || 0; const ma = mr?.average || 0;
-    const sc = sfRating?.count || 0; const sa = sfRating?.avg || 0;
-    const t = mc + sc; if (!t) return 0;
-    return Math.round(((ma * mc + sa * sc) / t) * 10) / 10;
-  })();
-  const totalCount = (mr?.count || 0) + (sfRating?.count || 0);
+function MiniBar({ poi, category, sfRating, mapyPhoto, onExpand, onClose, onNavigate, onShare, onAddPhoto, user }) {
+  const avg   = sfRating?.count > 0 ? sfRating.avg : 0;
+  const count = sfRating?.count || 0;
 
   return (
-    <div className="fixed left-0 right-0 z-[1200] bg-white dark:bg-card shadow-2xl border-t border-gray-100 dark:border-border rounded-t-2xl" style={{ bottom: 56 }}>
-      {/* Drag handle */}
+    <div className="fixed left-0 right-0 z-[1200] bg-white dark:bg-card shadow-2xl border-t border-gray-100 dark:border-border rounded-t-2xl"
+      style={{ bottom: 56 }}>
       <button className="w-full flex justify-center pt-2.5 pb-0" onClick={onExpand}>
         <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-border" />
       </button>
-
-      {/* Close */}
-      <button onClick={onClose} className="absolute top-3 right-3 w-7 h-7 rounded-full bg-gray-100 dark:bg-accent flex items-center justify-center z-10">
+      <button onClick={onClose}
+        className="absolute top-3 right-3 w-7 h-7 rounded-full bg-gray-100 dark:bg-accent flex items-center justify-center z-10">
         <X className="w-3.5 h-3.5" />
       </button>
 
@@ -95,59 +140,57 @@ function MiniBar({ poi, category, detail, sfRating, onExpand, onClose, onNavigat
       <div className="flex items-center gap-3 px-4 pt-2 pb-3 cursor-pointer" onClick={onExpand}>
         <div className="w-14 h-14 rounded-full flex-shrink-0 overflow-hidden border-2 flex items-center justify-center"
           style={{ borderColor: category.color, background: `${category.color}18` }}>
-          {photo
-            ? <img src={photo} alt={poi.name} className="w-full h-full object-cover" />
+          {mapyPhoto
+            ? <img src={mapyPhoto} alt={poi.name} className="w-full h-full object-cover"
+                onError={e => { e.target.style.display = 'none'; e.target.parentNode.innerHTML = `<span style="font-size:24px">${category.icon}</span>`; }} />
             : <span className="text-2xl">{category.icon}</span>}
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-foreground text-sm leading-tight truncate">{poi.name}</p>
           {poi.address && <p className="text-xs text-muted-foreground truncate mt-0.5">{poi.address}</p>}
-          {combinedAvg > 0 && (
+          {avg > 0 && (
             <div className="flex items-center gap-1.5 mt-1">
-              <Stars value={combinedAvg} size={12} />
-              <span className="text-xs font-semibold text-green-600 dark:text-green-400">{combinedAvg.toFixed(1)}</span>
-              {totalCount > 0 && <span className="text-xs text-muted-foreground">({totalCount})</span>}
+              <Stars value={avg} size={12} />
+              <span className="text-xs font-semibold text-green-600 dark:text-green-400">{avg.toFixed(1)}</span>
+              {count > 0 && <span className="text-xs text-muted-foreground">({count})</span>}
             </div>
           )}
         </div>
         <ChevronUp className="w-4 h-4 text-muted-foreground flex-shrink-0 mr-8" />
       </div>
 
-      {/* Actions */}
       <div className="flex items-center gap-2 px-4 pb-4">
         <ActionBtn icon={Navigation} label="Navigate" onClick={onNavigate} color={category.color} />
-        <ActionBtn icon={Share2} label="Share" onClick={onShare} />
-        <ActionBtn icon={Camera} label="Add Photo" onClick={onAddPhoto} disabled={!user} />
+        <ActionBtn icon={Share2}     label="Share"    onClick={onShare} />
+        <ActionBtn icon={Camera}     label="Add Photo" onClick={onAddPhoto} disabled={!user} />
       </div>
     </div>
   );
 }
 
 // ─── Full sheet ───────────────────────────────────────────────────────────────
-
-function FullSheet({ poi, category, detail, sfPhotos, sfRating, onClose, onNavigate, onShare, onAddPhoto, onSubmitRating, user }) {
-  const [ratingVal, setRatingVal] = useState(0);
+function FullSheet({ poi, category, sfPhotos, sfRating, mapyPhotos, onClose, onNavigate, onShare, onAddPhoto, onSubmitRating, user }) {
+  const [ratingVal, setRatingVal]         = useState(0);
   const [ratingComment, setRatingComment] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [ratingDone, setRatingDone] = useState(false);
+  const [submitting, setSubmitting]       = useState(false);
+  const [ratingDone, setRatingDone]       = useState(false);
 
-  const mapyPhotos = detail?.photos || [];
-  const mr = detail?.rating;
-  const hours = detail?.openingHours;
-  const contact = detail?.contact;
+  const tags    = poi.tags || {};
+  const phone   = getPhone(tags);
+  const website = getWebsite(tags);
+  const email   = getEmail(tags);
+  const ohRaw   = getHours(tags);
+  const desc    = getDescription(tags);
+  const status  = parseOpenStatus(ohRaw);
 
+  const avg   = sfRating?.count > 0 ? sfRating.avg : 0;
+  const count = sfRating?.count || 0;
+
+  // Combine Mapy.cz photos + SpotFinder photos
   const allPhotos = [
-    ...mapyPhotos.map(p => ({ url: p.url, source: 'mapy' })),
+    ...mapyPhotos.map(u => ({ url: u, source: 'mapy' })),
     ...sfPhotos.map(p => ({ url: p.image || p.photo, source: 'sf' })),
   ];
-
-  const combinedAvg = (() => {
-    const mc = mr?.count || 0; const ma = mr?.average || 0;
-    const sc = sfRating?.count || 0; const sa = sfRating?.avg || 0;
-    const t = mc + sc; if (!t) return 0;
-    return Math.round(((ma * mc + sa * sc) / t) * 10) / 10;
-  })();
-  const combinedCount = (mr?.count || 0) + (sfRating?.count || 0);
 
   const handleRateSubmit = async () => {
     if (!ratingVal || submitting) return;
@@ -163,9 +206,10 @@ function FullSheet({ poi, category, detail, sfPhotos, sfRating, onClose, onNavig
         style={{ maxHeight: '92vh' }} onClick={e => e.stopPropagation()}>
 
         {/* Hero */}
-        <div className="relative bg-gray-100 dark:bg-accent" style={{ height: 220 }}>
+        <div className="relative bg-gray-100 dark:bg-accent" style={{ height: 200 }}>
           {allPhotos[0]?.url
-            ? <img src={allPhotos[0].url} alt={poi.name} className="w-full h-full object-cover" />
+            ? <img src={allPhotos[0].url} alt={poi.name} className="w-full h-full object-cover"
+                onError={e => { e.target.style.display = 'none'; }} />
             : <div className="w-full h-full flex items-center justify-center" style={{ background: `${category.color}18` }}>
                 <span className="text-7xl">{category.icon}</span>
               </div>}
@@ -177,12 +221,12 @@ function FullSheet({ poi, category, detail, sfPhotos, sfRating, onClose, onNavig
           </button>
         </div>
 
-        {/* Body */}
-        <div className="overflow-y-auto overscroll-contain" style={{ maxHeight: 'calc(92vh - 220px)' }}>
+        {/* Scrollable body */}
+        <div className="overflow-y-auto overscroll-contain" style={{ maxHeight: 'calc(92vh - 200px)' }}>
           <div className="px-5 pt-4 pb-10">
 
-            {/* Name + badge */}
-            <h1 className="text-xl font-bold text-foreground">{poi.name}</h1>
+            {/* Name + category badge */}
+            <h1 className="text-xl font-bold text-foreground leading-tight">{poi.name}</h1>
             <div className="mt-1.5 mb-4">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-white"
                 style={{ background: category.color }}>
@@ -190,33 +234,38 @@ function FullSheet({ poi, category, detail, sfPhotos, sfRating, onClose, onNavig
               </span>
             </div>
 
-            {/* Actions */}
+            {/* Action buttons */}
             <div className="flex gap-2 mb-5">
               <ActionBtn icon={Navigation} label="Navigate" onClick={onNavigate} color={category.color} />
-              <ActionBtn icon={Share2} label="Share" onClick={onShare} />
-              <ActionBtn icon={Camera} label="Add Photo" onClick={onAddPhoto} disabled={!user} />
+              <ActionBtn icon={Share2}     label="Share"    onClick={onShare} />
+              <ActionBtn icon={Camera}     label="Add Photo" onClick={onAddPhoto} disabled={!user} />
             </div>
 
             <div className="h-px bg-gray-100 dark:bg-border mb-4" />
 
-            {/* Open/Closed */}
-            {hours && (
+            {/* Opening hours */}
+            {status && (
               <div className="flex items-center gap-2 mb-4">
-                <Clock className="w-4 h-4 text-muted-foreground" />
-                <span className={`text-sm font-semibold ${hours.isOpen ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
-                  {hours.isOpen ? 'Open now' : 'Closed'}
+                <Clock className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <span className={`text-sm font-semibold ${status.isOpen ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+                  {status.label}
                 </span>
-                {hours.currentStatus && <span className="text-xs text-muted-foreground">· {hours.currentStatus}</span>}
+              </div>
+            )}
+            {ohRaw && !status && (
+              <div className="flex items-start gap-2 mb-4">
+                <Clock className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                <span className="text-sm text-muted-foreground">{ohRaw}</span>
               </div>
             )}
 
             {/* Ratings */}
             <div className="mb-4">
-              {combinedAvg > 0 ? (
+              {avg > 0 ? (
                 <div className="flex items-center gap-2 mb-3">
-                  <Stars value={combinedAvg} size={20} />
-                  <span className="text-lg font-bold text-green-600 dark:text-green-400">{combinedAvg.toFixed(1)}</span>
-                  <span className="text-sm text-muted-foreground">({combinedCount} {combinedCount === 1 ? 'review' : 'reviews'})</span>
+                  <Stars value={avg} size={20} />
+                  <span className="text-lg font-bold text-green-600 dark:text-green-400">{avg.toFixed(1)}</span>
+                  <span className="text-sm text-muted-foreground">({count} {count === 1 ? 'review' : 'reviews'})</span>
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground mb-3">No ratings yet — be the first!</p>
@@ -227,7 +276,7 @@ function FullSheet({ poi, category, detail, sfPhotos, sfRating, onClose, onNavig
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Rate this place</p>
                   {user ? (
                     <>
-                      <Stars value={ratingVal} size={26} interactive onRate={setRatingVal} />
+                      <Stars value={ratingVal} size={28} interactive onRate={setRatingVal} />
                       {ratingVal > 0 && (
                         <>
                           <textarea value={ratingComment} onChange={e => setRatingComment(e.target.value)}
@@ -256,30 +305,32 @@ function FullSheet({ poi, category, detail, sfPhotos, sfRating, onClose, onNavig
             <div className="h-px bg-gray-100 dark:bg-border mb-4" />
 
             {/* Description */}
-            {detail?.description && (
+            {desc && (
               <>
-                <p className="text-sm text-foreground leading-relaxed mb-4">{detail.description}</p>
+                <p className="text-sm text-foreground leading-relaxed mb-4">{desc}</p>
                 <div className="h-px bg-gray-100 dark:bg-border mb-4" />
               </>
             )}
 
-            {/* Contact */}
-            {(contact?.phone || contact?.email || contact?.url || contact?.website || poi.lat) && (
+            {/* Contact info — sourced directly from OSM tags, instant, no extra API */}
+            {(phone || email || website || poi.lat) && (
               <>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Contact & Info</p>
-                {contact?.phone && <ContactRow icon={Phone} value={contact.phone} href={`tel:${contact.phone}`} />}
-                {contact?.email && <ContactRow icon={Mail} value={contact.email} href={`mailto:${contact.email}`} />}
-                {(contact?.url || contact?.website) && <ContactRow icon={Globe} value={contact.url || contact.website} href={contact.url || contact.website} />}
-                <ContactRow icon={MapPin} value={`${poi.lat.toFixed(6)}, ${poi.lon.toFixed(6)}`} href={`https://maps.google.com/?q=${poi.lat},${poi.lon}`} />
+                {phone   && <ContactRow icon={Phone}  value={phone}   href={`tel:${phone}`} />}
+                {email   && <ContactRow icon={Mail}   value={email}   href={`mailto:${email}`} />}
+                {website && <ContactRow icon={Globe}  value={website} href={website.startsWith('http') ? website : `https://${website}`} />}
+                <ContactRow icon={MapPin} value={`${poi.lat.toFixed(6)}, ${poi.lon.toFixed(6)}`}
+                  href={`https://maps.google.com/?q=${poi.lat},${poi.lon}`} />
                 <div className="h-px bg-gray-100 dark:bg-border mt-2 mb-4" />
               </>
             )}
 
-            {/* Photos */}
+            {/* Photo gallery */}
             {allPhotos.length > 0 && (
               <>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                  Photos {sfPhotos.length > 0 && <span className="text-green-600 dark:text-green-400 normal-case font-normal ml-1">· {sfPhotos.length} from SpotFinder</span>}
+                  Photos
+                  {sfPhotos.length > 0 && <span className="text-green-600 dark:text-green-400 normal-case font-normal ml-1">· {sfPhotos.length} from SpotFinder</span>}
                 </p>
                 <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
                   {allPhotos.map((p, i) => (
@@ -297,6 +348,15 @@ function FullSheet({ poi, category, detail, sfPhotos, sfRating, onClose, onNavig
                   )}
                 </div>
               </>
+            )}
+
+            {/* If no photos yet, still show add button */}
+            {allPhotos.length === 0 && user && (
+              <button onClick={onAddPhoto}
+                className="w-full h-20 rounded-xl border-2 border-dashed border-gray-300 dark:border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-gray-400 transition-colors mb-4">
+                <Camera className="w-5 h-5" />
+                <span className="text-xs">Be the first to add a photo</span>
+              </button>
             )}
 
             {/* SpotFinder reviews */}
@@ -324,27 +384,74 @@ function FullSheet({ poi, category, detail, sfPhotos, sfRating, onClose, onNavig
   );
 }
 
-// ─── Entry point ─────────────────────────────────────────────────────────────
+// ─── Main export ─────────────────────────────────────────────────────────────
+
+const MAPY_API_KEY = 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
+
+/** Try to fetch Mapy.cz photos for a POI — non-blocking, fails silently */
+async function tryFetchMapyPhotos(name, lat, lon) {
+  try {
+    const near = `&preferNear=${lon},${lat}&preferNearPrecision=500`;
+    const url  = `https://api.mapy.com/v1/suggest?apikey=${MAPY_API_KEY}&query=${encodeURIComponent(name)}&lang=en&limit=5${near}`;
+    const res  = await fetch(url);
+    if (!res.ok) return [];
+
+    const data  = await res.json();
+    const items = data.items || [];
+
+    // Find closest match
+    let best = null, bestDist = Infinity;
+    for (const item of items) {
+      const pos = item.position;
+      if (!pos) continue;
+      const d = Math.hypot(pos.lat - lat, pos.lon - lon);
+      if (d < bestDist) { bestDist = d; best = item; }
+    }
+    if (!best || bestDist > 0.005) return [];
+
+    // Extract source + id from userData
+    const ud     = best.userData || {};
+    const source = ud.source || best.source;
+    const id     = ud.id     || best.id;
+    if (!source || !id) return [];
+
+    const detailRes = await fetch(
+      `https://api.mapy.com/v1/place/${encodeURIComponent(`${source}:${id}`)}?apikey=${MAPY_API_KEY}&lang=en`
+    );
+    if (!detailRes.ok) return [];
+
+    const detail = await detailRes.json();
+    // photos is an array of {url, ...} objects
+    return (detail.photos || []).map(p => p.url).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
 
 export default function POIDetailPanel({ poi, category, onClose, onNavigate, user }) {
-  const [expanded, setExpanded] = useState(false);
-  const [detail, setDetail] = useState(null);
-  const [sfPhotos, setSfPhotos] = useState([]);
-  const [sfRating, setSfRating] = useState({ ratings: [], avg: 0, count: 0 });
+  const [expanded, setExpanded]   = useState(false);
+  const [sfPhotos, setSfPhotos]   = useState([]);
+  const [sfRating, setSfRating]   = useState({ ratings: [], avg: 0, count: 0 });
+  const [mapyPhotos, setMapyPhotos] = useState([]);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (!poi) return;
-    setDetail(null);
     setExpanded(false);
+    setMapyPhotos([]);
+
     const poiId = makePOIId(poi.lat, poi.lon, poi.name);
-    fetchPOIDetails(poi.name, poi.lat, poi.lon).then(d => setDetail(d || null));
     getPOIPhotos(poiId).then(setSfPhotos);
     getPOIRatings(poiId).then(r => setSfRating(
       Array.isArray(r)
-        ? { ratings: r, avg: r.length ? Math.round(r.reduce((s,x)=>s+x.rating,0)/r.length*10)/10 : 0, count: r.length }
-        : r
+        ? { ratings: r, avg: r.length ? Math.round(r.reduce((s, x) => s + x.rating, 0) / r.length * 10) / 10 : 0, count: r.length }
+        : (r || { ratings: [], avg: 0, count: 0 })
     ));
+
+    // Fetch Mapy.cz photos in background — non-blocking
+    tryFetchMapyPhotos(poi.name, poi.lat, poi.lon).then(urls => {
+      if (urls.length) setMapyPhotos(urls);
+    });
   }, [poi?.id]);
 
   const handleShare = async () => {
@@ -374,7 +481,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
     await addPOIRating(poiId, rating, comment, user?.email);
     getPOIRatings(poiId).then(r => setSfRating(
       Array.isArray(r)
-        ? { ratings: r, avg: r.length ? Math.round(r.reduce((s,x)=>s+x.rating,0)/r.length*10)/10 : 0, count: r.length }
+        ? { ratings: r, avg: r.length ? Math.round(r.reduce((s, x) => s + x.rating, 0) / r.length * 10) / 10 : 0, count: r.length }
         : r
     ));
   };
@@ -384,7 +491,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
   if (!poi) return null;
 
   const sharedProps = {
-    poi, category, detail, sfPhotos, sfRating,
+    poi, category, sfPhotos, sfRating, mapyPhotos,
     onClose, onNavigate: handleNavigate, onShare: handleShare, onAddPhoto: handleAddPhoto, user,
   };
 
@@ -393,7 +500,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
       {expanded
         ? <FullSheet {...sharedProps} onSubmitRating={handleSubmitRating} />
-        : <MiniBar {...sharedProps} onExpand={() => setExpanded(true)} />}
+        : <MiniBar {...sharedProps} mapyPhoto={mapyPhotos[0] || null} onExpand={() => setExpanded(true)} />}
     </>
   );
 }
