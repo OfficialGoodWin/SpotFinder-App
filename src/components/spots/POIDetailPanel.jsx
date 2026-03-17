@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Navigation, Share2, Camera, Star, Phone, Mail, Globe, MapPin, ChevronUp, Clock } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { X, Navigation, Share2, Camera, Star, Phone, Mail, Globe, MapPin, ChevronUp, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getPOIPhotos, getPOIRatings, addPOIPhoto, addPOIRating, uploadSpotImage, makePOIId } from '@/api/firebaseClient';
 
 const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY || '';
@@ -19,14 +19,12 @@ function parseOpenStatus(ohString) {
     const days = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
     const today = days[now.getDay()];
     const timeNow = now.getHours() * 60 + now.getMinutes();
-    const rules = ohString.split(';').map(s => s.trim());
-    for (const rule of rules) {
+    for (const rule of ohString.split(';').map(s => s.trim())) {
       const match = rule.match(/^([A-Za-z,\-\s]+)\s+(\d{2}:\d{2})-(\d{2}:\d{2})$/);
       if (!match) continue;
       const [, dayPart, open, close] = match;
       let todayMatches = false;
-      const segments = dayPart.split(',').map(s => s.trim());
-      for (const seg of segments) {
+      for (const seg of dayPart.split(',').map(s => s.trim())) {
         const range = seg.match(/^([A-Z][a-z])-([A-Z][a-z])$/);
         if (range) {
           const s = days.indexOf(range[1]), e = days.indexOf(range[2]), c = days.indexOf(today);
@@ -43,60 +41,51 @@ function parseOpenStatus(ohString) {
   return null;
 }
 
-// ─── Google Places photo fetch ────────────────────────────────────────────────
+// ─── Photo fetching ───────────────────────────────────────────────────────────
+// Google Places: strict radius=50m + name match to avoid nearby-place bleed
 async function fetchGooglePhotos(name, lat, lon) {
   if (!GOOGLE_API_KEY) return [];
   try {
-    // Find place
-    const findUrl = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(name)}&inputtype=textquery&locationbias=circle:200@${lat},${lon}&fields=place_id,photos&key=${GOOGLE_API_KEY}`;
+    const findUrl = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(name)}&inputtype=textquery&locationbias=circle:50@${lat},${lon}&fields=place_id,name,geometry,photos&key=${GOOGLE_API_KEY}`;
     const res = await fetch(findUrl);
     if (!res.ok) return [];
     const data = await res.json();
-    const placeId = data.candidates?.[0]?.place_id;
-    const photosFromFind = data.candidates?.[0]?.photos || [];
+    const candidate = data.candidates?.[0];
+    if (!candidate) return [];
 
-    // Get details for more photos if needed
-    let photos = photosFromFind;
-    if (!photos.length && placeId) {
-      const detailUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=photos&key=${GOOGLE_API_KEY}`;
-      const dr = await fetch(detailUrl);
-      if (dr.ok) {
-        const dd = await dr.json();
-        photos = dd.result?.photos || [];
-      }
+    // Verify the returned place is actually close (within ~100m)
+    const cLat = candidate.geometry?.location?.lat;
+    const cLon = candidate.geometry?.location?.lng;
+    if (cLat && cLon) {
+      const distDeg = Math.hypot(cLat - lat, cLon - lon);
+      if (distDeg > 0.001) return []; // ~111m — reject if too far
     }
 
-    return photos.slice(0, 6).map(p =>
-      `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${p.photo_reference}&key=${GOOGLE_API_KEY}`
+    let photos = candidate.photos || [];
+    if (!photos.length && candidate.place_id) {
+      const dr = await fetch(`https://maps.googleapis.com/maps/api/place/details/json?place_id=${candidate.place_id}&fields=photos&key=${GOOGLE_API_KEY}`);
+      if (dr.ok) photos = (await dr.json()).result?.photos || [];
+    }
+    return photos.slice(0, 8).map(p =>
+      `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photo_reference=${p.photo_reference}&key=${GOOGLE_API_KEY}`
     );
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
 
-// ─── Fallback: fetch photos from Wikimedia/OpenStreetMap ─────────────────────
+// Wikimedia Commons: tight 50m radius
 async function fetchOpenPhotos(name, lat, lon) {
   try {
-    // Try Wikimedia Commons geoSearch
-    const url = `https://commons.wikimedia.org/w/api.php?action=query&list=geosearch&gscoord=${lat}|${lon}&gsradius=100&gslimit=5&gsnamespace=6&format=json&origin=*`;
+    const url = `https://commons.wikimedia.org/w/api.php?action=query&list=geosearch&gscoord=${lat}|${lon}&gsradius=50&gslimit=6&gsnamespace=6&format=json&origin=*`;
     const res = await fetch(url);
     if (!res.ok) return [];
-    const data = await res.json();
-    const pages = data.query?.geosearch || [];
+    const pages = (await res.json()).query?.geosearch || [];
     if (!pages.length) return [];
-
     const titles = pages.map(p => `File:${p.title.replace('File:', '')}`).join('|');
-    const imgUrl = `https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(titles)}&prop=imageinfo&iiprop=url&iiurlwidth=800&format=json&origin=*`;
-    const ir = await fetch(imgUrl);
+    const ir = await fetch(`https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(titles)}&prop=imageinfo&iiprop=url&iiurlwidth=1200&format=json&origin=*`);
     if (!ir.ok) return [];
-    const id = await ir.json();
-    return Object.values(id.query?.pages || {})
-      .map(p => p.imageinfo?.[0]?.thumburl)
-      .filter(Boolean)
-      .slice(0, 4);
-  } catch {
-    return [];
-  }
+    return Object.values((await ir.json()).query?.pages || {})
+      .map(p => p.imageinfo?.[0]?.thumburl).filter(Boolean).slice(0, 4);
+  } catch { return []; }
 }
 
 async function tryFetchPhotos(name, lat, lon) {
@@ -105,15 +94,104 @@ async function tryFetchPhotos(name, lat, lon) {
   return fetchOpenPhotos(name, lat, lon);
 }
 
+// ─── Lightbox ─────────────────────────────────────────────────────────────────
+function Lightbox({ photos, startIndex, onClose }) {
+  const [idx, setIdx] = useState(startIndex);
+  const touchStartX = useRef(null);
+
+  const prev = useCallback(() => setIdx(i => (i - 1 + photos.length) % photos.length), [photos.length]);
+  const next = useCallback(() => setIdx(i => (i + 1) % photos.length), [photos.length]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'ArrowLeft') prev();
+      else if (e.key === 'ArrowRight') next();
+      else if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [prev, next, onClose]);
+
+  const onTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
+  const onTouchEnd = (e) => {
+    if (touchStartX.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    if (Math.abs(dx) > 40) dx < 0 ? next() : prev();
+    touchStartX.current = null;
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[2000] bg-black flex items-center justify-center"
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
+      {/* Close */}
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white backdrop-blur-sm transition-colors"
+      >
+        <X className="w-5 h-5" />
+      </button>
+
+      {/* Counter */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-black/50 backdrop-blur-sm text-white text-sm font-medium px-3 py-1 rounded-full">
+        {idx + 1} / {photos.length}
+      </div>
+
+      {/* Prev */}
+      {photos.length > 1 && (
+        <button
+          onClick={prev}
+          className="absolute left-3 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center text-white backdrop-blur-sm transition-colors"
+        >
+          <ChevronLeft className="w-6 h-6" />
+        </button>
+      )}
+
+      {/* Image */}
+      <img
+        key={idx}
+        src={photos[idx]}
+        alt=""
+        className="max-w-full max-h-full object-contain select-none"
+        style={{ maxHeight: '100dvh', maxWidth: '100dvw' }}
+        onError={e => { e.target.src = ''; }}
+      />
+
+      {/* Next */}
+      {photos.length > 1 && (
+        <button
+          onClick={next}
+          className="absolute right-3 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center text-white backdrop-blur-sm transition-colors"
+        >
+          <ChevronRight className="w-6 h-6" />
+        </button>
+      )}
+
+      {/* Dot indicators */}
+      {photos.length > 1 && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-1.5">
+          {photos.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setIdx(i)}
+              className={`w-1.5 h-1.5 rounded-full transition-all ${i === idx ? 'bg-white w-4' : 'bg-white/40'}`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Stars ────────────────────────────────────────────────────────────────────
 function Stars({ value = 0, size = 14, interactive = false, onRate }) {
   const [hover, setHover] = useState(0);
   return (
     <span className="flex items-center gap-0.5">
       {[1, 2, 3, 4, 5].map(i => {
-        const fill = interactive
-          ? (hover || value) >= i ? 1 : 0
-          : Math.min(Math.max(value - (i - 1), 0), 1);
+        const fill = interactive ? (hover || value) >= i ? 1 : 0 : Math.min(Math.max(value - (i - 1), 0), 1);
         return (
           <span key={i} className="relative inline-block leading-none"
             style={{ width: size, height: size, fontSize: size, cursor: interactive ? 'pointer' : 'default' }}
@@ -155,7 +233,7 @@ function ContactRow({ icon: Icon, value, href }) {
 }
 
 // ─── Mini bar ─────────────────────────────────────────────────────────────────
-function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavigate, onShare, onAddPhoto, user }) {
+function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavigate, onShare, onAddPhoto, user, onOpenLightbox }) {
   const avg = sfRating?.count > 0 ? sfRating.avg : 0;
   const count = sfRating?.count || 0;
 
@@ -171,10 +249,13 @@ function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavig
       </button>
 
       <div className="flex items-center gap-3 px-4 pt-2 pb-3 cursor-pointer" onClick={onExpand}>
-        <div className="w-14 h-14 rounded-full flex-shrink-0 overflow-hidden border-2 flex items-center justify-center"
-          style={{ borderColor: category.color, background: `${category.color}18` }}>
+        <div
+          className="w-14 h-14 rounded-full flex-shrink-0 overflow-hidden border-2 flex items-center justify-center"
+          style={{ borderColor: category.color, background: `${category.color}18` }}
+          onClick={photoUrl ? (e => { e.stopPropagation(); onOpenLightbox(0); }) : undefined}
+        >
           {photoUrl
-            ? <img src={photoUrl} alt={poi.name} className="w-full h-full object-cover"
+            ? <img src={photoUrl} alt={poi.name} className="w-full h-full object-cover cursor-zoom-in"
                 onError={e => { e.target.style.display = 'none'; }} />
             : <span className="text-2xl">{category.icon}</span>}
         </div>
@@ -202,19 +283,15 @@ function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavig
 }
 
 // ─── Full sheet ───────────────────────────────────────────────────────────────
-function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavigate, onShare, onAddPhoto, onSubmitRating, user }) {
+function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavigate, onShare, onAddPhoto, onSubmitRating, user, onOpenLightbox }) {
   const [ratingVal, setRatingVal] = useState(0);
   const [ratingComment, setRatingComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [ratingDone, setRatingDone] = useState(false);
 
   const tags = poi.tags || {};
-  const phone = getPhone(tags);
-  const website = getWebsite(tags);
-  const email = getEmail(tags);
-  const ohRaw = getHours(tags);
-  const desc = getDescription(tags);
-  const status = parseOpenStatus(ohRaw);
+  const phone = getPhone(tags), website = getWebsite(tags), email = getEmail(tags);
+  const ohRaw = getHours(tags), desc = getDescription(tags), status = parseOpenStatus(ohRaw);
   const avg = sfRating?.count > 0 ? sfRating.avg : 0;
   const count = sfRating?.count || 0;
 
@@ -236,18 +313,30 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
       <div className="mt-auto bg-white dark:bg-card rounded-t-3xl shadow-2xl overflow-hidden"
         style={{ maxHeight: '92vh' }} onClick={e => e.stopPropagation()}>
 
-        {/* Hero */}
-        <div className="relative bg-gray-100 dark:bg-accent" style={{ height: 200 }}>
+        {/* Hero — clickable to open lightbox */}
+        <div
+          className="relative bg-gray-100 dark:bg-accent cursor-zoom-in"
+          style={{ height: 200 }}
+          onClick={allPhotos.length ? () => onOpenLightbox(0) : undefined}
+        >
           {allPhotos[0]?.url
             ? <img src={allPhotos[0].url} alt={poi.name} className="w-full h-full object-cover"
                 onError={e => { e.target.style.display = 'none'; }} />
             : <div className="w-full h-full flex items-center justify-center" style={{ background: `${category.color}18` }}>
                 <span className="text-7xl">{category.icon}</span>
               </div>}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full bg-white/50" />
-          <button onClick={onClose}
-            className="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white">
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full bg-white/50 pointer-events-none" />
+          {/* Photo count badge */}
+          {allPhotos.length > 1 && (
+            <div className="absolute bottom-3 right-3 bg-black/50 backdrop-blur-sm text-white text-xs font-medium px-2 py-1 rounded-full pointer-events-none">
+              1 / {allPhotos.length}
+            </div>
+          )}
+          <button
+            onClick={e => { e.stopPropagation(); onClose(); }}
+            className="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -285,6 +374,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
               </div>
             )}
 
+            {/* Ratings */}
             <div className="mb-4">
               {avg > 0 ? (
                 <div className="flex items-center gap-2 mb-3">
@@ -347,19 +437,26 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
               </>
             )}
 
+            {/* Photo gallery */}
             {allPhotos.length > 0 && (
               <>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                  Photos
+                  Photos ({allPhotos.length})
                   {sfPhotos.length > 0 && <span className="text-green-600 dark:text-green-400 normal-case font-normal ml-1">· {sfPhotos.length} from SpotFinder</span>}
                 </p>
-                <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
+                <div className="flex gap-2 overflow-x-auto pb-2 mb-4 -mx-1 px-1">
                   {allPhotos.map((p, i) => (
-                    <div key={i} className="flex-shrink-0 w-28 h-20 rounded-xl overflow-hidden bg-gray-100 dark:bg-accent relative">
+                    <button
+                      key={i}
+                      onClick={() => onOpenLightbox(i)}
+                      className="flex-shrink-0 w-28 h-20 rounded-xl overflow-hidden bg-gray-100 dark:bg-accent relative cursor-zoom-in hover:opacity-90 active:scale-95 transition-all"
+                    >
                       <img src={p.url} alt="" className="w-full h-full object-cover"
                         onError={e => { e.target.parentNode.style.display = 'none'; }} />
-                      {p.source === 'sf' && <div className="absolute bottom-1 right-1 bg-green-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">SF</div>}
-                    </div>
+                      {p.source === 'sf' && (
+                        <div className="absolute bottom-1 right-1 bg-green-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">SF</div>
+                      )}
+                    </button>
                   ))}
                   {user && (
                     <button onClick={onAddPhoto}
@@ -409,12 +506,14 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
   const [sfPhotos, setSfPhotos] = useState([]);
   const [sfRating, setSfRating] = useState({ ratings: [], avg: 0, count: 0 });
   const [photos, setPhotos] = useState([]);
+  const [lightboxIndex, setLightboxIndex] = useState(null); // null = closed
   const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (!poi) return;
     setExpanded(false);
     setPhotos([]);
+    setLightboxIndex(null);
 
     const poiId = makePOIId(poi.lat, poi.lon, poi.name);
     getPOIPhotos(poiId).then(setSfPhotos);
@@ -423,27 +522,16 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
         ? { ratings: r, avg: r.length ? Math.round(r.reduce((s, x) => s + x.rating, 0) / r.length * 10) / 10 : 0, count: r.length }
         : (r || { ratings: [], avg: 0, count: 0 })
     ));
-
-    tryFetchPhotos(poi.name, poi.lat, poi.lon).then(urls => {
-      if (urls.length) setPhotos(urls);
-    });
+    tryFetchPhotos(poi.name, poi.lat, poi.lon).then(urls => { if (urls.length) setPhotos(urls); });
   }, [poi?.id]);
 
   const handleShare = async () => {
     const url = `https://maps.google.com/?q=${poi.lat},${poi.lon}`;
-    const shareText = `${poi.name}\n${url}`;
     try {
-      if (navigator.share) {
-        await navigator.share({ title: poi.name, text: poi.address || poi.name, url });
-      } else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(shareText);
-        alert('Link copied to clipboard!');
-      } else {
-        window.open(url, '_blank');
-      }
-    } catch (e) {
-      if (e.name !== 'AbortError') window.open(url, '_blank');
-    }
+      if (navigator.share) await navigator.share({ title: poi.name, text: poi.address || poi.name, url });
+      else if (navigator.clipboard) { await navigator.clipboard.writeText(`${poi.name}\n${url}`); alert('Link copied!'); }
+      else window.open(url, '_blank');
+    } catch (e) { if (e.name !== 'AbortError') window.open(url, '_blank'); }
   };
 
   const handleAddPhoto = () => { if (user) fileInputRef.current?.click(); };
@@ -472,19 +560,36 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
 
   const handleNavigate = () => { onNavigate?.({ lat: poi.lat, lng: poi.lon, label: poi.name }); onClose(); };
 
+  // All photos merged for lightbox
+  const allPhotoUrls = [
+    ...photos,
+    ...sfPhotos.map(p => p.image || p.photo).filter(Boolean),
+  ];
+
   if (!poi) return null;
 
   const sharedProps = {
     poi, category, sfPhotos, sfRating, photos,
-    onClose, onNavigate: handleNavigate, onShare: handleShare, onAddPhoto: handleAddPhoto, user,
+    onClose, onNavigate: handleNavigate, onShare: handleShare,
+    onAddPhoto: handleAddPhoto, user,
+    onOpenLightbox: (i) => setLightboxIndex(i),
   };
 
   return (
     <>
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+
       {expanded
         ? <FullSheet {...sharedProps} onSubmitRating={handleSubmitRating} />
         : <MiniBar {...sharedProps} photoUrl={photos[0] || null} onExpand={() => setExpanded(true)} />}
+
+      {lightboxIndex !== null && allPhotoUrls.length > 0 && (
+        <Lightbox
+          photos={allPhotoUrls}
+          startIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
+      )}
     </>
   );
 }
