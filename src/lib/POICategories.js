@@ -1,329 +1,378 @@
 // POI Categories with icons, colors, zoom levels, and OSM tags
+// Smart zoom handling: lower zoom = only "main" POIs, higher zoom = all POIs
 export const POI_CATEGORIES = [
-  // Zoom 18+ (local amenities)
+  // === EDUCATION ===
   { 
     name: 'Schools', 
-    geoapifyCategory: 'education.school',
     keywords: ['school', 'škola', 'schule', 'école', 'escuela', 'scuola', 'szkoła'],
     icon: '🏫', 
     color: '#4A90E2',
     osmTag: 'amenity=school',
-    minZoom: 14,
-    desc: 'Elementary, high schools, universities'
+    minZoom: 10,  // Show major schools at lower zoom
+    detailZoom: 16,  // Show all schools at this zoom
+    desc: 'Elementary, high schools, universities',
+    importance: 'high'  // high = always show, medium = show when zoomed in more, low = only at detail zoom
   },
+  
+  // === FOOD & DINING ===
   { 
     name: 'Restaurants', 
-    geoapifyCategory: 'catering.restaurant',
     keywords: ['restaurant', 'restaurace', 'food', 'jídlo', 'essen', 'nourriture', 'comida', 'ristorante'],
     icon: '🍽️', 
     color: '#E74C3C',
     osmTag: 'amenity=restaurant',
-    minZoom: 14,
-    desc: 'Dining and food places'
+    minZoom: 12,  // Show popular restaurants at lower zoom
+    detailZoom: 17,
+    desc: 'Dining and food places',
+    importance: 'medium'
   },
   { 
     name: 'Cafes', 
-    geoapifyCategory: 'catering.cafe',
     keywords: ['cafe', 'coffee', 'kavárna', 'kaffee', 'café', 'caffè', 'kawa'],
     icon: '☕', 
     color: '#8B4513',
     osmTag: 'amenity=cafe',
     minZoom: 14,
-    desc: 'Coffee shops and cafes'
-  },
-  { 
-    name: 'Shops', 
-    geoapifyCategory: 'commercial',
-    keywords: ['shop', 'store', 'obchod', 'geschäft', 'magasin', 'tienda', 'negozio', 'sklep'],
-    icon: '🛍️', 
-    color: '#9B59B6',
-    osmTag: 'shop',
-    minZoom: 14,
-    desc: 'Retail stores and shops'
-  },
-  { 
-    name: 'Supermarkets', 
-    geoapifyCategory: 'commercial.supermarket',
-    keywords: ['supermarket', 'grocery', 'potraviny', 'lebensmittel', 'alimentación', 'spożywczy'],
-    icon: '🏪', 
-    color: '#27AE60',
-    osmTag: 'shop=supermarket',
-    minZoom: 14,
-    desc: 'Grocery stores'
-  },
-  { 
-    name: 'Toilets', 
-    geoapifyCategory: 'service.toilets',
-    keywords: ['toilet', 'wc', 'restroom', 'záchod', 'toilette', 'baño', 'bagno', 'toaleta'],
-    icon: '🚻', 
-    color: '#3498DB',
-    osmTag: 'amenity=toilets',
-    minZoom: 14,
-    desc: 'Public restrooms'
-  },
-  { 
-    name: 'Banks', 
-    geoapifyCategory: 'service.financial.bank',
-    keywords: ['bank', 'banka', 'banco', 'banque', 'banca'],
-    icon: '🏦', 
-    color: '#F39C12',
-    osmTag: 'amenity=bank',
-    minZoom: 14,
-    desc: 'Banking services'
-  },
-  { 
-    name: 'ATMs', 
-    geoapifyCategory: 'service.financial.atm',
-    keywords: ['atm', 'bankomat', 'cash', 'geldautomat', 'cajero', 'bancomat'],
-    icon: '💳', 
-    color: '#16A085',
-    osmTag: 'amenity=atm',
-    minZoom: 14,
-    desc: 'Cash machines'
-  },
-  { 
-    name: 'Pharmacies', 
-    geoapifyCategory: 'healthcare.pharmacy',
-    keywords: ['pharmacy', 'lékárna', 'apotheke', 'farmacia', 'pharmacie', 'apteka'],
-    icon: '💊', 
-    color: '#E67E22',
-    osmTag: 'amenity=pharmacy',
-    minZoom: 14,
-    desc: 'Medicine and healthcare'
-  },
-  { 
-    name: 'Hospitals', 
-    geoapifyCategory: 'healthcare.hospital',
-    keywords: ['hospital', 'nemocnice', 'krankenhaus', 'hôpital', 'ospedale', 'szpital'],
-    icon: '🏥', 
-    color: '#C0392B',
-    osmTag: 'amenity=hospital',
-    minZoom: 14,
-    desc: 'Medical centers'
-  },
-  { 
-    name: 'Libraries', 
-    geoapifyCategory: 'education.library',
-    keywords: ['library', 'knihovna', 'bibliothek', 'bibliothèque', 'biblioteca', 'biblioteka'],
-    icon: '📚', 
-    color: '#8E44AD',
-    osmTag: 'amenity=library',
-    minZoom: 14,
-    desc: 'Public libraries'
-  },
-  { 
-    name: 'Playgrounds', 
-    geoapifyCategory: 'leisure.playground',
-    keywords: ['playground', 'hřiště', 'spielplatz', 'aire de jeux', 'parque infantil', 'plac zabaw'],
-    icon: '🎮', 
-    color: '#F1C40F',
-    osmTag: 'leisure=playground',
-    minZoom: 14,
-    desc: 'Children play areas'
-  },
-  { 
-    name: 'Hotels', 
-    geoapifyCategory: 'accommodation.hotel',
-    keywords: ['hotel', 'accommodation', 'ubytování', 'unterkunft', 'hébergement', 'alojamiento', 'nocleg'],
-    icon: '🏨', 
-    color: '#2980B9',
-    osmTag: 'tourism=hotel',
-    minZoom: 14,
-    desc: 'Hotels and lodging'
-  },
-  { 
-    name: 'Museums', 
-    geoapifyCategory: 'entertainment.museum',
-    keywords: ['museum', 'muzeum', 'musée', 'museo', 'muzeum'],
-    icon: '🏛️', 
-    color: '#34495E',
-    osmTag: 'tourism=museum',
-    minZoom: 14,
-    desc: 'Art and history museums'
-  },
-  { 
-    name: 'Castles', 
-    geoapifyCategory: 'heritage.castle',
-    keywords: ['castle', 'hrad', 'schloss', 'château', 'castello', 'castillo', 'zamek'],
-    icon: '🏰', 
-    color: '#95A5A6',
-    osmTag: 'historic=castle',
-    minZoom: 14,
-    desc: 'Historic castles and fortresses'
-  },
-  { 
-    name: 'Churches', 
-    geoapifyCategory: 'religion',
-    keywords: ['church', 'kostel', 'kirche', 'église', 'iglesia', 'chiesa', 'kościół'],
-    icon: '⛪', 
-    color: '#7F8C8D',
-    osmTag: 'amenity=place_of_worship',
-    minZoom: 14,
-    desc: 'Places of worship'
-  },
-  { 
-    name: 'Gyms', 
-    geoapifyCategory: 'sport.fitness',
-    keywords: ['gym', 'fitness', 'posilovna', 'fitnessstudio', 'gimnasio', 'palestra', 'siłownia'],
-    icon: '💪', 
-    color: '#E74C3C',
-    osmTag: 'leisure=fitness_centre',
-    minZoom: 14,
-    desc: 'Fitness centers'
-  },
-  { 
-    name: 'Cinemas', 
-    geoapifyCategory: 'entertainment.cinema',
-    keywords: ['cinema', 'movie', 'kino', 'cine', 'film'],
-    icon: '🎬', 
-    color: '#9B59B6',
-    osmTag: 'amenity=cinema',
-    minZoom: 14,
-    desc: 'Movie theaters'
-  },
-  { 
-    name: 'Car Service', 
-    geoapifyCategory: 'service.vehicle.car_repair',
-    keywords: ['car service', 'repair', 'autoservis', 'werkstatt', 'taller', 'officina', 'warsztat'],
-    icon: '🔧', 
-    color: '#E67E22',
-    osmTag: 'shop=car_repair',
-    minZoom: 14,
-    desc: 'Auto repair shops'
-  },
-  { 
-    name: 'Post Office', 
-    geoapifyCategory: 'service.post_office',
-    keywords: ['post', 'pošta', 'correos', 'bureau de poste', 'ufficio postale', 'poczta'],
-    icon: '📮', 
-    color: '#F39C12',
-    osmTag: 'amenity=post_office',
-    minZoom: 14,
-    desc: 'Postal services'
+    detailZoom: 17,
+    desc: 'Coffee shops and cafes',
+    importance: 'medium'
   },
   { 
     name: 'Bars', 
-    geoapifyCategory: 'catering.bar',
     keywords: ['bar', 'pub', 'hospoda', 'kneipe', 'bar'],
     icon: '🍺', 
     color: '#D68910',
     osmTag: 'amenity=bar',
     minZoom: 14,
-    desc: 'Bars and pubs'
-  },
-  { 
-    name: 'Police', 
-    geoapifyCategory: 'service.police',
-    keywords: ['police', 'policie', 'polizei', 'policía', 'polizia', 'policja'],
-    icon: '👮', 
-    color: '#2C3E50',
-    osmTag: 'amenity=police',
-    minZoom: 14,
-    desc: 'Police stations'
-  },
-  { 
-    name: 'Fire Station', 
-    geoapifyCategory: 'service.fire_station',
-    keywords: ['fire station', 'hasičská', 'feuerwehr', 'bomberos', 'pompieri', 'straż pożarna'],
-    icon: '🚒', 
-    color: '#E74C3C',
-    osmTag: 'amenity=fire_station',
-    minZoom: 14,
-    desc: 'Fire departments'
-  },
-  { 
-    name: 'Dentist', 
-    geoapifyCategory: 'healthcare.dentist',
-    keywords: ['dentist', 'zubař', 'zahnarzt', 'dentiste', 'dentista', 'dentysta'],
-    icon: '🦷', 
-    color: '#16A085',
-    osmTag: 'amenity=dentist',
-    minZoom: 14,
-    desc: 'Dental clinics'
-  },
-  { 
-    name: 'Veterinary', 
-    geoapifyCategory: 'healthcare.vet',
-    keywords: ['vet', 'veterinary', 'veterinář', 'tierarzt', 'veterinario', 'weterynarz'],
-    icon: '🐾', 
-    color: '#27AE60',
-    osmTag: 'amenity=veterinary',
-    minZoom: 14,
-    desc: 'Animal hospitals'
+    detailZoom: 17,
+    desc: 'Bars and pubs',
+    importance: 'low'
   },
   { 
     name: 'Bakery', 
-    geoapifyCategory: 'commercial.food_and_drink.bakery',
     keywords: ['bakery', 'pekárna', 'bäckerei', 'boulangerie', 'panadería', 'panetteria', 'piekarnia'],
     icon: '🥖', 
     color: '#D4A574',
     osmTag: 'shop=bakery',
     minZoom: 14,
-    desc: 'Bakeries and bread shops'
+    detailZoom: 17,
+    desc: 'Bakeries and bread shops',
+    importance: 'low'
   },
   
-  // Zoom 15+ (parking)
+  // === SHOPPING ===
+  { 
+    name: 'Shops', 
+    keywords: ['shop', 'store', 'obchod', 'geschäft', 'magasin', 'tienda', 'negozio', 'sklep'],
+    icon: '🛍️', 
+    color: '#9B59B6',
+    osmTag: 'shop',
+    minZoom: 14,
+    detailZoom: 17,
+    desc: 'Retail stores and shops',
+    importance: 'low'
+  },
+  { 
+    name: 'Supermarkets', 
+    keywords: ['supermarket', 'grocery', 'potraviny', 'lebensmittel', 'alimentación', 'spożywczy'],
+    icon: '🏪', 
+    color: '#27AE60',
+    osmTag: 'shop=supermarket',
+    minZoom: 12,  // Important - show at lower zoom
+    detailZoom: 16,
+    desc: 'Grocery stores',
+    importance: 'high'
+  },
+  
+  // === FACILITIES ===
+  { 
+    name: 'Toilets', 
+    keywords: ['toilet', 'wc', 'restroom', 'záchod', 'toilette', 'baño', 'bagno', 'toaleta'],
+    icon: '🚻', 
+    color: '#3498DB',
+    osmTag: 'amenity=toilets',
+    minZoom: 15,
+    detailZoom: 18,
+    desc: 'Public restrooms',
+    importance: 'low'
+  },
+  { 
+    name: 'Banks', 
+    keywords: ['bank', 'banka', 'banco', 'banque', 'banca'],
+    icon: '🏦', 
+    color: '#F39C12',
+    osmTag: 'amenity=bank',
+    minZoom: 12,
+    detailZoom: 16,
+    desc: 'Banking services',
+    importance: 'high'
+  },
+  { 
+    name: 'ATMs', 
+    keywords: ['atm', 'bankomat', 'cash', 'geldautomat', 'cajero', 'bancomat'],
+    icon: '💳', 
+    color: '#16A085',
+    osmTag: 'amenity=atm',
+    minZoom: 14,
+    detailZoom: 17,
+    desc: 'Cash machines',
+    importance: 'medium'
+  },
+  { 
+    name: 'Post Office', 
+    keywords: ['post', 'pošta', 'correos', 'bureau de poste', 'ufficio postale', 'poczta'],
+    icon: '📮', 
+    color: '#F39C12',
+    osmTag: 'amenity=post_office',
+    minZoom: 12,
+    detailZoom: 16,
+    desc: 'Postal services',
+    importance: 'high'
+  },
+  
+  // === HEALTHCARE ===
+  { 
+    name: 'Pharmacies', 
+    keywords: ['pharmacy', 'lékárna', 'apotheke', 'farmacia', 'pharmacie', 'apteka'],
+    icon: '💊', 
+    color: '#E67E22',
+    osmTag: 'amenity=pharmacy',
+    minZoom: 12,  // Important - show at lower zoom
+    detailZoom: 16,
+    desc: 'Medicine and healthcare',
+    importance: 'high'
+  },
+  { 
+    name: 'Hospitals', 
+    keywords: ['hospital', 'nemocnice', 'krankenhaus', 'hôpital', 'ospedale', 'szpital'],
+    icon: '🏥', 
+    color: '#C0392B',
+    osmTag: 'amenity=hospital',
+    minZoom: 10,  // Very important - show at low zoom
+    detailZoom: 15,
+    desc: 'Medical centers',
+    importance: 'high'
+  },
+  { 
+    name: 'Dentist', 
+    keywords: ['dentist', 'zubař', 'zahnarzt', 'dentiste', 'dentista', 'dentysta'],
+    icon: '🦷', 
+    color: '#16A085',
+    osmTag: 'amenity=dentist',
+    minZoom: 14,
+    detailZoom: 17,
+    desc: 'Dental clinics',
+    importance: 'medium'
+  },
+  { 
+    name: 'Veterinary', 
+    keywords: ['vet', 'veterinary', 'veterinář', 'tierarzt', 'veterinario', 'weterynarz'],
+    icon: '🐾', 
+    color: '#27AE60',
+    osmTag: 'amenity=veterinary',
+    minZoom: 14,
+    detailZoom: 17,
+    desc: 'Animal hospitals',
+    importance: 'low'
+  },
+  
+  // === CULTURE & LEISURE ===
+  { 
+    name: 'Libraries', 
+    keywords: ['library', 'knihovna', 'bibliothek', 'bibliothèque', 'biblioteca', 'biblioteka'],
+    icon: '📚', 
+    color: '#8E44AD',
+    osmTag: 'amenity=library',
+    minZoom: 12,
+    detailZoom: 16,
+    desc: 'Public libraries',
+    importance: 'medium'
+  },
+  { 
+    name: 'Playgrounds', 
+    keywords: ['playground', 'hřiště', 'spielplatz', 'aire de jeux', 'parque infantil', 'plac zabaw'],
+    icon: '🎮', 
+    color: '#F1C40F',
+    osmTag: 'leisure=playground',
+    minZoom: 15,
+    detailZoom: 18,
+    desc: 'Children play areas',
+    importance: 'low'
+  },
+  { 
+    name: 'Gyms', 
+    keywords: ['gym', 'fitness', 'posilovna', 'fitnessstudio', 'gimnasio', 'palestra', 'siłownia'],
+    icon: '💪', 
+    color: '#E74C3C',
+    osmTag: 'leisure=fitness_centre',
+    minZoom: 14,
+    detailZoom: 17,
+    desc: 'Fitness centers',
+    importance: 'low'
+  },
+  { 
+    name: 'Cinemas', 
+    keywords: ['cinema', 'movie', 'kino', 'cine', 'film'],
+    icon: '🎬', 
+    color: '#9B59B6',
+    osmTag: 'amenity=cinema',
+    minZoom: 12,
+    detailZoom: 16,
+    desc: 'Movie theaters',
+    importance: 'medium'
+  },
+  
+  // === ACCOMMODATION & TOURISM ===
+  { 
+    name: 'Hotels', 
+    keywords: ['hotel', 'accommodation', 'ubytování', 'unterkunft', 'hébergement', 'alojamiento', 'nocleg'],
+    icon: '🏨', 
+    color: '#2980B9',
+    osmTag: 'tourism=hotel',
+    minZoom: 10,  // Important for travelers
+    detailZoom: 15,
+    desc: 'Hotels and lodging',
+    importance: 'high'
+  },
+  { 
+    name: 'Museums', 
+    keywords: ['museum', 'muzeum', 'musée', 'museo', 'muzeum'],
+    icon: '🏛️', 
+    color: '#34495E',
+    osmTag: 'tourism=museum',
+    minZoom: 10,
+    detailZoom: 15,
+    desc: 'Art and history museums',
+    importance: 'high'
+  },
+  { 
+    name: 'Castles', 
+    keywords: ['castle', 'hrad', 'schloss', 'château', 'castello', 'castillo', 'zamek'],
+    icon: '🏰', 
+    color: '#95A5A6',
+    osmTag: 'historic=castle',
+    minZoom: 8,  // Very important landmarks
+    detailZoom: 14,
+    desc: 'Historic castles and fortresses',
+    importance: 'high'
+  },
+  { 
+    name: 'Churches', 
+    keywords: ['church', 'kostel', 'kirche', 'église', 'iglesia', 'chiesa', 'kościół'],
+    icon: '⛪', 
+    color: '#7F8C8D',
+    osmTag: 'amenity=place_of_worship',
+    minZoom: 12,
+    detailZoom: 16,
+    desc: 'Places of worship',
+    importance: 'medium'
+  },
+  
+  // === SERVICES ===
+  { 
+    name: 'Car Service', 
+    keywords: ['car service', 'repair', 'autoservis', 'werkstatt', 'taller', 'officina', 'warsztat'],
+    icon: '🔧', 
+    color: '#E67E22',
+    osmTag: 'shop=car_repair',
+    minZoom: 13,
+    detailZoom: 16,
+    desc: 'Auto repair shops',
+    importance: 'medium'
+  },
+  
+  // === EMERGENCY ===
+  { 
+    name: 'Police', 
+    keywords: ['police', 'policie', 'polizei', 'policía', 'polizia', 'policja'],
+    icon: '👮', 
+    color: '#2C3E50',
+    osmTag: 'amenity=police',
+    minZoom: 12,
+    detailZoom: 16,
+    desc: 'Police stations',
+    importance: 'high'
+  },
+  { 
+    name: 'Fire Station', 
+    keywords: ['fire station', 'hasičská', 'feuerwehr', 'bomberos', 'pompieri', 'straż pożarna'],
+    icon: '🚒', 
+    color: '#E74C3C',
+    osmTag: 'amenity=fire_station',
+    minZoom: 12,
+    detailZoom: 16,
+    desc: 'Fire departments',
+    importance: 'high'
+  },
+  
+  // === PARKING ===
   { 
     name: 'Parking', 
-    geoapifyCategory: 'parking',
     keywords: ['parking', 'parkování', 'parken', 'estacionamiento', 'parcheggio', 'parkowanie'],
     icon: '🅿️', 
     color: '#3498DB',
     osmTag: 'amenity=parking',
-    minZoom: 15,
-    desc: 'Parking lots and garages'
+    minZoom: 13,
+    detailZoom: 16,
+    desc: 'Parking lots and garages',
+    importance: 'medium'
   },
   
-  // Zoom 13+ (travel/infrastructure)
+  // === TRANSPORT ===
   { 
     name: 'Gas Stations', 
-    geoapifyCategory: 'service.vehicle.fuel',
     keywords: ['gas', 'fuel', 'petrol', 'benzín', 'tankstelle', 'essence', 'gasolina', 'benzina', 'stacja paliw'],
     icon: '⛽', 
     color: '#E74C3C',
     osmTag: 'amenity=fuel',
-    minZoom: 13,
-    desc: 'Fuel stations'
+    minZoom: 10,  // Important for travelers
+    detailZoom: 15,
+    desc: 'Fuel stations',
+    importance: 'high'
   },
   { 
     name: 'EV Charging', 
-    geoapifyCategory: 'service.vehicle.charging_station',
     keywords: ['charging', 'electric', 'ev', 'nabíjení', 'ladestation', 'recarga', 'ładowanie'],
     icon: '🔌', 
     color: '#27AE60',
     osmTag: 'amenity=charging_station',
-    minZoom: 13,
-    desc: 'Electric vehicle charging'
+    minZoom: 12,
+    detailZoom: 16,
+    desc: 'Electric vehicle charging',
+    importance: 'medium'
   },
   { 
     name: 'Speed Cameras', 
-    geoapifyCategory: null,
     keywords: ['speed camera', 'radar', 'rychlost', 'geschwindigkeit', 'velocidad', 'velocità', 'prędkość'],
     icon: '📷', 
     color: '#C0392B',
     osmTag: 'highway=speed_camera',
     minZoom: 13,
-    desc: 'Speed enforcement cameras'
+    detailZoom: 16,
+    desc: 'Speed enforcement cameras',
+    importance: 'medium'
   },
   { 
     name: 'Train Stations', 
-    geoapifyCategory: 'public_transport.train',
     keywords: ['train', 'railway', 'vlak', 'bahnhof', 'gare', 'estación', 'stazione', 'dworzec'],
     icon: '🚆', 
     color: '#34495E',
     osmTag: 'railway=station',
-    minZoom: 13,
-    desc: 'Railway stations'
+    minZoom: 8,  // Major transport hubs
+    detailZoom: 14,
+    desc: 'Railway stations',
+    importance: 'high'
   },
   { 
     name: 'Bus Stops', 
-    geoapifyCategory: 'public_transport.bus',
     keywords: ['bus', 'autobus', 'bushaltestelle', 'arrêt de bus', 'fermata'],
     icon: '🚌', 
     color: '#F39C12',
     osmTag: 'highway=bus_stop',
-    minZoom: 15,
-    desc: 'Public bus stops'
+    minZoom: 14,
+    detailZoom: 17,
+    desc: 'Public bus stops',
+    importance: 'low'
   }
 ];
 
@@ -338,11 +387,45 @@ export function filterCategories(query) {
   );
 }
 
-// Stub icon map (kept for import compatibility with POILayer)
-export const POI_ICON_MAP = {};
+// Get max POI count based on zoom level
+export function getMaxPOICount(zoom, category) {
+  // At very low zoom, show fewer POIs
+  if (zoom < 10) return 20;
+  if (zoom < 12) return 50;
+  if (zoom < 14) return 100;
+  if (zoom < 16) return 200;
+  return 500;  // At high zoom, show many
+}
 
-// Returns the display name for a category
-export function getCategoryName(category, language) {
-  if (!category) return '';
-  return category.name || '';
+// Determine if a POI should be shown based on zoom and importance
+export function shouldShowPOI(zoom, category, poi) {
+  // Always show if zoom is high enough
+  if (zoom >= category.detailZoom) return true;
+  
+  // At lower zoom, only show "high" importance POIs or those with special tags
+  if (zoom >= category.minZoom) {
+    if (category.importance === 'high') return true;
+    
+    // Check for importance indicators in POI tags
+    const tags = poi.tags || {};
+    
+    // Universities, major hospitals, etc.
+    if (tags.university === 'yes' || 
+        tags.college === 'yes' ||
+        tags.emergency === 'yes' ||
+        tags['emergency'] === 'hospital') {
+      return true;
+    }
+    
+    // Named POIs with Wikipedia/wikidata are usually important
+    if (tags.wikipedia || tags.wikidata) return true;
+    
+    // Brand names indicate importance
+    if (tags.brand) return true;
+    
+    // At medium zoom, show medium importance
+    if (zoom >= 14 && category.importance === 'medium') return true;
+  }
+  
+  return false;
 }

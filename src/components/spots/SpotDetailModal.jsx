@@ -1,15 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { X, Navigation, MapPin, Edit2, Trash2, Share2, Check } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { X, Navigation, MapPin, Edit2, Trash2, Share2, Check, Image, Globe, ExternalLink, Loader2 } from 'lucide-react';
 import StarRating from './StarRating';
 import { submitCategoryRatings } from '@/api/firebaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
+import { searchPlacesWithDetails } from '@/api/mapyPOIService';
+
+const MAPY_API_KEY = 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
 
 const RATED_KEY = (spotId, userId) => `sf_rated_${spotId}_${userId || 'guest'}`;
 
 export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdit, onDelete, onSpotUpdate }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [localSpot, setLocalSpot] = useState(spot);
   const [shareTooltip, setShareTooltip] = useState(false);
+  const [mapyDetails, setMapyDetails] = useState(null);
+  const [loadingMapy, setLoadingMapy] = useState(false);
+  const [mapyError, setMapyError] = useState(null);
 
   const [pendingParking, setPendingParking] = useState(0);
   const [pendingBeauty,  setPendingBeauty]  = useState(0);
@@ -26,6 +32,64 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
     } catch (_) {}
   }, [spot.id]);
 
+  // Fetch additional details from Mapy.cz if no image/description
+  const fetchMapyDetails = useCallback(async () => {
+    // Skip if we already have an image and description
+    if (localSpot.image_url && localSpot.description) {
+      return;
+    }
+
+    setLoadingMapy(true);
+    setMapyError(null);
+
+    try {
+      // Search for the place by name or coordinates
+      const searchQuery = localSpot.title || localSpot.name || `${localSpot.lat}, ${localSpot.lng}`;
+      const center = { lat: localSpot.lat, lng: localSpot.lng };
+      
+      const results = await searchPlacesWithDetails(searchQuery, center, language, 5);
+      
+      // Find the closest match
+      if (results && results.length > 0) {
+        // Sort by distance if coordinates available
+        const withDistance = results.map(r => {
+          if (r.lat && r.lon) {
+            const dist = Math.sqrt(
+              Math.pow(r.lat - localSpot.lat, 2) + 
+              Math.pow(r.lon - localSpot.lng, 2)
+            );
+            return { ...r, distance: dist };
+          }
+          return { ...r, distance: Infinity };
+        });
+        
+        // Sort by distance and name match
+        withDistance.sort((a, b) => {
+          // Prefer name matches
+          const aNameMatch = a.name?.toLowerCase() === searchQuery?.toLowerCase() ? 0 : 1;
+          const bNameMatch = b.name?.toLowerCase() === searchQuery?.toLowerCase() ? 0 : 1;
+          if (aNameMatch !== bNameMatch) return aNameMatch - bNameMatch;
+          return a.distance - b.distance;
+        });
+        
+        const bestMatch = withDistance[0];
+        
+        if (bestMatch && (bestMatch.photo || bestMatch.description)) {
+          setMapyDetails(bestMatch);
+        }
+      }
+    } catch (error) {
+      console.warn('Could not fetch Mapy.cz details:', error);
+      setMapyError('Could not load additional details');
+    } finally {
+      setLoadingMapy(false);
+    }
+  }, [localSpot, language]);
+
+  useEffect(() => {
+    fetchMapyDetails();
+  }, [fetchMapyDetails]);
+
   const overallRating = localSpot.rating || 0;
   const overallCount  = localSpot.rating_count || 0;
 
@@ -36,6 +100,10 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
   ];
 
   const hasCategoryRatings = catRows.some(r => r.val > 0);
+
+  // Get the best available image
+  const displayImage = localSpot.image_url || mapyDetails?.photo || null;
+  const displayDescription = localSpot.description || mapyDetails?.description || null;
 
   // Fractional star display for overall
   const renderOverallStars = (value) =>
@@ -75,7 +143,7 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
     const url = `${window.location.origin}${window.location.pathname}?spot=${spot.id}`;
     try {
       if (navigator.share) {
-        await navigator.share({ title: spot.title || 'Spot', text: spot.description || 'Check out this spot!', url });
+        await navigator.share({ title: spot.title || 'Spot', text: displayDescription || 'Check out this spot!', url });
       } else {
         await navigator.clipboard.writeText(url);
         setShareTooltip(true);
@@ -90,12 +158,18 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
 
   const formatDate = (d) => d ? new Date(d).toLocaleDateString() : '';
 
+  // Open in Mapy.cz
+  const openInMapy = () => {
+    const url = `https://mapy.cz/zakladni?x=${localSpot.lng}&y=${localSpot.lat}&z=16&source=coor&id=${localSpot.lng}%2C${localSpot.lat}`;
+    window.open(url, '_blank');
+  };
+
   return (
     <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white dark:bg-card w-full max-w-lg rounded-t-3xl shadow-2xl max-h-[85vh] overflow-y-auto">
 
         {/* Header */}
-        <div className="sticky top-0 bg-white dark:bg-card px-6 pt-5 pb-3 border-b border-gray-100 dark:border-border">
+        <div className="sticky top-0 bg-white dark:bg-card px-6 pt-5 pb-3 border-b border-gray-100 dark:border-border z-10">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
@@ -117,13 +191,45 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
 
         <div className="px-6 py-4 space-y-4">
           {/* Image */}
-          {localSpot.image_url && (
-            <img src={localSpot.image_url} alt="spot" className="w-full h-48 object-cover rounded-2xl" />
+          {displayImage && (
+            <img 
+              src={displayImage} 
+              alt={localSpot.title || 'spot'} 
+              className="w-full h-48 object-cover rounded-2xl"
+              onError={(e) => {
+                e.target.style.display = 'none';
+              }}
+            />
+          )}
+          
+          {/* Loading Mapy.cz details */}
+          {loadingMapy && (
+            <div className="flex items-center justify-center gap-2 py-4 text-sm text-gray-500 dark:text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Loading details from Mapy.cz...
+            </div>
+          )}
+
+          {/* No image placeholder */}
+          {!displayImage && !loadingMapy && (
+            <div className="w-full h-32 bg-gray-100 dark:bg-accent rounded-2xl flex flex-col items-center justify-center gap-2 text-gray-400 dark:text-muted-foreground">
+              <Image className="w-8 h-8" />
+              <span className="text-xs">No image available</span>
+            </div>
           )}
 
           {/* Description */}
-          {localSpot.description && (
-            <p className="text-gray-600 dark:text-muted-foreground text-sm leading-relaxed">{localSpot.description}</p>
+          {displayDescription && (
+            <p className="text-gray-600 dark:text-muted-foreground text-sm leading-relaxed">{displayDescription}</p>
+          )}
+          
+          {/* Mapy.cz rating if available */}
+          {mapyDetails?.rating && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-yellow-500">★</span>
+              <span className="font-medium text-gray-700 dark:text-foreground">{mapyDetails.rating.toFixed(1)}</span>
+              <span className="text-gray-400 dark:text-muted-foreground text-xs">(Mapy.cz)</span>
+            </div>
           )}
 
           {/* Overall Rating — read-only, derived from category reviews */}
