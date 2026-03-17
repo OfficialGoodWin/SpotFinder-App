@@ -436,6 +436,16 @@ export function shouldShowPOI(zoom, category, poi) {
 export function getCategoryName(categoryId) {
   if (!categoryId) return '';
   
+  // Handle non-string inputs
+  if (typeof categoryId !== 'string') {
+    // If it's an object with a name property
+    if (typeof categoryId === 'object' && categoryId?.name) {
+      return categoryId.name;
+    }
+    // Convert to string as fallback
+    return String(categoryId);
+  }
+  
   // If it's already a name, find the category
   const category = POI_CATEGORIES.find(cat => 
     cat.name.toLowerCase() === categoryId.toLowerCase() ||
@@ -448,7 +458,16 @@ export function getCategoryName(categoryId) {
 // Get category by name or id
 export function getCategoryById(categoryId) {
   if (!categoryId) return null;
-
+  
+  // Handle non-string inputs
+  if (typeof categoryId !== 'string') {
+    // If it's already a category object
+    if (typeof categoryId === 'object' && categoryId?.name) {
+      return categoryId;
+    }
+    return null;
+  }
+  
   return POI_CATEGORIES.find(cat => 
     cat.name.toLowerCase() === categoryId.toLowerCase() ||
     cat.osmTag === categoryId
