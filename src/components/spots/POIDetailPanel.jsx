@@ -56,33 +56,22 @@ function getTagPhotos(tags = {}) {
   return urls;
 }
 
-// 2. Mapy.cz internal detail API (XML-RPC → JSON)
-// Flow: suggest by name+coords → get source+id → call pro.mapy.cz detail → extract photos
-// source=firm means Firmy.cz business listing (has the best photos)
-// source=osm/base/pubt also work but rarely have photos
+// 2. Mapy.cz via our Vercel serverless proxy (avoids CORS)
+// Proxy scrapes mapy.com/en/dopravni?source=X&id=Y and extracts gallery images.
 async function fetchMapyPhotos(name, lat, lon) {
   try {
-    // Step 1: suggest to find the place and get its source+id
     const suggestUrl = `https://api.mapy.com/v1/suggest?apikey=${MAPY_API_KEY}&query=${encodeURIComponent(name)}&lat=${lat}&lon=${lon}&limit=5&lang=cs`;
     const suggestRes = await fetch(suggestUrl);
     if (!suggestRes.ok) return [];
-    const suggestData = await suggestRes.json();
-    const items = suggestData.items || [];
+    const items = (await suggestRes.json()).items || [];
 
-    // Find the closest result that is actually a firm/place (not just an address)
-    let best = null;
-    let bestDist = Infinity;
+    let best = null, bestDist = Infinity;
     for (const item of items) {
       const pos = item.position;
       if (!pos) continue;
       const dist = Math.hypot(pos.lat - lat, pos.lon - lon);
-      if (dist < bestDist) {
-        bestDist = dist;
-        best = item;
-      }
+      if (dist < bestDist) { bestDist = dist; best = item; }
     }
-
-    // Reject if more than ~100m away (0.0009 deg ≈ 100m)
     if (!best || bestDist > 0.0009) return [];
 
     const ud = best.userData || {};
@@ -90,45 +79,11 @@ async function fetchMapyPhotos(name, lat, lon) {
     const id = ud.id || best.id;
     if (!source || !id) return [];
 
-    // Step 2: call the internal Mapy.cz XML-RPC detail endpoint
-    // This is the same endpoint the Mapy.cz website uses internally
-    // We send XML-RPC but request JSON response via Accept header
-    const xmlBody = `<?xml version="1.0"?>
-<methodCall>
-  <methodName>detail.getById</methodName>
-  <params>
-    <param><value><string>${source}</string></value></param>
-    <param><value><int>${id}</int></value></param>
-    <param><value><struct>
-      <member><name>fetchPhoto</name><value><boolean>1</boolean></value></member>
-      <member><name>photoMax</name><value><int>8</int></value></member>
-    </struct></value></param>
-  </params>
-</methodCall>`;
-
-    const detailRes = await fetch('https://pro.mapy.cz/detail', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'text/xml',
-        'Accept': 'application/json',
-      },
-      body: xmlBody,
-    });
-
-    if (!detailRes.ok) return [];
-    const detail = await detailRes.json();
-
-    // Navigate the response — photos live at result.photo[] or result.photos[]
-    const result = detail?.result || detail?.data || detail;
-    const photoArr = result?.photo || result?.photos || [];
-
-    return photoArr
-      .map(p => {
-        // Each photo object has various size keys: url, thumb, big, original
-        return p.url || p.big || p.original || p.thumb || null;
-      })
-      .filter(Boolean)
-      .slice(0, 8);
+    const proxyUrl = `/api/mapy-photos?source=${encodeURIComponent(source)}&id=${encodeURIComponent(id)}`;
+    const proxyRes = await fetch(proxyUrl);
+    if (!proxyRes.ok) return [];
+    const data = await proxyRes.json();
+    return data.photos || [];
   } catch {
     return [];
   }
