@@ -59,7 +59,7 @@ async function fetchGooglePhotos(name, lat, lon) {
   if (!GOOGLE_KEY) return [];
   try {
     const findRes = await fetch(
-      `https://maps.googleapis.com/maps/api/place/findplacefromtext/json` +
+      `/gplaces/findplacefromtext/json` +
       `?input=${encodeURIComponent(name)}&inputtype=textquery` +
       `&locationbias=circle:100@${lat},${lon}` +
       `&fields=place_id,name,geometry,photos&key=${GOOGLE_KEY}`
@@ -76,13 +76,13 @@ async function fetchGooglePhotos(name, lat, lon) {
     let photos = candidate.photos || [];
     if (!photos.length && candidate.place_id) {
       const dr = await fetch(
-        `https://maps.googleapis.com/maps/api/place/details/json` +
+        `/gplaces/details/json` +
         `?place_id=${candidate.place_id}&fields=photos&key=${GOOGLE_KEY}`
       );
       if (dr.ok) photos = (await dr.json()).result?.photos || [];
     }
     return photos.slice(0, 8).map(p =>
-      `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photo_reference=${p.photo_reference}&key=${GOOGLE_KEY}`
+      `/gplaces/photo?maxwidth=1200&photo_reference=${p.photo_reference}&key=${GOOGLE_KEY}`
     );
   } catch { return []; }
 }
