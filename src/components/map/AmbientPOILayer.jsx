@@ -2,57 +2,98 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 
-// Which categories to show at each zoom level (ambient, no search required)
-// Only show the most universally useful ones to avoid clutter
-const AMBIENT_CATEGORIES = [
-  // zoom 13+ — big infrastructure
-  { osmTag: 'railway=station',          icon: '🚆', color: '#34495E', minZoom: 13 },
-  { osmTag: 'amenity=fuel',             icon: '⛽', color: '#E74C3C', minZoom: 13 },
-  { osmTag: 'amenity=charging_station', icon: '🔌', color: '#27AE60', minZoom: 13 },
-  { osmTag: 'tourism=hotel',            icon: '🏨', color: '#2980B9', minZoom: 13 },
-  { osmTag: 'tourism=museum',           icon: '🏛️', color: '#34495E', minZoom: 13 },
-  { osmTag: 'historic=castle',          icon: '🏰', color: '#95A5A6', minZoom: 13 },
-  { osmTag: 'amenity=hospital',         icon: '🏥', color: '#C0392B', minZoom: 13 },
-  // zoom 14+ — neighbourhood
-  { osmTag: 'amenity=restaurant',       icon: '🍽️', color: '#E74C3C', minZoom: 15 },
-  { osmTag: 'amenity=cafe',             icon: '☕', color: '#8B4513', minZoom: 15 },
-  { osmTag: 'amenity=bar',              icon: '🍺', color: '#D68910', minZoom: 15 },
-  { osmTag: 'amenity=pharmacy',         icon: '💊', color: '#E67E22', minZoom: 15 },
-  { osmTag: 'amenity=bank',             icon: '🏦', color: '#F39C12', minZoom: 15 },
-  { osmTag: 'amenity=atm',              icon: '💳', color: '#16A085', minZoom: 16 },
-  { osmTag: 'shop=supermarket',         icon: '🏪', color: '#27AE60', minZoom: 15 },
-  { osmTag: 'shop=bakery',              icon: '🥖', color: '#D4A574', minZoom: 16 },
-  { osmTag: 'amenity=parking',          icon: '🅿️', color: '#3498DB', minZoom: 16 },
-  { osmTag: 'amenity=toilets',          icon: '🚻', color: '#3498DB', minZoom: 16 },
+const MAPY_API_KEY = import.meta.env.VITE_MAPY_API_KEY || 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
+
+// ---------------------------------------------------------------------------
+// Category hints matched against Mapy.cz `type` / `category` / `name`.
+// We join all three into one string and do substring search. The `words`
+// list uses simple tokens so they work across all possible Mapy.cz formats.
+// ---------------------------------------------------------------------------
+const CAT_HINTS = [
+  { key: 'train',       minZoom: 13, icon: '🚆', color: '#34495E', words: ['railway', 'train_station', 'nádraží', 'bahnhof', 'gare', 'stacja'] },
+  { key: 'fuel',        minZoom: 13, icon: '⛽', color: '#E74C3C', words: ['fuel', 'petrol', 'gas_station', 'čerpací', 'tankstelle'] },
+  { key: 'charging',    minZoom: 13, icon: '🔌', color: '#27AE60', words: ['charging_station', 'electric_vehicle', 'nabíjecí', 'ladestation'] },
+  { key: 'hotel',       minZoom: 13, icon: '🏨', color: '#2980B9', words: ['hotel', 'accommodation', 'ubytování', 'unterkunft'] },
+  { key: 'museum',      minZoom: 13, icon: '🏛️', color: '#34495E', words: ['museum', 'muzeum', 'musée', 'museo'] },
+  { key: 'castle',      minZoom: 13, icon: '🏰', color: '#95A5A6', words: ['castle', 'hrad', 'château', 'schloss', 'zamek'] },
+  { key: 'hospital',    minZoom: 13, icon: '🏥', color: '#C0392B', words: ['hospital', 'nemocnice', 'krankenhaus', 'szpital'] },
+  { key: 'restaurant',  minZoom: 15, icon: '🍽️', color: '#E74C3C', words: ['restaurant', 'restaurace', 'ristorante', 'restauracja'] },
+  { key: 'cafe',        minZoom: 15, icon: '☕', color: '#8B4513', words: ['cafe', 'coffee', 'kavárna', 'caffè', 'kawiarnia'] },
+  { key: 'bar',         minZoom: 15, icon: '🍺', color: '#D68910', words: ['bar', 'pub', 'hospoda', 'kneipe', 'brasserie'] },
+  { key: 'pharmacy',    minZoom: 15, icon: '💊', color: '#E67E22', words: ['pharmacy', 'lékárna', 'apotheke', 'farmacia', 'apteka'] },
+  { key: 'supermarket', minZoom: 15, icon: '🏪', color: '#27AE60', words: ['supermarket', 'grocery', 'potraviny', 'spożywczy'] },
+  { key: 'atm',         minZoom: 16, icon: '💳', color: '#16A085', words: ['atm', 'bankomat', 'geldautomat', 'cajero'] },
+  { key: 'bakery',      minZoom: 16, icon: '🥖', color: '#D4A574', words: ['bakery', 'pekárna', 'bäckerei', 'boulangerie'] },
+  { key: 'parking',     minZoom: 16, icon: '🅿️', color: '#3498DB', words: ['parking', 'parkoviště', 'parkplatz'] },
+  { key: 'toilets',     minZoom: 16, icon: '🚻', color: '#3498DB', words: ['toilet', 'restroom', 'záchod', 'toilette'] },
+  // bank last — very short word, needs to not shadow bakery/bankomat
+  { key: 'bank',        minZoom: 15, icon: '🏦', color: '#F39C12', words: ['bank'] },
 ];
 
-const OVERPASS_MIRRORS = [
-  'https://overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-];
+function detectCategory(item, zoom) {
+  const typeStr = (item.type || item.category || '').toLowerCase();
+  const nameStr = (item.name || item.label || '').toLowerCase();
 
+  // Check structured type/category field first (more reliable)
+  for (const hint of CAT_HINTS) {
+    if (zoom < hint.minZoom) continue;
+    if (hint.words.some(w => typeStr.includes(w))) return hint;
+  }
+  // Fall back to name (less reliable but catches e.g. "Kavárna XYZ")
+  for (const hint of CAT_HINTS) {
+    if (zoom < hint.minZoom) continue;
+    if (hint.words.some(w => nameStr.includes(w))) return hint;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Icon factory (div-based, emoji-coloured circle, cached)
+// ---------------------------------------------------------------------------
 const iconCache = new Map();
 function makeIcon(emoji, color, zoom) {
   const size = zoom >= 16 ? 32 : zoom >= 14 ? 28 : 24;
-  const key = `${emoji}-${color}-${size}`;
+  const key  = `${emoji}-${color}-${size}`;
   if (iconCache.has(key)) return iconCache.get(key);
   const icon = L.divIcon({
     className: '',
-    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);cursor:pointer;font-size:${Math.round(size*0.5)}px;line-height:1">${emoji}</div>`,
-    iconSize: [size, size], iconAnchor: [size/2, size], popupAnchor: [0, -size],
+    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);cursor:pointer;font-size:${Math.round(size * 0.5)}px;line-height:1">${emoji}</div>`,
+    iconSize: [size, size], iconAnchor: [size / 2, size], popupAnchor: [0, -size],
   });
   iconCache.set(key, icon);
   return icon;
 }
 
-// Simple in-memory cache
-const cache = new Map();
+// ---------------------------------------------------------------------------
+// In-memory request cache (10-minute TTL)
+// ---------------------------------------------------------------------------
+const reqCache = new Map();
 const CACHE_TTL = 10 * 60 * 1000;
 
+// ---------------------------------------------------------------------------
+// Mapy.cz Places API — returns all POIs in a bounding box
+// ---------------------------------------------------------------------------
+async function fetchMapyPlaces(south, west, north, east, zoom, signal) {
+  const limit = zoom >= 16 ? 200 : zoom >= 15 ? 100 : zoom >= 14 ? 60 : 30;
+  const url =
+    `https://api.mapy.com/v1/places` +
+    `?apikey=${MAPY_API_KEY}` +
+    `&bbox=${west},${south},${east},${north}` +
+    `&limit=${limit}` +
+    `&lang=en`;
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new Error(`Mapy.cz places ${res.status}`);
+  const data = await res.json();
+  return data.items || [];
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 export default function AmbientPOILayer({ onSelectPOI, selectedCategory }) {
   const [markers, setMarkers] = useState([]);
-  const [zoom, setZoom] = useState(13);
-  const map = useMap();
+  const [zoom, setZoom]       = useState(13);
+  const map      = useMap();
   const abortRef = useRef(null);
   const timerRef = useRef(null);
 
@@ -64,74 +105,59 @@ export default function AmbientPOILayer({ onSelectPOI, selectedCategory }) {
   }, [map]);
 
   useEffect(() => {
-    // Don't show ambient POIs when a category search is active
     if (selectedCategory) { setMarkers([]); return; }
 
     const load = async () => {
       const z = map.getZoom();
-      const b = map.getBounds();
-      const south = b.getSouth(), north = b.getNorth(), west = b.getWest(), east = b.getEast();
+      if (z < 13) { setMarkers([]); return; }
 
-      const visible = AMBIENT_CATEGORIES.filter(c => z >= c.minZoom);
-      if (!visible.length) { setMarkers([]); return; }
+      const b     = map.getBounds();
+      const south = b.getSouth(), north = b.getNorth();
+      const west  = b.getWest(),  east  = b.getEast();
 
       abortRef.current?.abort();
       abortRef.current = new AbortController();
-      const signal = abortRef.current.signal;
+      const { signal } = abortRef.current;
 
       const cacheKey = `ambient|${south.toFixed(2)}|${west.toFixed(2)}|${z}`;
-      const cached = cache.get(cacheKey);
-      if (cached && Date.now() - cached.ts < CACHE_TTL) { setMarkers(cached.data); return; }
-
-      const limit = z >= 16 ? 10 : z >= 14 ? 6 : 4;
-
-      // Build ONE combined Overpass query for all visible categories
-      const bbox = `(${south},${west},${north},${east})`;
-      const parts = visible.map(cat => {
-        const eq = cat.osmTag.indexOf('=');
-        const filter = eq !== -1
-          ? `["${cat.osmTag.slice(0,eq)}"="${cat.osmTag.slice(eq+1)}"]`
-          : `["${cat.osmTag}"]`;
-        return `node${filter}${bbox};way${filter}${bbox};`;
-      }).join('');
-      const query = `[out:json][timeout:15];(${parts});out center ${limit * visible.length};`;
+      const cached   = reqCache.get(cacheKey);
+      if (cached && Date.now() - cached.ts < CACHE_TTL) {
+        setMarkers(cached.data);
+        return;
+      }
 
       try {
-        let res = null;
-        for (const ep of OVERPASS_MIRRORS) {
-          try {
-            res = await fetch(ep, { method:'POST', body:query, signal, headers:{'Content-Type':'text/plain'} });
-            if (res.ok) break;
-          } catch(e) { if (e.name==='AbortError') throw e; }
-        }
-        if (!res?.ok) return;
-        const data = await res.json();
+        const items  = await fetchMapyPlaces(south, west, north, east, z, signal);
+        const result = [];
+        const seen   = new Set();
 
-        // Map each element back to its category by matching OSM tags
-        const all = [];
-        for (const el of data.elements || []) {
-          const lat = el.lat ?? el.center?.lat;
-          const lon = el.lon ?? el.center?.lon;
+        for (const item of items) {
+          const lat = item.position?.lat ?? item.lat;
+          const lon = item.position?.lon ?? item.position?.lng ?? item.lon ?? item.lng;
           if (!lat || !lon) continue;
 
-          // Find which ambient category this element belongs to
-          const cat = visible.find(c => {
-            const eq = c.osmTag.indexOf('=');
-            if (eq !== -1) {
-              const k = c.osmTag.slice(0, eq), v = c.osmTag.slice(eq+1);
-              return el.tags?.[k] === v;
-            }
-            return el.tags?.[c.osmTag] !== undefined;
-          });
+          const id = item.id || `${lat.toFixed(5)}-${lon.toFixed(5)}`;
+          if (seen.has(id)) continue;
+          seen.add(id);
+
+          const cat = detectCategory(item, z);
           if (!cat) continue;
 
-          all.push({ id: el.id, lat, lon, name: el.tags?.name || '', address: el.tags?.['addr:street'] ? `${el.tags['addr:street']} ${el.tags['addr:housenumber']||''}`.trim() : '', tags: el.tags||{}, _cat: cat });
+          result.push({
+            id, lat, lon,
+            name:    item.name || item.label || '',
+            address: item.location || '',
+            tags:    {},
+            _cat:    cat,
+            mapyId:  item.id,
+            source:  item.source,
+          });
         }
 
-        cache.set(cacheKey, { data: all, ts: Date.now() });
-        if (!signal.aborted) setMarkers(all);
-      } catch(e) {
-        if (e.name !== 'AbortError') console.warn('ambient POI error:', e.message);
+        reqCache.set(cacheKey, { data: result, ts: Date.now() });
+        if (!signal.aborted) setMarkers(result);
+      } catch (e) {
+        if (e.name !== 'AbortError') console.warn('AmbientPOILayer:', e.message);
       }
     };
 
@@ -144,6 +170,7 @@ export default function AmbientPOILayer({ onSelectPOI, selectedCategory }) {
     };
     map.on('moveend', onMove);
     map.on('zoomend', onMove);
+
     return () => {
       map.off('moveend', onMove);
       map.off('zoomend', onMove);
@@ -156,7 +183,7 @@ export default function AmbientPOILayer({ onSelectPOI, selectedCategory }) {
     <>
       {markers.map(poi => (
         <Marker
-          key={`ambient-${poi._cat.osmTag}-${poi.id}`}
+          key={`ambient-${poi._cat.key}-${poi.id}`}
           position={[poi.lat, poi.lon]}
           icon={makeIcon(poi._cat.icon, poi._cat.color, zoom)}
           eventHandlers={{ click: () => onSelectPOI?.(poi, poi._cat) }}

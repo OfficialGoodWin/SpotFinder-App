@@ -177,22 +177,9 @@ function haversineDistance([lat1, lng1], [lat2, lng2]) {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 // ─── Check if destination is on/near a closed road ───────────────────────────
-async function isDestinationOnClosedRoad(lat, lng) {
-  try {
-    const r = 30; // metres radius
-    // Convert radius to approx degrees
-    const dLat = r / 111000;
-    const dLng = r / (111000 * Math.cos(lat * Math.PI / 180));
-    const bbox = `${lat-dLat},${lng-dLng},${lat+dLat},${lng+dLng}`;
-    const q = `[out:json][timeout:5];way["access"="no"]["highway"](${bbox});out center 1;`;
-    const res = await fetch('https://overpass-api.de/api/interpreter', {
-      method: 'POST', body: 'data=' + encodeURIComponent(q),
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) return false;
-    const data = await res.json();
-    return (data.elements || []).length > 0;
-  } catch (_) { return false; }
+// Overpass removed — skip closed-road destination check to avoid 429s.
+async function isDestinationOnClosedRoad(_lat, _lng) {
+  return false;
 }
 
 export default function NavigationPanel({ from, to, toLabel, onClose, onRouteReady, onRouteData, userPosition }) {

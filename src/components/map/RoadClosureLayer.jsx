@@ -155,31 +155,7 @@ async function fetchTomTomIncidents(bounds, apiKey, signal) {
   });
 }
 
-let overpassBackoffUntil = 0; // timestamp ms — don't call Overpass before this
-
-async function fetchOverpassClosures(bounds, signal) {
-  if (Date.now() < overpassBackoffUntil) throw new Error('Overpass rate-limited (backoff)');
-  const { _southWest: sw, _northEast: ne } = bounds;
-  const bbox = `${sw.lat},${sw.lng},${ne.lat},${ne.lng}`;
-  const query = `[out:json][timeout:8];(way["access"="no"]["highway"](${bbox});way["motor_vehicle"="no"]["highway"](${bbox}););out center 15;`;
-  const res = await fetch('https://overpass-api.de/api/interpreter', {
-    method: 'POST', body: 'data=' + encodeURIComponent(query), signal,
-  });
-  if (!res.ok) {
-    if (res.status === 429) {
-      const retryAfter = parseInt(res.headers.get('Retry-After') || '60', 10);
-      overpassBackoffUntil = Date.now() + retryAfter * 1000;
-    }
-    throw new Error('Overpass error');
-  }
-  const data = await res.json();
-  return (data.elements || []).slice(0, 15).map(el => ({
-    type: 'closure',
-    lat: el.center?.lat || el.lat,
-    lng: el.center?.lon || el.lon,
-    road: el.tags?.ref || el.tags?.name || '',
-  })).filter(e => e.lat && e.lng);
-}
+// Overpass removed — TomTom incidents are the sole source for road closures.
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function RoadClosureLayer({ apiKey, enabled, lang, t }) {
@@ -313,13 +289,7 @@ export default function RoadClosureLayer({ apiKey, enabled, lang, t }) {
       }
     }
 
-    // Only call Overpass when zoomed in enough (zoom ≥ 11) to keep bbox small
-    if (incidents.length === 0 && !ctrl.signal.aborted && zoom >= 11) {
-      try {
-        const ov = await fetchOverpassClosures(bounds, ctrl.signal);
-        incidents = ov.map(o => ({ ...o, from:'', to:'', desc:'', eventCode: null }));
-      } catch (_) {}
-    }
+    // (Overpass fallback removed — avoids 429 rate-limit errors.)
 
     fetchingRef.current = false;
     if (ctrl.signal.aborted) return;
@@ -336,7 +306,7 @@ export default function RoadClosureLayer({ apiKey, enabled, lang, t }) {
     }
   }, [enabled, clearMarkers, renderMarkers]);
 
-  // moveend debounce raised to 1800ms — reduces Overpass calls dramatically
+  // moveend debounce at 1800ms — avoids thrashing the TomTom API
   const loadDebounced = useCallback(debounce(load, 1800), [load]);
   const onZoomDebounced = useCallback(debounce(() => { onZoom(); loadDebounced(); }, 200), [onZoom, loadDebounced]);
 
