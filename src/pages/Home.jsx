@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MapContainer, TileLayer, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Plus, Settings, Crosshair, HelpCircle, Trash2 } from 'lucide-react';
+import { Plus, Settings, Crosshair, HelpCircle, Trash2, WifiOff } from 'lucide-react';
 import { getPublicSpots, createSpot, deleteSpot, updateSpot } from '@/api/firebaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
@@ -28,6 +28,9 @@ import POIPanel from '../components/spots/POIPanel';
 import POIDetailPanel from '../components/spots/POIDetailPanel';
 import SettingsModal from '../components/SettingsModal';
 import ProfileMenu from '../components/ProfileMenu';
+import OfflineMapsMenu from '../components/offline/OfflineMapsMenu';
+import OfflineTileLayer from '../components/map/OfflineTileLayer';
+import { getAllMeta } from '../lib/offlineStorage.js';
  
 // Note: Leaflet marker icons are fixed via src/lib/leaflet-fix.js
  
@@ -133,6 +136,13 @@ export default function Home() {
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showOffline, setShowOffline] = useState(false);
+  const [offlineMeta, setOfflineMeta] = useState({});
+
+  // Load offline metadata once on mount
+  useEffect(() => {
+    getAllMeta().then(setOfflineMeta);
+  }, []);
   const [navRouteData, setNavRouteData] = useState({ coordinates: [], turns: [], currentStep: 0 });
   const [showSpots, setShowSpots] = useState(false);
   const [fitBoundsData, setFitBoundsData] = useState(null);
@@ -338,8 +348,8 @@ export default function Home() {
         bounceAtZoomLimits={false}
         preferCanvas={true}
       >
-        {/* Base map tile */}
-        <TileLayer
+        {/* Base map tile — OfflineTileLayer caches tiles in IndexedDB automatically */}
+        <OfflineTileLayer
           key={`${mapLayer}-${isDark}`}
           url={tileUrls[mapLayer]}
           subdomains={useCartoTile ? cartoDomains : []}
@@ -351,8 +361,6 @@ export default function Home() {
           keepBuffer={6}
           updateWhenIdle={false}
           updateWhenZooming={false}
-          crossOrigin="anonymous"
-          errorTileUrl="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
         />
  
         {/* TomTom real-time traffic flow overlay (only on traffic layer) */}
@@ -531,6 +539,19 @@ export default function Home() {
             >
               <Settings className="w-5 h-5" />
             </button>
+            <button
+              onClick={() => setShowOffline(true)}
+              className={`w-10 h-10 rounded-xl flex items-center justify-center active:scale-95 transition-all relative
+                ${Object.keys(offlineMeta).length > 0
+                  ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/60'
+                  : 'bg-gray-100 dark:bg-accent/60 text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent'}`}
+              title="Offline Maps"
+            >
+              <WifiOff className="w-5 h-5" />
+              {Object.keys(offlineMeta).length > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-background" />
+              )}
+            </button>
           </div>
         </div>
       </div>
@@ -588,6 +609,12 @@ export default function Home() {
       )}
  
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+
+      {showOffline && (
+        <OfflineMapsMenu
+          onClose={() => { setShowOffline(false); getAllMeta().then(setOfflineMeta); }}
+        />
+      )}
  
       {showMySpots && isAuthenticated && user && (
         <MySpotsPanel
