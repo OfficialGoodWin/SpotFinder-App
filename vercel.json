@@ -24,7 +24,11 @@
   ],
   "rewrites": [
     {
-      "source": "/firmy-proxy",
+      "source": "/firmy-search",
+      "destination": "https://www.firmy.cz/search"
+    },
+    {
+      "source": "/firmy-detail",
       "destination": "https://www.firmy.cz/detail"
     },
     {

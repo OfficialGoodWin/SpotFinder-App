@@ -71,65 +71,92 @@ function extractSdnPhotos(text) {
   return out;
 }
 
-// 2. Mapy.cz via new suggest API + Firmy.cz proxy
-// The new api.mapy.com/v1/suggest returns firm IDs for actual businesses.
-// We proxy www.firmy.cz/detail through Vercel (/firmy-proxy) to avoid CORS,
-// then parse __NEXT_DATA__ JSON from the page for sdn.cz photo URLs.
+// 2. Firmy.cz photos — search by name near coordinates, then get detail page
+// Both endpoints proxied through Vercel to avoid CORS.
 async function fetchMapyPhotos(name, lat, lon) {
   try {
-    // Step 1: new suggest API — works for businesses, returns place data
-    const url = `https://api.mapy.com/v1/suggest?apikey=${MAPY_API_KEY}&query=${encodeURIComponent(name)}&preferNear=${lon},${lat}&preferNearPrecision=300&limit=8&lang=cs`;
-    const sr = await fetch(url);
+    // Step 1: search Firmy.cz for the place by name + coordinates
+    // /firmy-search → https://www.firmy.cz/search
+    const searchUrl = `/firmy-search?query=${encodeURIComponent(name)}&lat=${lat}&lon=${lon}&radius=300`;
+    const sr = await fetch(searchUrl);
+    console.log('[photos] firmy search status:', sr.status);
     if (!sr.ok) return [];
-    const items = (await sr.json()).items || [];
-    console.log('[photos] suggest items:', items.map(i => ({
-      name: i.name, type: i.type,
-      id: i.id || i.userData?.id,
-      source: i.userData?.source,
-      dist: i.position ? Math.hypot(i.position.lat - lat, i.position.lon - lon).toFixed(5) : '?'
-    })));
 
-    // Find closest item that has a firm ID
-    let firmId = null, bestDist = Infinity;
-    for (const item of items) {
-      const pos = item.position;
-      if (!pos) continue;
-      const dist = Math.hypot(pos.lat - lat, pos.lon - lon);
-      // Check all possible places the firm ID could live
-      const id = item.userData?.id || (item.type === 'firm' ? item.id : null);
-      const source = item.userData?.source || item.type;
-      if (dist < bestDist && id && source === 'firm') {
-        bestDist = dist;
-        firmId = id;
-      }
-    }
-    console.log('[photos] firmId:', firmId, 'dist:', bestDist);
-    if (!firmId || bestDist > 0.003) return [];
+    const searchHtml = await sr.text();
 
-    // Step 2: fetch Firmy.cz detail page through our Vercel proxy
-    // /firmy-proxy?id=X  →  https://www.firmy.cz/detail?id=X
-    const firmRes = await fetch(`/firmy-proxy?id=${firmId}`);
-    console.log('[photos] firmy status:', firmRes.status);
-    if (!firmRes.ok) return [];
+    // Try to find firm ID in __NEXT_DATA__ from search results
+    const ndMatch = searchHtml.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    let firmId = null;
 
-    const html = await firmRes.text();
-
-    // Extract __NEXT_DATA__ — contains all page data as JSON including photos
-    const ndMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
     if (ndMatch) {
-      const photos = extractSdnPhotos(ndMatch[1]);
-      console.log('[photos] from __NEXT_DATA__:', photos.length);
+      try {
+        const nd = JSON.parse(ndMatch[1]);
+        // Walk the data to find the first firm with a close match
+        firmId = findFirmId(nd, name, lat, lon);
+        console.log('[photos] firmId from search __NEXT_DATA__:', firmId);
+      } catch {}
+    }
+
+    // Also try regex scanning for firm IDs in search page
+    if (!firmId) {
+      const idMatch = searchHtml.match(/"id"\s*:\s*(\d{6,})/);
+      if (idMatch) firmId = idMatch[1];
+      console.log('[photos] firmId from regex:', firmId);
+    }
+
+    if (!firmId) {
+      // No firm found — try extracting photos directly from search results page
+      const photos = extractSdnPhotos(ndMatch?.[1] || searchHtml);
+      console.log('[photos] direct from search page:', photos.length);
+      return photos;
+    }
+
+    // Step 2: fetch firm detail page for full photo gallery
+    const detailRes = await fetch(`/firmy-detail?id=${firmId}`);
+    console.log('[photos] firmy detail status:', detailRes.status);
+    if (!detailRes.ok) return [];
+
+    const detailHtml = await detailRes.text();
+    const dndMatch = detailHtml.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    if (dndMatch) {
+      const photos = extractSdnPhotos(dndMatch[1]);
+      console.log('[photos] from detail __NEXT_DATA__:', photos.length);
       if (photos.length) return photos;
     }
 
-    // Fallback: scan entire HTML for sdn.cz URLs
-    const photos = extractSdnPhotos(html);
-    console.log('[photos] from raw HTML scan:', photos.length);
+    const photos = extractSdnPhotos(detailHtml);
+    console.log('[photos] from detail raw scan:', photos.length);
     return photos;
   } catch (e) {
     console.warn('[photos] error:', e);
     return [];
   }
+}
+
+// Walk a parsed JSON object looking for a firm ID near our coordinates
+function findFirmId(obj, name, lat, lon, depth = 0) {
+  if (depth > 10 || !obj || typeof obj !== 'object') return null;
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      const r = findFirmId(item, name, lat, lon, depth + 1);
+      if (r) return r;
+    }
+    return null;
+  }
+  // Look for objects that have an id + latitude + longitude
+  if (obj.id && (obj.latitude || obj.lat) && (obj.longitude || obj.lon)) {
+    const iLat = obj.latitude || obj.lat;
+    const iLon = obj.longitude || obj.lon;
+    const dist = Math.hypot(iLat - lat, iLon - lon);
+    if (dist < 0.005) return String(obj.id);
+  }
+  for (const val of Object.values(obj)) {
+    if (val && typeof val === 'object') {
+      const r = findFirmId(val, name, lat, lon, depth + 1);
+      if (r) return r;
+    }
+  }
+  return null;
 }
 
 // Main: OSM tags → Mapy/Firmy.cz → Wikimedia fallback
