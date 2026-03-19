@@ -2,53 +2,58 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 
-const MAPY_API_KEY = import.meta.env.VITE_MAPY_API_KEY || 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
+const GEOAPIFY_KEY = import.meta.env.VITE_GEOAPIFY_KEY || '';
 
 // ---------------------------------------------------------------------------
-// Category hints matched against Mapy.cz `type` / `category` / `name`.
-// We join all three into one string and do substring search. The `words`
-// list uses simple tokens so they work across all possible Mapy.cz formats.
+// Category definitions — each maps to a Geoapify category string.
+// Multiple Geoapify categories can be comma-joined in one request.
 // ---------------------------------------------------------------------------
-const CAT_HINTS = [
-  { key: 'train',       minZoom: 13, icon: '🚆', color: '#34495E', words: ['railway', 'train_station', 'nádraží', 'bahnhof', 'gare', 'stacja'] },
-  { key: 'fuel',        minZoom: 13, icon: '⛽', color: '#E74C3C', words: ['fuel', 'petrol', 'gas_station', 'čerpací', 'tankstelle'] },
-  { key: 'charging',    minZoom: 13, icon: '🔌', color: '#27AE60', words: ['charging_station', 'electric_vehicle', 'nabíjecí', 'ladestation'] },
-  { key: 'hotel',       minZoom: 13, icon: '🏨', color: '#2980B9', words: ['hotel', 'accommodation', 'ubytování', 'unterkunft'] },
-  { key: 'museum',      minZoom: 13, icon: '🏛️', color: '#34495E', words: ['museum', 'muzeum', 'musée', 'museo'] },
-  { key: 'castle',      minZoom: 13, icon: '🏰', color: '#95A5A6', words: ['castle', 'hrad', 'château', 'schloss', 'zamek'] },
-  { key: 'hospital',    minZoom: 13, icon: '🏥', color: '#C0392B', words: ['hospital', 'nemocnice', 'krankenhaus', 'szpital'] },
-  { key: 'restaurant',  minZoom: 15, icon: '🍽️', color: '#E74C3C', words: ['restaurant', 'restaurace', 'ristorante', 'restauracja'] },
-  { key: 'cafe',        minZoom: 15, icon: '☕', color: '#8B4513', words: ['cafe', 'coffee', 'kavárna', 'caffè', 'kawiarnia'] },
-  { key: 'bar',         minZoom: 15, icon: '🍺', color: '#D68910', words: ['bar', 'pub', 'hospoda', 'kneipe', 'brasserie'] },
-  { key: 'pharmacy',    minZoom: 15, icon: '💊', color: '#E67E22', words: ['pharmacy', 'lékárna', 'apotheke', 'farmacia', 'apteka'] },
-  { key: 'supermarket', minZoom: 15, icon: '🏪', color: '#27AE60', words: ['supermarket', 'grocery', 'potraviny', 'spożywczy'] },
-  { key: 'atm',         minZoom: 16, icon: '💳', color: '#16A085', words: ['atm', 'bankomat', 'geldautomat', 'cajero'] },
-  { key: 'bakery',      minZoom: 16, icon: '🥖', color: '#D4A574', words: ['bakery', 'pekárna', 'bäckerei', 'boulangerie'] },
-  { key: 'parking',     minZoom: 16, icon: '🅿️', color: '#3498DB', words: ['parking', 'parkoviště', 'parkplatz'] },
-  { key: 'toilets',     minZoom: 16, icon: '🚻', color: '#3498DB', words: ['toilet', 'restroom', 'záchod', 'toilette'] },
-  // bank last — very short word, needs to not shadow bakery/bankomat
-  { key: 'bank',        minZoom: 15, icon: '🏦', color: '#F39C12', words: ['bank'] },
+const AMBIENT_CATEGORIES = [
+  // zoom 13+ — big landmarks visible from afar
+  { key: 'train',       minZoom: 13, icon: '🚆', color: '#34495E', geo: 'public_transport.train' },
+  { key: 'fuel',        minZoom: 13, icon: '⛽', color: '#E74C3C', geo: 'service.vehicle.fuel' },
+  { key: 'charging',    minZoom: 13, icon: '🔌', color: '#27AE60', geo: 'service.vehicle.charging_station' },
+  { key: 'hotel',       minZoom: 13, icon: '🏨', color: '#2980B9', geo: 'accommodation.hotel' },
+  { key: 'museum',      minZoom: 13, icon: '🏛️', color: '#34495E', geo: 'entertainment.museum' },
+  { key: 'castle',      minZoom: 13, icon: '🏰', color: '#95A5A6', geo: 'heritage.castle' },
+  { key: 'hospital',    minZoom: 13, icon: '🏥', color: '#C0392B', geo: 'healthcare.hospital' },
+  // zoom 15+ — neighbourhood-level
+  { key: 'restaurant',  minZoom: 15, icon: '🍽️', color: '#E74C3C', geo: 'catering.restaurant' },
+  { key: 'cafe',        minZoom: 15, icon: '☕', color: '#8B4513', geo: 'catering.cafe' },
+  { key: 'bar',         minZoom: 15, icon: '🍺', color: '#D68910', geo: 'catering.bar' },
+  { key: 'pharmacy',    minZoom: 15, icon: '💊', color: '#E67E22', geo: 'healthcare.pharmacy' },
+  { key: 'bank',        minZoom: 15, icon: '🏦', color: '#F39C12', geo: 'service.financial.bank' },
+  { key: 'supermarket', minZoom: 15, icon: '🏪', color: '#27AE60', geo: 'commercial.supermarket' },
+  // zoom 16+ — street-level detail
+  { key: 'atm',         minZoom: 16, icon: '💳', color: '#16A085', geo: 'service.financial.atm' },
+  { key: 'bakery',      minZoom: 16, icon: '🥖', color: '#D4A574', geo: 'commercial.food_and_drink.bakery' },
+  { key: 'parking',     minZoom: 16, icon: '🅿️', color: '#3498DB', geo: 'parking' },
+  { key: 'toilets',     minZoom: 16, icon: '🚻', color: '#3498DB', geo: 'service.toilets' },
 ];
 
-function detectCategory(item, zoom) {
-  const typeStr = (item.type || item.category || '').toLowerCase();
-  const nameStr = (item.name || item.label || '').toLowerCase();
-
-  // Check structured type/category field first (more reliable)
-  for (const hint of CAT_HINTS) {
-    if (zoom < hint.minZoom) continue;
-    if (hint.words.some(w => typeStr.includes(w))) return hint;
+// Build a lookup from Geoapify category prefix → our hint object
+// (Geoapify returns hierarchical categories like ["catering","catering.restaurant"])
+function buildGeoLookup() {
+  const map = new Map();
+  for (const cat of AMBIENT_CATEGORIES) {
+    map.set(cat.geo, cat);
   }
-  // Fall back to name (less reliable but catches e.g. "Kavárna XYZ")
-  for (const hint of CAT_HINTS) {
-    if (zoom < hint.minZoom) continue;
-    if (hint.words.some(w => nameStr.includes(w))) return hint;
+  return map;
+}
+const GEO_LOOKUP = buildGeoLookup();
+
+function detectCategory(feature) {
+  const cats = feature.properties?.categories || [];
+  // Try most-specific first (longest string), then fall back to parent category
+  const sorted = [...cats].sort((a, b) => b.length - a.length);
+  for (const c of sorted) {
+    if (GEO_LOOKUP.has(c)) return GEO_LOOKUP.get(c);
   }
   return null;
 }
 
 // ---------------------------------------------------------------------------
-// Icon factory (div-based, emoji-coloured circle, cached)
+// Icon factory
 // ---------------------------------------------------------------------------
 const iconCache = new Map();
 function makeIcon(emoji, color, zoom) {
@@ -65,26 +70,38 @@ function makeIcon(emoji, color, zoom) {
 }
 
 // ---------------------------------------------------------------------------
-// In-memory request cache (10-minute TTL)
+// In-memory cache (10-minute TTL)
 // ---------------------------------------------------------------------------
 const reqCache = new Map();
 const CACHE_TTL = 10 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
-// Mapy.cz Places API — returns all POIs in a bounding box
+// Geoapify Places API — bbox fetch for all visible categories in ONE request
 // ---------------------------------------------------------------------------
-async function fetchMapyPlaces(south, west, north, east, zoom, signal) {
+async function fetchGeoapifyPlaces(south, west, north, east, zoom, signal) {
+  if (!GEOAPIFY_KEY) {
+    console.warn('AmbientPOILayer: VITE_GEOAPIFY_KEY is not set');
+    return [];
+  }
+
+  const visible = AMBIENT_CATEGORIES.filter(c => zoom >= c.minZoom);
+  if (!visible.length) return [];
+
+  const categories = visible.map(c => c.geo).join(',');
   const limit = zoom >= 16 ? 200 : zoom >= 15 ? 100 : zoom >= 14 ? 60 : 30;
+
+  // Geoapify bbox format: rect:lon_min,lat_min,lon_max,lat_max  (west,south,east,north)
   const url =
-    `https://api.mapy.com/v1/places` +
-    `?apikey=${MAPY_API_KEY}` +
-    `&bbox=${west},${south},${east},${north}` +
+    `https://api.geoapify.com/v2/places` +
+    `?categories=${encodeURIComponent(categories)}` +
+    `&filter=rect:${west},${south},${east},${north}` +
     `&limit=${limit}` +
-    `&lang=en`;
+    `&apiKey=${GEOAPIFY_KEY}`;
+
   const res = await fetch(url, { signal });
-  if (!res.ok) throw new Error(`Mapy.cz places ${res.status}`);
+  if (!res.ok) throw new Error(`Geoapify places ${res.status}`);
   const data = await res.json();
-  return data.items || [];
+  return data.features || [];
 }
 
 // ---------------------------------------------------------------------------
@@ -127,30 +144,32 @@ export default function AmbientPOILayer({ onSelectPOI, selectedCategory }) {
       }
 
       try {
-        const items  = await fetchMapyPlaces(south, west, north, east, z, signal);
-        const result = [];
-        const seen   = new Set();
+        const features = await fetchGeoapifyPlaces(south, west, north, east, z, signal);
+        const result   = [];
+        const seen     = new Set();
 
-        for (const item of items) {
-          const lat = item.position?.lat ?? item.lat;
-          const lon = item.position?.lon ?? item.position?.lng ?? item.lon ?? item.lng;
+        for (const feat of features) {
+          const [lon, lat] = feat.geometry?.coordinates || [];
           if (!lat || !lon) continue;
 
-          const id = item.id || `${lat.toFixed(5)}-${lon.toFixed(5)}`;
+          const id = feat.properties?.place_id || `${lat.toFixed(5)}-${lon.toFixed(5)}`;
           if (seen.has(id)) continue;
           seen.add(id);
 
-          const cat = detectCategory(item, z);
+          const cat = detectCategory(feat);
           if (!cat) continue;
 
+          const p = feat.properties || {};
           result.push({
             id, lat, lon,
-            name:    item.name || item.label || '',
-            address: item.location || '',
-            tags:    {},
-            _cat:    cat,
-            mapyId:  item.id,
-            source:  item.source,
+            name:    p.name || p.address_line1 || cat.key,
+            address: p.address_line2 || p.formatted || '',
+            tags: {
+              phone:         p.contact?.phone,
+              website:       p.website || p.contact?.website,
+              opening_hours: p.opening_hours,
+            },
+            _cat: cat,
           });
         }
 

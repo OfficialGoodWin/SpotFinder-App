@@ -30,50 +30,8 @@ const createPOIIcon = (emoji, color, zoom) => {
   return icon;
 };
 
-// ─── Mapy.cz (primary fallback — replaces Overpass) ──────────────────────────
-const MAPY_API_KEY = import.meta.env.VITE_MAPY_API_KEY || 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
-
-async function fetchMapy(category, south, west, north, east, limit, signal) {
-  // Use the first short English keyword as the search query
-  const query = (category.keywords || []).find(k => /^[a-z]/i.test(k)) || category.name;
-  const centerLat = (south + north) / 2;
-  const centerLon = (west + east) / 2;
-  // Estimate a search radius from the bbox width (capped at 50 km)
-  const radiusM = Math.min(50000, Math.round((east - west) * 111_000 / 2));
-
-  const url =
-    `https://api.mapy.com/v1/suggest` +
-    `?apikey=${MAPY_API_KEY}` +
-    `&query=${encodeURIComponent(query)}` +
-    `&lang=en` +
-    `&limit=${Math.min(limit, 50)}` +
-    `&preferNear=${centerLon},${centerLat}` +
-    `&preferNearPrecision=${radiusM}` +
-    `&category=poi`;
-
-  const res = await fetch(url, { signal });
-  if (!res.ok) throw new Error(`Mapy.cz suggest ${res.status}`);
-  const data = await res.json();
-
-  return (data.items || [])
-    .map(item => {
-      const lat = item.position?.lat ?? item.lat;
-      const lon = item.position?.lon ?? item.position?.lng ?? item.lon ?? item.lng;
-      if (!lat || !lon) return null;
-      // Filter to items actually inside the current bbox
-      if (lat < south || lat > north || lon < west || lon > east) return null;
-      return {
-        id:      item.id || `${lat.toFixed(5)}-${lon.toFixed(5)}`,
-        lat, lon,
-        name:    item.name || item.label || category.name,
-        address: item.location || '',
-        tags:    {},
-        mapyId:  item.id,
-        source:  item.source,
-      };
-    })
-    .filter(Boolean);
-}
+// ─── Geoapify fallback (browser-friendly CORS, free 3k credits/day) ──────────
+// Set VITE_GEOAPIFY_KEY in your Vercel env vars. Free key: geoapify.com
 
 // ─── Geoapify (kept for users who supply their own key) ───────────────────────
 const GEOAPIFY_KEY = import.meta.env.VITE_GEOAPIFY_KEY || '';
@@ -193,12 +151,15 @@ export default function POILayer({ category, onNavigate, onPOIsLoaded, onLoading
             category.geoapifyCategory, south, west, north, east,
             fetchLimit, abortControllerRef.current.signal
           );
-        } else {
-          // Mapy.cz suggest — replaces Overpass, no rate-limit issues
-          poiList = await fetchMapy(
-            category, south, west, north, east,
+        } else if (GEOAPIFY_KEY) {
+          // Geoapify Places API — bbox search, CORS-friendly, free tier available
+          poiList = await fetchGeoapify(
+            category.geoapifyCategory || 'leisure', south, west, north, east,
             fetchLimit, abortControllerRef.current.signal
           );
+        } else {
+          // No API key configured — POI search unavailable
+          console.warn('POILayer: set VITE_GEOAPIFY_KEY to enable POI search');
         }
 
         const distributed = distributeEvenly(poiList, south, west, north, east);
