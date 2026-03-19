@@ -58,29 +58,29 @@ function getTagPhotos(tags = {}) {
 async function fetchGooglePhotos(name, lat, lon) {
   if (!GOOGLE_KEY) return [];
   try {
+    // Step 1: find the place_id
     const findRes = await fetch(
       `/gplaces/findplacefromtext/json` +
       `?input=${encodeURIComponent(name)}&inputtype=textquery` +
       `&locationbias=circle:100@${lat},${lon}` +
-      `&fields=place_id,name,geometry,photos&key=${GOOGLE_KEY}`
+      `&fields=place_id,name,geometry&key=${GOOGLE_KEY}`
     );
     if (!findRes.ok) return [];
     const candidate = (await findRes.json()).candidates?.[0];
-    if (!candidate) return [];
+    if (!candidate?.place_id) return [];
 
     // Reject if too far away (~100m)
     const cLat = candidate.geometry?.location?.lat;
     const cLon = candidate.geometry?.location?.lng;
     if (!cLat || Math.hypot(cLat - lat, cLon - lon) > 0.001) return [];
 
-    let photos = candidate.photos || [];
-    if (!photos.length && candidate.place_id) {
-      const dr = await fetch(
-        `/gplaces/details/json` +
-        `?place_id=${candidate.place_id}&fields=photos&key=${GOOGLE_KEY}`
-      );
-      if (dr.ok) photos = (await dr.json()).result?.photos || [];
-    }
+    // Step 2: always fetch details to get ALL photos (findplacefromtext only returns 1)
+    const dr = await fetch(
+      `/gplaces/details/json` +
+      `?place_id=${candidate.place_id}&fields=photos&key=${GOOGLE_KEY}`
+    );
+    if (!dr.ok) return [];
+    const photos = (await dr.json()).result?.photos || [];
     return photos.slice(0, 10).map(p =>
       `/gplaces/photo?maxwidth=1200&photo_reference=${p.photo_reference}&key=${GOOGLE_KEY}`
     );
