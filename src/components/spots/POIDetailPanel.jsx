@@ -81,7 +81,7 @@ async function fetchGooglePhotos(name, lat, lon) {
       );
       if (dr.ok) photos = (await dr.json()).result?.photos || [];
     }
-    return photos.slice(0, 8).map(p =>
+    return photos.slice(0, 10).map(p =>
       `/gplaces/photo?maxwidth=1200&photo_reference=${p.photo_reference}&key=${GOOGLE_KEY}`
     );
   } catch { return []; }
@@ -166,9 +166,9 @@ function Lightbox({ photos, startIndex, onClose }) {
       {photos.length > 1 && (
         <button
           onClick={prev}
-          className="absolute left-3 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center text-white backdrop-blur-sm transition-colors"
+          className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white backdrop-blur-sm transition-all active:scale-95 shadow-lg"
         >
-          <ChevronLeft className="w-6 h-6" />
+          <ChevronLeft className="w-7 h-7" />
         </button>
       )}
 
@@ -178,7 +178,7 @@ function Lightbox({ photos, startIndex, onClose }) {
         src={photos[idx]}
         alt=""
         className="max-w-full max-h-full object-contain select-none"
-        style={{ maxHeight: '100dvh', maxWidth: '100dvw' }}
+        style={{ maxHeight: '100dvh', maxWidth: '100dvw', padding: '0 60px' }}
         onError={e => { e.target.src = ''; }}
       />
 
@@ -186,9 +186,9 @@ function Lightbox({ photos, startIndex, onClose }) {
       {photos.length > 1 && (
         <button
           onClick={next}
-          className="absolute right-3 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center text-white backdrop-blur-sm transition-colors"
+          className="absolute right-3 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white backdrop-blur-sm transition-all active:scale-95 shadow-lg"
         >
-          <ChevronRight className="w-6 h-6" />
+          <ChevronRight className="w-7 h-7" />
         </button>
       )}
 
@@ -460,19 +460,19 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
               </>
             )}
 
-            {/* Photo gallery */}
+            {/* Photo gallery — full grid, all photos visible */}
             {allPhotos.length > 0 && (
               <>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                   Photos ({allPhotos.length})
                   {sfPhotos.length > 0 && <span className="text-green-600 dark:text-green-400 normal-case font-normal ml-1">· {sfPhotos.length} from SpotFinder</span>}
                 </p>
-                <div className="flex gap-2 overflow-x-auto pb-2 mb-4 -mx-1 px-1">
+                <div className="grid grid-cols-3 gap-1.5 mb-4">
                   {allPhotos.map((p, i) => (
                     <button
                       key={i}
                       onClick={() => onOpenLightbox(i)}
-                      className="flex-shrink-0 w-28 h-20 rounded-xl overflow-hidden bg-gray-100 dark:bg-accent relative cursor-zoom-in hover:opacity-90 active:scale-95 transition-all"
+                      className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 dark:bg-accent cursor-zoom-in hover:opacity-90 active:scale-95 transition-all"
                     >
                       <img src={p.url} alt="" className="w-full h-full object-cover"
                         onError={e => { e.target.parentNode.style.display = 'none'; }} />
@@ -483,9 +483,9 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
                   ))}
                   {user && (
                     <button onClick={onAddPhoto}
-                      className="flex-shrink-0 w-28 h-20 rounded-xl border-2 border-dashed border-gray-300 dark:border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-gray-400 transition-colors">
+                      className="aspect-square rounded-xl border-2 border-dashed border-gray-300 dark:border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-gray-400 transition-colors">
                       <Camera className="w-5 h-5" />
-                      <span className="text-xs">Add photo</span>
+                      <span className="text-xs">Add</span>
                     </button>
                   )}
                 </div>
