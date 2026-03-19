@@ -9,13 +9,14 @@ const GEOAPIFY_KEY = import.meta.env.VITE_GEOAPIFY_KEY || '';
 // Multiple Geoapify categories can be comma-joined in one request.
 // ---------------------------------------------------------------------------
 const AMBIENT_CATEGORIES = [
-  // zoom 13+ — big landmarks visible from afar
+  // zoom 13+ — big landmarks
+  // Category strings verified against Geoapify Places API docs
   { key: 'train',       minZoom: 13, icon: '🚆', color: '#34495E', geo: 'public_transport.train' },
   { key: 'fuel',        minZoom: 13, icon: '⛽', color: '#E74C3C', geo: 'service.vehicle.fuel' },
   { key: 'charging',    minZoom: 13, icon: '🔌', color: '#27AE60', geo: 'service.vehicle.charging_station' },
   { key: 'hotel',       minZoom: 13, icon: '🏨', color: '#2980B9', geo: 'accommodation.hotel' },
   { key: 'museum',      minZoom: 13, icon: '🏛️', color: '#34495E', geo: 'entertainment.museum' },
-  { key: 'castle',      minZoom: 13, icon: '🏰', color: '#95A5A6', geo: 'heritage.castle' },
+  { key: 'heritage',    minZoom: 13, icon: '🏰', color: '#95A5A6', geo: 'heritage' },
   { key: 'hospital',    minZoom: 13, icon: '🏥', color: '#C0392B', geo: 'healthcare.hospital' },
   // zoom 15+ — neighbourhood-level
   { key: 'restaurant',  minZoom: 15, icon: '🍽️', color: '#E74C3C', geo: 'catering.restaurant' },
@@ -26,9 +27,8 @@ const AMBIENT_CATEGORIES = [
   { key: 'supermarket', minZoom: 15, icon: '🏪', color: '#27AE60', geo: 'commercial.supermarket' },
   // zoom 16+ — street-level detail
   { key: 'atm',         minZoom: 16, icon: '💳', color: '#16A085', geo: 'service.financial.atm' },
-  { key: 'bakery',      minZoom: 16, icon: '🥖', color: '#D4A574', geo: 'commercial.food_and_drink.bakery' },
+  { key: 'bakery',      minZoom: 16, icon: '🥖', color: '#D4A574', geo: 'commercial.food_and_drink' },
   { key: 'parking',     minZoom: 16, icon: '🅿️', color: '#3498DB', geo: 'parking' },
-  { key: 'toilets',     minZoom: 16, icon: '🚻', color: '#3498DB', geo: 'service.toilets' },
 ];
 
 // Build a lookup from Geoapify category prefix → our hint object
@@ -76,32 +76,58 @@ const reqCache = new Map();
 const CACHE_TTL = 10 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
-// Geoapify Places API — bbox fetch for all visible categories in ONE request
+// Geoapify Places API — fetch by zoom tier to keep category lists short.
+// Geoapify returns 400 when the combined category string is too long, so we
+// group by minZoom and fire one request per tier that becomes visible.
 // ---------------------------------------------------------------------------
+const ZOOM_TIERS = [
+  { minZoom: 13, limit: 30  },
+  { minZoom: 15, limit: 60  },
+  { minZoom: 16, limit: 100 },
+];
+
 async function fetchGeoapifyPlaces(south, west, north, east, zoom, signal) {
   if (!GEOAPIFY_KEY) {
     console.warn('AmbientPOILayer: VITE_GEOAPIFY_KEY is not set');
     return [];
   }
 
-  const visible = AMBIENT_CATEGORIES.filter(c => zoom >= c.minZoom);
-  if (!visible.length) return [];
+  const filter = `rect:${west},${south},${east},${north}`;
+  const allFeatures = [];
 
-  const categories = visible.map(c => c.geo).join(',');
-  const limit = zoom >= 16 ? 200 : zoom >= 15 ? 100 : zoom >= 14 ? 60 : 30;
+  // Only fire requests for tiers that are newly visible at this zoom
+  for (const tier of ZOOM_TIERS) {
+    if (zoom < tier.minZoom) continue;
 
-  // Geoapify bbox format: rect:lon_min,lat_min,lon_max,lat_max  (west,south,east,north)
-  const url =
-    `https://api.geoapify.com/v2/places` +
-    `?categories=${encodeURIComponent(categories)}` +
-    `&filter=rect:${west},${south},${east},${north}` +
-    `&limit=${limit}` +
-    `&apiKey=${GEOAPIFY_KEY}`;
+    const cats = AMBIENT_CATEGORIES
+      .filter(c => c.minZoom === tier.minZoom)
+      .map(c => c.geo)
+      .join(',');
 
-  const res = await fetch(url, { signal });
-  if (!res.ok) throw new Error(`Geoapify places ${res.status}`);
-  const data = await res.json();
-  return data.features || [];
+    if (!cats) continue;
+
+    const url =
+      `https://api.geoapify.com/v2/places` +
+      `?categories=${encodeURIComponent(cats)}` +
+      `&filter=${filter}` +
+      `&limit=${tier.limit}` +
+      `&apiKey=${GEOAPIFY_KEY}`;
+
+    try {
+      const res = await fetch(url, { signal });
+      if (!res.ok) {
+        console.warn(`AmbientPOILayer: Geoapify tier z${tier.minZoom} → ${res.status}`);
+        continue;
+      }
+      const data = await res.json();
+      allFeatures.push(...(data.features || []));
+    } catch (e) {
+      if (e.name === 'AbortError') throw e;
+      console.warn('AmbientPOILayer fetch error:', e.message);
+    }
+  }
+
+  return allFeatures;
 }
 
 // ---------------------------------------------------------------------------
