@@ -11,26 +11,22 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Download, Trash2, MapPin, CheckCircle2, AlertCircle,
          WifiOff, HardDrive, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
-import { COUNTRIES, downloadCountry, downloadCountryPOIs, deleteCountry,
-         hashTemplate } from '../../lib/offlineManager.js';
+import { COUNTRIES, downloadCountryPMTiles, downloadCountryPOIs, deleteCountry } from '../../lib/offlineManager.js';
 import { getAllMeta, estimateStorageUsage, getPOIs } from '../../lib/offlineStorage.js';
 
-const MAPY_KEY      = import.meta.env.VITE_MAPY_API_KEY || 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
-const GEOAPIFY_KEY  = import.meta.env.VITE_GEOAPIFY_KEY || '';
-
-// The tile template that's actually used by the map — we download this exact style.
-// We use the light/basic Mapy.cz tiles as the offline base.
-const OFFLINE_TILE_TEMPLATE =
-  `https://api.mapy.com/v1/maptiles/basic/256/{z}/{x}/{y}?apikey=${MAPY_KEY}`;
+const GEOAPIFY_KEY = import.meta.env.VITE_GEOAPIFY_KEY || '';
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ meta }) {
   if (!meta) return null;
   const date = new Date(meta.downloadedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  const zoom = meta.zoomMax <= 12 ? 'Basic' : 'Standard';
+  const label = meta.zoom >= 19 ? 'Detailed' : 'Basic';
+  const color = meta.zoom >= 19
+    ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300'
+    : 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300';
   return (
-    <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 font-medium">
-      {zoom} · {date}
+    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${color}`}>
+      {label} · {date}
     </span>
   );
 }
@@ -55,13 +51,17 @@ function StorageBar({ usedMB, quotaMB }) {
 }
 
 // ─── Progress bar ─────────────────────────────────────────────────────────────
-function ProgressBar({ done, total, label }) {
-  const pct = total > 0 ? Math.round(done / total * 100) : 0;
+function ProgressBar({ receivedMB, totalMB, speedMBps, etaSec, label }) {
+  const pct = totalMB > 0 ? Math.min(100, Math.round(receivedMB / totalMB * 100)) : 0;
+  const eta = etaSec > 60 ? `${Math.round(etaSec/60)}m` : etaSec > 0 ? `${Math.round(etaSec)}s` : '';
   return (
     <div className="space-y-1 mt-2">
       <div className="flex justify-between text-xs text-muted-foreground">
         <span>{label}</span>
-        <span>{pct}% ({done.toLocaleString()} / {total.toLocaleString()})</span>
+        <span>
+          {receivedMB.toFixed(1)} / {totalMB.toFixed(0)} MB
+          {speedMBps > 0 && <span className="ml-1 text-blue-500">· {speedMBps.toFixed(1)} MB/s{eta && ` · ${eta} left`}</span>}
+        </span>
       </div>
       <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
         <div
@@ -97,9 +97,11 @@ function CountryRow({ country, meta, onDownload, onDelete, activeDownload }) {
           </div>
           {isActive && activeDownload.progress && (
             <ProgressBar
-              done={activeDownload.progress.done}
-              total={activeDownload.progress.total}
-              label={activeDownload.phase === 'pois' ? 'Downloading POI data…' : 'Downloading tiles…'}
+              receivedMB={activeDownload.progress.receivedMB || 0}
+              totalMB={activeDownload.progress.totalMB || country.sizeMB}
+              speedMBps={activeDownload.progress.speedMBps || 0}
+              etaSec={activeDownload.progress.etaSec || 0}
+              label={activeDownload.phase === 'pois' ? 'Downloading POIs…' : 'Downloading map…'}
             />
           )}
         </div>
@@ -128,23 +130,23 @@ function CountryRow({ country, meta, onDownload, onDelete, activeDownload }) {
       {/* Expanded options */}
       {expanded && !isActive && (
         <div className="px-4 pb-3 border-t border-border/50 pt-3 space-y-2">
-          {/* Download buttons */}
+          {/* Download options */}
           <div className="flex gap-2 flex-wrap">
             <button
               onClick={() => { onDownload(country, 'basic'); setExpanded(false); }}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500 text-white text-xs font-medium hover:bg-blue-600 active:scale-95 transition-all"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-500 text-white text-xs font-medium hover:bg-blue-600 active:scale-95 transition-all"
             >
               <Download className="w-3 h-3" />
-              Basic (~{country.basicMB} MB)
-              <span className="opacity-70">zoom 0-12</span>
+              Basic
+              <span className="opacity-75">~{country.basicMB} MB · zoom 15</span>
             </button>
             <button
-              onClick={() => { onDownload(country, 'standard'); setExpanded(false); }}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-500 text-white text-xs font-medium hover:bg-indigo-600 active:scale-95 transition-all"
+              onClick={() => { onDownload(country, 'detailed'); setExpanded(false); }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-purple-500 text-white text-xs font-medium hover:bg-purple-600 active:scale-95 transition-all"
             >
               <Download className="w-3 h-3" />
-              Standard (~{country.standardMB} MB)
-              <span className="opacity-70">zoom 0-13</span>
+              Detailed
+              <span className="opacity-75">~{country.detailedMB >= 1000 ? (country.detailedMB/1000).toFixed(1)+'GB' : country.detailedMB+'MB'} · zoom 19</span>
             </button>
           </div>
 
@@ -172,8 +174,9 @@ function CountryRow({ country, meta, onDownload, onDelete, activeDownload }) {
 
           {/* Info */}
           <p className="text-xs text-muted-foreground">
-            Basic: city & road navigation · Standard: adds street-level detail & POI labels ·
-            Tiles are also auto-cached as you browse online.
+            <strong>Basic</strong> (zoom 0–15): navigation + streets, fast download. 
+            <strong> Detailed</strong> (zoom 0–19): every building &amp; alley, very large.
+            Generate with: <code>pmtiles extract planet.pmtiles {country.code}-basic.pmtiles --maxzoom=15</code>
           </p>
         </div>
       )}
@@ -214,47 +217,39 @@ export default function OfflineMapsMenu({ onClose }) {
     }
 
     abortRef.current = { current: false };
-    const tplHash = hashTemplate(OFFLINE_TILE_TEMPLATE);
 
     if (mode === 'pois') {
-      setActive({ code: country.code, phase: 'pois', progress: { done: 0, total: 1 } });
+      setActive({ code: country.code, phase: 'pois', progress: { receivedMB: 0, totalMB: 1, speedMBps: 0, etaSec: 0 } });
       await downloadCountryPOIs({
         country,
         geoapifyKey: GEOAPIFY_KEY,
         onProgress: (done, total) =>
-          setActive(a => a ? { ...a, progress: { done, total } } : null),
+          setActive(a => a ? { ...a, progress: { receivedMB: done, totalMB: total, speedMBps: 0, etaSec: 0 } } : null),
         abortRef: abortRef.current,
       });
-      if (!abortRef.current.current) {
-        // Mark hasPOIs in meta
-        const existing = metaMap[country.code] || {};
-        const newMeta  = { ...existing, hasPOIs: true };
-        // (setMeta is called inside downloadCountryPOIs only for full downloads;
-        //  here we just update the flag manually via getPOIs check)
-        showToast(`POIs downloaded for ${country.name} ✓`, 'success');
-      }
+      if (!abortRef.current.current) showToast(`POIs downloaded for ${country.name} ✓`, 'success');
       setActive(null);
       await refresh();
       return;
     }
 
-    const maxZoom = mode === 'standard' ? 13 : 12;
+    // Single-file PMTiles download
+    const isDetailed = mode === 'detailed';
+    const zoom       = isDetailed ? 19 : 15;
+    const sizeMB     = isDetailed ? country.detailedMB : country.basicMB;
+    setActive({ code: country.code, phase: 'tiles', progress: { receivedMB: 0, totalMB: sizeMB, speedMBps: 0, etaSec: 0 } });
 
-    setActive({ code: country.code, phase: 'tiles', progress: { done: 0, total: 1 } });
-
-    await downloadCountry({
-      country,
-      tileTemplate: OFFLINE_TILE_TEMPLATE,
-      maxZoom,
-      onProgress: (done, total) =>
-        setActive(a => a ? { ...a, progress: { done, total } } : null),
-      abortRef: abortRef.current,
-    });
-
-    if (!abortRef.current.current) {
-      showToast(`${country.name} downloaded ✓`, 'success');
-    } else {
-      showToast('Download cancelled', 'info');
+    try {
+      await downloadCountryPMTiles({
+        country,
+        zoom,
+        onProgress: (p) => setActive(a => a ? { ...a, progress: p } : null),
+        abortRef: abortRef.current,
+      });
+      if (!abortRef.current.current) showToast(`${country.name} downloaded ✓`, 'success');
+      else showToast('Download cancelled', 'info');
+    } catch (e) {
+      showToast(`Error: ${e.message}`, 'error');
     }
 
     setActive(null);

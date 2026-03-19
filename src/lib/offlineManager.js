@@ -1,188 +1,190 @@
 /**
  * offlineManager.js
- * Country registry, tile coordinate math, and download queue.
- *
- * Download levels:
- *   basic    → zoom 0-12  (~3-20 MB)   navigation + city names
- *   standard → zoom 0-13  (~20-120 MB) street-level detail + POI labels
- *
- * Tile counts are pre-computed estimates; actual sizes vary with content.
+ * 
+ * PMTiles-based offline map system.
+ * 
+ * Downloads a single .pmtiles file per country from /offline/{CC}.pmtiles
+ * on your own Vercel deployment. Stores in OPFS (Origin Private File System)
+ * which is optimised for large binary files — much better than IndexedDB.
+ * 
+ * To generate the PMTiles files, run the pmtiles CLI once per country:
+ *   npm install -g pmtiles
+ *   pmtiles extract https://build.protomaps.com/20260319.pmtiles public/offline/CZ.pmtiles \
+ *     --bbox=12.09,48.55,18.87,51.06 --maxzoom=14
+ * Then commit public/offline/*.pmtiles to your repo (Vercel serves them as static files).
  */
 
-import { getTile, setTile, setMeta, deleteMeta, deleteTilesWithPrefix,
-         deletePOIs, setPOIs } from './offlineStorage.js';
+import { setMeta, deleteMeta, deletePOIs, setPOIs, getMeta } from './offlineStorage.js';
 
 // ─── Country registry ─────────────────────────────────────────────────────────
-// bbox: [west, south, east, north]  (lng_min, lat_min, lng_max, lat_max)
+// basicMB   = zoom 0–15  (navigation + street names, ~same as Google Maps default)
+// detailedMB = zoom 0–19  (every building, alley, parking spot — very large files)
 export const COUNTRIES = [
-  { code: 'CZ', name: 'Czech Republic',   flag: '🇨🇿', bbox: [12.09, 48.55, 18.87, 51.06], basicMB: 12,  standardMB: 85  },
-  { code: 'SK', name: 'Slovakia',         flag: '🇸🇰', bbox: [16.83, 47.73, 22.57, 49.61], basicMB: 8,   standardMB: 55  },
-  { code: 'AT', name: 'Austria',          flag: '🇦🇹', bbox: [9.53,  46.37, 17.16, 49.02], basicMB: 10,  standardMB: 70  },
-  { code: 'HU', name: 'Hungary',          flag: '🇭🇺', bbox: [16.11, 45.74, 22.90, 48.59], basicMB: 9,   standardMB: 60  },
-  { code: 'PL', name: 'Poland',           flag: '🇵🇱', bbox: [14.12, 49.00, 24.15, 54.90], basicMB: 22,  standardMB: 180 },
-  { code: 'DE', name: 'Germany',          flag: '🇩🇪', bbox: [5.87,  47.27, 15.04, 55.06], basicMB: 30,  standardMB: 260 },
-  { code: 'FR', name: 'France',           flag: '🇫🇷', bbox: [-5.14, 41.33, 9.56,  51.09], basicMB: 38,  standardMB: 330 },
-  { code: 'IT', name: 'Italy',            flag: '🇮🇹', bbox: [6.63,  35.49, 18.52, 47.09], basicMB: 28,  standardMB: 230 },
-  { code: 'ES', name: 'Spain',            flag: '🇪🇸', bbox: [-9.30, 35.95, 4.33,  43.79], basicMB: 32,  standardMB: 260 },
-  { code: 'HR', name: 'Croatia',          flag: '🇭🇷', bbox: [13.49, 42.38, 19.45, 46.55], basicMB: 7,   standardMB: 45  },
-  { code: 'SI', name: 'Slovenia',         flag: '🇸🇮', bbox: [13.38, 45.42, 16.61, 46.88], basicMB: 3,   standardMB: 18  },
-  { code: 'RO', name: 'Romania',          flag: '🇷🇴', bbox: [20.26, 43.62, 29.74, 48.27], basicMB: 18,  standardMB: 145 },
-  { code: 'NL', name: 'Netherlands',      flag: '🇳🇱', bbox: [3.31,  50.75, 7.09,  53.55], basicMB: 6,   standardMB: 40  },
-  { code: 'BE', name: 'Belgium',          flag: '🇧🇪', bbox: [2.54,  49.50, 6.40,  51.50], basicMB: 4,   standardMB: 28  },
-  { code: 'CH', name: 'Switzerland',      flag: '🇨🇭', bbox: [5.96,  45.82, 10.49, 47.81], basicMB: 4,   standardMB: 30  },
-  { code: 'PT', name: 'Portugal',         flag: '🇵🇹', bbox: [-9.50, 36.96, -6.19, 42.15], basicMB: 6,   standardMB: 45  },
-  { code: 'GR', name: 'Greece',           flag: '🇬🇷', bbox: [19.37, 34.80, 28.24, 41.75], basicMB: 10,  standardMB: 75  },
-  { code: 'UA', name: 'Ukraine',          flag: '🇺🇦', bbox: [22.14, 44.36, 40.23, 52.38], basicMB: 25,  standardMB: 210 },
+  { code: 'CZ', name: 'Czech Republic',   flag: '🇨🇿', bbox: [12.09, 48.55, 18.87, 51.06], basicMB: 55,   detailedMB: 1800  },
+  { code: 'SK', name: 'Slovakia',         flag: '🇸🇰', bbox: [16.83, 47.73, 22.57, 49.61], basicMB: 35,   detailedMB: 1100  },
+  { code: 'AT', name: 'Austria',          flag: '🇦🇹', bbox: [9.53,  46.37, 17.16, 49.02], basicMB: 45,   detailedMB: 1500  },
+  { code: 'HU', name: 'Hungary',          flag: '🇭🇺', bbox: [16.11, 45.74, 22.90, 48.59], basicMB: 38,   detailedMB: 1200  },
+  { code: 'PL', name: 'Poland',           flag: '🇵🇱', bbox: [14.12, 49.00, 24.15, 54.90], basicMB: 120,  detailedMB: 4500  },
+  { code: 'DE', name: 'Germany',          flag: '🇩🇪', bbox: [5.87,  47.27, 15.04, 55.06], basicMB: 180,  detailedMB: 7000  },
+  { code: 'FR', name: 'France',           flag: '🇫🇷', bbox: [-5.14, 41.33, 9.56,  51.09], basicMB: 210,  detailedMB: 8000  },
+  { code: 'IT', name: 'Italy',            flag: '🇮🇹', bbox: [6.63,  35.49, 18.52, 47.09], basicMB: 150,  detailedMB: 5500  },
+  { code: 'ES', name: 'Spain',            flag: '🇪🇸', bbox: [-9.30, 35.95, 4.33,  43.79], basicMB: 160,  detailedMB: 6000  },
+  { code: 'HR', name: 'Croatia',          flag: '🇭🇷', bbox: [13.49, 42.38, 19.45, 46.55], basicMB: 28,   detailedMB: 900   },
+  { code: 'SI', name: 'Slovenia',         flag: '🇸🇮', bbox: [13.38, 45.42, 16.61, 46.88], basicMB: 12,   detailedMB: 380   },
+  { code: 'RO', name: 'Romania',          flag: '🇷🇴', bbox: [20.26, 43.62, 29.74, 48.27], basicMB: 90,   detailedMB: 3000  },
+  { code: 'NL', name: 'Netherlands',      flag: '🇳🇱', bbox: [3.31,  50.75, 7.09,  53.55], basicMB: 25,   detailedMB: 800   },
+  { code: 'BE', name: 'Belgium',          flag: '🇧🇪', bbox: [2.54,  49.50, 6.40,  51.50], basicMB: 18,   detailedMB: 580   },
+  { code: 'CH', name: 'Switzerland',      flag: '🇨🇭', bbox: [5.96,  45.82, 10.49, 47.81], basicMB: 20,   detailedMB: 650   },
+  { code: 'PT', name: 'Portugal',         flag: '🇵🇹', bbox: [-9.50, 36.96, -6.19, 42.15], basicMB: 30,   detailedMB: 950   },
+  { code: 'GR', name: 'Greece',           flag: '🇬🇷', bbox: [19.37, 34.80, 28.24, 41.75], basicMB: 48,   detailedMB: 1600  },
+  { code: 'UA', name: 'Ukraine',          flag: '🇺🇦', bbox: [22.14, 44.36, 40.23, 52.38], basicMB: 130,  detailedMB: 4800  },
 ];
 
-// ─── Tile coordinate math ─────────────────────────────────────────────────────
+// ─── OPFS helpers ─────────────────────────────────────────────────────────────
+// OPFS = Origin Private File System — browser API for large file storage.
+// Much faster than IndexedDB for binary blobs (no serialisation overhead).
 
-export function lngToTileX(lng, z) {
-  return Math.floor(((lng + 180) / 360) * Math.pow(2, z));
+async function getOPFSRoot() {
+  return navigator.storage.getDirectory();
 }
 
-export function latToTileY(lat, z) {
-  const r = lat * Math.PI / 180;
-  return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * Math.pow(2, z));
+async function getOfflineDir() {
+  const root = await getOPFSRoot();
+  return root.getDirectoryHandle('offline-maps', { create: true });
 }
 
-/** Returns an array of {z,x,y} for all tiles covering a bbox at a given zoom */
-export function tilesForBboxAtZoom(west, south, east, north, z) {
-  const x0 = lngToTileX(west,  z);
-  const x1 = lngToTileX(east,  z);
-  const y0 = latToTileY(north, z);  // north = smaller y
-  const y1 = latToTileY(south, z);  // south = larger y
-  const tiles = [];
-  for (let x = x0; x <= x1; x++) {
-    for (let y = y0; y <= y1; y++) {
-      tiles.push({ z, x, y });
+/** Returns a File object for a downloaded country, or null if not present */
+export async function getCountryFile(code, meta) {
+  try {
+    const dir    = await getOfflineDir();
+    // Try the suffix stored in meta first, then fall back to either variant
+    const suffix = meta?.suffix || null;
+    const tries  = suffix ? [`${code}-${suffix}.pmtiles`] : [`${code}-detailed.pmtiles`, `${code}-basic.pmtiles`];
+    for (const name of tries) {
+      try {
+        const handle = await dir.getFileHandle(name);
+        return handle.getFile();
+      } catch (_) {}
     }
+    return null;
+  } catch (_) {
+    return null;
   }
-  return tiles;
 }
 
-/** Total tile count for a country from zoom 0 up to and including maxZoom */
-export function countTiles(country, maxZoom) {
-  const [west, south, east, north] = country.bbox;
-  let total = 0;
-  for (let z = 0; z <= maxZoom; z++) {
-    total += tilesForBboxAtZoom(west, south, east, north, z).length;
+/** Returns true if the country pmtiles file exists in OPFS */
+export async function hasCountryFile(code) {
+  try {
+    const dir = await getOfflineDir();
+    for (const name of [`${code}-detailed.pmtiles`, `${code}-basic.pmtiles`]) {
+      try { await dir.getFileHandle(name); return true; } catch (_) {}
+    }
+    return false;
+  } catch (_) {
+    return false;
   }
-  return total;
 }
 
-// Tile key used for IndexedDB — includes a hash of the URL template so different
-// map styles are stored separately and don't collide.
-export function tileKey(z, x, y, tplHash) {
-  return `${tplHash}|${z}/${x}/${y}`;
+/** Delete a country's pmtiles file from OPFS */
+async function deleteCountryFile(code) {
+  try {
+    const dir = await getOfflineDir();
+    for (const name of [`${code}-detailed.pmtiles`, `${code}-basic.pmtiles`]) {
+      try { await dir.removeEntry(name); } catch (_) {}
+    }
+  } catch (_) {}
 }
 
-/** Simple djb2-style hash of a string → short hex string */
-export function hashTemplate(tpl) {
-  let h = 5381;
-  for (let i = 0; i < Math.min(tpl.length, 64); i++) {
-    h = ((h << 5) + h) ^ tpl.charCodeAt(i);
-    h = h >>> 0;
-  }
-  return h.toString(16);
-}
-
-/** Resolve a tile URL template (replaces {z}/{x}/{y}/{s}) */
-export function resolveTileUrl(tpl, z, x, y) {
-  // Replace {s} subdomain placeholder with a simple round-robin 'a'/'b'/'c'
-  const subs = ['a', 'b', 'c'];
-  const s    = subs[(x + y) % subs.length];
-  return tpl
-    .replace('{z}', z)
-    .replace('{x}', x)
-    .replace('{y}', y)
-    .replace('{s}', s)
-    .replace('{r}', '');  // retina suffix — ignore for cache
-}
-
-// ─── Download orchestrator ────────────────────────────────────────────────────
-
-const CONCURRENCY = 6;  // parallel tile fetches
+// ─── Single-file streaming download ──────────────────────────────────────────
 
 /**
- * Download tiles for a country and store in IndexedDB.
- *
- * @param {Object}   country     - entry from COUNTRIES
- * @param {string}   tileTemplate - e.g. "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
- * @param {number}   maxZoom     - inclusive (12 = basic, 13 = standard)
- * @param {Function} onProgress  - (done, total) callback
- * @param {Object}   abortRef    - { current: false } — set to true to cancel
+ * Download a country's PMTiles file as a single stream.
+ * The source URL is /offline/{CC}.pmtiles — served from your own Vercel deployment.
+ * 
+ * @param {Object}   country   - entry from COUNTRIES
+ * @param {Function} onProgress - ({ receivedMB, totalMB, speedMBps, etaSec }) callback
+ * @param {Object}   abortRef  - { current: false } — set .current = true to cancel
  */
-export async function downloadCountry({ country, tileTemplate, maxZoom = 12, onProgress, abortRef }) {
-  const [west, south, east, north] = country.bbox;
-  const tplHash = hashTemplate(tileTemplate);
-  const prefix  = `${tplHash}|`;
+export async function downloadCountryPMTiles({ country, zoom = 15, onProgress, abortRef }) {
+  // Files are named CZ-basic.pmtiles (zoom 15) or CZ-detailed.pmtiles (zoom 19)
+  const suffix = zoom >= 19 ? 'detailed' : 'basic';
+  const url = `/offline/${country.code}-${suffix}.pmtiles`;
+  const controller = new AbortController();
 
-  // Build full tile list
-  const allTiles = [];
-  for (let z = 0; z <= maxZoom; z++) {
-    allTiles.push(...tilesForBboxAtZoom(west, south, east, north, z));
-  }
+  // Watch for external cancellation
+  const cancelWatcher = setInterval(() => {
+    if (abortRef?.current) controller.abort();
+  }, 200);
 
-  const total = allTiles.length;
-  let done    = 0;
-  let idx     = 0;
+  try {
+    const res = await fetch(url, { signal: controller.signal });
 
-  async function worker() {
-    while (idx < total) {
-      if (abortRef?.current) return;
-      const tile = allTiles[idx++];
-      const key  = tileKey(tile.z, tile.x, tile.y, tplHash);
-
-      // Skip tiles we already have
-      try {
-        const existing = await getTile(key);
-        if (existing) { done++; onProgress?.(done, total); continue; }
-      } catch (_) {}
-
-      const url = resolveTileUrl(tileTemplate, tile.z, tile.x, tile.y);
-      try {
-        const res = await fetch(url, { mode: 'cors' });
-        if (res.ok) {
-          const buf = await res.arrayBuffer();
-          await setTile(key, buf);
-        }
-      } catch (_) {
-        // Silently skip failed tiles — they'll be fetched live when needed
-      }
-
-      done++;
-      onProgress?.(done, total);
+    if (res.status === 404) {
+      throw new Error(`${country.name} tiles not found on server. See offlineManager.js for how to generate them.`);
     }
-  }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-  // Launch workers
-  const workers = Array.from({ length: CONCURRENCY }, () => worker());
-  await Promise.all(workers);
+    const contentLength = parseInt(res.headers.get('Content-Length') || '0', 10);
+    const totalMB = contentLength > 0 ? contentLength / 1024 / 1024 : country.sizeMB;
 
-  if (!abortRef?.current) {
+    // Stream the response body
+    const reader    = res.body.getReader();
+    const chunks    = [];
+    let received    = 0;
+    let startTime   = Date.now();
+    let lastReport  = Date.now();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.byteLength;
+
+      const now = Date.now();
+      if (now - lastReport > 300) {  // report every 300ms
+        const elapsedSec  = (now - startTime) / 1000;
+        const speedMBps   = (received / 1024 / 1024) / Math.max(elapsedSec, 0.1);
+        const receivedMB  = received / 1024 / 1024;
+        const remaining   = totalMB - receivedMB;
+        const etaSec      = speedMBps > 0 ? remaining / speedMBps : 0;
+        onProgress?.({ receivedMB, totalMB, speedMBps, etaSec });
+        lastReport = now;
+      }
+    }
+
+    // Assemble and write to OPFS
+    const total  = new Uint8Array(received);
+    let offset   = 0;
+    for (const chunk of chunks) { total.set(chunk, offset); offset += chunk.length; }
+
+    const dir    = await getOfflineDir();
+    const handle = await dir.getFileHandle(`${country.code}.pmtiles`, { create: true });
+    const writable = await handle.createWritable();
+    await writable.write(total.buffer);
+    await writable.close();
+
     await setMeta(country.code, {
       downloadedAt: Date.now(),
-      tileCount: done,
-      zoomMax: maxZoom,
-      tplHash,
-      sizeMB: maxZoom <= 12 ? country.basicMB : country.standardMB,
+      sizeMB: Math.round(received / 1024 / 1024),
+      source: 'pmtiles',
+      zoom,
+      suffix,
     });
+
+    onProgress?.({ receivedMB: totalMB, totalMB, speedMBps: 0, etaSec: 0 });
+  } finally {
+    clearInterval(cancelWatcher);
   }
 }
 
-/**
- * Download POI data for a country from Geoapify and store locally.
- * Only fetches the most important categories (restaurants, cafes, etc.)
- * at a coverage level suitable for offline browsing.
- */
+// ─── POI download (Geoapify) ──────────────────────────────────────────────────
+
 const POI_CATEGORIES_OFFLINE = [
   'catering.restaurant', 'catering.cafe', 'catering.bar',
   'accommodation.hotel',
   'healthcare.pharmacy', 'healthcare.hospital',
   'service.financial.atm', 'service.financial.bank',
-  'commercial.supermarket',
-  'entertainment.museum', 'heritage',
+  'commercial.supermarket', 'entertainment.museum', 'heritage',
   'public_transport.train', 'service.vehicle.fuel',
 ];
 
@@ -190,24 +192,21 @@ export async function downloadCountryPOIs({ country, geoapifyKey, onProgress, ab
   if (!geoapifyKey) return;
 
   const [west, south, east, north] = country.bbox;
-  const allPOIs  = [];
-  const seen     = new Set();
-  const cats     = POI_CATEGORIES_OFFLINE;
-  const BATCH    = 4; // categories per request
+  const allPOIs = [];
+  const seen    = new Set();
+  const cats    = POI_CATEGORIES_OFFLINE;
+  const BATCH   = 4;
 
-  // Geoapify has a result limit of 500. For large countries we tile the bbox into a 3x3 grid.
-  const gridSteps = country.basicMB > 20 ? 3 : 2;
+  const gridSteps = country.sizeMB > 100 ? 3 : 2;
   const latStep   = (north - south) / gridSteps;
   const lngStep   = (east  - west)  / gridSteps;
+  const cells     = [];
 
-  const cells = [];
   for (let row = 0; row < gridSteps; row++) {
     for (let col = 0; col < gridSteps; col++) {
       cells.push({
-        s: south + row * latStep,
-        n: south + (row + 1) * latStep,
-        w: west  + col * lngStep,
-        e: west  + (col + 1) * lngStep,
+        s: south + row * latStep, n: south + (row + 1) * latStep,
+        w: west  + col * lngStep, e: west  + (col + 1) * lngStep,
       });
     }
   }
@@ -217,20 +216,12 @@ export async function downloadCountryPOIs({ country, geoapifyKey, onProgress, ab
 
   for (const cell of cells) {
     if (abortRef?.current) return;
-
     for (let i = 0; i < cats.length; i += BATCH) {
       if (abortRef?.current) return;
-
       const batch = cats.slice(i, i + BATCH).join(',');
-      const url   =
-        `https://api.geoapify.com/v2/places` +
-        `?categories=${encodeURIComponent(batch)}` +
-        `&filter=rect:${cell.w},${cell.s},${cell.e},${cell.n}` +
-        `&limit=500` +
-        `&apiKey=${geoapifyKey}`;
-
+      const url   = `https://api.geoapify.com/v2/places?categories=${encodeURIComponent(batch)}&filter=rect:${cell.w},${cell.s},${cell.e},${cell.n}&limit=500&apiKey=${geoapifyKey}`;
       try {
-        const res  = await fetch(url);
+        const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
           for (const feat of data.features || []) {
@@ -240,53 +231,40 @@ export async function downloadCountryPOIs({ country, geoapifyKey, onProgress, ab
             if (seen.has(id)) continue;
             seen.add(id);
             const p = feat.properties || {};
-            allPOIs.push({
-              id, lat, lon,
-              name:       p.name || p.address_line1 || '',
-              address:    p.address_line2 || p.formatted || '',
-              categories: p.categories || [],
-              phone:      p.contact?.phone,
-              website:    p.website || p.contact?.website,
-            });
+            allPOIs.push({ id, lat, lon, name: p.name || '', address: p.address_line2 || '', categories: p.categories || [], phone: p.contact?.phone, website: p.website });
           }
         }
       } catch (_) {}
-
       doneReqs++;
       onProgress?.(doneReqs, totalReqs);
-      // Small pause to avoid hammering the API
       await new Promise(r => setTimeout(r, 80));
     }
   }
 
   if (!abortRef?.current) {
     await setPOIs(country.code, allPOIs);
+    const existing = await getMeta(country.code) || {};
+    await setMeta(country.code, { ...existing, hasPOIs: true });
   }
 }
 
-/**
- * Delete all downloaded data for a country (tiles + POIs + meta).
- */
-export async function deleteCountry(country, tplHash) {
-  const prefix = `${tplHash}|`;
+// ─── Delete a country ─────────────────────────────────────────────────────────
+
+export async function deleteCountry(country) {
   await Promise.all([
-    deleteTilesWithPrefix(prefix),
+    deleteCountryFile(country.code),
     deletePOIs(country.code),
     deleteMeta(country.code),
   ]);
 }
 
-/**
- * Check if a lat/lng point is within a country's bbox.
- */
+// ─── Geo helpers ──────────────────────────────────────────────────────────────
+
 export function isPointInCountry(lat, lng, country) {
   const [west, south, east, north] = country.bbox;
   return lat >= south && lat <= north && lng >= west && lng <= east;
 }
 
-/**
- * Find which downloaded countries (from meta map) contain a given point.
- */
 export function getDownloadedCountryAt(lat, lng, metaMap) {
   for (const code of Object.keys(metaMap)) {
     const country = COUNTRIES.find(c => c.code === code);
