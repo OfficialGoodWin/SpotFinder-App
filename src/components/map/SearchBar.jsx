@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, X, Navigation, Mic } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
-import { filterCategories } from '@/lib/POICategories';
+import { filterCategories, getCategoryName } from '@/lib/POICategories';
 
 const MAPY_API_KEY = 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
 
@@ -65,7 +65,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
       setPoiCategories([]);
       return;
     }
-    setPoiCategories(filterCategories(query));
+    setPoiCategories(filterCategories(query, language));
 
     clearTimeout(debounce.current);
     debounce.current = setTimeout(async () => {
@@ -209,7 +209,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
                     <span className="text-lg">{cat.icon}</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 dark:text-foreground truncate">{cat.name}</p>
+                    <p className="text-sm font-medium text-gray-800 dark:text-foreground truncate">{getCategoryName(cat, language)}</p>
                     <p className="text-xs text-gray-400 dark:text-muted-foreground truncate">{cat.desc}</p>
                   </div>
                 </button>

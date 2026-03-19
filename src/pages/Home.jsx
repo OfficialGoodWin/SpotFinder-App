@@ -13,6 +13,7 @@ import UserLocationMarker from '../components/map/UserLocationMarker';
 import MapLayerSwitcher from '../components/map/MapLayerSwitcher';
 import SearchBar from '../components/map/SearchBar';
 import POILayer from '../components/map/POILayer';
+import AmbientPOILayer from '../components/map/AmbientPOILayer';
 import AddSpotModal from '../components/spots/AddSpotModal';
 import EditSpotModal from '../components/spots/EditSpotModal';
 import SpotDetailModal from '../components/spots/SpotDetailModal';
@@ -404,6 +405,15 @@ export default function Home() {
           />
         )}
 
+        {/* Ambient POI layer — shows icons based on zoom without searching */}
+        <AmbientPOILayer
+          selectedCategory={selectedPOICategory}
+          onSelectPOI={(poi, cat) => {
+            setSelectedPOICategory(cat);
+            setSelectedPOI(poi);
+          }}
+        />
+
         {/* POI Layer - shows category-based POIs */}
         <POILayer 
           category={selectedPOICategory}
@@ -608,7 +618,7 @@ export default function Home() {
           poi={selectedPOI}
           category={selectedPOICategory}
           user={user}
-          onClose={() => setSelectedPOI(null)}
+          onClose={() => { setSelectedPOI(null); if (!showPOIPanel) setSelectedPOICategory(null); }}
           onNavigate={(destination) => {
             if (!userPos) return alert(t('home.locationUnavailable'));
             startNavTo(destination);
