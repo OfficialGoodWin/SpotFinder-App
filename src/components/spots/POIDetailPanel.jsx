@@ -83,6 +83,10 @@ async function fetchMapyPhotos(name, lat, lon) {
     if (!sr.ok) return [];
 
     const searchHtml = await sr.text();
+    console.log('[photos] firmy html length:', searchHtml.length);
+    console.log('[photos] firmy html snippet:', searchHtml.slice(0, 500));
+    console.log('[photos] has __NEXT_DATA__:', searchHtml.includes('__NEXT_DATA__'));
+    console.log('[photos] has sdn.cz:', searchHtml.includes('sdn.cz'));
 
     // Try to find firm ID in __NEXT_DATA__ from search results
     const ndMatch = searchHtml.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
