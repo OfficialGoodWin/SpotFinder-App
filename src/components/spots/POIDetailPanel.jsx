@@ -64,6 +64,7 @@ async function fetchMapyPhotos(name, lat, lon) {
     const suggestRes = await fetch(suggestUrl);
     if (!suggestRes.ok) { console.warn('[mapy-photos] suggest failed', suggestRes.status); return []; }
     const items = (await suggestRes.json()).items || [];
+    console.log('[mapy-photos] suggest raw[0]:', JSON.stringify(items[0]));
     console.log('[mapy-photos] suggest items:', items.map(i => ({ name: i.name, source: i.userData?.source || i.source, id: i.userData?.id || i.id, dist: i.position ? Math.hypot(i.position.lat - lat, i.position.lon - lon).toFixed(5) : '?' })));
 
     let best = null, bestDist = Infinity;
