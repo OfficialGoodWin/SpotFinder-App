@@ -5,7 +5,7 @@
 // 1. Old api.mapy.cz suggest (returns userData.source + userData.id)
 // 2. Firmy.cz detail page → __NEXT_DATA__ JSON → sdn.cz photo URLs
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
