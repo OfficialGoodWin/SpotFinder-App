@@ -2,11 +2,6 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "devCommand": "npm run dev",
-  "functions": {
-    "api/mapy-photos.js": {
-      "maxDuration": 15
-    }
-  },
   "headers": [
     {
       "source": "/manifest.json",
