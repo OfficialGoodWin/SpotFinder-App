@@ -24,10 +24,6 @@
   ],
   "rewrites": [
     {
-      "source": "/mapy-suggest",
-      "destination": "https://api.mapy.cz/suggest"
-    },
-    {
       "source": "/firmy-proxy",
       "destination": "https://www.firmy.cz/detail"
     },

@@ -41,8 +41,8 @@ function parseOpenStatus(ohString) {
 }
 
 // ─── Photo fetching ───────────────────────────────────────────────────────────
-// No serverless function needed — Vercel rewrites proxy external URLs through
-// our own domain, so there's no CORS. We parse the HTML client-side.
+
+const MAPY_API_KEY = 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
 
 // 1. OSM tags — instant, zero network calls
 function getTagPhotos(tags = {}) {
@@ -55,75 +55,110 @@ function getTagPhotos(tags = {}) {
   return urls;
 }
 
-// Extract sdn.cz photo URLs from raw HTML text
-function extractSdnUrls(html) {
+// Extract sdn.cz photo URLs from a JSON string or HTML blob
+function extractSdnPhotos(text) {
   const out = [];
-  const re = /https?:\/\/d[\w-]*\.sdn\.cz\/[^\s"'`<>]+\.(?:jpeg|jpg|png|webp)(?:\?[^\s"'`<>]*)?/gi;
+  const re = /https?:\/\/d[\w-]*\.sdn\.cz\/[^\s"'`<>\\]+\.(?:jpeg|jpg|png|webp)/gi;
   let m;
-  while ((m = re.exec(html)) !== null && out.length < 10) {
-    const url = m[0];
-    // Skip tiny placeholders (40px, 80px thumbnails)
-    if (/[,_](40|80|100)[,_]/.test(url)) continue;
-    // Normalise to 1200px wide
-    const base = url.split('?')[0];
+  while ((m = re.exec(text)) !== null) {
+    const base = m[0].split('?')[0];
+    // Skip tiny thumbnails
+    if (/[/_](40|80|100)[/_,]/.test(m[0])) continue;
     const norm = `${base}?fl=res,1200,1200,1`;
     if (!out.includes(norm)) out.push(norm);
+    if (out.length >= 8) break;
   }
   return out;
 }
 
-// 2. Mapy.cz photos via Vercel rewrite proxies (no serverless function)
-//    /mapy-suggest  → https://api.mapy.cz/suggest   (old API, returns userData.source+id)
-//    /firmy-proxy   → https://www.firmy.cz/detail    (Next.js page with __NEXT_DATA__ photos)
+// 2. Mapy.cz via new suggest API + Firmy.cz proxy
+// The new api.mapy.com/v1/suggest returns firm IDs for actual businesses.
+// We proxy www.firmy.cz/detail through Vercel (/firmy-proxy) to avoid CORS,
+// then parse __NEXT_DATA__ JSON from the page for sdn.cz photo URLs.
 async function fetchMapyPhotos(name, lat, lon) {
   try {
-    // Step 1: old suggest API returns userData.source + userData.id
-    const suggestUrl = `/mapy-suggest?phrase=${encodeURIComponent(name)}&count=8&preferNear=${lon},${lat}&preferNearPrecision=300&enableCategories=1&lang=cs`;
-    const sr = await fetch(suggestUrl);
+    // Step 1: new suggest API — works for businesses, returns place data
+    const url = `https://api.mapy.com/v1/suggest?apikey=${MAPY_API_KEY}&query=${encodeURIComponent(name)}&preferNear=${lon},${lat}&preferNearPrecision=300&limit=8&lang=cs&type=poi,firm,base`;
+    const sr = await fetch(url);
     if (!sr.ok) return [];
-    const suggestData = await sr.json();
-    const items = suggestData.result || [];
+    const items = (await sr.json()).items || [];
+    console.log('[photos] suggest items:', items.map(i => ({
+      name: i.name, type: i.type,
+      id: i.id || i.userData?.id,
+      source: i.userData?.source,
+      dist: i.position ? Math.hypot(i.position.lat - lat, i.position.lon - lon).toFixed(5) : '?'
+    })));
 
-    let source = null, placeId = null, bestDist = Infinity;
+    // Find closest item that has a firm ID
+    let firmId = null, bestDist = Infinity;
     for (const item of items) {
-      const ud = item.userData || {};
-      const iLat = ud.latitude;
-      const iLon = ud.longitude;
-      if (!iLat || !iLon || !ud.source) continue;
-      const dist = Math.hypot(iLat - lat, iLon - lon);
-      if (dist < bestDist) { bestDist = dist; source = ud.source; placeId = ud.id; }
-    }
-
-    if (!source || !placeId || bestDist > 0.002) return [];
-
-    // Step 2: fetch Firmy.cz detail page through our proxy — contains __NEXT_DATA__ with photos
-    if (source === 'firm') {
-      const firmRes = await fetch(`/firmy-proxy?id=${placeId}`);
-      if (firmRes.ok) {
-        const html = await firmRes.text();
-        // Parse __NEXT_DATA__ JSON embedded in the page
-        const m = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-        if (m) {
-          try {
-            const photos = extractSdnUrls(m[1]);
-            if (photos.length) return photos;
-          } catch {}
-        }
-        // Fallback: scan raw HTML
-        const photos = extractSdnUrls(html);
-        if (photos.length) return photos;
+      const pos = item.position;
+      if (!pos) continue;
+      const dist = Math.hypot(pos.lat - lat, pos.lon - lon);
+      // Check all possible places the firm ID could live
+      const id = item.userData?.id || (item.type === 'firm' ? item.id : null);
+      const source = item.userData?.source || item.type;
+      if (dist < bestDist && id && source === 'firm') {
+        bestDist = dist;
+        firmId = id;
       }
     }
+    console.log('[photos] firmId:', firmId, 'dist:', bestDist);
+    if (!firmId || bestDist > 0.003) return [];
 
+    // Step 2: fetch Firmy.cz detail page through our Vercel proxy
+    // /firmy-proxy?id=X  →  https://www.firmy.cz/detail?id=X
+    const firmRes = await fetch(`/firmy-proxy?id=${firmId}`);
+    console.log('[photos] firmy status:', firmRes.status);
+    if (!firmRes.ok) return [];
+
+    const html = await firmRes.text();
+
+    // Extract __NEXT_DATA__ — contains all page data as JSON including photos
+    const ndMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    if (ndMatch) {
+      const photos = extractSdnPhotos(ndMatch[1]);
+      console.log('[photos] from __NEXT_DATA__:', photos.length);
+      if (photos.length) return photos;
+    }
+
+    // Fallback: scan entire HTML for sdn.cz URLs
+    const photos = extractSdnPhotos(html);
+    console.log('[photos] from raw HTML scan:', photos.length);
+    return photos;
+  } catch (e) {
+    console.warn('[photos] error:', e);
     return [];
-  } catch { return []; }
+  }
 }
 
-// Main: OSM tags → Mapy.cz rewrite proxy → done
+// Main: OSM tags → Mapy/Firmy.cz → Wikimedia fallback
 async function tryFetchPhotos(name, lat, lon, tags = {}) {
   const tagPhotos = getTagPhotos(tags);
   if (tagPhotos.length) return tagPhotos;
-  return fetchMapyPhotos(name, lat, lon);
+
+  const mapy = await fetchMapyPhotos(name, lat, lon);
+  if (mapy.length) return mapy;
+
+  // Wikimedia fallback for well-known places
+  try {
+    const geoUrl = `https://commons.wikimedia.org/w/api.php?action=query&list=geosearch&gscoord=${lat}|${lon}&gsradius=100&gslimit=5&gsnamespace=6&format=json&origin=*`;
+    const gr = await fetch(geoUrl);
+    if (gr.ok) {
+      const pages = (await gr.json()).query?.geosearch || [];
+      if (pages.length) {
+        const titles = pages.map(p => p.title).join('|');
+        const ir = await fetch(`https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(titles)}&prop=imageinfo&iiprop=url&iiurlwidth=1200&format=json&origin=*`);
+        if (ir.ok) {
+          const imgs = Object.values((await ir.json()).query?.pages || {})
+            .map(p => p.imageinfo?.[0]?.thumburl).filter(Boolean);
+          if (imgs.length) return imgs;
+        }
+      }
+    }
+  } catch {}
+
+  return [];
 }
 
 // ─── Lightbox ─────────────────────────────────────────────────────────────────
