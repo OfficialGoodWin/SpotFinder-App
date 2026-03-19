@@ -78,7 +78,7 @@ function extractSdnPhotos(text) {
 async function fetchMapyPhotos(name, lat, lon) {
   try {
     // Step 1: new suggest API — works for businesses, returns place data
-    const url = `https://api.mapy.com/v1/suggest?apikey=${MAPY_API_KEY}&query=${encodeURIComponent(name)}&preferNear=${lon},${lat}&preferNearPrecision=300&limit=8&lang=cs&type=poi,firm,base`;
+    const url = `https://api.mapy.com/v1/suggest?apikey=${MAPY_API_KEY}&query=${encodeURIComponent(name)}&preferNear=${lon},${lat}&preferNearPrecision=300&limit=8&lang=cs`;
     const sr = await fetch(url);
     if (!sr.ok) return [];
     const items = (await sr.json()).items || [];
