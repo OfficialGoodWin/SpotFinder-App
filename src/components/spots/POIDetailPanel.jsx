@@ -56,37 +56,16 @@ function getTagPhotos(tags = {}) {
   return urls;
 }
 
-// 2. Mapy.cz via our Vercel serverless proxy (avoids CORS)
-// Proxy scrapes mapy.com/en/dopravni?source=X&id=Y and extracts gallery images.
+// 2. Mapy.cz via Vercel serverless proxy
+// Proxy uses the OLD api.mapy.cz suggest (which returns source+id) server-side,
+// then fetches Firmy.cz/Mapy.cz detail pages to extract sdn.cz photo URLs.
 async function fetchMapyPhotos(name, lat, lon) {
   try {
-    const suggestUrl = `https://api.mapy.com/v1/suggest?apikey=${MAPY_API_KEY}&query=${encodeURIComponent(name)}&lat=${lat}&lon=${lon}&limit=5&lang=cs`;
-    const suggestRes = await fetch(suggestUrl);
-    if (!suggestRes.ok) { console.warn('[mapy-photos] suggest failed', suggestRes.status); return []; }
-    const items = (await suggestRes.json()).items || [];
-    console.log('[mapy-photos] suggest raw[0]:', JSON.stringify(items[0]));
-    console.log('[mapy-photos] suggest items:', items.map(i => ({ name: i.name, source: i.userData?.source || i.source, id: i.userData?.id || i.id, dist: i.position ? Math.hypot(i.position.lat - lat, i.position.lon - lon).toFixed(5) : '?' })));
-
-    let best = null, bestDist = Infinity;
-    for (const item of items) {
-      const pos = item.position;
-      if (!pos) continue;
-      const dist = Math.hypot(pos.lat - lat, pos.lon - lon);
-      if (dist < bestDist) { bestDist = dist; best = item; }
-    }
-    if (!best || bestDist > 0.0009) { console.warn('[mapy-photos] no close match, bestDist=', bestDist); return []; }
-
-    const ud = best.userData || {};
-    const source = ud.source || best.source;
-    const id = ud.id || best.id;
-    console.log('[mapy-photos] using source=%s id=%s', source, id);
-    if (!source || !id) return [];
-
-    const proxyUrl = `/api/mapy-photos?source=${encodeURIComponent(source)}&id=${encodeURIComponent(id)}`;
+    const proxyUrl = `/api/mapy-photos?name=${encodeURIComponent(name)}&lat=${lat}&lon=${lon}`;
     const proxyRes = await fetch(proxyUrl);
     if (!proxyRes.ok) { console.warn('[mapy-photos] proxy failed', proxyRes.status); return []; }
     const data = await proxyRes.json();
-    console.log('[mapy-photos] proxy result:', data);
+    console.log('[mapy-photos] result:', data);
     return data.photos || [];
   } catch (e) {
     console.warn('[mapy-photos] error:', e);
