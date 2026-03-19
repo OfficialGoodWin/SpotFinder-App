@@ -41,10 +41,10 @@ function parseOpenStatus(ohString) {
 }
 
 // ─── Photo fetching ───────────────────────────────────────────────────────────
+// Google Places API (needs VITE_GOOGLE_MAPS_KEY env var) → Wikimedia fallback
 
-const MAPY_API_KEY = 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
+const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY || '';
 
-// 1. OSM tags — instant, zero network calls
 function getTagPhotos(tags = {}) {
   const urls = [];
   if (tags.image?.startsWith('http')) urls.push(tags.image);
@@ -55,141 +55,66 @@ function getTagPhotos(tags = {}) {
   return urls;
 }
 
-// Extract sdn.cz photo URLs from a JSON string or HTML blob
-function extractSdnPhotos(text) {
-  const out = [];
-  const re = /https?:\/\/d[\w-]*\.sdn\.cz\/[^\s"'`<>\\]+\.(?:jpeg|jpg|png|webp)/gi;
-  let m;
-  while ((m = re.exec(text)) !== null) {
-    const base = m[0].split('?')[0];
-    // Skip tiny thumbnails
-    if (/[/_](40|80|100)[/_,]/.test(m[0])) continue;
-    const norm = `${base}?fl=res,1200,1200,1`;
-    if (!out.includes(norm)) out.push(norm);
-    if (out.length >= 8) break;
-  }
-  return out;
-}
-
-// 2. Firmy.cz photos — search by name near coordinates, then get detail page
-// Both endpoints proxied through Vercel to avoid CORS.
-async function fetchMapyPhotos(name, lat, lon) {
+async function fetchGooglePhotos(name, lat, lon) {
+  if (!GOOGLE_KEY) return [];
   try {
-    // Step 1: search Firmy.cz for the place by name + coordinates
-    // /firmy-search → https://www.firmy.cz/search
-    const searchUrl = `/firmy-search?query=${encodeURIComponent(name)}&lat=${lat}&lon=${lon}&radius=300`;
-    const sr = await fetch(searchUrl);
-    console.log('[photos] firmy search status:', sr.status);
-    if (!sr.ok) return [];
+    const findRes = await fetch(
+      `https://maps.googleapis.com/maps/api/place/findplacefromtext/json` +
+      `?input=${encodeURIComponent(name)}&inputtype=textquery` +
+      `&locationbias=circle:100@${lat},${lon}` +
+      `&fields=place_id,name,geometry,photos&key=${GOOGLE_KEY}`
+    );
+    if (!findRes.ok) return [];
+    const candidate = (await findRes.json()).candidates?.[0];
+    if (!candidate) return [];
 
-    const searchHtml = await sr.text();
-    console.log('[photos] firmy html length:', searchHtml.length);
-    console.log('[photos] firmy html snippet:', searchHtml.slice(0, 500));
-    console.log('[photos] has __NEXT_DATA__:', searchHtml.includes('__NEXT_DATA__'));
-    console.log('[photos] has sdn.cz:', searchHtml.includes('sdn.cz'));
+    // Reject if too far away (~100m)
+    const cLat = candidate.geometry?.location?.lat;
+    const cLon = candidate.geometry?.location?.lng;
+    if (!cLat || Math.hypot(cLat - lat, cLon - lon) > 0.001) return [];
 
-    // Try to find firm ID in __NEXT_DATA__ from search results
-    const ndMatch = searchHtml.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-    let firmId = null;
-
-    if (ndMatch) {
-      try {
-        const nd = JSON.parse(ndMatch[1]);
-        // Walk the data to find the first firm with a close match
-        firmId = findFirmId(nd, name, lat, lon);
-        console.log('[photos] firmId from search __NEXT_DATA__:', firmId);
-      } catch {}
+    let photos = candidate.photos || [];
+    if (!photos.length && candidate.place_id) {
+      const dr = await fetch(
+        `https://maps.googleapis.com/maps/api/place/details/json` +
+        `?place_id=${candidate.place_id}&fields=photos&key=${GOOGLE_KEY}`
+      );
+      if (dr.ok) photos = (await dr.json()).result?.photos || [];
     }
-
-    // Also try regex scanning for firm IDs in search page
-    if (!firmId) {
-      const idMatch = searchHtml.match(/"id"\s*:\s*(\d{6,})/);
-      if (idMatch) firmId = idMatch[1];
-      console.log('[photos] firmId from regex:', firmId);
-    }
-
-    if (!firmId) {
-      // No firm found — try extracting photos directly from search results page
-      const photos = extractSdnPhotos(ndMatch?.[1] || searchHtml);
-      console.log('[photos] direct from search page:', photos.length);
-      return photos;
-    }
-
-    // Step 2: fetch firm detail page for full photo gallery
-    const detailRes = await fetch(`/firmy-detail?id=${firmId}`);
-    console.log('[photos] firmy detail status:', detailRes.status);
-    if (!detailRes.ok) return [];
-
-    const detailHtml = await detailRes.text();
-    const dndMatch = detailHtml.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-    if (dndMatch) {
-      const photos = extractSdnPhotos(dndMatch[1]);
-      console.log('[photos] from detail __NEXT_DATA__:', photos.length);
-      if (photos.length) return photos;
-    }
-
-    const photos = extractSdnPhotos(detailHtml);
-    console.log('[photos] from detail raw scan:', photos.length);
-    return photos;
-  } catch (e) {
-    console.warn('[photos] error:', e);
-    return [];
-  }
+    return photos.slice(0, 8).map(p =>
+      `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photo_reference=${p.photo_reference}&key=${GOOGLE_KEY}`
+    );
+  } catch { return []; }
 }
 
-// Walk a parsed JSON object looking for a firm ID near our coordinates
-function findFirmId(obj, name, lat, lon, depth = 0) {
-  if (depth > 10 || !obj || typeof obj !== 'object') return null;
-  if (Array.isArray(obj)) {
-    for (const item of obj) {
-      const r = findFirmId(item, name, lat, lon, depth + 1);
-      if (r) return r;
-    }
-    return null;
-  }
-  // Look for objects that have an id + latitude + longitude
-  if (obj.id && (obj.latitude || obj.lat) && (obj.longitude || obj.lon)) {
-    const iLat = obj.latitude || obj.lat;
-    const iLon = obj.longitude || obj.lon;
-    const dist = Math.hypot(iLat - lat, iLon - lon);
-    if (dist < 0.005) return String(obj.id);
-  }
-  for (const val of Object.values(obj)) {
-    if (val && typeof val === 'object') {
-      const r = findFirmId(val, name, lat, lon, depth + 1);
-      if (r) return r;
-    }
-  }
-  return null;
+async function fetchWikimediaPhotos(lat, lon) {
+  try {
+    const r = await fetch(
+      `https://commons.wikimedia.org/w/api.php?action=query&list=geosearch` +
+      `&gscoord=${lat}|${lon}&gsradius=100&gslimit=5&gsnamespace=6&format=json&origin=*`
+    );
+    if (!r.ok) return [];
+    const pages = (await r.json()).query?.geosearch || [];
+    if (!pages.length) return [];
+    const titles = pages.map(p => p.title).join('|');
+    const ir = await fetch(
+      `https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(titles)}` +
+      `&prop=imageinfo&iiprop=url&iiurlwidth=1200&format=json&origin=*`
+    );
+    if (!ir.ok) return [];
+    return Object.values((await ir.json()).query?.pages || {})
+      .map(p => p.imageinfo?.[0]?.thumburl).filter(Boolean);
+  } catch { return []; }
 }
 
-// Main: OSM tags → Mapy/Firmy.cz → Wikimedia fallback
 async function tryFetchPhotos(name, lat, lon, tags = {}) {
   const tagPhotos = getTagPhotos(tags);
   if (tagPhotos.length) return tagPhotos;
-
-  const mapy = await fetchMapyPhotos(name, lat, lon);
-  if (mapy.length) return mapy;
-
-  // Wikimedia fallback for well-known places
-  try {
-    const geoUrl = `https://commons.wikimedia.org/w/api.php?action=query&list=geosearch&gscoord=${lat}|${lon}&gsradius=100&gslimit=5&gsnamespace=6&format=json&origin=*`;
-    const gr = await fetch(geoUrl);
-    if (gr.ok) {
-      const pages = (await gr.json()).query?.geosearch || [];
-      if (pages.length) {
-        const titles = pages.map(p => p.title).join('|');
-        const ir = await fetch(`https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(titles)}&prop=imageinfo&iiprop=url&iiurlwidth=1200&format=json&origin=*`);
-        if (ir.ok) {
-          const imgs = Object.values((await ir.json()).query?.pages || {})
-            .map(p => p.imageinfo?.[0]?.thumburl).filter(Boolean);
-          if (imgs.length) return imgs;
-        }
-      }
-    }
-  } catch {}
-
-  return [];
+  if (GOOGLE_KEY) {
+    const google = await fetchGooglePhotos(name, lat, lon);
+    if (google.length) return google;
+  }
+  return fetchWikimediaPhotos(lat, lon);
 }
 
 // ─── Lightbox ─────────────────────────────────────────────────────────────────
