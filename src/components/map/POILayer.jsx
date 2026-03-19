@@ -30,29 +30,10 @@ const createPOIIcon = (emoji, color, zoom) => {
   return icon;
 };
 
-// ─── Overpass mirrors ─────────────────────────────────────────────────────────
-const OVERPASS_MIRRORS = [
-  'https://overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-  'https://overpass.private.coffee/api/interpreter',
-];
+// ─── Geoapify fallback (browser-friendly CORS, free 3k credits/day) ──────────
+// Set VITE_GEOAPIFY_KEY in your Vercel env vars. Free key: geoapify.com
 
-async function fetchOverpass(queryStr, signal) {
-  for (const endpoint of OVERPASS_MIRRORS) {
-    try {
-      const res = await fetch(endpoint, {
-        method: 'POST', body: queryStr, signal,
-        headers: { 'Content-Type': 'text/plain' },
-      });
-      if (res.ok) return res;
-    } catch (err) {
-      if (err.name === 'AbortError') throw err;
-    }
-  }
-  throw new Error('All Overpass mirrors failed');
-}
-
-// ─── Geoapify ─────────────────────────────────────────────────────────────────
+// ─── Geoapify (kept for users who supply their own key) ───────────────────────
 const GEOAPIFY_KEY = import.meta.env.VITE_GEOAPIFY_KEY || '';
 
 async function fetchGeoapify(category, south, west, north, east, limit, signal) {
@@ -170,29 +151,15 @@ export default function POILayer({ category, onNavigate, onPOIsLoaded, onLoading
             category.geoapifyCategory, south, west, north, east,
             fetchLimit, abortControllerRef.current.signal
           );
+        } else if (GEOAPIFY_KEY) {
+          // Geoapify Places API — bbox search, CORS-friendly, free tier available
+          poiList = await fetchGeoapify(
+            category.geoapifyCategory || 'leisure', south, west, north, east,
+            fetchLimit, abortControllerRef.current.signal
+          );
         } else {
-          const osmTag = category.osmTag;
-          const eqIdx = osmTag.indexOf('=');
-          const tagFilter = eqIdx !== -1
-            ? `["${osmTag.slice(0, eqIdx)}"="${osmTag.slice(eqIdx + 1)}"]`
-            : `["${osmTag}"]`;
-          const query = `[out:json][timeout:15];(node${tagFilter}(${south},${west},${north},${east});way${tagFilter}(${south},${west},${north},${east}););out center ${fetchLimit};`;
-          const res = await fetchOverpass(query, abortControllerRef.current.signal);
-          const text = await res.text();
-          if (!text.trim().startsWith('{')) throw new Error('Invalid Overpass response');
-          const data = JSON.parse(text);
-          poiList = data.elements.map(el => {
-            const lat = el.lat || el.center?.lat;
-            const lon = el.lon || el.center?.lon;
-            if (!lat || !lon) return null;
-            return {
-              id: el.id, lat, lon,
-              name: el.tags?.name || category.name,
-              address: el.tags?.['addr:street']
-                ? `${el.tags['addr:street']} ${el.tags['addr:housenumber'] || ''}`.trim() : '',
-              tags: el.tags || {},
-            };
-          }).filter(Boolean);
+          // No API key configured — POI search unavailable
+          console.warn('POILayer: set VITE_GEOAPIFY_KEY to enable POI search');
         }
 
         const distributed = distributeEvenly(poiList, south, west, north, east);
