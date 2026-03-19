@@ -2,20 +2,24 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "devCommand": "npm run dev",
-  "headers": [
+  "functions": {
+    "api/mapy-photos.js": {
+      "maxDuration": 15
+    }
+  },
+  "routes": [
     {
-      "source": "/manifest.json",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=3600" }]
+      "src": "/api/mapy-photos",
+      "dest": "/api/mapy-photos.js"
     },
     {
-      "source": "/assets/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
-    }
-  ],
-  "rewrites": [
+      "src": "/assets/(.*)",
+      "headers": { "cache-control": "public, max-age=31536000, immutable" },
+      "dest": "/assets/$1"
+    },
     {
-      "source": "/((?!api/).*)",
-      "destination": "/index.html"
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 }
