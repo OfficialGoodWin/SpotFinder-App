@@ -62,8 +62,9 @@ async function fetchMapyPhotos(name, lat, lon) {
   try {
     const suggestUrl = `https://api.mapy.com/v1/suggest?apikey=${MAPY_API_KEY}&query=${encodeURIComponent(name)}&lat=${lat}&lon=${lon}&limit=5&lang=cs`;
     const suggestRes = await fetch(suggestUrl);
-    if (!suggestRes.ok) return [];
+    if (!suggestRes.ok) { console.warn('[mapy-photos] suggest failed', suggestRes.status); return []; }
     const items = (await suggestRes.json()).items || [];
+    console.log('[mapy-photos] suggest items:', items.map(i => ({ name: i.name, source: i.userData?.source || i.source, id: i.userData?.id || i.id, dist: i.position ? Math.hypot(i.position.lat - lat, i.position.lon - lon).toFixed(5) : '?' })));
 
     let best = null, bestDist = Infinity;
     for (const item of items) {
@@ -72,19 +73,22 @@ async function fetchMapyPhotos(name, lat, lon) {
       const dist = Math.hypot(pos.lat - lat, pos.lon - lon);
       if (dist < bestDist) { bestDist = dist; best = item; }
     }
-    if (!best || bestDist > 0.0009) return [];
+    if (!best || bestDist > 0.0009) { console.warn('[mapy-photos] no close match, bestDist=', bestDist); return []; }
 
     const ud = best.userData || {};
     const source = ud.source || best.source;
     const id = ud.id || best.id;
+    console.log('[mapy-photos] using source=%s id=%s', source, id);
     if (!source || !id) return [];
 
     const proxyUrl = `/api/mapy-photos?source=${encodeURIComponent(source)}&id=${encodeURIComponent(id)}`;
     const proxyRes = await fetch(proxyUrl);
-    if (!proxyRes.ok) return [];
+    if (!proxyRes.ok) { console.warn('[mapy-photos] proxy failed', proxyRes.status); return []; }
     const data = await proxyRes.json();
+    console.log('[mapy-photos] proxy result:', data);
     return data.photos || [];
-  } catch {
+  } catch (e) {
+    console.warn('[mapy-photos] error:', e);
     return [];
   }
 }
