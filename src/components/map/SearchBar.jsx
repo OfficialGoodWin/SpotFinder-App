@@ -1,11 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Search, X, Navigation, Mic, MicOff } from 'lucide-react';
+import { Search, X, Navigation, Mic } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { filterCategories } from '@/lib/POICategories';
 
 const MAPY_API_KEY = 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
 
-// BCP-47 locale for each supported app language
 const LANG_TO_BCP47 = {
   en: 'en-US', cs: 'cs-CZ', pl: 'pl-PL', de: 'de-DE', sk: 'sk-SK',
   it: 'it-IT', fr: 'fr-FR', ru: 'ru-RU', uk: 'uk-UA', hu: 'hu-HU',
@@ -36,21 +35,38 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
   const debounce = useRef(null);
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
-
-  // Re-create recognition with the current language whenever it changes
+  const containerRef = useRef(null);
   const bcp47 = LANG_TO_BCP47[language] || 'en-US';
 
+  // Close dropdown when clicking/touching outside
   useEffect(() => {
-    if (!query.trim()) { 
-      setResults([]); 
+    const handleOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        closeDropdown();
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('touchstart', handleOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('touchstart', handleOutside);
+    };
+  }, []);
+
+  const closeDropdown = () => {
+    setResults([]);
+    setPoiCategories([]);
+    setFocused(false);
+  };
+
+  useEffect(() => {
+    if (!query.trim()) {
+      setResults([]);
       setPoiCategories([]);
-      return; 
+      return;
     }
-    
-    // Filter POI categories
-    const filteredPOI = filterCategories(query);
-    setPoiCategories(filteredPOI);
-    
+    setPoiCategories(filterCategories(query));
+
     clearTimeout(debounce.current);
     debounce.current = setTimeout(async () => {
       setLoading(true);
@@ -69,17 +85,15 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
     const pos = item.position || item.regionalStructure?.[0];
     if (pos) onSelect({ lat: pos.lat, lng: pos.lon || pos.lng, label: item.name || item.label });
     setQuery(item.name || item.label || '');
-    setResults([]);
-    setPoiCategories([]);
+    closeDropdown();
     inputRef.current?.blur();
   };
 
   const handleSelectCategory = (category) => {
     if (onSelectCategory) {
       onSelectCategory(category);
-      setQuery(category.name);
-      setResults([]);
-      setPoiCategories([]);
+      setQuery('');
+      closeDropdown();
       inputRef.current?.blur();
     }
   };
@@ -88,8 +102,6 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) { alert(t('addSpot.voiceNotSupported')); return; }
     if (recognitionRef.current) recognitionRef.current.abort();
-
-    // Check microphone availability before starting
     setMicError('');
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
@@ -97,16 +109,12 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
       if (!hasMic) { setMicError('Error: no microphone detected'); return; }
       await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (err) {
-      if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        setMicError('Error: no microphone detected');
-      } else {
-        setMicError('Error: microphone permission was not allowed');
-      }
+      setMicError(err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError'
+        ? 'Error: no microphone detected'
+        : 'Error: microphone permission was not allowed');
       return;
     }
-
     const rec = new SpeechRecognition();
-    // KEY FIX: use current language locale, not hardcoded en-US
     rec.lang = bcp47;
     rec.interimResults = true;
     rec.maxAlternatives = 1;
@@ -116,11 +124,9 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
     rec.onerror = (e) => {
       setListening(false);
       if (e.error === 'no-speech') return;
-      if (e.error === 'audio-capture' || e.error === 'not-allowed') {
-        setMicError(e.error === 'not-allowed'
-          ? 'Error: microphone permission was not allowed'
-          : 'Error: no microphone detected');
-      }
+      setMicError(e.error === 'not-allowed'
+        ? 'Error: microphone permission was not allowed'
+        : 'Error: no microphone detected');
     };
     rec.onresult = (e) => {
       let transcript = '';
@@ -137,32 +143,37 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
     else startListening();
   };
 
+  const showDropdown = focused && (poiCategories.length > 0 || results.length > 0 || (loading && !!query));
+
   return (
-    <div className="absolute top-4 left-4 z-[1002]" style={{ right: '3.75rem' }}>
+    <div ref={containerRef} className="absolute top-4 left-4 z-[1002]" style={{ right: '3.75rem' }}>
       <div className={`bg-white dark:bg-card rounded-2xl shadow-lg border transition-all ${focused ? 'border-blue-400 dark:border-blue-500' : 'border-gray-200 dark:border-border'}`}>
         <div className="flex items-center px-3 gap-1.5">
           <Search className="w-4 h-4 text-gray-400 dark:text-muted-foreground flex-shrink-0" />
-          <input ref={inputRef} value={query}
+          <input
+            ref={inputRef}
+            value={query}
             onChange={e => setQuery(e.target.value)}
             onFocus={() => setFocused(true)}
-            onBlur={() => setTimeout(() => setFocused(false), 150)}
             placeholder={t('search.placeholder')}
             className="flex-1 py-3 text-sm outline-none bg-transparent text-gray-800 dark:text-foreground placeholder-gray-400 dark:placeholder-muted-foreground min-w-0"
           />
           {query && (
-            <button onClick={() => { setQuery(''); setResults([]); setPoiCategories([]); }} className="p-1 flex-shrink-0">
+            <button onClick={() => { setQuery(''); closeDropdown(); }} className="p-1 flex-shrink-0">
               <X className="w-3.5 h-3.5 text-gray-400 dark:text-muted-foreground" />
             </button>
           )}
-          <button onMouseDown={e => { e.preventDefault(); toggleMic(); }}
+          <button
+            onMouseDown={e => { e.preventDefault(); toggleMic(); }}
             className={`p-1.5 rounded-lg flex-shrink-0 transition-colors ${listening ? 'bg-red-500 text-white' : 'text-gray-400 dark:text-muted-foreground hover:text-gray-600'}`}
-            title={listening ? t('search.voiceStop') : t('search.voiceSearch')}>
-            {listening ? <Mic className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          >
+            <Mic className="w-4 h-4" />
           </button>
           <div className="w-px h-5 bg-gray-200 dark:bg-border flex-shrink-0" />
-          <button onClick={onToggleSpots}
-            title={showSpots ? t('search.hideSpots') : t('search.showSpots')}
-            className={`px-2 py-1.5 rounded-lg flex-shrink-0 transition-all active:scale-95 ${showSpots ? 'text-primary bg-primary/10' : 'text-gray-500 dark:text-muted-foreground hover:text-gray-700'}`}>
+          <button
+            onClick={onToggleSpots}
+            className={`px-2 py-1.5 rounded-lg flex-shrink-0 transition-all active:scale-95 ${showSpots ? 'text-primary bg-primary/10' : 'text-gray-500 dark:text-muted-foreground hover:text-gray-700'}`}
+          >
             <SpotsBtnIcon />
           </button>
         </div>
@@ -184,16 +195,17 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
           </div>
         )}
 
-        {(poiCategories.length > 0 || results.length > 0) && (
-          <div className="border-t border-gray-100 dark:border-border max-h-64 overflow-y-auto rounded-b-2xl">
-            {/* POI Categories */}
+        {showDropdown && (
+          <div className="border-t border-gray-100 dark:border-border max-h-64 overflow-y-auto rounded-b-2xl bg-white dark:bg-card">
             {poiCategories.map((cat, i) => (
               <div key={`cat-${i}`} className="flex items-center hover:bg-gray-50 dark:hover:bg-accent transition-colors">
-                <button onMouseDown={() => handleSelectCategory(cat)} className="flex-1 text-left px-4 py-2.5 flex items-center gap-3">
-                  <div 
-                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ background: `${cat.color}20`, color: cat.color }}
-                  >
+                <button
+                  onMouseDown={e => { e.preventDefault(); handleSelectCategory(cat); }}
+                  onTouchEnd={e => { e.preventDefault(); handleSelectCategory(cat); }}
+                  className="flex-1 text-left px-4 py-2.5 flex items-center gap-3"
+                >
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ background: `${cat.color}20`, color: cat.color }}>
                     <span className="text-lg">{cat.icon}</span>
                   </div>
                   <div className="flex-1 min-w-0">
@@ -203,31 +215,37 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
                 </button>
               </div>
             ))}
-            
-            {/* Geocoding Results */}
+
             {results.map((item, i) => {
               const pos = item.position || item.regionalStructure?.[0];
               return (
                 <div key={`geo-${i}`} className="flex items-center hover:bg-gray-50 dark:hover:bg-accent transition-colors">
-                  <button onMouseDown={() => handleSelect(item)} className="flex-1 text-left px-4 py-2.5">
+                  <button
+                    onMouseDown={e => { e.preventDefault(); handleSelect(item); }}
+                    onTouchEnd={e => { e.preventDefault(); handleSelect(item); }}
+                    className="flex-1 text-left px-4 py-2.5"
+                  >
                     <p className="text-sm font-medium text-gray-800 dark:text-foreground truncate">{item.name || item.label}</p>
                     <p className="text-xs text-gray-400 dark:text-muted-foreground truncate">
                       {item.location || item.regionalStructure?.map(r => r.name).join(', ')}
                     </p>
                   </button>
                   {pos && onNavigate && (
-                    <button onMouseDown={e => { e.stopPropagation(); onNavigate({ lat: pos.lat, lng: pos.lon || pos.lng, label: item.name || item.label }); }}
-                      className="px-3 py-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-accent transition-colors" title="Navigate">
+                    <button
+                      onMouseDown={e => { e.preventDefault(); e.stopPropagation(); onNavigate({ lat: pos.lat, lng: pos.lon || pos.lng, label: item.name || item.label }); closeDropdown(); }}
+                      className="px-3 py-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-accent transition-colors"
+                    >
                       <Navigation className="w-5 h-5" />
                     </button>
                   )}
                 </div>
               );
             })}
+
+            {loading && !!query && !results.length && !poiCategories.length && (
+              <div className="px-4 py-2 text-xs text-gray-400 dark:text-muted-foreground">{t('search.searching')}</div>
+            )}
           </div>
-        )}
-        {loading && query && !results.length && (
-          <div className="px-4 py-2 text-xs text-gray-400 dark:text-muted-foreground border-t border-gray-100 dark:border-border rounded-b-2xl">{t('search.searching')}</div>
         )}
       </div>
     </div>

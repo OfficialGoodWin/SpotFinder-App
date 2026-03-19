@@ -276,7 +276,7 @@ export default function SpotsPanel({
         </MobileSheet>
       </div>
 
-      {/* ── DESKTOP ── */}
+      {/* ─ DESKTOP ── */}
       <div
         className="hidden md:block absolute z-[1002] rounded-2xl shadow-2xl border border-gray-100 dark:border-border bg-white dark:bg-card overflow-hidden"
         style={{ top: '5rem', left: '1rem', width: 340 }}

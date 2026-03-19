@@ -257,6 +257,61 @@ export const submitCategoryRatings = async (spotId, currentSpot, ratings) => {
   return { ...currentSpot, ...updates };
 };
  
+// ─── POI Community Data ───────────────────────────────────────────────────────
+// Stable ID for any OSM POI: "lat4_lon4_slug"
+export const makePOIId = (lat, lon, name) =>
+  `${lat.toFixed(4)}_${lon.toFixed(4)}_${(name || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20)}`;
+
+const POI_PHOTOS_COLLECTION  = 'poi_photos';
+const POI_RATINGS_COLLECTION = 'poi_ratings';
+
+// Photos
+export const getPOIPhotos = async (poiId) => {
+  const { db } = getFirebaseServices();
+  const q = query(
+    collection(db, POI_PHOTOS_COLLECTION),
+    where('poi_id', '==', poiId),
+    orderBy('created_date', 'desc'),
+    limit(20)
+  );
+  return (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
+};
+
+export const addPOIPhoto = async (poiId, imageDataUrl, userEmail) => {
+  const { db } = getFirebaseServices();
+  const docRef = await addDoc(collection(db, POI_PHOTOS_COLLECTION), {
+    poi_id: poiId,
+    image: imageDataUrl,
+    created_by: userEmail || 'anonymous',
+    created_date: new Date().toISOString(),
+  });
+  return { id: docRef.id, poi_id: poiId, image: imageDataUrl };
+};
+
+// Ratings
+export const getPOIRatings = async (poiId) => {
+  const { db } = getFirebaseServices();
+  const q = query(
+    collection(db, POI_RATINGS_COLLECTION),
+    where('poi_id', '==', poiId),
+    orderBy('created_date', 'desc'),
+    limit(100)
+  );
+  return (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
+};
+
+export const addPOIRating = async (poiId, rating, reviewText, userEmail) => {
+  const { db } = getFirebaseServices();
+  const docRef = await addDoc(collection(db, POI_RATINGS_COLLECTION), {
+    poi_id: poiId,
+    rating,
+    review: reviewText || '',
+    created_by: userEmail || 'anonymous',
+    created_date: new Date().toISOString(),
+  });
+  return { id: docRef.id };
+};
+
 export const base44 = {
   auth: {
     me: async () => {

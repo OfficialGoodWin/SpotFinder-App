@@ -23,6 +23,8 @@ import AuthModal from '../components/auth/AuthModal';
 import MySpotsPanel from '../components/spots/MySpotsPanel';
 
 import SpotsPanel from '../components/spots/SpotsPanel';
+import POIPanel from '../components/spots/POIPanel';
+import POIDetailPanel from '../components/spots/POIDetailPanel';
 import SettingsModal from '../components/SettingsModal';
 import ProfileMenu from '../components/ProfileMenu';
  
@@ -136,6 +138,10 @@ export default function Home() {
   const [zoomToArea, setZoomToArea] = useState(null);
   const [deleteInput, setDeleteInput] = useState('');
   const [selectedPOICategory, setSelectedPOICategory] = useState(null);
+  const [currentPOIs, setCurrentPOIs] = useState([]);
+  const [showPOIPanel, setShowPOIPanel] = useState(false);
+  const [selectedPOI, setSelectedPOI] = useState(null);
+  const [poiLoading, setPoiLoading] = useState(false);
   const mapRef = useRef(null);
  
  
@@ -340,10 +346,10 @@ export default function Home() {
             ? '&copy; <a href="https://carto.com">CARTO</a> &copy; <a href="https://osm.org/copyright">OpenStreetMap</a>'
             : '&copy; <a href="https://mapy.com">Mapy.cz</a>'}
           maxZoom={20}
-          maxNativeZoom={useCartoTile ? 19 : 19}
-          keepBuffer={4}
+          maxNativeZoom={19}
+          keepBuffer={6}
           updateWhenIdle={false}
-          updateWhenZooming={true}
+          updateWhenZooming={false}
           crossOrigin="anonymous"
           errorTileUrl="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
         />
@@ -366,10 +372,10 @@ export default function Home() {
             errorTileUrl="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
           />
         )}
-        {/* Road closure markers — shown on traffic layer when TomTom key is set */}
+        {/* Road closure markers — shown on traffic layer when TomTom key is set AND no POI category selected */}
         <RoadClosureLayer
           apiKey={TOMTOM_API_KEY}
-          enabled={mapLayer === 'traffic'}
+          enabled={mapLayer === 'traffic' && !selectedPOICategory}
           lang={language}
           t={t}
         />
@@ -405,6 +411,9 @@ export default function Home() {
             if (!userPos) return alert(t('home.locationUnavailable'));
             startNavTo(destination);
           }}
+          onPOIsLoaded={(pois) => setCurrentPOIs(pois)}
+          onLoadingChange={(loading) => setPoiLoading(loading)}
+          onSelectPOI={(poi) => setSelectedPOI(poi)}
         />
       </MapContainer>
  
@@ -420,10 +429,12 @@ export default function Home() {
         }}
         onSelectCategory={(category) => {
           setSelectedPOICategory(category);
-          // Zoom out to show 30km radius
-          const center = mapRef.current?.getCenter();
-          if (center && mapRef.current) {
-            mapRef.current.setView(center, Math.max(12, category.minZoom - 2), { animate: true });
+          setShowPOIPanel(true);
+          // Zoom to level 14 so POILayer's minZoom check passes and the
+          // Overpass bounding box is small enough to return results
+          if (mapRef.current) {
+            const center = mapRef.current.getCenter();
+            mapRef.current.setView(center, 14, { animate: true, duration: 1 });
           }
         }}
       />
@@ -573,6 +584,35 @@ export default function Home() {
           user={user}
           onClose={() => setShowMySpots(false)}
           onFlyTo={(pos) => setFlyTo(pos)}
+        />
+      )}
+
+      {showPOIPanel && selectedPOICategory && (
+        <POIPanel
+          pois={currentPOIs}
+          category={selectedPOICategory}
+          userPos={userPos}
+          loading={poiLoading}
+          onFlyTo={(pos) => setFlyTo(pos)}
+          onNavigate={(poi) => {
+            if (!userPos) return alert(t('home.locationUnavailable'));
+            startNavTo({ lat: poi.lat, lng: poi.lon, label: poi.name });
+          }}
+          onSelect={(poi) => setSelectedPOI(poi)}
+          onClose={() => { setShowPOIPanel(false); setSelectedPOICategory(null); setSelectedPOI(null); }}
+        />
+      )}
+
+      {selectedPOI && selectedPOICategory && (
+        <POIDetailPanel
+          poi={selectedPOI}
+          category={selectedPOICategory}
+          user={user}
+          onClose={() => setSelectedPOI(null)}
+          onNavigate={(destination) => {
+            if (!userPos) return alert(t('home.locationUnavailable'));
+            startNavTo(destination);
+          }}
         />
       )}
  
