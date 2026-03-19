@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Navigation, Share2, Camera, Star, Phone, Mail, Globe, MapPin, ChevronUp, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getPOIPhotos, getPOIRatings, addPOIPhoto, addPOIRating, uploadSpotImage, makePOIId } from '@/api/firebaseClient';
 
-const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY || '';
 
 // ─── OSM tag helpers ──────────────────────────────────────────────────────────
 function getPhone(tags = {}) { return tags.phone || tags['contact:phone'] || tags['contact:mobile'] || null; }
@@ -42,13 +41,13 @@ function parseOpenStatus(ohString) {
 }
 
 // ─── Photo fetching ───────────────────────────────────────────────────────────
+// No serverless function needed — Vercel rewrites proxy external URLs through
+// our own domain, so there's no CORS. We parse the HTML client-side.
 
-const MAPY_API_KEY = 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
-
-// 1. OSM tags — instant, exact, no API call needed
+// 1. OSM tags — instant, zero network calls
 function getTagPhotos(tags = {}) {
   const urls = [];
-  if (tags.image && tags.image.startsWith('http')) urls.push(tags.image);
+  if (tags.image?.startsWith('http')) urls.push(tags.image);
   if (tags.wikimedia_commons?.startsWith('File:')) {
     const file = tags.wikimedia_commons.replace('File:', '');
     urls.push(`https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}?width=1200`);
@@ -56,64 +55,75 @@ function getTagPhotos(tags = {}) {
   return urls;
 }
 
-// 2. Mapy.cz via Vercel serverless proxy
-// Proxy uses the OLD api.mapy.cz suggest (which returns source+id) server-side,
-// then fetches Firmy.cz/Mapy.cz detail pages to extract sdn.cz photo URLs.
-async function fetchMapyPhotos(name, lat, lon) {
-  try {
-    const proxyUrl = `/api/mapy-photos?name=${encodeURIComponent(name)}&lat=${lat}&lon=${lon}`;
-    const proxyRes = await fetch(proxyUrl);
-    if (!proxyRes.ok) { console.warn('[mapy-photos] proxy failed', proxyRes.status); return []; }
-    const data = await proxyRes.json();
-    console.log('[mapy-photos] result:', data);
-    return data.photos || [];
-  } catch (e) {
-    console.warn('[mapy-photos] error:', e);
-    return [];
+// Extract sdn.cz photo URLs from raw HTML text
+function extractSdnUrls(html) {
+  const out = [];
+  const re = /https?:\/\/d[\w-]*\.sdn\.cz\/[^\s"'`<>]+\.(?:jpeg|jpg|png|webp)(?:\?[^\s"'`<>]*)?/gi;
+  let m;
+  while ((m = re.exec(html)) !== null && out.length < 10) {
+    const url = m[0];
+    // Skip tiny placeholders (40px, 80px thumbnails)
+    if (/[,_](40|80|100)[,_]/.test(url)) continue;
+    // Normalise to 1200px wide
+    const base = url.split('?')[0];
+    const norm = `${base}?fl=res,1200,1200,1`;
+    if (!out.includes(norm)) out.push(norm);
   }
+  return out;
 }
 
-// 3. Google Places fallback — strict name + distance guard
-async function fetchGooglePhotos(name, lat, lon) {
-  if (!GOOGLE_API_KEY) return [];
+// 2. Mapy.cz photos via Vercel rewrite proxies (no serverless function)
+//    /mapy-suggest  → https://api.mapy.cz/suggest   (old API, returns userData.source+id)
+//    /firmy-proxy   → https://www.firmy.cz/detail    (Next.js page with __NEXT_DATA__ photos)
+async function fetchMapyPhotos(name, lat, lon) {
   try {
-    const findUrl = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(name)}&inputtype=textquery&locationbias=circle:30@${lat},${lon}&fields=place_id,name,geometry,photos&key=${GOOGLE_API_KEY}`;
-    const res = await fetch(findUrl);
-    if (!res.ok) return [];
-    const candidate = (await res.json()).candidates?.[0];
-    if (!candidate) return [];
-    const cLat = candidate.geometry?.location?.lat;
-    const cLon = candidate.geometry?.location?.lng;
-    if (!cLat || !cLon || Math.hypot(cLat - lat, cLon - lon) > 0.0007) return [];
-    // Name word match guard
-    const norm = s => s.toLowerCase().replace(/[^a-z0-9 ]/g, '');
-    const qWords = norm(name).split(' ').filter(w => w.length > 2);
-    if (qWords.length > 0 && !qWords.some(w => norm(candidate.name || '').includes(w))) return [];
-    let photos = candidate.photos || [];
-    if (!photos.length && candidate.place_id) {
-      const dr = await fetch(`https://maps.googleapis.com/maps/api/place/details/json?place_id=${candidate.place_id}&fields=photos&key=${GOOGLE_API_KEY}`);
-      if (dr.ok) photos = (await dr.json()).result?.photos || [];
+    // Step 1: old suggest API returns userData.source + userData.id
+    const suggestUrl = `/mapy-suggest?phrase=${encodeURIComponent(name)}&count=8&preferNear=${lon},${lat}&preferNearPrecision=300&enableCategories=1&lang=cs`;
+    const sr = await fetch(suggestUrl);
+    if (!sr.ok) return [];
+    const suggestData = await sr.json();
+    const items = suggestData.result || [];
+
+    let source = null, placeId = null, bestDist = Infinity;
+    for (const item of items) {
+      const ud = item.userData || {};
+      const iLat = ud.latitude;
+      const iLon = ud.longitude;
+      if (!iLat || !iLon || !ud.source) continue;
+      const dist = Math.hypot(iLat - lat, iLon - lon);
+      if (dist < bestDist) { bestDist = dist; source = ud.source; placeId = ud.id; }
     }
-    return photos.slice(0, 8).map(p =>
-      `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photo_reference=${p.photo_reference}&key=${GOOGLE_API_KEY}`
-    );
+
+    if (!source || !placeId || bestDist > 0.002) return [];
+
+    // Step 2: fetch Firmy.cz detail page through our proxy — contains __NEXT_DATA__ with photos
+    if (source === 'firm') {
+      const firmRes = await fetch(`/firmy-proxy?id=${placeId}`);
+      if (firmRes.ok) {
+        const html = await firmRes.text();
+        // Parse __NEXT_DATA__ JSON embedded in the page
+        const m = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+        if (m) {
+          try {
+            const photos = extractSdnUrls(m[1]);
+            if (photos.length) return photos;
+          } catch {}
+        }
+        // Fallback: scan raw HTML
+        const photos = extractSdnUrls(html);
+        if (photos.length) return photos;
+      }
+    }
+
+    return [];
   } catch { return []; }
 }
 
-// Main: OSM tags → Mapy.cz → Google → nothing
+// Main: OSM tags → Mapy.cz rewrite proxy → done
 async function tryFetchPhotos(name, lat, lon, tags = {}) {
   const tagPhotos = getTagPhotos(tags);
   if (tagPhotos.length) return tagPhotos;
-
-  const mapy = await fetchMapyPhotos(name, lat, lon);
-  if (mapy.length) return mapy;
-
-  if (GOOGLE_API_KEY) {
-    const google = await fetchGooglePhotos(name, lat, lon);
-    if (google.length) return google;
-  }
-
-  return [];
+  return fetchMapyPhotos(name, lat, lon);
 }
 
 // ─── Lightbox ─────────────────────────────────────────────────────────────────
