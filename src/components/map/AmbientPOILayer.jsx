@@ -49,31 +49,6 @@ function makeIcon(emoji, color, zoom) {
 const cache = new Map();
 const CACHE_TTL = 10 * 60 * 1000;
 
-async function fetchPOIs(osmTag, south, west, north, east, limit, signal) {
-  const eq = osmTag.indexOf('=');
-  const filter = eq !== -1
-    ? `["${osmTag.slice(0,eq)}"="${osmTag.slice(eq+1)}"]`
-    : `["${osmTag}"]`;
-  const query = `[out:json][timeout:10];(node${filter}(${south},${west},${north},${east});way${filter}(${south},${west},${north},${east}););out center ${limit};`;
-  
-  for (const ep of OVERPASS_MIRRORS) {
-    try {
-      const r = await fetch(ep, { method:'POST', body:query, signal, headers:{'Content-Type':'text/plain'} });
-      if (!r.ok) continue;
-      const d = await r.json();
-      return (d.elements||[]).map(el => {
-        const lat = el.lat ?? el.center?.lat;
-        const lon = el.lon ?? el.center?.lon;
-        if (!lat||!lon) return null;
-        return { id: el.id, lat, lon, name: el.tags?.name || '', address: el.tags?.['addr:street'] ? `${el.tags['addr:street']} ${el.tags['addr:housenumber']||''}`.trim() : '', tags: el.tags||{} };
-      }).filter(Boolean);
-    } catch(e) {
-      if (e.name==='AbortError') throw e;
-    }
-  }
-  return [];
-}
-
 export default function AmbientPOILayer({ onSelectPOI, selectedCategory }) {
   const [markers, setMarkers] = useState([]);
   const [zoom, setZoom] = useState(13);
@@ -97,7 +72,6 @@ export default function AmbientPOILayer({ onSelectPOI, selectedCategory }) {
       const b = map.getBounds();
       const south = b.getSouth(), north = b.getNorth(), west = b.getWest(), east = b.getEast();
 
-      // Which categories are visible at this zoom?
       const visible = AMBIENT_CATEGORIES.filter(c => z >= c.minZoom);
       if (!visible.length) { setMarkers([]); return; }
 
@@ -105,30 +79,68 @@ export default function AmbientPOILayer({ onSelectPOI, selectedCategory }) {
       abortRef.current = new AbortController();
       const signal = abortRef.current.signal;
 
-      const limit = z >= 16 ? 15 : z >= 14 ? 10 : 6;
-      const all = [];
+      const cacheKey = `ambient|${south.toFixed(2)}|${west.toFixed(2)}|${z}`;
+      const cached = cache.get(cacheKey);
+      if (cached && Date.now() - cached.ts < CACHE_TTL) { setMarkers(cached.data); return; }
 
-      await Promise.all(visible.map(async cat => {
-        const key = `${cat.osmTag}|${south.toFixed(2)}|${west.toFixed(2)}|${z}`;
-        const cached = cache.get(key);
-        if (cached && Date.now() - cached.ts < CACHE_TTL) { all.push(...cached.data); return; }
-        try {
-          const pois = await fetchPOIs(cat.osmTag, south, west, north, east, limit, signal);
-          const tagged = pois.map(p => ({ ...p, _cat: cat }));
-          cache.set(key, { data: tagged, ts: Date.now() });
-          all.push(...tagged);
-        } catch(e) { if (e.name !== 'AbortError') console.warn('ambient POI error:', e.message); }
-      }));
+      const limit = z >= 16 ? 10 : z >= 14 ? 6 : 4;
 
-      if (!signal.aborted) setMarkers(all);
+      // Build ONE combined Overpass query for all visible categories
+      const bbox = `(${south},${west},${north},${east})`;
+      const parts = visible.map(cat => {
+        const eq = cat.osmTag.indexOf('=');
+        const filter = eq !== -1
+          ? `["${cat.osmTag.slice(0,eq)}"="${cat.osmTag.slice(eq+1)}"]`
+          : `["${cat.osmTag}"]`;
+        return `node${filter}${bbox};way${filter}${bbox};`;
+      }).join('');
+      const query = `[out:json][timeout:15];(${parts});out center ${limit * visible.length};`;
+
+      try {
+        let res = null;
+        for (const ep of OVERPASS_MIRRORS) {
+          try {
+            res = await fetch(ep, { method:'POST', body:query, signal, headers:{'Content-Type':'text/plain'} });
+            if (res.ok) break;
+          } catch(e) { if (e.name==='AbortError') throw e; }
+        }
+        if (!res?.ok) return;
+        const data = await res.json();
+
+        // Map each element back to its category by matching OSM tags
+        const all = [];
+        for (const el of data.elements || []) {
+          const lat = el.lat ?? el.center?.lat;
+          const lon = el.lon ?? el.center?.lon;
+          if (!lat || !lon) continue;
+
+          // Find which ambient category this element belongs to
+          const cat = visible.find(c => {
+            const eq = c.osmTag.indexOf('=');
+            if (eq !== -1) {
+              const k = c.osmTag.slice(0, eq), v = c.osmTag.slice(eq+1);
+              return el.tags?.[k] === v;
+            }
+            return el.tags?.[c.osmTag] !== undefined;
+          });
+          if (!cat) continue;
+
+          all.push({ id: el.id, lat, lon, name: el.tags?.name || '', address: el.tags?.['addr:street'] ? `${el.tags['addr:street']} ${el.tags['addr:housenumber']||''}`.trim() : '', tags: el.tags||{}, _cat: cat });
+        }
+
+        cache.set(cacheKey, { data: all, ts: Date.now() });
+        if (!signal.aborted) setMarkers(all);
+      } catch(e) {
+        if (e.name !== 'AbortError') console.warn('ambient POI error:', e.message);
+      }
     };
 
     clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(load, 400);
+    timerRef.current = setTimeout(load, 800);
 
     const onMove = () => {
       clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(load, 600);
+      timerRef.current = setTimeout(load, 1200);
     };
     map.on('moveend', onMove);
     map.on('zoomend', onMove);
