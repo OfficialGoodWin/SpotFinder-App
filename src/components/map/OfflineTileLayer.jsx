@@ -11,7 +11,8 @@
  * Usage: drop-in replacement for the existing <TileLayer> in Home.jsx.
  */
 import { useEffect, useRef, useState } from 'react';
-import { TileLayer, useMap } from 'react-leaflet';
+import { useMap } from 'react-leaflet';
+import L from 'leaflet';
 import { getCountryFile, COUNTRIES, isPointInCountry } from '../../lib/offlineManager.js';
 import { getAllMeta } from '../../lib/offlineStorage.js';
 
@@ -93,7 +94,6 @@ export default function OfflineTileLayer({ url, subdomains, maxZoom, maxNativeZo
     }
 
     function addRasterLayer() {
-      const L = require('leaflet');
       const layer = L.tileLayer(url, {
         subdomains:       subdomains || [],
         maxZoom:          maxZoom    || 20,
