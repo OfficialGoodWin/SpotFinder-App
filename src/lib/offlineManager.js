@@ -108,15 +108,9 @@ async function fetchTileWithRetry(url) {
 async function downloadTiles({ country, tileTemplate, maxZoom = 19, onProgress, abortRef }) {
   const [west, south, east, north] = country.bbox;
   const urlHash = hashUrl(tileTemplate);
+  const total   = countTilesForCountry(country, maxZoom);
 
-  const allTiles = [];
-  for (let z = 0; z <= maxZoom; z++) {
-    allTiles.push(...tilesForZoom(west, south, east, north, z));
-  }
-
-  const total    = allTiles.length;
   let done       = 0;
-  let idx        = 0;
   let startTime  = Date.now();
   let lastReport = 0;
 
@@ -132,13 +126,27 @@ async function downloadTiles({ country, tileTemplate, maxZoom = 19, onProgress, 
     onProgress?.({ phase: 'tiles', done, total, tilesPerSec, etaSec });
   }
 
+  // Lazy tile generator — yields one tile at a time, never builds a huge array
+  function* tileGenerator() {
+    for (let z = 0; z <= maxZoom; z++) {
+      const x0 = lngToX(west, z),  x1 = lngToX(east,  z);
+      const y0 = latToY(north, z), y1 = latToY(south, z);
+      for (let x = x0; x <= x1; x++)
+        for (let y = y0; y <= y1; y++)
+          yield { z, x, y };
+    }
+  }
+
+  const gen = tileGenerator();
+
+  // Each worker pulls the next tile from the generator
   async function worker() {
     while (true) {
       if (abortRef?.current) return;
-      const i = idx++;
-      if (i >= total) return;
+      const next = gen.next();
+      if (next.done) return;
 
-      const { z, x, y } = allTiles[i];
+      const { z, x, y } = next.value;
       const key = tileKey(z, x, y, urlHash);
 
       try {
