@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Download, Trash2, MapPin, CheckCircle2,
          WifiOff, HardDrive, ChevronDown, ChevronUp } from 'lucide-react';
-import { COUNTRIES, downloadCountryTiles, downloadCountryPOIs, deleteCountryTiles } from '../../lib/offlineManager.js';
+import { COUNTRIES, downloadCountryTiles, downloadCountryPOIs, deleteCountryTiles, scrubInvalidMeta } from '../../lib/offlineManager.js';
 import { getAllMeta, estimateStorageUsage } from '../../lib/offlineStorage.js';
 
 const GEOAPIFY_KEY = import.meta.env.VITE_GEOAPIFY_KEY || '';
@@ -33,12 +33,14 @@ function StorageBar({ usedMB, quotaMB }) {
 
 // ─── Progress bar ─────────────────────────────────────────────────────────────
 function ProgressBar({ done, total, tilesPerSec, etaSec, label }) {
-  const pct = total > 0 ? Math.min(100, Math.round(done / total * 100)) : 0;
-  const eta = etaSec > 3600
+  const safeDone  = Math.max(0, done  || 0);
+  const safeTotal = Math.max(1, total || 1);
+  const pct = Math.min(100, Math.round(safeDone / safeTotal * 100));
+  const eta = (etaSec || 0) > 3600
     ? `${Math.round(etaSec/3600)}h`
-    : etaSec > 60
+    : (etaSec || 0) > 60
     ? `${Math.round(etaSec/60)}m`
-    : etaSec > 0 ? `${etaSec}s` : '';
+    : (etaSec || 0) > 0 ? `${Math.round(etaSec)}s` : '';
 
   return (
     <div className="space-y-1 mt-2">
@@ -60,7 +62,7 @@ function ProgressBar({ done, total, tilesPerSec, etaSec, label }) {
         />
       </div>
       <div className="text-xs text-muted-foreground text-right">
-        {done.toLocaleString()} / {total.toLocaleString()} tiles
+        {safeDone.toLocaleString()} / {safeTotal.toLocaleString()} tiles
       </div>
     </div>
   );
@@ -196,7 +198,10 @@ export default function OfflineMapsMenu({ onClose }) {
   const abortRef = useRef({ current: false });
 
   useEffect(() => {
-    getAllMeta().then(setMetaMap);
+    // Remove any meta left over from crashed/cancelled downloads
+    scrubInvalidMeta().then(() => {
+      getAllMeta().then(setMetaMap);
+    });
     estimateStorageUsage().then(setStorage);
   }, []);
 

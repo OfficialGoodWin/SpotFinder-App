@@ -125,6 +125,8 @@ export async function downloadCountryTiles({ country, tileTemplate, maxZoom = 15
   let startTime   = Date.now();
 
   // Process in batches of BATCH_SIZE
+  let lastReport = 0;
+
   for (let i = 0; i < total; i += BATCH_SIZE) {
     if (abortRef?.current) break;
 
@@ -150,12 +152,16 @@ export async function downloadCountryTiles({ country, tileTemplate, maxZoom = 15
       done++;
     }));
 
-    // Report progress after each batch
-    const elapsed     = (Date.now() - startTime) / 1000;
-    const tilesPerSec = elapsed > 0 ? Math.round(done / elapsed) : 0;
-    const remaining   = total - done;
-    const etaSec      = tilesPerSec > 0 ? Math.round(remaining / tilesPerSec) : 0;
-    onProgress?.({ done, total, tilesPerSec, etaSec });
+    // Throttle progress reports to max once per 250ms to avoid UI glitching
+    const now = Date.now();
+    if (now - lastReport >= 250 || done >= total) {
+      lastReport = now;
+      const elapsed     = Math.max((now - startTime) / 1000, 0.1);
+      const tilesPerSec = Math.round(done / elapsed);
+      const remaining   = total - done;
+      const etaSec      = tilesPerSec > 0 ? Math.round(remaining / tilesPerSec) : 0;
+      onProgress?.({ done, total, tilesPerSec, etaSec });
+    }
   }
 
   if (!abortRef?.current) {
@@ -173,16 +179,28 @@ export async function downloadCountryTiles({ country, tileTemplate, maxZoom = 15
 
 export async function deleteCountryTiles(country) {
   const meta = await getMeta(country.code);
-  if (!meta?.urlHash) {
-    await deleteMeta(country.code);
-    return;
+
+  if (meta?.urlHash) {
+    const { deleteTilesWithPrefix } = await import('./offlineStorage.js');
+    await deleteTilesWithPrefix(`${meta.urlHash}|`);
   }
 
-  // Delete all tiles with this country's urlHash prefix
-  const { deleteTilesWithPrefix } = await import('./offlineStorage.js');
-  await deleteTilesWithPrefix(`${meta.urlHash}|`);
   await deletePOIs(country.code);
   await deleteMeta(country.code);
+}
+
+/**
+ * Scrub any meta entries that were written by a crashed/cancelled download.
+ * A valid download always has tileCount > 0 AND a downloadedAt timestamp.
+ */
+export async function scrubInvalidMeta() {
+  const { getAllMeta, deleteMeta: _del } = await import('./offlineStorage.js');
+  const all = await getAllMeta();
+  for (const [code, meta] of Object.entries(all)) {
+    if (!meta.tileCount || meta.tileCount < 10) {
+      await _del(code);
+    }
+  }
 }
 
 // ─── POI download ─────────────────────────────────────────────────────────────
