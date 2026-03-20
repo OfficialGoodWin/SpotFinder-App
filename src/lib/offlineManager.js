@@ -58,6 +58,18 @@ function tilesForZoom(west, south, east, north, z) {
   return tiles;
 }
 
+/** Count total tiles for a country up to maxZoom without building the full array */
+export function countTilesForCountry(country, maxZoom) {
+  const [west, south, east, north] = country.bbox;
+  let total = 0;
+  for (let z = 0; z <= maxZoom; z++) {
+    const x0 = lngToX(west,  z), x1 = lngToX(east,  z);
+    const y0 = latToY(north, z), y1 = latToY(south, z);
+    total += (x1 - x0 + 1) * (y1 - y0 + 1);
+  }
+  return total;
+}
+
 export function tileKey(z, x, y, urlHash) {
   return `${urlHash}|${z}/${x}/${y}`;
 }
@@ -79,10 +91,12 @@ export function resolveTileUrl(template, z, x, y) {
     .replace('{s}', s).replace('{r}', '');
 }
 
-// ─── Batch downloader ─────────────────────────────────────────────────────────
+// ─── Worker pool downloader ───────────────────────────────────────────────────
+// Keeps CONCURRENCY requests in-flight at all times.
+// As soon as one tile finishes the next starts — no batch stalling.
 
-const BATCH_SIZE  = 32;   // tiles fetched in parallel per batch
-const MAX_RETRIES = 2;    // retry failed tiles this many times
+const CONCURRENCY = 64;  // simultaneous tile requests
+const MAX_RETRIES = 1;
 
 async function fetchTileWithRetry(url, retries = MAX_RETRIES) {
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -90,31 +104,24 @@ async function fetchTileWithRetry(url, retries = MAX_RETRIES) {
       const res = await fetch(url, { mode: 'cors' });
       if (res.ok) return await res.arrayBuffer();
       if (res.status === 429 && attempt < retries) {
-        // Rate limited — back off
-        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-        continue;
+        await new Promise(r => setTimeout(r, 800 * (attempt + 1)));
       }
     } catch (_) {
-      if (attempt < retries) await new Promise(r => setTimeout(r, 500));
+      if (attempt < retries) await new Promise(r => setTimeout(r, 200));
     }
   }
-  return null; // Skip failed tiles silently
+  return null;
 }
 
 /**
- * Download all tiles for a country in parallel batches.
- * 
- * @param {Object}   country      - entry from COUNTRIES
- * @param {string}   tileTemplate - URL template with {z}/{x}/{y}
- * @param {number}   maxZoom      - 15 for basic, 19 for detailed
- * @param {Function} onProgress   - ({ done, total, tilesPerSec, etaSec }) => void
- * @param {Object}   abortRef     - { current: false } set true to cancel
+ * Download all tiles for a country using a worker pool.
+ * CONCURRENCY requests always in-flight — no stalling on slow tiles.
  */
 export async function downloadCountryTiles({ country, tileTemplate, maxZoom = 15, onProgress, abortRef }) {
   const [west, south, east, north] = country.bbox;
   const urlHash = hashUrl(tileTemplate);
 
-  // Build full tile list across all zoom levels
+  // Build tile list zoom by zoom (low zooms first — fast wins)
   const allTiles = [];
   for (let z = 0; z <= maxZoom; z++) {
     allTiles.push(...tilesForZoom(west, south, east, north, z));
@@ -122,47 +129,49 @@ export async function downloadCountryTiles({ country, tileTemplate, maxZoom = 15
 
   const total     = allTiles.length;
   let done        = 0;
+  let idx         = 0;
   let startTime   = Date.now();
+  let lastReport  = 0;
 
-  // Process in batches of BATCH_SIZE
-  let lastReport = 0;
+  // Report real total immediately
+  onProgress?.({ done: 0, total, tilesPerSec: 0, etaSec: 0 });
 
-  for (let i = 0; i < total; i += BATCH_SIZE) {
-    if (abortRef?.current) break;
+  function reportProgress() {
+    const now = Date.now();
+    if (now - lastReport < 250 && done < total) return;
+    lastReport = now;
+    const elapsed     = Math.max((now - startTime) / 1000, 0.1);
+    const tilesPerSec = Math.round(done / elapsed);
+    const etaSec      = tilesPerSec > 0 ? Math.round((total - done) / tilesPerSec) : 0;
+    onProgress?.({ done, total, tilesPerSec, etaSec });
+  }
 
-    const batch = allTiles.slice(i, i + BATCH_SIZE);
-
-    // Download entire batch in parallel
-    await Promise.all(batch.map(async ({ z, x, y }) => {
+  // Each worker pulls the next tile from the queue and processes it
+  async function worker() {
+    while (true) {
       if (abortRef?.current) return;
+      const i = idx++;
+      if (i >= total) return;
 
+      const { z, x, y } = allTiles[i];
       const key = tileKey(z, x, y, urlHash);
 
-      // Skip tiles already in cache
       try {
         const existing = await getTile(key);
-        if (existing) { done++; return; }
+        if (!existing) {
+          const tileUrl = resolveTileUrl(tileTemplate, z, x, y);
+          const buf     = await fetchTileWithRetry(tileUrl);
+          if (buf) await setTile(key, buf).catch(() => {});
+        }
       } catch (_) {}
 
-      const url = resolveTileUrl(tileTemplate, z, x, y);
-      const buf = await fetchTileWithRetry(url);
-      if (buf) {
-        try { await setTile(key, buf); } catch (_) {}
-      }
       done++;
-    }));
-
-    // Throttle progress reports to max once per 250ms to avoid UI glitching
-    const now = Date.now();
-    if (now - lastReport >= 250 || done >= total) {
-      lastReport = now;
-      const elapsed     = Math.max((now - startTime) / 1000, 0.1);
-      const tilesPerSec = Math.round(done / elapsed);
-      const remaining   = total - done;
-      const etaSec      = tilesPerSec > 0 ? Math.round(remaining / tilesPerSec) : 0;
-      onProgress?.({ done, total, tilesPerSec, etaSec });
+      reportProgress();
     }
   }
+
+  // Launch CONCURRENCY workers — they race through the queue independently
+  await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
 
   if (!abortRef?.current) {
     await setMeta(country.code, {

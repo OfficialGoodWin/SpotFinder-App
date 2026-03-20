@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Download, Trash2, MapPin, CheckCircle2,
          WifiOff, HardDrive, ChevronDown, ChevronUp } from 'lucide-react';
-import { COUNTRIES, downloadCountryTiles, downloadCountryPOIs, deleteCountryTiles, scrubInvalidMeta } from '../../lib/offlineManager.js';
+import { COUNTRIES, downloadCountryTiles, downloadCountryPOIs, deleteCountryTiles, scrubInvalidMeta, countTilesForCountry } from '../../lib/offlineManager.js';
 import { getAllMeta, estimateStorageUsage } from '../../lib/offlineStorage.js';
 
 const GEOAPIFY_KEY = import.meta.env.VITE_GEOAPIFY_KEY || '';
@@ -238,8 +238,10 @@ export default function OfflineMapsMenu({ onClose }) {
       return;
     }
 
-    const maxZoom = mode === 'detailed' ? 19 : 15;
-    setActive({ code: country.code, phase: 'tiles', progress: { done: 0, total: 1, tilesPerSec: 0, etaSec: 0 } });
+    const maxZoom   = mode === 'detailed' ? 19 : 15;
+    // Calculate real tile count upfront so progress bar doesn't jump
+    const realTotal = countTilesForCountry(country, maxZoom);
+    setActive({ code: country.code, phase: 'tiles', progress: { done: 0, total: realTotal, tilesPerSec: 0, etaSec: 0 } });
 
     try {
       await downloadCountryTiles({
