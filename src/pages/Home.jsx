@@ -348,7 +348,7 @@ export default function Home() {
         bounceAtZoomLimits={false}
         preferCanvas={true}
       >
-        {/* Base map tile — OfflineTileLayer caches tiles in IndexedDB automatically */}
+        {/* Base map tile — uses PMTiles offline file if downloaded, otherwise raster */}
         <OfflineTileLayer
           key={`${mapLayer}-${isDark}`}
           url={tileUrls[mapLayer]}
@@ -361,6 +361,7 @@ export default function Home() {
           keepBuffer={6}
           updateWhenIdle={false}
           updateWhenZooming={false}
+          isDark={isDark}
         />
  
         {/* TomTom real-time traffic flow overlay (only on traffic layer) */}
