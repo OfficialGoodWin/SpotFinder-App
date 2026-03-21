@@ -480,16 +480,12 @@ export default function MapLibreMap({
       } catch(_){}
     };
 
-    // Wait for style to fully load before adding overlay
-    const tryAdd = () => {
-      if (map.isStyleLoaded()) add();
-      else map.once('idle', add);
-    };
-    tryAdd();
-
-    // Re-add traffic layer whenever style reloads (dark mode switch etc)
-    map.on('styledata', tryAdd);
-    return () => map.off('styledata', tryAdd);
+    // Add once when style is ready — don't listen to styledata (causes infinite loop)
+    if (map.isStyleLoaded()) {
+      add();
+    } else {
+      map.once('idle', add);
+    }
   }, [mapLayer, isDark]);
 
   // ── Aerial layer (Mapy.cz satellite) ──────────────────────────────────────

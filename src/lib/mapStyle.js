@@ -31,8 +31,8 @@ const LIGHT = {
   school:       '#f0e8d8',
   water:        '#a8c8e0',
   waterway:     '#90b8d0',
-  building:     '#ddd4c8',
-  buildingLine: '#c8bfb0',
+  building:     '#d4c4a8',
+  buildingLine: '#b8a888',
   // Roads
   motorway:     '#3a8a3a',
   motorwayLine: '#1f6b1f',
@@ -81,8 +81,8 @@ const DARK = {
   school:       '#181818',
   water:        '#0d2a3d',
   waterway:     '#0a2030',
-  building:     '#2a2a2a',
-  buildingLine: '#1a1a1a',
+  building:     '#2e2418',
+  buildingLine: '#1e160e',
   motorway:     '#2a6e2a',
   motorwayLine: '#1a5a1a',
   motorwayStripe: '#f5d800',
@@ -225,53 +225,104 @@ function style(dark = false) {
         filter: ['==', 'admin_level', 4], minzoom: 6,
         paint: { 'line-color': c.boundaryProv, 'line-width': 0.8, 'line-dasharray': [3, 2] } },
 
-      // ── Road labels ───────────────────────────────────────────────────────
-      // D road shields (motorway) — green background matching road color
-      { id: 'lbl-motorway', type: 'symbol', source: 'v', 'source-layer': 'transportation_name',
-        filter: ['==', 'class', 'motorway'], minzoom: 10,
-        layout: { 'text-field': ['get', 'ref'], 'text-font': FONTS.bold,
-          'text-size': 10, 'symbol-placement': 'line', 'symbol-spacing': 300, 'text-max-angle': 30 },
-        paint: { 'text-color': '#ffffff', 'text-halo-color': c.motorway, 'text-halo-width': 4 } },
+      // ── Road number plates ────────────────────────────────────────────────
+      // D1/D5/D7 motorway plate — RED background, white text
+      { id: 'plate-motorway', type: 'symbol', source: 'v', 'source-layer': 'transportation_name',
+        filter: ['==', 'class', 'motorway'], minzoom: 9,
+        layout: {
+          'text-field': ['get', 'ref'],
+          'text-font': FONTS.bold,
+          'text-size': 11,
+          'symbol-placement': 'line',
+          'symbol-spacing': 350,
+          'text-max-angle': 20,
+          'text-padding': 4,
+        },
+        paint: {
+          'text-color': '#ffffff',
+          'text-halo-color': '#cc1111',
+          'text-halo-width': 5,
+        } },
 
-      // European route (E50, E49) below motorway ref — green basic shield
-      { id: 'lbl-motorway-intl', type: 'symbol', source: 'v', 'source-layer': 'transportation_name',
-        filter: ['all', ['==', 'class', 'motorway'], ['has', 'name']],
+      // E50/E49 European route on motorway — GREEN plate below D number
+      { id: 'plate-motorway-euro', type: 'symbol', source: 'v', 'source-layer': 'transportation_name',
+        filter: ['all', ['==', 'class', 'motorway'], ['has', 'network']],
         minzoom: 11,
         layout: {
-          'text-field': ['concat', 'E', ['get', 'name']],
-          'text-font': FONTS.regular,
-          'text-size': 8,
+          'text-field': ['get', 'network'],
+          'text-font': FONTS.bold,
+          'text-size': 9,
           'symbol-placement': 'line',
-          'symbol-spacing': 400,
-          'text-max-angle': 30,
-          'text-offset': [0, 1.4],
+          'symbol-spacing': 500,
+          'text-max-angle': 20,
+          'text-offset': [0, 1.8],
+          'text-padding': 3,
         },
-        paint: { 'text-color': '#ffffff', 'text-halo-color': '#388e3c', 'text-halo-width': 3 } },
+        paint: {
+          'text-color': '#ffffff',
+          'text-halo-color': '#2e7d32',
+          'text-halo-width': 4,
+        } },
 
-      // Numbered highway shields (trunk: R26, 26, 48 etc) — blue background
-      { id: 'lbl-trunk-ref', type: 'symbol', source: 'v', 'source-layer': 'transportation_name',
-        filter: ['==', 'class', 'trunk'], minzoom: 10,
-        layout: { 'text-field': ['get', 'ref'], 'text-font': FONTS.bold,
-          'text-size': 10, 'symbol-placement': 'line', 'symbol-spacing': 300, 'text-max-angle': 30 },
-        paint: { 'text-color': '#ffffff', 'text-halo-color': c.trunk, 'text-halo-width': 4 } },
+      // R26/48/27 trunk + primary road plate — BLUE background, white text
+      { id: 'plate-trunk', type: 'symbol', source: 'v', 'source-layer': 'transportation_name',
+        filter: ['in', 'class', 'trunk', 'primary'], minzoom: 10,
+        layout: {
+          'text-field': ['get', 'ref'],
+          'text-font': FONTS.bold,
+          'text-size': 10,
+          'symbol-placement': 'line',
+          'symbol-spacing': 320,
+          'text-max-angle': 20,
+          'text-padding': 3,
+        },
+        paint: {
+          'text-color': '#ffffff',
+          'text-halo-color': '#1a4abf',
+          'text-halo-width': 4,
+        } },
 
-      // European route below trunk (E50 etc) — basic green
-      { id: 'lbl-trunk-intl', type: 'symbol', source: 'v', 'source-layer': 'transportation_name',
-        filter: ['all', ['==', 'class', 'trunk'], ['has', 'name']],
+      // E50 on trunk/primary — GREEN plate below road number
+      { id: 'plate-trunk-euro', type: 'symbol', source: 'v', 'source-layer': 'transportation_name',
+        filter: ['all', ['in', 'class', 'trunk', 'primary'], ['has', 'network']],
         minzoom: 11,
         layout: {
-          'text-field': ['concat', 'E', ['get', 'name']],
-          'text-font': FONTS.regular,
-          'text-size': 8,
+          'text-field': ['get', 'network'],
+          'text-font': FONTS.bold,
+          'text-size': 9,
           'symbol-placement': 'line',
-          'symbol-spacing': 400,
-          'text-max-angle': 30,
-          'text-offset': [0, 1.4],
+          'symbol-spacing': 500,
+          'text-max-angle': 20,
+          'text-offset': [0, 1.8],
+          'text-padding': 3,
         },
-        paint: { 'text-color': '#ffffff', 'text-halo-color': '#388e3c', 'text-halo-width': 3 } },
+        paint: {
+          'text-color': '#ffffff',
+          'text-halo-color': '#2e7d32',
+          'text-halo-width': 4,
+        } },
 
+      // Secondary/tertiary local road number plate — BLUE, smaller
+      { id: 'plate-secondary', type: 'symbol', source: 'v', 'source-layer': 'transportation_name',
+        filter: ['in', 'class', 'secondary', 'tertiary'], minzoom: 12,
+        layout: {
+          'text-field': ['get', 'ref'],
+          'text-font': FONTS.bold,
+          'text-size': 9,
+          'symbol-placement': 'line',
+          'symbol-spacing': 300,
+          'text-max-angle': 20,
+          'text-padding': 2,
+        },
+        paint: {
+          'text-color': '#ffffff',
+          'text-halo-color': '#2563eb',
+          'text-halo-width': 3,
+        } },
+
+      // Road name labels (street names below plates)
       { id: 'lbl-primary', type: 'symbol', source: 'v', 'source-layer': 'transportation_name',
-        filter: ['in', 'class', 'primary', 'trunk'], minzoom: 12,
+        filter: ['in', 'class', 'primary', 'trunk'], minzoom: 13,
         layout: { 'text-field': ['get', 'name'], 'text-font': FONTS.regular, 'text-size': 10,
           'symbol-placement': 'line', 'symbol-spacing': 250, 'text-max-angle': 30 },
         paint: { 'text-color': c.label, 'text-halo-color': c.bg, 'text-halo-width': 2 } },
@@ -288,6 +339,17 @@ function style(dark = false) {
           'text-font': FONTS.italic,
           'text-size': ['interpolate',['linear'],['zoom'], 8,10, 14,14] },
         paint: { 'text-color': c.labelWater, 'text-halo-color': c.water, 'text-halo-width': 1 } },
+
+      // ── Place/settlement boundaries ──────────────────────────────────────
+      { id: 'place-boundary', type: 'line', source: 'v', 'source-layer': 'boundary',
+        filter: ['in', 'admin_level', 8, 9, 10],
+        minzoom: 12,
+        paint: {
+          'line-color': dark ? '#5a3a1a' : '#c4a882',
+          'line-width': 0.8,
+          'line-dasharray': [3, 2],
+          'line-opacity': 0.6,
+        } },
 
       // ── Place labels ──────────────────────────────────────────────────────
       { id: 'lbl-village', type: 'symbol', source: 'v', 'source-layer': 'place',
