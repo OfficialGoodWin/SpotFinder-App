@@ -13,7 +13,7 @@ import maplibregl from 'maplibre-gl';
 import { Protocol } from 'pmtiles';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { lightStyle, darkStyle } from '../../lib/mapStyle.js';
-import { getCountryFile, COUNTRIES, isPointInCountry } from '../../lib/offlineManager.js';
+import { getCountryFile, COUNTRIES, isPointInCountry, getDownloadedCountryAt } from '../../lib/offlineManager.js';
 import { getAllMeta, getPOIs } from '../../lib/offlineStorage.js';
 
 const GEOAPIFY_KEY = import.meta.env.VITE_GEOAPIFY_KEY || '';
