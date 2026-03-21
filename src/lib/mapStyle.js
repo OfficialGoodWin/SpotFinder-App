@@ -45,8 +45,8 @@ const LIGHT = {
   secondaryLine:'#a87800',
   tertiary:     '#c0b090',
   tertiaryLine: '#a09070',
-  road:         '#ffffff',
-  roadLine:     '#c8c0b0',
+  road:         '#f8f4ee',
+  roadLine:     '#b8b0a0',
   path:         '#c0a878',
   track:        '#c0a060',
   railway:      '#888888',
@@ -177,8 +177,8 @@ function style(dark = false) {
       rc('rc-trunk',     c.trunkLine,    'trunk',      [2,   4]),
       rc('rc-primary',   c.primaryLine,  'primary',    [1.5, 3.5]),
       rc('rc-secondary', c.secondaryLine,'secondary',  [1,   3]),
-      rc('rc-tertiary',  c.tertiaryLine, 'tertiary',   [0.8, 2.5], 10),
-      rc('rc-street',    c.roadLine,     ['in', 'class', 'street', 'street_limited', 'service', 'residential', 'living_street', 'unclassified'], [0.5, 2], 13),
+      rc('rc-tertiary',  c.tertiaryLine, 'tertiary',   [1.0, 3.0], 9),
+      rc('rc-street',    c.roadLine,     ['in', 'class', 'street', 'street_limited', 'service', 'residential', 'living_street', 'unclassified', 'minor'], [0.5, 2.5], 12),
 
       // ── Roads — fills ─────────────────────────────────────────────────────
       { id: 'r-track', type: 'line', source: 'v', 'source-layer': 'transportation',
@@ -189,7 +189,7 @@ function style(dark = false) {
         filter: ['in', 'class', 'path', 'footway', 'pedestrian', 'cycleway'], minzoom: 13,
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: { 'line-color': c.path, 'line-width': 0.8, 'line-dasharray': [3, 2] } },
-      rl('r-street',    c.road,      ['in', 'class', 'street', 'street_limited', 'service', 'residential', 'living_street', 'unclassified'], [0.5, 2.5], 13),
+      rl('r-street',    c.road,      ['in', 'class', 'street', 'street_limited', 'service', 'residential', 'living_street', 'unclassified', 'minor'], [0.5, 2.5], 12),
       rl('r-tertiary',  c.tertiary,  'tertiary',  [0.5, 1.5], 10),
       rl('r-secondary', c.secondary, 'secondary', [0.5, 2]),
       rl('r-primary',   c.primary,   'primary',   [1,   2.5]),
@@ -226,11 +226,26 @@ function style(dark = false) {
         paint: { 'line-color': c.boundaryProv, 'line-width': 0.8, 'line-dasharray': [3, 2] } },
 
       // ── Road labels ───────────────────────────────────────────────────────
+      // Motorway shields — Czech D roads have RED background
       { id: 'lbl-motorway', type: 'symbol', source: 'v', 'source-layer': 'transportation_name',
         filter: ['==', 'class', 'motorway'], minzoom: 10,
         layout: { 'text-field': ['get', 'ref'], 'text-font': FONTS.bold,
           'text-size': 10, 'symbol-placement': 'line', 'symbol-spacing': 300, 'text-max-angle': 30 },
-        paint: { 'text-color': '#ffffff', 'text-halo-color': c.motorway, 'text-halo-width': 3 } },
+        paint: {
+          'text-color': '#ffffff',
+          'text-halo-color': '#cc0000',  // RED shield background for D roads
+          'text-halo-width': 4,
+        } },
+      // Trunk road shields — Czech R roads have GREEN background
+      { id: 'lbl-trunk-ref', type: 'symbol', source: 'v', 'source-layer': 'transportation_name',
+        filter: ['==', 'class', 'trunk'], minzoom: 10,
+        layout: { 'text-field': ['get', 'ref'], 'text-font': FONTS.bold,
+          'text-size': 10, 'symbol-placement': 'line', 'symbol-spacing': 300, 'text-max-angle': 30 },
+        paint: {
+          'text-color': '#ffffff',
+          'text-halo-color': '#2e7d32',  // GREEN shield background for R roads
+          'text-halo-width': 4,
+        } },
       { id: 'lbl-primary', type: 'symbol', source: 'v', 'source-layer': 'transportation_name',
         filter: ['in', 'class', 'primary', 'trunk'], minzoom: 12,
         layout: { 'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name']],

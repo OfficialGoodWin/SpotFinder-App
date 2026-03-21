@@ -7,7 +7,7 @@
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Download, Trash2, MapPin, WifiOff, HardDrive, ChevronDown, ChevronUp, Info } from 'lucide-react';
-import { COUNTRIES, downloadCountryPMTiles, downloadCountryPOIs, deleteCountry, scrubInvalidMeta } from '../../lib/offlineManager.js';
+import { COUNTRIES, downloadCountryVectorTiles, downloadCountryPOIs, deleteCountry, scrubInvalidMeta, countTilesForCountry } from '../../lib/vectorTileDownloader.js';
 import { getAllMeta, estimateStorageUsage } from '../../lib/offlineStorage.js';
 
 const GEOAPIFY_KEY = import.meta.env.VITE_GEOAPIFY_KEY || '';

@@ -13,19 +13,35 @@ import maplibregl from 'maplibre-gl';
 import { Protocol } from 'pmtiles';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { lightStyle, darkStyle } from '../../lib/mapStyle.js';
-import { getCountryFile, COUNTRIES, isPointInCountry, getDownloadedCountryAt } from '../../lib/offlineManager.js';
-import { getAllMeta, getPOIs } from '../../lib/offlineStorage.js';
+import { COUNTRIES, isPointInCountry, getDownloadedCountryAt, vtKey } from '../../lib/vectorTileDownloader.js';
+import { getAllMeta, getPOIs, getTile } from '../../lib/offlineStorage.js';
 
 const GEOAPIFY_KEY = import.meta.env.VITE_GEOAPIFY_KEY || '';
 const TOMTOM_KEY   = import.meta.env.VITE_TOMTOM_API_KEY || '';
 
-// Register pmtiles protocol once globally
-let pmtilesRegistered = false;
-function ensurePMTilesProtocol() {
-  if (pmtilesRegistered) return;
+// Register protocols once globally
+let protocolsRegistered = false;
+function ensureProtocols() {
+  if (protocolsRegistered) return;
+  // PMTiles protocol — used for online streaming
   const protocol = new Protocol();
   maplibregl.addProtocol('pmtiles', protocol.tile.bind(protocol));
-  pmtilesRegistered = true;
+
+  // Offline vector tile protocol — serves from IndexedDB
+  // URL format: offline-vt://z/x/y
+  maplibregl.addProtocol('offline-vt', async (params, abortController) => {
+    try {
+      const parts = params.url.replace('offline-vt://', '').split('/');
+      const [z, x, y] = parts.map(Number);
+      const key = vtKey(z, x, y);
+      const buf = await getTile(key);
+      if (buf) return { data: buf };
+    } catch (_) {}
+    // Not cached — return empty tile
+    return { data: new ArrayBuffer(0) };
+  });
+
+  protocolsRegistered = true;
 }
 
 // ── Ambient POI categories ────────────────────────────────────────────────────
@@ -123,7 +139,7 @@ export default function MapLibreMap({
   // ── Init ───────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-    ensurePMTilesProtocol();
+    ensureProtocols();
 
     const map = new maplibregl.Map({
       container:          containerRef.current,
@@ -156,16 +172,14 @@ export default function MapLibreMap({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Offline PMTiles switcher ───────────────────────────────────────────────
-  // When offline AND a PMTiles file exists for the current location,
-  // switch the map source to the local file
+  // ── Offline vector tile switcher ─────────────────────────────────────────
+  // When offline and the country has downloaded tiles, switch to offline-vt:// source
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
     async function checkOffline() {
       if (isOnline) {
-        // Back online — restore cloud tiles
         if (offlineActive) {
           map.setStyle(isDark ? darkStyle : lightStyle);
           setOfflineActive(false);
@@ -174,33 +188,35 @@ export default function MapLibreMap({
         return;
       }
 
-      // Offline — look for a local PMTiles file
-      const c     = map.getCenter();
-      const meta  = await getAllMeta();
-      let found   = null;
+      // Check if this location has downloaded vector tiles
+      const c    = map.getCenter();
+      const meta = await getAllMeta();
+      let found  = null;
       for (const code of Object.keys(meta)) {
         const country = COUNTRIES.find(x => x.code === code);
-        if (country && isPointInCountry(c.lat, c.lng, country)) {
-          const file = await getCountryFile(code);
-          if (file) { found = { country, file }; break; }
+        if (country && meta[code]?.type === 'vector' && isPointInCountry(c.lat, c.lng, country)) {
+          found = country; break;
         }
       }
 
       if (found) {
-        const blobUrl = URL.createObjectURL(found.file);
+        // Switch to offline-vt:// source — served from IndexedDB
         const offlineStyle = {
           ...(isDark ? darkStyle : lightStyle),
           sources: {
             v: {
-              type:  'vector',
-              url:   `pmtiles://${blobUrl}`,
+              type:        'vector',
+              // Custom TileJSON pointing at our IndexedDB protocol
+              tiles:       ['offline-vt://{z}/{x}/{y}'],
+              minzoom:     0,
+              maxzoom:     14,
               attribution: '© OpenStreetMap contributors',
             },
           },
         };
         map.setStyle(offlineStyle);
         setOfflineActive(true);
-        setOfflineCountry(found.country.name);
+        setOfflineCountry(found.name);
       }
     }
 
