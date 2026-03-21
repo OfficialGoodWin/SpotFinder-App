@@ -233,8 +233,9 @@ async function downloadPOIs({ country, geoapifyKey, onProgress, abortRef }) {
 
 // ─── Main download entry point ────────────────────────────────────────────────
 
-const MAPY_KEY      = import.meta.env.VITE_MAPY_API_KEY || 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
-const TILE_TEMPLATE = `https://api.mapy.com/v1/maptiles/basic/256/{z}/{x}/{y}?apikey=${MAPY_KEY}`;
+// OSM standard tiles — used for offline download (Mapy.cz ToS prohibits bulk download)
+// OSM tiles are free, no API key required, globally available
+const TILE_TEMPLATE = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 /**
  * Download everything for a country — tiles (zoom 0-19) + POIs.

@@ -61,6 +61,12 @@ const DARK_TILES = {
   traffic: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
 };
  
+// ── OSM tiles — used for offline caching (free, no API key, global) ─────────
+// Downloaded tiles are stored in IndexedDB and served offline.
+// We use OSM instead of Mapy.cz for offline because Mapy.cz ToS prohibits
+// bulk downloading of tiles for offline use.
+const OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+
 // ── TomTom traffic flow overlay ───────────────────────────────────────────────
 // Overlaid on top of ANY base layer when mapLayer === 'traffic'
 // Green = free flow  |  Yellow = slow  |  Red = heavy congestion
@@ -352,6 +358,7 @@ export default function Home() {
         <OfflineTileLayer
           key={`${mapLayer}-${isDark}`}
           url={tileUrls[mapLayer]}
+          offlineUrl={OSM_TILE_URL}
           subdomains={useCartoTile ? cartoDomains : []}
           attribution={useCartoTile
             ? '&copy; <a href="https://carto.com">CARTO</a> &copy; <a href="https://osm.org/copyright">OpenStreetMap</a>'

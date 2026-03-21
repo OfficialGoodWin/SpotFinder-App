@@ -10,14 +10,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { getTile } from '../../lib/offlineStorage.js';
+import { getTile, setTile } from '../../lib/offlineStorage.js';
 import { hashUrl, tileKey, resolveTileUrl } from '../../lib/offlineManager.js';
 
 export default function OfflineTileLayer({
-  url, subdomains, maxZoom = 20, maxNativeZoom = 19,
+  url, offlineUrl, subdomains, maxZoom = 20, maxNativeZoom = 19,
   keepBuffer = 6, updateWhenIdle = false, updateWhenZooming = false,
   attribution = '', zIndex, opacity = 1, isDark,
 }) {
+  // Use OSM URL for offline caching if provided, otherwise fall back to main url
+  const cacheUrl = offlineUrl || url;
   const map        = useMap();
   const layerRef   = useRef(null);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -36,7 +38,7 @@ export default function OfflineTileLayer({
   useEffect(() => {
     if (!url || !map) return;
 
-    const urlHash = hashUrl(url);
+    const urlHash = hashUrl(cacheUrl);
 
     // Extend L.TileLayer with IndexedDB lookup
     const OfflineLayer = L.TileLayer.extend({
@@ -46,7 +48,9 @@ export default function OfflineTileLayer({
         img.crossOrigin = 'anonymous';
 
         const key      = tileKey(coords.z, coords.x, coords.y, urlHash);
+        // Online: serve from Mapy.cz (or CartoDB dark). Cache fetch uses OSM URL.
         const tileUrl  = resolveTileUrl(url, coords.z, coords.x, coords.y);
+        const cacheTileUrl = resolveTileUrl(cacheUrl, coords.z, coords.x, coords.y);
         const errorUrl = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
         getTile(key)
@@ -59,8 +63,17 @@ export default function OfflineTileLayer({
               img.onerror = () => { URL.revokeObjectURL(burl); done(new Error('cached tile error'), img); };
               img.src = burl;
             } else if (navigator.onLine) {
-              // Fetch from network
-              img.onload  = () => done(null, img);
+              // Serve display tile from Mapy.cz/CartoDB
+              img.onload = () => {
+                done(null, img);
+                // Also cache the OSM equivalent for offline use (fire and forget)
+                if (cacheUrl !== url) {
+                  fetch(cacheTileUrl, { mode: 'cors' })
+                    .then(r => r.ok ? r.arrayBuffer() : null)
+                    .then(buf => buf ? setTile(key, buf).catch(()=>{}) : null)
+                    .catch(()=>{});
+                }
+              };
               img.onerror = () => { img.src = errorUrl; done(new Error('tile fetch error'), img); };
               img.src = tileUrl;
             } else {
@@ -121,7 +134,7 @@ export default function OfflineTileLayer({
         background: '#2563eb', color: '#fff', fontWeight: 600,
         boxShadow: '0 2px 8px rgba(0,0,0,0.3)', opacity: 0.9,
       }}>
-        📴 Offline
+        📴 Offline · OpenStreetMap
       </span>
     </div>
   ) : null;
