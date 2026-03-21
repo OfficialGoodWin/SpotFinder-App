@@ -228,7 +228,12 @@ export default function MapLibreMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || offlineActive) return;
-    map.setStyle(isDark ? darkStyle : lightStyle);
+    // Wait for any in-progress style load before switching
+    if (!map.isStyleLoaded()) {
+      map.once('idle', () => map.setStyle(isDark ? darkStyle : lightStyle));
+    } else {
+      map.setStyle(isDark ? darkStyle : lightStyle);
+    }
   }, [isDark, offlineActive]);
 
   // ── Cursor ─────────────────────────────────────────────────────────────────
@@ -455,17 +460,37 @@ export default function MapLibreMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !TOMTOM_KEY) return;
-    const remove = () => { try { if(map.getLayer('traffic')) map.removeLayer('traffic'); if(map.getSource('traffic')) map.removeSource('traffic'); } catch(_){} };
+
+    const remove = () => {
+      try { if(map.getLayer('traffic')) map.removeLayer('traffic'); } catch(_){}
+      try { if(map.getSource('traffic')) map.removeSource('traffic'); } catch(_){}
+    };
+
     if (mapLayer !== 'traffic') { remove(); return; }
+
     const add = () => {
       remove();
       try {
-        map.addSource('traffic', { type:'raster', tiles:[`https://a.api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?key=${TOMTOM_KEY}`], tileSize:256 });
+        map.addSource('traffic', {
+          type: 'raster',
+          tiles: [`https://a.api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?key=${TOMTOM_KEY}`],
+          tileSize: 256,
+        });
         map.addLayer({ id:'traffic', type:'raster', source:'traffic', paint:{ 'raster-opacity':0.65 } });
       } catch(_){}
     };
-    if (map.isStyleLoaded()) add(); else map.once('styledata', add);
-  }, [mapLayer]);
+
+    // Wait for style to fully load before adding overlay
+    const tryAdd = () => {
+      if (map.isStyleLoaded()) add();
+      else map.once('idle', add);
+    };
+    tryAdd();
+
+    // Re-add traffic layer whenever style reloads (dark mode switch etc)
+    map.on('styledata', tryAdd);
+    return () => map.off('styledata', tryAdd);
+  }, [mapLayer, isDark]);
 
   // ── Aerial layer (Mapy.cz satellite) ──────────────────────────────────────
   useEffect(() => {
