@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MapContainer, TileLayer, useMapEvents, useMap } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
+
 import { Plus, Settings, Crosshair, HelpCircle, Trash2, WifiOff } from 'lucide-react';
 import { getPublicSpots, createSpot, deleteSpot, updateSpot } from '@/api/firebaseClient';
 import { useAuth } from '@/lib/AuthContext';
@@ -8,18 +7,13 @@ import { useTheme } from '@/lib/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/lib/LanguageContext';
  
-import SpotMarker from '../components/map/SpotMarker';
-import UserLocationMarker from '../components/map/UserLocationMarker';
 import MapLayerSwitcher from '../components/map/MapLayerSwitcher';
 import SearchBar from '../components/map/SearchBar';
-import POILayer from '../components/map/POILayer';
-import AmbientPOILayer from '../components/map/AmbientPOILayer';
+import MapLibreMap from '../components/map/MapLibreMap';
 import AddSpotModal from '../components/spots/AddSpotModal';
 import EditSpotModal from '../components/spots/EditSpotModal';
 import SpotDetailModal from '../components/spots/SpotDetailModal';
 import NavigationPanel from '../components/navigation/NavigationPanel';
-import RouteOverlay from '../components/navigation/RouteOverlay';
-import RoadClosureLayer from '../components/map/RoadClosureLayer';
 import AuthModal from '../components/auth/AuthModal';
 import MySpotsPanel from '../components/spots/MySpotsPanel';
 
@@ -29,91 +23,9 @@ import POIDetailPanel from '../components/spots/POIDetailPanel';
 import SettingsModal from '../components/SettingsModal';
 import ProfileMenu from '../components/ProfileMenu';
 import OfflineMapsMenu from '../components/offline/OfflineMapsMenu';
-import OfflineTileLayer from '../components/map/OfflineTileLayer';
 import { getAllMeta } from '../lib/offlineStorage.js';
  
 // Note: Leaflet marker icons are fixed via src/lib/leaflet-fix.js
- 
-const MAPY_API_KEY = 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
- 
-// ── TomTom API key for real-time traffic overlay ────────────────────────────
-// Sign up free at https://developer.tomtom.com — 2,500 req/day on free tier.
-// Paste your key below; traffic overlay is silently disabled without it.
-const TOMTOM_API_KEY = import.meta.env.VITE_TOMTOM_API_KEY || '';
- 
-// ── Base tile URLs ────────────────────────────────────────────────────────────
-// Light tiles (default)
-const LIGHT_TILES = {
-  basic:   `https://api.mapy.com/v1/maptiles/basic/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
-  outdoor: `https://api.mapy.com/v1/maptiles/outdoor/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
-  aerial:  `https://api.mapy.com/v1/maptiles/aerial/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
-  winter:  `https://api.mapy.com/v1/maptiles/winter/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
-  traffic: `https://api.mapy.com/v1/maptiles/basic/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
-};
- 
-// Dark tiles — CartoDB Dark Matter (free, no API key required)
-// aerial stays as Mapy.cz (inverted satellite looks terrible), winter keeps its own style
-const DARK_TILES = {
-  basic:   'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-  outdoor: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-  aerial:  `https://api.mapy.com/v1/maptiles/aerial/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
-  winter:  `https://api.mapy.com/v1/maptiles/winter/256/{z}/{x}/{y}?apikey=${MAPY_API_KEY}`,
-  traffic: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-};
- 
-// ── OSM tiles — used for offline caching (free, no API key, global) ─────────
-// Downloaded tiles are stored in IndexedDB and served offline.
-// We use OSM instead of Mapy.cz for offline because Mapy.cz ToS prohibits
-// bulk downloading of tiles for offline use.
-const OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-
-// ── TomTom traffic flow overlay ───────────────────────────────────────────────
-// Overlaid on top of ANY base layer when mapLayer === 'traffic'
-// Green = free flow  |  Yellow = slow  |  Red = heavy congestion
-// TomTom traffic tile URL — 256px tiles load ~4× faster than 512px,
-// have better browser cache hit rate, and avoid ERR_FAILED on slow connections.
-// We use 'relative' style (proportional width coloring) which renders cleaner at zoom <14.
-const TRAFFIC_OVERLAY_URL = TOMTOM_API_KEY
-  ? `https://api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?key=${TOMTOM_API_KEY}`
-  : null;
-
-// Second TomTom subdomain mirror — round-robin between a/b/c/d to parallelise requests
-// Leaflet's {s} subdomain syntax picks randomly from the subdomains array per tile
-const TRAFFIC_OVERLAY_URL_SUB = TOMTOM_API_KEY
-  ? `https://{s}.api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?key=${TOMTOM_API_KEY}`
-  : null;
- 
-// Map controller component
-function MapController({ flyTo, fitBoundsData, zoomToArea, setMapRef }) {
-  const map = useMap();
-  useEffect(() => { setMapRef(map); }, [map]);
-  useEffect(() => {
-    if (flyTo) map.flyTo(flyTo, 15, { duration: 1 });
-  }, [flyTo]);
-  useEffect(() => {
-    if (fitBoundsData && fitBoundsData.length >= 2) {
-      map.fitBounds(fitBoundsData, { padding: [60, 60], animate: true, duration: 1.2 });
-    }
-  }, [fitBoundsData]);
-  useEffect(() => {
-    if (zoomToArea) {
-      // Zoom to current position at ~40km radius visible (zoom 9)
-      if (zoomToArea.center) map.flyTo(zoomToArea.center, 9, { duration: 1.2 });
-      else map.setZoom(9);
-    }
-  }, [zoomToArea]);
-  return null;
-}
- 
-// Click handler for adding spot
-function MapClickHandler({ addMode, onMapClick }) {
-  useMapEvents({
-    click: (e) => {
-      if (addMode) onMapClick(e.latlng);
-    }
-  });
-  return null;
-}
  
 export default function Home() {
   const { user, logout, isAuthenticated } = useAuth();
@@ -122,11 +34,6 @@ export default function Home() {
   const navigate = useNavigate();
   const [spots, setSpots] = useState([]);
   const [mapLayer, setMapLayer] = useState('basic');
-  // Select the right tile set based on dark mode
-  const tileUrls = isDark ? DARK_TILES : LIGHT_TILES;
-  // CartoDB needs subdomains; Mapy.cz does not
-  const cartoDomains = ['a', 'b', 'c', 'd'];
-  const useCartoTile = isDark && mapLayer !== 'aerial' && mapLayer !== 'winter';
   const [userPos, setUserPos] = useState(null);
   const [userAccuracy, setUserAccuracy] = useState(null);
   const [addMode, setAddMode] = useState(false);
@@ -336,112 +243,32 @@ export default function Home() {
         </div>
       )}
  
-      {/* Map */}
-      <MapContainer
-        center={[mapCenter.lat, mapCenter.lng]}
-        zoom={13}
-        minZoom={3}
-        maxZoom={20}
-        style={{ width: '100%', height: '100%' }}
-        zoomControl={false}
-        attributionControl={false}
-        scrollWheelZoom={true}
-        wheelPxPerZoomLevel={80}
-        zoomSnap={0.5}
-        zoomDelta={0.5}
-        wheelDebounceTime={40}
-        touchZoom={true}
-        bounceAtZoomLimits={false}
-        preferCanvas={true}
-      >
-        {/* Base map tile — uses PMTiles offline file if downloaded, otherwise raster */}
-        <OfflineTileLayer
-          key={`${mapLayer}-${isDark}`}
-          url={tileUrls[mapLayer]}
-          offlineUrl={OSM_TILE_URL}
-          subdomains={useCartoTile ? cartoDomains : []}
-          attribution={useCartoTile
-            ? '&copy; <a href="https://carto.com">CARTO</a> &copy; <a href="https://osm.org/copyright">OpenStreetMap</a>'
-            : '&copy; <a href="https://mapy.com">Mapy.cz</a>'}
-          maxZoom={20}
-          maxNativeZoom={19}
-          keepBuffer={6}
-          updateWhenIdle={false}
-          updateWhenZooming={false}
-          isDark={isDark}
-        />
- 
-        {/* TomTom real-time traffic flow overlay (only on traffic layer) */}
-        {mapLayer === 'traffic' && TRAFFIC_OVERLAY_URL_SUB && (
-          <TileLayer
-            key="traffic-overlay"
-            url={TRAFFIC_OVERLAY_URL_SUB}
-            subdomains={['a','b','c','d']}
-            tileSize={256}
-            opacity={0.60}
-            maxZoom={20}
-            maxNativeZoom={18}
-            zIndex={200}
-            keepBuffer={4}
-            updateWhenIdle={false}
-            updateWhenZooming={true}
-            crossOrigin="anonymous"
-            errorTileUrl="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
-          />
-        )}
-        {/* Road closure markers — shown on traffic layer when TomTom key is set AND no POI category selected */}
-        <RoadClosureLayer
-          apiKey={TOMTOM_API_KEY}
-          enabled={mapLayer === 'traffic' && !selectedPOICategory}
-          lang={language}
-          t={t}
-        />
- 
-        <MapController flyTo={flyTo} fitBoundsData={fitBoundsData} zoomToArea={zoomToArea} setMapRef={(m) => { mapRef.current = m; }} />
-        <MapClickHandler addMode={addMode} onMapClick={handleMapClick} />
- 
-        {/* User location */}
-        <UserLocationMarker position={userPos} accuracy={userAccuracy} />
- 
-        {/* Spot markers — only shown when showSpots is enabled */}
-        {showSpots && spots.map(spot => (
-          <SpotMarker
-            key={spot.id}
-            spot={spot}
-            onClick={() => setSelectedSpot(spot)}
-          />
-        ))}
- 
-        {/* Route overlay during navigation */}
-        {navTarget && navRouteData.coordinates.length > 0 && (
-          <RouteOverlay
-            routeCoordinates={navRouteData.coordinates}
-            turnMarkers={navRouteData.turns}
-            currentStep={navRouteData.currentStep}
-          />
-        )}
-
-        {/* Ambient POI layer — shows icons based on zoom without searching */}
-        <AmbientPOILayer
-          selectedCategory={selectedPOICategory}
-          onSelectPOI={(poi, cat) => {
-            setSelectedPOICategory(cat);
-            setSelectedPOI(poi);
-          }}
-        />
-
-        {/* POI Layer - shows category-based POIs */}
-        <POILayer 
-          category={selectedPOICategory}
-          onNavigate={(destination) => {
-            if (!userPos) return alert(t('home.locationUnavailable'));
-            startNavTo(destination);
-          }}
-          onPOIsLoaded={(pois) => setCurrentPOIs(pois)}
-          onLoadingChange={(loading) => setPoiLoading(loading)}
-          onSelectPOI={(poi) => setSelectedPOI(poi)}
-        />
-      </MapContainer>
+      {/* Map — MapLibre GL: online=vector tiles from R2, offline=local PMTiles */}
+      <MapLibreMap
+        center={mapCenter}
+        flyTo={flyTo}
+        fitBoundsData={fitBoundsData}
+        zoomToArea={zoomToArea}
+        setMapRef={(m) => { mapRef.current = m; }}
+        addMode={addMode}
+        onMapClick={handleMapClick}
+        spots={spots}
+        showSpots={showSpots}
+        onSelectSpot={setSelectedSpot}
+        userPos={userPos}
+        userAccuracy={userAccuracy}
+        selectedPOICategory={selectedPOICategory}
+        onSelectPOI={(poi, cat) => {
+          if (cat) setSelectedPOICategory(cat);
+          setSelectedPOI(poi);
+        }}
+        onPOIsLoaded={(pois) => setCurrentPOIs(pois)}
+        onLoadingChange={(loading) => setPoiLoading(loading)}
+        navTarget={navTarget}
+        navRouteData={navRouteData}
+        isDark={isDark}
+        mapLayer={mapLayer}
+      />
  
       {/* Search bar */}
       <SearchBar
@@ -456,11 +283,10 @@ export default function Home() {
         onSelectCategory={(category) => {
           setSelectedPOICategory(category);
           setShowPOIPanel(true);
-          // Zoom to level 14 so POILayer's minZoom check passes and the
-          // Overpass bounding box is small enough to return results
           if (mapRef.current) {
             const center = mapRef.current.getCenter();
-            mapRef.current.setView(center, 14, { animate: true, duration: 1 });
+            const zoom   = mapRef.current.getZoom();
+            if (zoom < 14) mapRef.current.flyTo({ center, zoom: 14, duration: 800 });
           }
         }}
       />

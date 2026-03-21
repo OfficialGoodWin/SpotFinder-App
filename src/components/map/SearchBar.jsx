@@ -3,7 +3,6 @@ import { Search, X, Navigation, Mic } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { filterCategories, getCategoryName } from '@/lib/POICategories';
 
-const MAPY_API_KEY = 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
 
 const LANG_TO_BCP47 = {
   en: 'en-US', cs: 'cs-CZ', pl: 'pl-PL', de: 'de-DE', sk: 'sk-SK',
@@ -70,15 +69,30 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
     clearTimeout(debounce.current);
     debounce.current = setTimeout(async () => {
       setLoading(true);
-      const near = mapCenter ? `&preferNear=${mapCenter.lng},${mapCenter.lat}&preferNearPrecision=25000` : '';
-      const url = `https://api.mapy.com/v1/suggest?apikey=${MAPY_API_KEY}&query=${encodeURIComponent(query)}&lang=${language}&limit=6${near}`;
       try {
-        const res = await fetch(url);
+        // OSM Nominatim — free, no API key, global coverage
+        const near = mapCenter
+          ? `&lat=${mapCenter.lat}&lon=${mapCenter.lng}&bounded=0`
+          : '';
+        const url =
+          `https://nominatim.openstreetmap.org/search` +
+          `?q=${encodeURIComponent(query)}` +
+          `&format=json&limit=6&addressdetails=1${near}` +
+          `&accept-language=${language}`;
+        const res  = await fetch(url, {
+          headers: { 'Accept-Language': language, 'User-Agent': 'SpotFinderApp/1.0' },
+        });
         const data = await res.json();
-        setResults(data.items || []);
+        // Normalise Nominatim response to match the shape handleSelect expects
+        setResults((data || []).map(item => ({
+          name:     item.display_name?.split(',')[0] || item.name || '',
+          label:    item.display_name || '',
+          location: item.display_name || '',
+          position: { lat: parseFloat(item.lat), lon: parseFloat(item.lon) },
+        })));
       } catch { setResults([]); }
       setLoading(false);
-    }, 300);
+    }, 400);
   }, [query]);
 
   const handleSelect = (item) => {
