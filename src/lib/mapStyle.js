@@ -138,6 +138,7 @@ function style(dark = false) {
       lf('lc-grass',     c.grass,     'landcover', ['in', 'class', 'grass', 'meadow']),
       lf('lc-scrub',     c.scrub,     'landcover', ['in', 'class', 'scrub', 'heath']),
       lf('lc-wood',      c.forest,    'landcover', ['in', 'class', 'wood', 'forest']),
+      lf('lu-wood',      c.forest,    'landuse',   ['in', 'class', 'forest', 'wood']),
       lf('lc-wetland',   c.wetland,   'landcover', ['==', 'class', 'wetland']),
       lf('lc-sand',      c.beach,     'landcover', ['in', 'class', 'sand', 'beach']),
       lf('lc-ice',       c.glacier,   'landcover', ['==', 'class', 'ice']),
@@ -188,7 +189,7 @@ function style(dark = false) {
           'rgba(0,0,0,0)'
         ],
         'line-width':['interpolate',['linear'],['zoom'],6,0.8,10,2.5,14,5,18,12] } },
-      rc('rc-tertiary',  c.roadLine,     'tertiary',   [0.8, 2.5], 9),
+      rc('rc-tertiary',  c.tertiaryLine, 'tertiary',   [0.8, 2.5], 8),
       rc('rc-local', c.roadLine, ['in', 'class', 'unclassified', 'minor'], [0.5, 2.0], 12),
       rc('rc-street',    c.roadLine,     ['in', 'class', 'street', 'street_limited', 'service', 'residential', 'living_street', 'unclassified', 'minor'], [0.5, 2.0], 13),
 
@@ -220,6 +221,53 @@ function style(dark = false) {
       rl('r-trunk',     c.trunk,     'trunk',     [1.5, 3]),
       rl('r-motorway',  c.motorway,  'motorway',  [2,   4]),
 
+
+      // ── Tunnels — dimmed (brunnel=tunnel) ─────────────────────────────────────
+      { id:'tunnel-motorway', type:'line', source:'v', 'source-layer':'transportation',
+        filter:['all',['==','class','motorway'],['==','brunnel','tunnel']],
+        layout:{'line-join':'round','line-cap':'butt'},
+        paint:{'line-color':c.motorway,'line-opacity':0.35,
+          'line-width':['interpolate',['linear'],['zoom'],6,2,10,4,14,8,18,17],'line-dasharray':[3,2]} },
+      { id:'tunnel-trunk', type:'line', source:'v', 'source-layer':'transportation',
+        filter:['all',['==','class','trunk'],['==','brunnel','tunnel']],
+        layout:{'line-join':'round','line-cap':'butt'},
+        paint:{'line-color':c.trunk,'line-opacity':0.35,
+          'line-width':['interpolate',['linear'],['zoom'],6,1.5,10,3,14,7,18,15],'line-dasharray':[3,2]} },
+      { id:'tunnel-primary', type:'line', source:'v', 'source-layer':'transportation',
+        filter:['all',['==','class','primary'],['==','brunnel','tunnel']],
+        layout:{'line-join':'round','line-cap':'butt'},
+        paint:{'line-color':c.primary,'line-opacity':0.35,
+          'line-width':['interpolate',['linear'],['zoom'],8,1,12,2.5,16,7],'line-dasharray':[3,2]} },
+      { id:'tunnel-other', type:'line', source:'v', 'source-layer':'transportation',
+        filter:['all',['in','class','secondary','tertiary','street','residential'],['==','brunnel','tunnel']],
+        layout:{'line-join':'round','line-cap':'butt'},
+        paint:{'line-color':c.road,'line-opacity':0.35,
+          'line-width':['interpolate',['linear'],['zoom'],10,1,14,3,18,7],'line-dasharray':[3,2]} },
+
+      // ── Bridges — gray side lines (brunnel=bridge) ──────────────────────────
+      { id:'bridge-motorway-side', type:'line', source:'v', 'source-layer':'transportation',
+        filter:['all',['==','class','motorway'],['==','brunnel','bridge']],
+        layout:{'line-join':'miter','line-cap':'butt'},
+        paint:{'line-color':'#aaaaaa',
+          'line-width':['interpolate',['linear'],['zoom'],6,3.5,10,7,14,12,18,22],
+          'line-gap-width':0} },
+      { id:'bridge-trunk-side', type:'line', source:'v', 'source-layer':'transportation',
+        filter:['all',['==','class','trunk'],['==','brunnel','bridge']],
+        layout:{'line-join':'miter','line-cap':'butt'},
+        paint:{'line-color':'#aaaaaa',
+          'line-width':['interpolate',['linear'],['zoom'],6,3,10,6,14,11,18,20],
+          'line-gap-width':0} },
+      { id:'bridge-primary-side', type:'line', source:'v', 'source-layer':'transportation',
+        filter:['all',['==','class','primary'],['==','brunnel','bridge']],
+        layout:{'line-join':'miter','line-cap':'butt'},
+        paint:{'line-color':'#aaaaaa',
+          'line-width':['interpolate',['linear'],['zoom'],8,2,12,5,16,10],'line-gap-width':0} },
+      { id:'bridge-other-side', type:'line', source:'v', 'source-layer':'transportation',
+        filter:['all',['in','class','secondary','tertiary','street','residential'],['==','brunnel','bridge']],
+        minzoom:12,
+        layout:{'line-join':'miter','line-cap':'butt'},
+        paint:{'line-color':'#aaaaaa',
+          'line-width':['interpolate',['linear'],['zoom'],10,1.5,14,4,18,9],'line-gap-width':0} },
 
       // ── Railway ───────────────────────────────────────────────────────────
       { id: 'rail-case', type: 'line', source: 'v', 'source-layer': 'transportation',
@@ -255,6 +303,7 @@ function style(dark = false) {
         layout:{
           'icon-image':['concat','shield-motorway-',['get','ref']],
           'icon-allow-overlap':false,
+          'icon-rotation-alignment':'viewport',
           'symbol-placement':'line',
           'symbol-spacing':350,
           'text-field':'',
@@ -268,6 +317,7 @@ function style(dark = false) {
         layout:{
           'icon-image':['concat','shield-trunk-',['get','ref']],
           'icon-allow-overlap':false,
+          'icon-rotation-alignment':'viewport',
           'symbol-placement':'line',
           'symbol-spacing':320,
           'text-field':'',
@@ -281,6 +331,7 @@ function style(dark = false) {
         layout:{
           'icon-image':['concat','shield-primary-',['get','ref']],
           'icon-allow-overlap':false,
+          'icon-rotation-alignment':'viewport',
           'symbol-placement':'line',
           'symbol-spacing':300,
           'text-field':'',
@@ -294,6 +345,7 @@ function style(dark = false) {
         layout:{
           'icon-image':['concat','shield-secondary-',['get','ref']],
           'icon-allow-overlap':false,
+          'icon-rotation-alignment':'viewport',
           'symbol-placement':'line',
           'symbol-spacing':280,
           'text-field':'',

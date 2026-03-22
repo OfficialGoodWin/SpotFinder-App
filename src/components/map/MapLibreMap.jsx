@@ -420,19 +420,36 @@ export default function MapLibreMap({
     const map = mapRef.current;
     if (!map) return;
 
-    // Render E-route markers once — MapLibre moves them automatically
-    loadERoutes().then(routes => {
-      if (!mapRef.current) return;
-      routes.forEach(({ r, lat, lng }) => {
-        const el = drawERouteShield(r);
-        const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
-          .setLngLat([lng, lat])
-          .addTo(map);
-        eRouteMarkersRef.current.push(marker);
+    // E-routes: for each unique ref, show only the point CLOSEST to map center
+    // This avoids showing E50 over Germany when you're in Czechia
+    function placeERoutes() {
+      eRouteMarkersRef.current.forEach(m => m.remove());
+      eRouteMarkersRef.current = [];
+      const center = map.getCenter();
+      loadERoutes().then(routes => {
+        if (!mapRef.current) return;
+        // Group by ref, pick closest point to current center
+        const byRef = new Map();
+        routes.forEach(pt => {
+          const dist = Math.hypot(pt.lat - center.lat, pt.lng - center.lng);
+          const cur  = byRef.get(pt.r);
+          if (!cur || dist < cur.dist) byRef.set(pt.r, { ...pt, dist });
+        });
+        byRef.forEach(({ r, lat, lng }) => {
+          const el = drawERouteShield(r);
+          const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+            .setLngLat([lng, lat])
+            .addTo(map);
+          eRouteMarkersRef.current.push(marker);
+        });
       });
-    });
+    }
+
+    placeERoutes();
+    map.on('moveend', placeERoutes);
 
     return () => {
+      map.off('moveend', placeERoutes);
       eRouteMarkersRef.current.forEach(m => m.remove());
       eRouteMarkersRef.current = [];
     };
