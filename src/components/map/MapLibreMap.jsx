@@ -420,39 +420,21 @@ export default function MapLibreMap({
     const map = mapRef.current;
     if (!map) return;
 
-    function clearERoutes() {
+    // Render E-route markers once — MapLibre moves them automatically
+    loadERoutes().then(routes => {
+      if (!mapRef.current) return;
+      routes.forEach(({ r, lat, lng }) => {
+        const el = drawERouteShield(r);
+        const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([lng, lat])
+          .addTo(map);
+        eRouteMarkersRef.current.push(marker);
+      });
+    });
+
+    return () => {
       eRouteMarkersRef.current.forEach(m => m.remove());
       eRouteMarkersRef.current = [];
-    }
-
-    function renderERoutes() {
-      clearERoutes();
-      if (!isOnline) return;
-      const zoom = map.getZoom();
-      if (zoom < 7) return; // don't show at very low zoom
-      const bounds = map.getBounds();
-      const pad = 3;
-
-      loadERoutes().then(routes => {
-        if (!mapRef.current) return;
-        routes.forEach(({ r, lat, lng }) => {
-          const el     = drawERouteShield(r);
-          const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
-            .setLngLat([lng, lat])
-            .addTo(map);
-          eRouteMarkersRef.current.push(marker);
-        });
-      });
-    }
-
-    // Fire once map is fully ready
-    map.once('idle', renderERoutes);
-    map.on('moveend', renderERoutes);
-    map.on('zoomend', renderERoutes);
-    return () => {
-      map.off('moveend', renderERoutes);
-      map.off('zoomend', renderERoutes);
-      clearERoutes();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnline]);

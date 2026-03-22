@@ -151,9 +151,10 @@ function style(dark = false) {
       lf('lu-hospital',    c.hospital,    'landuse', ['==', 'class', 'hospital'], 0.7),
       lf('lu-school',      c.school,      'landuse', ['in', 'class', 'school', 'university', 'college'], 0.7),
 
-      // National parks
+      // National parks — subtle dashed border, only visible close up
       { id: 'park-border', type: 'line', source: 'v', 'source-layer': 'park',
-        paint: { 'line-color': c.natPark, 'line-width': 1.5, 'line-dasharray': [4, 3] } },
+        minzoom: 9,
+        paint: { 'line-color': dark ? '#2a4820' : '#8aaa60', 'line-width': 0.8, 'line-opacity': 0.5, 'line-dasharray': [6, 4] } },
 
       // ── Water ─────────────────────────────────────────────────────────────
       { id: 'water',  type: 'fill', source: 'v', 'source-layer': 'water',
@@ -254,10 +255,7 @@ function style(dark = false) {
         layout:{
           'icon-image':['concat','shield-motorway-',['get','ref']],
           'icon-allow-overlap':false,
-          'icon-rotation-alignment':'map',
-          'icon-pitch-alignment':'map',
           'symbol-placement':'line',
-          'icon-keep-upright':false,
           'symbol-spacing':350,
           'text-field':'',
         },
@@ -270,10 +268,7 @@ function style(dark = false) {
         layout:{
           'icon-image':['concat','shield-trunk-',['get','ref']],
           'icon-allow-overlap':false,
-          'icon-rotation-alignment':'map',
-          'icon-pitch-alignment':'map',
           'symbol-placement':'line',
-          'icon-keep-upright':false,
           'symbol-spacing':320,
           'text-field':'',
         },
@@ -286,10 +281,7 @@ function style(dark = false) {
         layout:{
           'icon-image':['concat','shield-primary-',['get','ref']],
           'icon-allow-overlap':false,
-          'icon-rotation-alignment':'map',
-          'icon-pitch-alignment':'map',
           'symbol-placement':'line',
-          'icon-keep-upright':false,
           'symbol-spacing':300,
           'text-field':'',
         },
@@ -302,10 +294,7 @@ function style(dark = false) {
         layout:{
           'icon-image':['concat','shield-secondary-',['get','ref']],
           'icon-allow-overlap':false,
-          'icon-rotation-alignment':'map',
-          'icon-pitch-alignment':'map',
           'symbol-placement':'line',
-          'icon-keep-upright':false,
           'symbol-spacing':280,
           'text-field':'',
         },
