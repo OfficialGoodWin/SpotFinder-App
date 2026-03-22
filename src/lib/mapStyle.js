@@ -7,7 +7,7 @@
 
 const FONTS = {
   regular: ['Noto Sans Regular'],
-  bold:    ['Noto Sans Bold'],
+  bold:    ['Noto Sans Medium'],   // Protomaps only has Regular/Medium/Italic — no Bold
   italic:  ['Noto Sans Italic'],
 };
 
@@ -120,7 +120,7 @@ function style(dark = false) {
   return {
     version: 8,
     name: dark ? 'SpotFinder Dark' : 'SpotFinder',
-    glyphs:  'https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf',
+    glyphs:  'https://cdn.protomaps.com/fonts/pbf/{fontstack}/{range}.pbf',
     sprite:  dark ? 'https://protomaps.github.io/basemaps-assets/sprites/v4/dark' : 'https://protomaps.github.io/basemaps-assets/sprites/v4/light',
     sources: {
       v: {

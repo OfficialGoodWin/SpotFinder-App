@@ -288,11 +288,20 @@ async function fetchAmbientPOIs(south, west, north, east, zoom, signal) {
 
 
 function registerShieldListener(map) {
-  // Generate shield images on demand when MapLibre requests them
   map.on('styleimagemissing', (e) => {
     if (e.id && e.id.startsWith('shield-')) {
       addShieldImage(map, e.id);
     }
+  });
+}
+
+function reRegisterShieldListener(map) {
+  // styleimagemissing survives setStyle in MapLibre — no need to re-add
+  // BUT we need to clear the image cache so shields get redrawn after style reload
+  // (setStyle wipes all images including our shields)
+  map.on('style.load', () => {
+    // Shields are gone after style reload — they'll be re-requested via styleimagemissing
+    // No action needed, the listener persists
   });
 }
 
@@ -337,6 +346,11 @@ export default function MapLibreMap({
 
     // Register shield image listener — generates signs on demand via styleimagemissing
     registerShieldListener(map);
+    // Also call once after style loads to handle any already-queued requests
+    map.once('load', () => {
+      // Force re-request of any shields that may have been missed
+      map.triggerRepaint();
+    });
 
     mapRef.current = map;
     setMapRef?.(map);
@@ -468,12 +482,13 @@ export default function MapLibreMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || offlineActive) return;
-    // Wait for any in-progress style load before switching
-    if (!map.isStyleLoaded()) {
-      map.once('idle', () => map.setStyle(isDark ? darkStyle : lightStyle));
-    } else {
+    const doSwitch = () => {
       map.setStyle(isDark ? darkStyle : lightStyle);
-    }
+      // After style loads, trigger repaint so shields get re-requested via styleimagemissing
+      map.once('style.load', () => map.triggerRepaint());
+    };
+    if (!map.isStyleLoaded()) map.once('idle', doSwitch);
+    else doSwitch();
   }, [isDark, offlineActive]);
 
   // ── Cursor ─────────────────────────────────────────────────────────────────
