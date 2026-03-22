@@ -340,8 +340,26 @@ export default function MapLibreMap({
     registerShieldListener(map);
     // Also call once after style loads to handle any already-queued requests
     map.once('load', () => {
-      // Force re-request of any shields that may have been missed
       map.triggerRepaint();
+      // Add E-route GeoJSON source + shield layer
+      try {
+        map.addSource('eroutes', { type: 'geojson', data: EROUTES_GEOJSON });
+        map.addLayer({
+          id: 'shield-euro',
+          type: 'symbol',
+          source: 'eroutes',
+          layout: {
+            'icon-image': ['concat', 'shield-euro-', ['get', 'ref']],
+            'icon-allow-overlap': false,
+            'icon-rotation-alignment': 'viewport',
+            'symbol-placement': 'line',
+            'symbol-spacing': 320,
+            'icon-offset': [22, 0],
+            'text-field': '',
+          },
+          paint: { 'icon-opacity': 1 },
+        });
+      } catch(_) {}
     });
 
     mapRef.current = map;
@@ -413,55 +431,31 @@ export default function MapLibreMap({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnline, isDark]);
 
-  // ── E-route shields — GeoJSON line source + symbol layer ─────────────────
-  // Works exactly like regular road shields: placed along the line,
-  // repeats at intervals, scales with zoom, rotates with road direction.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    function addERoutes() {
-      // Always remove then re-add — called after style is fully loaded
-      try { if (map.getLayer('shield-euro')) map.removeLayer('shield-euro'); } catch(_) {}
-      try { if (map.getSource('eroutes'))    map.removeSource('eroutes');    } catch(_) {}
-      try {
-        map.addSource('eroutes', { type: 'geojson', data: EROUTES_GEOJSON });
-        map.addLayer({
-          id: 'shield-euro',
-          type: 'symbol',
-          source: 'eroutes',
-          layout: {
-            'icon-image': ['concat', 'shield-euro-', ['get', 'ref']],
-            'icon-allow-overlap': false,
-            'icon-rotation-alignment': 'viewport',
-            'symbol-placement': 'line',
-            'symbol-spacing': 320,
-            'icon-offset': [22, 0],
-            'text-field': '',
-          },
-          paint: { 'icon-opacity': 1 },
-        });
-      } catch(_) {}
-    }
-
-    // Wait for map to be fully idle before adding
-    map.once('idle', addERoutes);
-
-    // Re-add after every style reload (setStyle wipes everything)
-    const onStyleLoad = () => map.once('idle', addERoutes);
-    map.on('style.load', onStyleLoad);
-    return () => map.off('style.load', onStyleLoad);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // ── Dark mode ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current;
     if (!map || offlineActive) return;
     const doSwitch = () => {
       map.setStyle(isDark ? darkStyle : lightStyle);
-      // After style loads, trigger repaint so shields get re-requested via styleimagemissing
-      map.once('style.load', () => map.triggerRepaint());
+      map.once('idle', () => {
+        map.triggerRepaint();
+        // Re-add E-routes after style reload
+        try {
+          if (!map.getSource('eroutes')) {
+            map.addSource('eroutes', { type: 'geojson', data: EROUTES_GEOJSON });
+            map.addLayer({
+              id: 'shield-euro', type: 'symbol', source: 'eroutes',
+              layout: {
+                'icon-image': ['concat', 'shield-euro-', ['get', 'ref']],
+                'icon-allow-overlap': false, 'icon-rotation-alignment': 'viewport',
+                'symbol-placement': 'line', 'symbol-spacing': 320,
+                'icon-offset': [22, 0], 'text-field': '',
+              },
+              paint: { 'icon-opacity': 1 },
+            });
+          }
+        } catch(_) {}
+      });
     };
     if (!map.isStyleLoaded()) map.once('idle', doSwitch);
     else doSwitch();
