@@ -426,13 +426,19 @@ export default function MapLibreMap({
       eRouteMarkersRef.current.forEach(m => m.remove());
       eRouteMarkersRef.current = [];
       const center = map.getCenter();
+      const zoom   = map.getZoom();
+      // Only show E-routes from zoom 7+ 
+      if (zoom < 7) return;
+      // Max distance to show a route (degrees, ~2° ≈ 220km)
+      const maxDist = Math.max(2, 20 / Math.pow(2, zoom - 5));
       loadERoutes().then(routes => {
         if (!mapRef.current) return;
-        // Group by ref, pick closest point to current center
+        // For each ref, collect all points within range, pick the closest
         const byRef = new Map();
         routes.forEach(pt => {
           const dist = Math.hypot(pt.lat - center.lat, pt.lng - center.lng);
-          const cur  = byRef.get(pt.r);
+          if (dist > maxDist) return; // skip points far away
+          const cur = byRef.get(pt.r);
           if (!cur || dist < cur.dist) byRef.set(pt.r, { ...pt, dist });
         });
         byRef.forEach(({ r, lat, lng }) => {
