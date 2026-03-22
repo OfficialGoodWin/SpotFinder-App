@@ -33,23 +33,52 @@ const SHIELD_COLORS = {
 // Road ref → E-route lookup (static mapping from official sources)
 // When drawing a road shield, if the ref has an E-route, draw it stacked below
 const EURO_ROUTES = {
-  // Czech motorways
-  'D1':['E50','E65'],'D2':['E65'],'D5':['E50'],'D8':['E55'],
-  'D11':['E67'],'D35':['E442'],'D46':['E462'],'D48':['E462'],'D49':['E462'],
-  // Czech expressways / R-roads (MO = Prague ring)
-  'MO':['E53'],'R10':['E65'],'R35':['E442'],
-  // Slovak D1
-  'D1/SK':['E571'],
-  // Key primary roads
-  '2':['E55'],'4':['E49'],'5':['E49'],'6':['E48'],'13':['E442'],
-  '35':['E442'],'50':['E442'],
-  // German Autobahns visible from CZ
-  'A3':['E56'],'A6':['E50'],'A9':['E51'],'A17':['E55'],
-  'A72':['E441'],'A93':['E53'],
-  // Austrian
-  'A1':['E60'],'A2':['E59'],'A4':['E60'],'A8':['E60'],
-  // Polish
-  'A1':['E75'],'A4':['E40'],'S3':['E65'],
+  // ── Czech motorways — source: OSM int_ref field, way-count weighted ─────────
+  'D0': ['E50'],            // Prague ring (also E48,E55,E65 — E50 dominant)
+  'MO': ['E50'],            // same road different ref
+  'D1': ['E50','E65'],      // Praha–Brno (E50 dominant), Brno–SK (E65)
+  'D2': ['E65'],            // Brno–Bratislava
+  'D3': ['E55'],            // Praha–C.Budějovice
+  'D5': ['E50'],            // Praha–Plzeň–Rozvadov
+  'D6': ['E48','E49'],      // Praha–KV–Cheb (E48 dominant, E49 on border section)
+  'D8': ['E55'],            // Praha–Ústí–Dresden
+  'D10':['E65'],            // Praha–Ml.Boleslav
+  'D11':['E67'],            // Praha–Hradec Králové
+  'D35':['E442'],           // Olomouc–Lipník
+  'D46':['E462'],           // Vyškov–Olomouc
+  'D48':['E462'],           // Bělotín–Frýdek-Místek
+  'D52':['E461'],           // Brno–Pohořelice (new)
+  // Czech expressways
+  'R1': ['E571','E58'],     // Slovak R1
+  'R2': ['E571','E58'],     // Slovak R2
+  'R4': ['E58'],
+  // Czech primary roads
+  '6':  ['E48'],
+  '10': ['E65'],
+  '11': ['E75'],            // Ostrava–Mosty u Jablunkova
+  '13': ['E442'],
+  '17': ['E442'],
+  '20': ['E49'],
+  '21': ['E49'],
+  '27': ['E53'],
+  '33': ['E67'],
+  '35': ['E442'],
+  '50': ['E50'],
+  // German Autobahns
+  'A 3': ['E56'],
+  'A 6': ['E50'],
+  'A 9': ['E51'],
+  'A 17':['E55'],
+  'A 70':['E48'],
+  'A 72':['E441'],
+  'A 92':['E53'],
+  // Austrian/Polish/Slovak
+  'A1': ['E75'],
+  'A2': ['E59'],
+  'A4': ['E40'],
+  'A8': ['E56'],
+  'A9': ['E59'],
+  'A10':['E55'],
 };
 
 // Detect if a ref is a local road (5+ digits = district/local road)
@@ -125,32 +154,39 @@ function drawRoadShield(ref, roadClass) {
   // 5. If this road has E-routes, draw a green shield stacked below
   const euroRefs = EURO_ROUTES[ref];
   if (euroRefs && euroRefs.length > 0) {
-    const euroText = euroRefs[0]; // show first E-route
-    const EFS   = FONT_SIZE - 1;
-    const EPX   = PADDING_X - 1;
-    const EPY   = PADDING_Y - 1;
-    const EB    = BORDER;
-    const EIG   = INNER_GAP;
-    const ER    = RADIUS - 1;
-    const EW    = Math.ceil(ctx.measureText(euroText).width + EPX * 2 + (EB + EIG) * 2);
-    const EH    = EFS + EPY * 2 + (EB + EIG) * 2;
-    const GAP   = 2; // gap between main shield and euro shield
-    const EX    = (W - EW) / 2;
-    const EY    = H + GAP;
+    const euroText = euroRefs[0];
+    const EFS = FONT_SIZE;      // same font size as main shield
+    const EPX = PADDING_X;
+    const EPY = PADDING_Y;
+    const EB  = BORDER;
+    const EIG = INNER_GAP;
+    const ER  = RADIUS;
+    const GAP = 2;
 
-    // Expand canvas height to fit euro shield
-    const newH = H + GAP + EH;
-    // Can't easily resize canvas, so we use a separate canvas and composite
-    const c2 = document.createElement('canvas');
-    c2.width  = W * SCALE;
-    c2.height = newH * SCALE;
+    // Measure euro text properly
+    const mCtx = document.createElement('canvas').getContext('2d');
+    mCtx.font   = `bold ${EFS}px Arial, sans-serif`;
+    const ETW   = mCtx.measureText(euroText).width;
+    const EW    = Math.ceil(ETW + EPX * 2 + (EB + EIG) * 2);
+    const EH    = Math.ceil(EFS + EPY * 2 + (EB + EIG) * 2);
+
+    // Combined canvas — wide enough for both shields
+    const CW   = Math.max(W, EW);
+    const CH   = H + GAP + EH;
+    const c2   = document.createElement('canvas');
+    c2.width   = CW * SCALE;
+    c2.height  = CH * SCALE;
     const ctx2 = c2.getContext('2d');
     ctx2.scale(SCALE, SCALE);
 
-    // Copy main shield
-    ctx2.drawImage(canvas, 0, 0, W * SCALE, H * SCALE, 0, 0, W, H);
+    // Center & paste main shield
+    const mainX = (CW - W) / 2;
+    ctx2.drawImage(canvas, 0, 0, W * SCALE, H * SCALE, mainX, 0, W, H);
 
-    // Draw euro shield
+    // Draw euro shield centered below
+    const EX = (CW - EW) / 2;
+    const EY = H + GAP;
+
     function rr2(x, y, w, h, r) {
       ctx2.beginPath();
       ctx2.moveTo(x+r,y); ctx2.lineTo(x+w-r,y);
@@ -160,14 +196,15 @@ function drawRoadShield(ref, roadClass) {
       ctx2.arcTo(x,y,x+r,y,r); ctx2.closePath();
     }
     ctx2.fillStyle = '#2e7d32'; rr2(EX,EY,EW,EH,ER); ctx2.fill();
-    ctx2.fillStyle = '#fff';    rr2(EX+EB,EY+EB,EW-EB*2,EH-EB*2,ER-1); ctx2.fill();
+    ctx2.fillStyle = '#ffffff'; rr2(EX+EB,EY+EB,EW-EB*2,EH-EB*2,ER-1); ctx2.fill();
     ctx2.fillStyle = '#2e7d32'; rr2(EX+EB+EIG,EY+EB+EIG,EW-(EB+EIG)*2,EH-(EB+EIG)*2,ER-2); ctx2.fill();
-    ctx2.fillStyle = '#fff';
-    ctx2.font = `bold ${EFS}px Arial, sans-serif`;
-    ctx2.textAlign = 'center'; ctx2.textBaseline = 'middle';
-    ctx2.fillText(euroText, W/2, EY + EH/2);
+    ctx2.fillStyle   = '#ffffff';
+    ctx2.font        = `bold ${EFS}px Arial, sans-serif`;
+    ctx2.textAlign   = 'center';
+    ctx2.textBaseline = 'middle';
+    ctx2.fillText(euroText, CW/2, EY + EH/2);
 
-    return { data: ctx2.getImageData(0, 0, W*SCALE, newH*SCALE).data, width: W*SCALE, height: newH*SCALE };
+    return { data: ctx2.getImageData(0, 0, CW*SCALE, CH*SCALE).data, width: CW*SCALE, height: CH*SCALE };
   }
 
   return { data: ctx.getImageData(0, 0, W * SCALE, H * SCALE).data, width: W * SCALE, height: H * SCALE };
