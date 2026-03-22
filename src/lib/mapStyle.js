@@ -225,132 +225,76 @@ function style(dark = false) {
         filter: ['==', 'admin_level', 4], minzoom: 6,
         paint: { 'line-color': c.boundaryProv, 'line-width': 0.8, 'line-dasharray': [3, 2] } },
 
-      // ── Road number plates ────────────────────────────────────────────────
-      // 3 layers per plate type: background halo → white inner border → white text
-      // This gives the rounded rectangle look with inner white line like Czech signs
+      // ── Road shields — generated dynamically via styleimagemissing ─────────
+      // Image name format: "shield-{class}-{ref}"  e.g. "shield-motorway-D1"
+      // MapLibreMap.jsx draws the actual canvas image on demand.
 
-      // ── MOTORWAY D1/D5 — red plate ───────────────────────────────────────
-      { id:'plate-mway-bg', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['==','class','motorway'], minzoom:9,
-        layout:{ 'text-field':['get','ref'], 'text-font':FONTS.bold, 'text-size':13,
-          'symbol-placement':'line', 'symbol-spacing':350, 'text-max-angle':20,
-          'text-padding':5, 'text-allow-overlap':false },
-        paint:{ 'text-color':'rgba(0,0,0,0)', 'text-halo-color':'#cc1111', 'text-halo-width':12 } },
-      { id:'plate-mway-brd', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['==','class','motorway'], minzoom:9,
-        layout:{ 'text-field':['get','ref'], 'text-font':FONTS.bold, 'text-size':13,
-          'symbol-placement':'line', 'symbol-spacing':350, 'text-max-angle':20,
-          'text-padding':5, 'text-allow-overlap':true },
-        paint:{ 'text-color':'rgba(0,0,0,0)', 'text-halo-color':'#ffffff', 'text-halo-width':9 } },
-      { id:'plate-mway', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['==','class','motorway'], minzoom:9,
-        layout:{ 'text-field':['get','ref'], 'text-font':FONTS.bold, 'text-size':13,
-          'symbol-placement':'line', 'symbol-spacing':350, 'text-max-angle':20,
-          'text-padding':5, 'text-allow-overlap':true },
-        paint:{ 'text-color':'#ffffff', 'text-halo-color':'#cc1111', 'text-halo-width':1 } },
-
-      // ── TRUNK (R26, 48, numbered highways) — blue plate ──────────────────
-      { id:'plate-trunk-bg', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['==','class','trunk'], minzoom:10,
-        layout:{ 'text-field':['get','ref'], 'text-font':FONTS.bold, 'text-size':13,
-          'symbol-placement':'line', 'symbol-spacing':320, 'text-max-angle':20,
-          'text-padding':5, 'text-allow-overlap':false },
-        paint:{ 'text-color':'rgba(0,0,0,0)', 'text-halo-color':'#003d9e', 'text-halo-width':12 } },
-      { id:'plate-trunk-brd', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['==','class','trunk'], minzoom:10,
-        layout:{ 'text-field':['get','ref'], 'text-font':FONTS.bold, 'text-size':13,
-          'symbol-placement':'line', 'symbol-spacing':320, 'text-max-angle':20,
-          'text-padding':5, 'text-allow-overlap':true },
-        paint:{ 'text-color':'rgba(0,0,0,0)', 'text-halo-color':'#ffffff', 'text-halo-width':9 } },
-      { id:'plate-trunk', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['==','class','trunk'], minzoom:10,
-        layout:{ 'text-field':['get','ref'], 'text-font':FONTS.bold, 'text-size':13,
-          'symbol-placement':'line', 'symbol-spacing':320, 'text-max-angle':20,
-          'text-padding':5, 'text-allow-overlap':true },
-        paint:{ 'text-color':'#ffffff', 'text-halo-color':'#003d9e', 'text-halo-width':1 } },
-
-      // ── PRIMARY (27, 9, 605) — blue plate ────────────────────────────────
-      { id:'plate-prim-bg', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['==','class','primary'], minzoom:11,
-        layout:{ 'text-field':['get','ref'], 'text-font':FONTS.bold, 'text-size':12,
-          'symbol-placement':'line', 'symbol-spacing':300, 'text-max-angle':20,
-          'text-padding':4, 'text-allow-overlap':false },
-        paint:{ 'text-color':'rgba(0,0,0,0)', 'text-halo-color':'#003d9e', 'text-halo-width':11 } },
-      { id:'plate-prim-brd', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['==','class','primary'], minzoom:11,
-        layout:{ 'text-field':['get','ref'], 'text-font':FONTS.bold, 'text-size':12,
-          'symbol-placement':'line', 'symbol-spacing':300, 'text-max-angle':20,
-          'text-padding':4, 'text-allow-overlap':true },
-        paint:{ 'text-color':'rgba(0,0,0,0)', 'text-halo-color':'#ffffff', 'text-halo-width':8 } },
-      { id:'plate-prim', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['==','class','primary'], minzoom:11,
-        layout:{ 'text-field':['get','ref'], 'text-font':FONTS.bold, 'text-size':12,
-          'symbol-placement':'line', 'symbol-spacing':300, 'text-max-angle':20,
-          'text-padding':4, 'text-allow-overlap':true },
-        paint:{ 'text-color':'#ffffff', 'text-halo-color':'#003d9e', 'text-halo-width':1 } },
-
-      // ── SECONDARY/TERTIARY (605, 431) — blue plate ────────────────────────
-      { id:'plate-sec-bg', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['in','class','secondary','tertiary'], minzoom:13,
-        layout:{ 'text-field':['get','ref'], 'text-font':FONTS.bold, 'text-size':11,
-          'symbol-placement':'line', 'symbol-spacing':280, 'text-max-angle':20,
-          'text-padding':3, 'text-allow-overlap':false },
-        paint:{ 'text-color':'rgba(0,0,0,0)', 'text-halo-color':'#003d9e', 'text-halo-width':10 } },
-      { id:'plate-sec-brd', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['in','class','secondary','tertiary'], minzoom:13,
-        layout:{ 'text-field':['get','ref'], 'text-font':FONTS.bold, 'text-size':11,
-          'symbol-placement':'line', 'symbol-spacing':280, 'text-max-angle':20,
-          'text-padding':3, 'text-allow-overlap':true },
-        paint:{ 'text-color':'rgba(0,0,0,0)', 'text-halo-color':'#ffffff', 'text-halo-width':7 } },
-      { id:'plate-sec', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['in','class','secondary','tertiary'], minzoom:13,
-        layout:{ 'text-field':['get','ref'], 'text-font':FONTS.bold, 'text-size':11,
-          'symbol-placement':'line', 'symbol-spacing':280, 'text-max-angle':20,
-          'text-padding':3, 'text-allow-overlap':true },
-        paint:{ 'text-color':'#ffffff', 'text-halo-color':'#003d9e', 'text-halo-width':1 } },
-
-      // ── EUROPEAN ROUTES E50/E49 — green plate, shown on all road classes ──
-      // E-routes have ref starting with E (e.g. "E50", "E55") — shown as separate
-      // overlapping label offset below the national number plate
-      { id:'plate-euro-bg', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['in','class','motorway','trunk','primary'], minzoom:11,
+      // Motorway (D1, D5, D7) — red shield
+      { id:'shield-motorway', type:'symbol', source:'v', 'source-layer':'transportation_name',
+        filter:['all',['==','class','motorway'],['has','ref']],
+        minzoom:9,
         layout:{
-          'text-field': ['case',
-            ['has','network'], ['get','network'],
-            ['literal','']
-          ],
-          'text-font':FONTS.bold, 'text-size':11,
-          'symbol-placement':'line', 'symbol-spacing':500, 'text-max-angle':20,
-          'text-padding':4, 'text-allow-overlap':true,
-          'text-offset':[0, 2.4],
+          'icon-image':['concat','shield-motorway-',['get','ref']],
+          'icon-allow-overlap':false,
+          'icon-ignore-placement':false,
+          'symbol-placement':'line',
+          'symbol-spacing':350,
+          'text-field':'',
         },
-        paint:{ 'text-color':'rgba(0,0,0,0)', 'text-halo-color':'#2e7d32', 'text-halo-width':11 } },
-      { id:'plate-euro-brd', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['in','class','motorway','trunk','primary'], minzoom:11,
+        paint:{ 'icon-opacity':1 } },
+
+      // Trunk (R26, 48, numbered) — blue shield
+      { id:'shield-trunk', type:'symbol', source:'v', 'source-layer':'transportation_name',
+        filter:['all',['==','class','trunk'],['has','ref']],
+        minzoom:10,
         layout:{
-          'text-field': ['case',
-            ['has','network'], ['get','network'],
-            ['literal','']
-          ],
-          'text-font':FONTS.bold, 'text-size':11,
-          'symbol-placement':'line', 'symbol-spacing':500, 'text-max-angle':20,
-          'text-padding':4, 'text-allow-overlap':true,
-          'text-offset':[0, 2.4],
+          'icon-image':['concat','shield-trunk-',['get','ref']],
+          'icon-allow-overlap':false,
+          'symbol-placement':'line',
+          'symbol-spacing':320,
+          'text-field':'',
         },
-        paint:{ 'text-color':'rgba(0,0,0,0)', 'text-halo-color':'#ffffff', 'text-halo-width':8 } },
-      { id:'plate-euro', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['in','class','motorway','trunk','primary'], minzoom:11,
+        paint:{ 'icon-opacity':1 } },
+
+      // Primary (27, 9) — blue shield
+      { id:'shield-primary', type:'symbol', source:'v', 'source-layer':'transportation_name',
+        filter:['all',['==','class','primary'],['has','ref']],
+        minzoom:11,
         layout:{
-          'text-field': ['case',
-            ['has','network'], ['get','network'],
-            ['literal','']
-          ],
-          'text-font':FONTS.bold, 'text-size':11,
-          'symbol-placement':'line', 'symbol-spacing':500, 'text-max-angle':20,
-          'text-padding':4, 'text-allow-overlap':true,
-          'text-offset':[0, 2.4],
+          'icon-image':['concat','shield-primary-',['get','ref']],
+          'icon-allow-overlap':false,
+          'symbol-placement':'line',
+          'symbol-spacing':300,
+          'text-field':'',
         },
-        paint:{ 'text-color':'#ffffff', 'text-halo-color':'#2e7d32', 'text-halo-width':1 } },
+        paint:{ 'icon-opacity':1 } },
+
+      // Secondary/tertiary (605, 431) — blue shield
+      { id:'shield-secondary', type:'symbol', source:'v', 'source-layer':'transportation_name',
+        filter:['all',['in','class','secondary','tertiary'],['has','ref']],
+        minzoom:13,
+        layout:{
+          'icon-image':['concat','shield-secondary-',['get','ref']],
+          'icon-allow-overlap':false,
+          'symbol-placement':'line',
+          'symbol-spacing':280,
+          'text-field':'',
+        },
+        paint:{ 'icon-opacity':1 } },
+
+      // European routes E50/E49 — green shield, offset below road number
+      { id:'shield-euro', type:'symbol', source:'v', 'source-layer':'transportation_name',
+        filter:['all',['in','class','motorway','trunk','primary'],['has','network']],
+        minzoom:11,
+        layout:{
+          'icon-image':['concat','shield-euro-',['get','network']],
+          'icon-allow-overlap':true,
+          'icon-offset':[0,22],
+          'symbol-placement':'line',
+          'symbol-spacing':500,
+          'text-field':'',
+        },
+        paint:{ 'icon-opacity':1 } },
 
       // Road name labels
       { id: 'lbl-primary', type: 'symbol', source: 'v', 'source-layer': 'transportation_name',

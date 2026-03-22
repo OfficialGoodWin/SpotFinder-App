@@ -16,6 +16,103 @@ import { lightStyle, darkStyle } from '../../lib/mapStyle.js';
 import { COUNTRIES, isPointInCountry, getDownloadedCountryAt, vtKey } from '../../lib/vectorTileDownloader.js';
 import { getAllMeta, getPOIs, getTile } from '../../lib/offlineStorage.js';
 
+// ── Road shield generator ─────────────────────────────────────────────────────
+// Draws a real road sign on an offscreen canvas and returns ImageData.
+// Called lazily via map.on('styleimagemissing', ...) — only generates each
+// unique ref once, then caches it.
+
+const SHIELD_COLORS = {
+  motorway: { bg: '#cc1111', border: '#cc1111' },  // D roads — red
+  trunk:    { bg: '#003d9e', border: '#003d9e' },  // R/numbered — blue
+  primary:  { bg: '#003d9e', border: '#003d9e' },  // 27, 9 — blue
+  secondary:{ bg: '#003d9e', border: '#003d9e' },  // 605, 431 — blue
+  tertiary: { bg: '#003d9e', border: '#003d9e' },  // smaller — blue
+  euro:     { bg: '#1a6e1a', border: '#1a6e1a' },  // E50 — green
+};
+
+function drawRoadShield(ref, roadClass) {
+  const colors = SHIELD_COLORS[roadClass] || SHIELD_COLORS.primary;
+  const FONT_SIZE = 13;
+  const PADDING_X = 10;
+  const PADDING_Y = 5;
+  const BORDER    = 2.5;  // outer border width
+  const INNER_GAP = 2.5;  // gap between outer border and inner white line
+  const RADIUS    = 5;
+  const SCALE     = 2;    // retina
+
+  // Measure text
+  const canvas0 = document.createElement('canvas');
+  const ctx0    = canvas0.getContext('2d');
+  ctx0.font     = `bold ${FONT_SIZE}px Arial, sans-serif`;
+  const tw      = ctx0.measureText(ref).width;
+
+  const W = Math.ceil(tw + PADDING_X * 2 + (BORDER + INNER_GAP) * 2);
+  const H = FONT_SIZE + PADDING_Y * 2 + (BORDER + INNER_GAP) * 2;
+
+  const canvas = document.createElement('canvas');
+  canvas.width  = W * SCALE;
+  canvas.height = H * SCALE;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(SCALE, SCALE);
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h);
+    ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+  }
+
+  // 1. Outer colored border
+  ctx.fillStyle = colors.bg;
+  roundRect(0, 0, W, H, RADIUS);
+  ctx.fill();
+
+  // 2. White inner border line
+  ctx.fillStyle = '#ffffff';
+  roundRect(BORDER, BORDER, W - BORDER * 2, H - BORDER * 2, RADIUS - 1);
+  ctx.fill();
+
+  // 3. Colored fill inside white border
+  ctx.fillStyle = colors.bg;
+  roundRect(BORDER + INNER_GAP, BORDER + INNER_GAP,
+    W - (BORDER + INNER_GAP) * 2, H - (BORDER + INNER_GAP) * 2, RADIUS - 2);
+  ctx.fill();
+
+  // 4. White bold text centered
+  ctx.fillStyle   = '#ffffff';
+  ctx.font        = `bold ${FONT_SIZE}px Arial, sans-serif`;
+  ctx.textAlign   = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(ref, W / 2, H / 2);
+
+  return { data: ctx.getImageData(0, 0, W * SCALE, H * SCALE).data, width: W * SCALE, height: H * SCALE };
+}
+
+function addShieldImage(map, imageId) {
+  try {
+    // Parse "shield-{class}-{ref}" — ref may contain dashes (E50, D1 are fine)
+    const withoutPrefix = imageId.slice('shield-'.length);
+    const classEnd = withoutPrefix.indexOf('-');
+    if (classEnd < 0) return;
+    const roadClass = withoutPrefix.slice(0, classEnd);
+    const ref       = withoutPrefix.slice(classEnd + 1);
+    if (!ref) return;
+
+    const { data, width, height } = drawRoadShield(ref, roadClass);
+    map.addImage(imageId, { width, height, data });
+  } catch (e) {
+    // Silently skip — missing image just won't render
+  }
+}
+
+
 const GEOAPIFY_KEY = import.meta.env.VITE_GEOAPIFY_KEY || '';
 const TOMTOM_KEY   = import.meta.env.VITE_TOMTOM_API_KEY || '';
 
@@ -117,6 +214,59 @@ async function fetchAmbientPOIs(south, west, north, east, zoom, signal) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
+
+// ── Shield image factory ──────────────────────────────────────────────────────
+// Draws a road sign shield: solid bg + white inner border, 1px transparent gap
+// The image is a single pixel repeated — MapLibre's icon-text-fit stretches it
+function drawShield(bgColor, borderColor = '#ffffff') {
+  const size = 40;
+  const c    = document.createElement('canvas');
+  c.width    = size;
+  c.height   = size;
+  const ctx  = c.getContext('2d');
+  const r    = size * 0.22; // corner radius ratio
+
+  function roundRect(x, y, w, h, rad, color) {
+    ctx.beginPath();
+    ctx.moveTo(x + rad, y);
+    ctx.lineTo(x + w - rad, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + rad);
+    ctx.lineTo(x + w, y + h - rad);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - rad, y + h);
+    ctx.lineTo(x + rad, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - rad);
+    ctx.lineTo(x, y + rad);
+    ctx.quadraticCurveTo(x, y, x + rad, y);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+
+  // Outer colored bg
+  roundRect(0, 0, size, size, r, bgColor);
+  // White inner border (3px inset)
+  roundRect(3, 3, size-6, size-6, r * 0.7, borderColor);
+  // Inner bg again (2px inside the white border)
+  roundRect(5, 5, size-10, size-10, r * 0.5, bgColor);
+
+  return { data: ctx.getImageData(0, 0, size, size).data, width: size, height: size };
+}
+
+function addShieldImages(map) {
+  const shields = [
+    { name: 'shield-red',   bg: '#cc1111' },
+    { name: 'shield-blue',  bg: '#003d9e' },
+    { name: 'shield-green', bg: '#2e7d32' },
+  ];
+  for (const { name, bg } of shields) {
+    try {
+      if (map.hasImage(name)) map.removeImage(name);
+      const { data, width, height } = drawShield(bg);
+      map.addImage(name, { width, height, data }, { sdf: false, pixelRatio: 2 });
+    } catch(_) {}
+  }
+}
+
 export default function MapLibreMap({
   center, flyTo, fitBoundsData, zoomToArea, setMapRef,
   addMode, onMapClick,
@@ -154,6 +304,11 @@ export default function MapLibreMap({
 
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
     map.on('click', e => { if (addMode) onMapClick?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }); });
+
+    // Add shield images — drawn on canvas so no sprite needed
+    // Each shield: solid color bg, outer rounded rect, white inner border, ready for icon-text-fit
+    map.once('load', () => addShieldImages(map));
+    map.on('style.load', () => addShieldImages(map));
 
     mapRef.current = map;
     setMapRef?.(map);
