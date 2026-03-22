@@ -7,7 +7,7 @@
 
 const FONTS = {
   regular: ['Noto Sans Regular'],
-  bold:    ['Noto Sans Medium'],   // Protomaps only has Regular/Medium/Italic — no Bold
+  bold:    ['Noto Sans Bold'],
   italic:  ['Noto Sans Italic'],
 };
 
@@ -120,7 +120,7 @@ function style(dark = false) {
   return {
     version: 8,
     name: dark ? 'SpotFinder Dark' : 'SpotFinder',
-    glyphs:  'https://cdn.protomaps.com/fonts/pbf/{fontstack}/{range}.pbf',
+    glyphs:  'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
     sprite:  dark ? 'https://protomaps.github.io/basemaps-assets/sprites/v4/dark' : 'https://protomaps.github.io/basemaps-assets/sprites/v4/light',
     sources: {
       v: {
@@ -223,16 +223,16 @@ function style(dark = false) {
         paint: { 'line-color': c.boundaryProv, 'line-width': 0.8, 'line-dasharray': [3, 2] } },
 
       // ── Road shields (via styleimagemissing) ────────────────────────────────
-      // Image name: "shield-{class}-{shield_text}" e.g. "shield-motorway-D1"
-      // Uses shield_text field (Protomaps-specific, derived from OSM ref)
+      // Image name: "shield-{class}-{ref}" e.g. "shield-motorway-D1"
+      // Uses ref field (OpenMapTiles/OpenFreeMap schema)
       // E-routes (E50 etc) are OSM route RELATIONS — not stored per-way in tiles, skip them
 
       // D1/D5/D7 motorway — RED shield
       { id:'shield-motorway', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['all',['==','kind','highway'],['==','kind_detail','motorway'],['has','shield_text']],
+        filter:['all',['==','class','motorway'],['has','ref']],
         minzoom:9,
         layout:{
-          'icon-image':['concat','shield-motorway-',['get','shield_text']],
+          'icon-image':['concat','shield-motorway-',['get','ref']],
           'icon-allow-overlap':false,
           'icon-ignore-placement':false,
           'symbol-placement':'line',
@@ -243,10 +243,10 @@ function style(dark = false) {
 
       // R26, 48, MO trunk — BRIGHT BLUE shield
       { id:'shield-trunk', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['all',['==','kind','highway'],['==','kind_detail','trunk'],['has','shield_text']],
+        filter:['all',['==','class','trunk'],['has','ref']],
         minzoom:10,
         layout:{
-          'icon-image':['concat','shield-trunk-',['get','shield_text']],
+          'icon-image':['concat','shield-trunk-',['get','ref']],
           'icon-allow-overlap':false,
           'symbol-placement':'line',
           'symbol-spacing':320,
@@ -256,10 +256,10 @@ function style(dark = false) {
 
       // 27, 9 primary — BRIGHT BLUE shield
       { id:'shield-primary', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['all',['==','kind','highway'],['==','kind_detail','primary'],['has','shield_text']],
+        filter:['all',['==','class','primary'],['has','ref']],
         minzoom:11,
         layout:{
-          'icon-image':['concat','shield-primary-',['get','shield_text']],
+          'icon-image':['concat','shield-primary-',['get','ref']],
           'icon-allow-overlap':false,
           'symbol-placement':'line',
           'symbol-spacing':300,
@@ -269,10 +269,10 @@ function style(dark = false) {
 
       // 605, 431 secondary — BRIGHT BLUE shield
       { id:'shield-secondary', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['all',['in','kind_detail','secondary','tertiary'],['has','shield_text']],
+        filter:['all',['in','class','secondary','tertiary'],['has','ref']],
         minzoom:13,
         layout:{
-          'icon-image':['concat','shield-secondary-',['get','shield_text']],
+          'icon-image':['concat','shield-secondary-',['get','ref']],
           'icon-allow-overlap':false,
           'symbol-placement':'line',
           'symbol-spacing':280,
