@@ -22,22 +22,29 @@ import { getAllMeta, getPOIs, getTile } from '../../lib/offlineStorage.js';
 // unique ref once, then caches it.
 
 const SHIELD_COLORS = {
-  motorway: { bg: '#cc1111' },  // D roads (D1, D5, D7) — red
-  trunk:    { bg: '#3a81fc' },  // MO, orbital/ring roads — blue (bright)
-  primary:  { bg: '#003d9e' },  // 27, 9, numbered — deep blue
-  secondary:{ bg: '#003d9e' },  // 605, 431 — deep blue
-  tertiary: { bg: '#003d9e' },  // local — deep blue
-  euro:     { bg: '#2e7d32' },  // E50, E49 — green
+  motorway:  { bg: '#cc1111' },  // D roads (D1, D5, D7) — red
+  trunk:     { bg: '#3a81fc' },  // MO, R roads, numbered — bright blue (same as highways)
+  primary:   { bg: '#3a81fc' },  // 27, 9, 5 — same bright blue
+  secondary: { bg: '#3a81fc' },  // 605, 431 — same bright blue
+  // local: 5-digit roads like 18005 — light brown
+  local:     { bg: '#b89060' },
 };
 
+// Detect if a ref is a local road (5+ digits = district/local road)
+function getShieldClass(roadClass, ref) {
+  if (ref && ref.length >= 5 && /^\d+$/.test(ref)) return 'local';
+  return roadClass;
+}
+
 function drawRoadShield(ref, roadClass) {
-  const colors = SHIELD_COLORS[roadClass] || SHIELD_COLORS.primary;
-  const FONT_SIZE = 13;
-  const PADDING_X = 10;
-  const PADDING_Y = 5;
-  const BORDER    = 2.5;  // outer border width
-  const INNER_GAP = 2.5;  // gap between outer border and inner white line
-  const RADIUS    = 5;
+  const effectiveClass = getShieldClass(roadClass, ref);
+  const colors = SHIELD_COLORS[effectiveClass] || SHIELD_COLORS.primary;
+  const FONT_SIZE = 10;
+  const PADDING_X = 6;
+  const PADDING_Y = 3;
+  const BORDER    = 2;    // outer border width
+  const INNER_GAP = 2;    // gap between outer border and inner white line
+  const RADIUS    = 4;
   const SCALE     = 2;    // retina
 
   // Measure text
@@ -97,23 +104,87 @@ function drawRoadShield(ref, roadClass) {
 
 function addShieldImage(map, imageId) {
   try {
-    // Parse "shield-{class}-{ref}" — ref may contain dashes (E50, D1 are fine)
+    // Parse "shield-{class}-{shield_text}" e.g. "shield-motorway-D1", "shield-trunk-MO"
     const withoutPrefix = imageId.slice('shield-'.length);
     const classEnd = withoutPrefix.indexOf('-');
     if (classEnd < 0) return;
-    const roadClass = withoutPrefix.slice(0, classEnd);
-    const ref       = withoutPrefix.slice(classEnd + 1);
-    if (!ref) return;
+    const roadClass  = withoutPrefix.slice(0, classEnd);
+    const shieldText = withoutPrefix.slice(classEnd + 1);
+    if (!shieldText || shieldText === 'undefined') return;
 
-    const { data, width, height } = drawRoadShield(ref, roadClass);
+    const { data, width, height } = drawRoadShield(shieldText, roadClass);
     map.addImage(imageId, { width, height, data });
   } catch (e) {
-    // Silently skip — missing image just won't render
+    // Silently skip
   }
 }
 
 
 const GEOAPIFY_KEY = import.meta.env.VITE_GEOAPIFY_KEY || '';
+
+// ── E-route shield markers ────────────────────────────────────────────────────
+// Fetches static /data/eroutes.json (8KB, pre-built from OSM export)
+// Draws green E-route shields as custom MapLibre markers at each route center point
+
+let eRouteCache = null;
+
+async function loadERoutes() {
+  if (eRouteCache) return eRouteCache;
+  try {
+    const res = await fetch('/data/eroutes.json');
+    if (!res.ok) return [];
+    eRouteCache = await res.json();
+    return eRouteCache;
+  } catch (_) { return []; }
+}
+
+function drawERouteShield(ref) {
+  const FONT_SIZE = 10;
+  const PADDING_X = 6;
+  const PADDING_Y = 3;
+  const BORDER    = 2;
+  const INNER_GAP = 2;
+  const RADIUS    = 4;
+  const SCALE     = 2;
+
+  const canvas0 = document.createElement('canvas');
+  const ctx0    = canvas0.getContext('2d');
+  ctx0.font     = `bold ${FONT_SIZE}px Arial, sans-serif`;
+  const tw      = ctx0.measureText(ref).width;
+
+  const W = Math.ceil(tw + PADDING_X * 2 + (BORDER + INNER_GAP) * 2);
+  const H = FONT_SIZE + PADDING_Y * 2 + (BORDER + INNER_GAP) * 2;
+
+  const canvas = document.createElement('canvas');
+  canvas.width  = W * SCALE;
+  canvas.height = H * SCALE;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(SCALE, SCALE);
+
+  function rr(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x+r, y); ctx.lineTo(x+w-r, y);
+    ctx.arcTo(x+w, y, x+w, y+r, r); ctx.lineTo(x+w, y+h-r);
+    ctx.arcTo(x+w, y+h, x+w-r, y+h, r); ctx.lineTo(x+r, y+h);
+    ctx.arcTo(x, y+h, x, y+h-r, r); ctx.lineTo(x, y+r);
+    ctx.arcTo(x, y, x+r, y, r); ctx.closePath();
+  }
+
+  ctx.fillStyle = '#2e7d32'; rr(0,0,W,H,RADIUS); ctx.fill();
+  ctx.fillStyle = '#fff'; rr(BORDER,BORDER,W-BORDER*2,H-BORDER*2,RADIUS-1); ctx.fill();
+  ctx.fillStyle = '#2e7d32'; rr(BORDER+INNER_GAP,BORDER+INNER_GAP,W-(BORDER+INNER_GAP)*2,H-(BORDER+INNER_GAP)*2,RADIUS-2); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = `bold ${FONT_SIZE}px Arial, sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(ref, W/2, H/2);
+
+  // Return as HTMLElement for use as a MapLibre marker
+  const img = document.createElement('img');
+  img.src    = canvas.toDataURL();
+  img.width  = W;
+  img.height = H;
+  img.style.cssText = 'display:block;pointer-events:none;';
+  return img;
+}
 const TOMTOM_KEY   = import.meta.env.VITE_TOMTOM_API_KEY || '';
 
 // Register protocols once globally
@@ -242,6 +313,7 @@ export default function MapLibreMap({
   const poiTimer     = useRef(null);
   const [offlineActive, setOfflineActive] = useState(false);
   const [offlineCountry, setOfflineCountry] = useState('');
+  const eRouteMarkersRef = useRef([]);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   // ── Init ───────────────────────────────────────────────────────────────────
@@ -334,6 +406,63 @@ export default function MapLibreMap({
     checkOffline();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnline, isDark]);
+
+  // ── E-route shields ────────────────────────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Remove existing E-route markers
+    eRouteMarkersRef.current.forEach(m => m.remove());
+    eRouteMarkersRef.current = [];
+
+    if (!isOnline) return;  // skip when offline
+
+    loadERoutes().then(routes => {
+      if (!mapRef.current) return;
+      const bounds = map.getBounds();
+
+      routes.forEach(({ r, lat, lng }) => {
+        // Only show if within current viewport (with generous padding)
+        if (lat < bounds.getSouth() - 2 || lat > bounds.getNorth() + 2 ||
+            lng < bounds.getWest()  - 2 || lng > bounds.getEast()  + 2) return;
+
+        const el     = drawERouteShield(r);
+        const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([lng, lat])
+          .addTo(map);
+        eRouteMarkersRef.current.push(marker);
+      });
+    });
+
+    // Re-render on map move
+    const onMove = () => {
+      // Remove markers outside new viewport, add new ones
+      eRouteMarkersRef.current.forEach(m => m.remove());
+      eRouteMarkersRef.current = [];
+      const bounds = map.getBounds();
+      loadERoutes().then(routes => {
+        if (!mapRef.current) return;
+        routes.forEach(({ r, lat, lng }) => {
+          if (lat < bounds.getSouth() - 2 || lat > bounds.getNorth() + 2 ||
+              lng < bounds.getWest()  - 2 || lng > bounds.getEast()  + 2) return;
+          const el     = drawERouteShield(r);
+          const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+            .setLngLat([lng, lat])
+            .addTo(map);
+          eRouteMarkersRef.current.push(marker);
+        });
+      });
+    };
+
+    map.on('moveend', onMove);
+    return () => {
+      map.off('moveend', onMove);
+      eRouteMarkersRef.current.forEach(m => m.remove());
+      eRouteMarkersRef.current = [];
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnline]);
 
   // ── Dark mode ──────────────────────────────────────────────────────────────
   useEffect(() => {

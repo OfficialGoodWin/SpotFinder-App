@@ -219,16 +219,17 @@ function style(dark = false) {
         filter: ['==', 'admin_level', 4], minzoom: 6,
         paint: { 'line-color': c.boundaryProv, 'line-width': 0.8, 'line-dasharray': [3, 2] } },
 
-      // ── Road shields — generated dynamically via styleimagemissing ─────────
-      // Image name format: "shield-{class}-{ref}"  e.g. "shield-motorway-D1"
-      // MapLibreMap.jsx draws the actual canvas image on demand.
+      // ── Road shields (via styleimagemissing) ────────────────────────────────
+      // Image name: "shield-{class}-{shield_text}" e.g. "shield-motorway-D1"
+      // Uses shield_text field (Protomaps-specific, derived from OSM ref)
+      // E-routes (E50 etc) are OSM route RELATIONS — not stored per-way in tiles, skip them
 
-      // Motorway (D1, D5, D7) — red shield
-      { id:'shield-motorway', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['all',['==','class','motorway'],['has','ref']],
+      // D1/D5/D7 motorway — RED shield
+      { id:'shield-motorway', type:'symbol', source:'v', 'source-layer':'roads',
+        filter:['all',['==','kind','highway'],['==','kind_detail','motorway'],['has','shield_text']],
         minzoom:9,
         layout:{
-          'icon-image':['concat','shield-motorway-',['get','ref']],
+          'icon-image':['concat','shield-motorway-',['get','shield_text']],
           'icon-allow-overlap':false,
           'icon-ignore-placement':false,
           'symbol-placement':'line',
@@ -237,12 +238,12 @@ function style(dark = false) {
         },
         paint:{ 'icon-opacity':1 } },
 
-      // Trunk (R26, 48, numbered) — blue shield
-      { id:'shield-trunk', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['all',['==','class','trunk'],['has','ref']],
+      // R26, 48, MO trunk — BRIGHT BLUE shield
+      { id:'shield-trunk', type:'symbol', source:'v', 'source-layer':'roads',
+        filter:['all',['==','kind','highway'],['==','kind_detail','trunk'],['has','shield_text']],
         minzoom:10,
         layout:{
-          'icon-image':['concat','shield-trunk-',['get','ref']],
+          'icon-image':['concat','shield-trunk-',['get','shield_text']],
           'icon-allow-overlap':false,
           'symbol-placement':'line',
           'symbol-spacing':320,
@@ -250,12 +251,12 @@ function style(dark = false) {
         },
         paint:{ 'icon-opacity':1 } },
 
-      // Primary (27, 9) — blue shield
-      { id:'shield-primary', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['all',['==','class','primary'],['has','ref']],
+      // 27, 9 primary — BRIGHT BLUE shield
+      { id:'shield-primary', type:'symbol', source:'v', 'source-layer':'roads',
+        filter:['all',['==','kind','highway'],['==','kind_detail','primary'],['has','shield_text']],
         minzoom:11,
         layout:{
-          'icon-image':['concat','shield-primary-',['get','ref']],
+          'icon-image':['concat','shield-primary-',['get','shield_text']],
           'icon-allow-overlap':false,
           'symbol-placement':'line',
           'symbol-spacing':300,
@@ -263,12 +264,12 @@ function style(dark = false) {
         },
         paint:{ 'icon-opacity':1 } },
 
-      // Secondary/tertiary (605, 431) — blue shield
-      { id:'shield-secondary', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['all',['in','class','secondary','tertiary'],['has','ref']],
+      // 605, 431 secondary — BRIGHT BLUE shield
+      { id:'shield-secondary', type:'symbol', source:'v', 'source-layer':'roads',
+        filter:['all',['in','kind_detail','secondary','tertiary'],['has','shield_text']],
         minzoom:13,
         layout:{
-          'icon-image':['concat','shield-secondary-',['get','ref']],
+          'icon-image':['concat','shield-secondary-',['get','shield_text']],
           'icon-allow-overlap':false,
           'symbol-placement':'line',
           'symbol-spacing':280,
@@ -276,30 +277,15 @@ function style(dark = false) {
         },
         paint:{ 'icon-opacity':1 } },
 
-      // European routes E50/E49 — green shield, offset below road number
-      { id:'shield-euro', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['all',['in','class','motorway','trunk','primary'],['has','network']],
-        minzoom:11,
-        layout:{
-          'icon-image':['concat','shield-euro-',['get','network']],
-          'icon-allow-overlap':true,
-          'icon-offset':[0,22],
-          'symbol-placement':'line',
-          'symbol-spacing':500,
-          'text-field':'',
-        },
-        paint:{ 'icon-opacity':1 } },
-
-      // Road name labels
-      { id: 'lbl-primary', type: 'symbol', source: 'v', 'source-layer': 'transportation_name',
-        filter: ['in', 'class', 'primary', 'trunk'], minzoom: 13,
+      // ── Road name labels ──────────────────────────────────────────────────
+      { id: 'lbl-primary', type: 'symbol', source: 'v', 'source-layer': 'roads',
+        filter: ['in', 'kind_detail', 'primary', 'trunk'], minzoom: 13,
         layout: { 'text-field': ['get', 'name'], 'text-font': FONTS.regular, 'text-size': 10,
           'symbol-placement': 'line', 'symbol-spacing': 250, 'text-max-angle': 30 },
         paint: { 'text-color': c.label, 'text-halo-color': c.bg, 'text-halo-width': 2 } },
-      { id: 'lbl-street', type: 'symbol', source: 'v', 'source-layer': 'transportation_name',
-        filter: ['in', 'class', 'secondary', 'tertiary', 'street', 'residential'], minzoom: 14,
-        layout: { 'text-field': ['get', 'name'],
-          'text-font': FONTS.regular, 'text-size': 10,
+      { id: 'lbl-street', type: 'symbol', source: 'v', 'source-layer': 'roads',
+        filter: ['in', 'kind_detail', 'secondary', 'tertiary', 'residential', 'unclassified', 'service'], minzoom: 14,
+        layout: { 'text-field': ['get', 'name'], 'text-font': FONTS.regular, 'text-size': 10,
           'symbol-placement': 'line', 'symbol-spacing': 200, 'text-max-angle': 30 },
         paint: { 'text-color': c.labelMuted, 'text-halo-color': c.bg, 'text-halo-width': 1.5 } },
 
