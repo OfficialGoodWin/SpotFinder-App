@@ -167,13 +167,6 @@ function style(dark = false) {
         filter: ['in', 'class', 'stream', 'drain', 'ditch'], minzoom: 12,
         paint: { 'line-color': c.waterway, 'line-width': ['interpolate',['linear'],['zoom'], 12,0.5, 18,2] } },
 
-      // ── Buildings ─────────────────────────────────────────────────────────
-      { id: 'bldg-fill', type: 'fill', source: 'v', 'source-layer': 'building', minzoom: 13,
-        paint: { 'fill-color': c.building,
-          'fill-opacity': ['interpolate',['linear'],['zoom'], 13,0, 14,0.8, 16,1] } },
-      { id: 'bldg-line', type: 'line', source: 'v', 'source-layer': 'building', minzoom: 14,
-        paint: { 'line-color': c.buildingLine, 'line-width': 0.5 } },
-
       // ── Tunnels (brunnel=tunnel) — transparent dashed, no solid fill ──────────
       // Casing (gray sides)
       { id:'tunnel-motorway-case', type:'line', source:'v', 'source-layer':'transportation',
@@ -306,6 +299,13 @@ function style(dark = false) {
         paint:{'line-color':c.motorway,
           'line-width':['interpolate',['linear'],['zoom'],6,2,10,4,14,8,18,17]} },
 
+
+      // ── Buildings (after roads so they render on top of tunnels) ────────────
+      { id: 'bldg-fill', type: 'fill', source: 'v', 'source-layer': 'building', minzoom: 13,
+        paint: { 'fill-color': c.building,
+          'fill-opacity': ['interpolate',['linear'],['zoom'], 13,0, 14,0.8, 16,1] } },
+      { id: 'bldg-line', type: 'line', source: 'v', 'source-layer': 'building', minzoom: 14,
+        paint: { 'line-color': c.buildingLine, 'line-width': 0.5 } },
 
       // ── Railway ───────────────────────────────────────────────────────────
       { id: 'rail-case', type: 'line', source: 'v', 'source-layer': 'transportation',

@@ -425,24 +425,28 @@ export default function MapLibreMap({
     function placeERoutes() {
       eRouteMarkersRef.current.forEach(m => m.remove());
       eRouteMarkersRef.current = [];
-      const center = map.getCenter();
-      const zoom   = map.getZoom();
-      // Only show E-routes from zoom 7+ 
-      if (zoom < 7) return;
-      // Max distance to show a route (degrees, ~2° ≈ 220km)
-      const maxDist = Math.max(2, 20 / Math.pow(2, zoom - 5));
+      if (map.getZoom() < 7) return;
+
+      const b   = map.getBounds();
+      const pad = 1.5; // degrees padding around viewport
+      const s = b.getSouth() - pad, n = b.getNorth() + pad;
+      const w = b.getWest()  - pad, e = b.getEast()  + pad;
+
       loadERoutes().then(routes => {
         if (!mapRef.current) return;
-        // For each ref, collect all points within range, pick the closest
-        const byRef = new Map();
+        // Show every point that falls inside the padded viewport
+        // deduplicate by ref so each E-number only appears once even if
+        // multiple points are in viewport (pick the most central one)
+        const center = map.getCenter();
+        const byRef  = new Map();
         routes.forEach(pt => {
+          if (pt.lat < s || pt.lat > n || pt.lng < w || pt.lng > e) return;
           const dist = Math.hypot(pt.lat - center.lat, pt.lng - center.lng);
-          if (dist > maxDist) return; // skip points far away
-          const cur = byRef.get(pt.r);
+          const cur  = byRef.get(pt.r);
           if (!cur || dist < cur.dist) byRef.set(pt.r, { ...pt, dist });
         });
         byRef.forEach(({ r, lat, lng }) => {
-          const el = drawERouteShield(r);
+          const el     = drawERouteShield(r);
           const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
             .setLngLat([lng, lat])
             .addTo(map);
