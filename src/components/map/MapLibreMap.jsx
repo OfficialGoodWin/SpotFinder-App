@@ -420,39 +420,37 @@ export default function MapLibreMap({
     const map = mapRef.current;
     if (!map) return;
 
-    function initERoutes() {
+    function addERoutes() {
+      // Always remove then re-add — called after style is fully loaded
+      try { if (map.getLayer('shield-euro')) map.removeLayer('shield-euro'); } catch(_) {}
+      try { if (map.getSource('eroutes'))    map.removeSource('eroutes');    } catch(_) {}
       try {
-        // Add GeoJSON source with all E-route LineStrings
-        if (!map.getSource('eroutes')) {
-          map.addSource('eroutes', { type: 'geojson', data: EROUTES_GEOJSON });
-        }
-        // Add shield layer — placed along the line, offset to sit beside road plate
-        if (!map.getLayer('shield-euro')) {
-          map.addLayer({
-            id: 'shield-euro',
-            type: 'symbol',
-            source: 'eroutes',
-            layout: {
-              'icon-image': ['concat', 'shield-euro-', ['get', 'ref']],
-              'icon-allow-overlap': false,
-              'icon-rotation-alignment': 'viewport',
-              'symbol-placement': 'line',
-              'symbol-spacing': 320,  // match road shield spacing
-              'icon-offset': [22, 0], // offset right in screen space (beside road plate)
-              'text-field': '',
-            },
-            paint: { 'icon-opacity': 1 },
-          });
-        }
+        map.addSource('eroutes', { type: 'geojson', data: EROUTES_GEOJSON });
+        map.addLayer({
+          id: 'shield-euro',
+          type: 'symbol',
+          source: 'eroutes',
+          layout: {
+            'icon-image': ['concat', 'shield-euro-', ['get', 'ref']],
+            'icon-allow-overlap': false,
+            'icon-rotation-alignment': 'viewport',
+            'symbol-placement': 'line',
+            'symbol-spacing': 320,
+            'icon-offset': [22, 0],
+            'text-field': '',
+          },
+          paint: { 'icon-opacity': 1 },
+        });
       } catch(_) {}
     }
 
-    if (map.isStyleLoaded()) initERoutes();
-    else map.once('idle', initERoutes);
+    // Wait for map to be fully idle before adding
+    map.once('idle', addERoutes);
 
-    // Re-add after style reload (dark mode switch wipes sources)
-    map.on('style.load', initERoutes);
-    return () => map.off('style.load', initERoutes);
+    // Re-add after every style reload (setStyle wipes everything)
+    const onStyleLoad = () => map.once('idle', addERoutes);
+    map.on('style.load', onStyleLoad);
+    return () => map.off('style.load', onStyleLoad);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
