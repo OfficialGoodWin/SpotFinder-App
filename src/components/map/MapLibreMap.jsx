@@ -32,20 +32,21 @@ const SHIELD_COLORS = {
 
 // Detect if a ref is a local road (5+ digits = district/local road)
 function getShieldClass(roadClass, ref) {
-  if (ref && ref.length >= 5 && /^\d+$/.test(ref)) return 'local';
+  // 4+ digit pure numbers (2341, 18512, 00515) = local district roads → brown
+  if (ref && ref.length >= 4 && /^\d+$/.test(ref)) return 'local';
   return roadClass;
 }
 
 function drawRoadShield(ref, roadClass) {
   const effectiveClass = getShieldClass(roadClass, ref);
   const colors = SHIELD_COLORS[effectiveClass] || SHIELD_COLORS.primary;
-  const FONT_SIZE = 10;
-  const PADDING_X = 6;
-  const PADDING_Y = 3;
-  const BORDER    = 2;    // outer border width
-  const INNER_GAP = 2;    // gap between outer border and inner white line
-  const RADIUS    = 4;
-  const SCALE     = 2;    // retina
+  const FONT_SIZE = 9;
+  const PADDING_X = 4;
+  const PADDING_Y = 2;
+  const BORDER    = 1.5;  // outer border width
+  const INNER_GAP = 1.5;  // gap between outer border and inner white line
+  const RADIUS    = 3;
+  const SCALE     = 1;    // no retina scaling — keeps size reasonable
 
   // Measure text
   const canvas0 = document.createElement('canvas');
@@ -426,40 +427,24 @@ export default function MapLibreMap({
     const map = mapRef.current;
     if (!map) return;
 
-    // Remove existing E-route markers
-    eRouteMarkersRef.current.forEach(m => m.remove());
-    eRouteMarkersRef.current = [];
-
-    if (!isOnline) return;  // skip when offline
-
-    loadERoutes().then(routes => {
-      if (!mapRef.current) return;
-      const bounds = map.getBounds();
-
-      routes.forEach(({ r, lat, lng }) => {
-        // Only show if within current viewport (with generous padding)
-        if (lat < bounds.getSouth() - 2 || lat > bounds.getNorth() + 2 ||
-            lng < bounds.getWest()  - 2 || lng > bounds.getEast()  + 2) return;
-
-        const el     = drawERouteShield(r);
-        const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
-          .setLngLat([lng, lat])
-          .addTo(map);
-        eRouteMarkersRef.current.push(marker);
-      });
-    });
-
-    // Re-render on map move
-    const onMove = () => {
-      // Remove markers outside new viewport, add new ones
+    function clearERoutes() {
       eRouteMarkersRef.current.forEach(m => m.remove());
       eRouteMarkersRef.current = [];
+    }
+
+    function renderERoutes() {
+      clearERoutes();
+      if (!isOnline) return;
+      const zoom = map.getZoom();
+      if (zoom < 7) return; // don't show at very low zoom
       const bounds = map.getBounds();
+      const pad = 3;
+
       loadERoutes().then(routes => {
         if (!mapRef.current) return;
         routes.forEach(({ r, lat, lng }) => {
-          if (lat < bounds.getSouth() - 2 || lat > bounds.getNorth() + 2 ||
-              lng < bounds.getWest()  - 2 || lng > bounds.getEast()  + 2) return;
+          if (lat < bounds.getSouth() - pad || lat > bounds.getNorth() + pad ||
+              lng < bounds.getWest()  - pad || lng > bounds.getEast()  + pad) return;
           const el     = drawERouteShield(r);
           const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
             .setLngLat([lng, lat])
@@ -467,13 +452,15 @@ export default function MapLibreMap({
           eRouteMarkersRef.current.push(marker);
         });
       });
-    };
+    }
 
-    map.on('moveend', onMove);
+    renderERoutes();
+    map.on('moveend', renderERoutes);
+    map.on('zoomend', renderERoutes);
     return () => {
-      map.off('moveend', onMove);
-      eRouteMarkersRef.current.forEach(m => m.remove());
-      eRouteMarkersRef.current = [];
+      map.off('moveend', renderERoutes);
+      map.off('zoomend', renderERoutes);
+      clearERoutes();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnline]);
