@@ -3,7 +3,6 @@ import { Search, X, Navigation, Mic } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { filterCategories, getCategoryName } from '@/lib/POICategories';
 
-const MAPY_API_KEY = 'aZQcHL3uznHNI_dIUHIMrc9Oes4EhkbMBS6muOSNUNk';
 
 const LANG_TO_BCP47 = {
   en: 'en-US', cs: 'cs-CZ', pl: 'pl-PL', de: 'de-DE', sk: 'sk-SK',
@@ -70,15 +69,58 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
     clearTimeout(debounce.current);
     debounce.current = setTimeout(async () => {
       setLoading(true);
-      const near = mapCenter ? `&preferNear=${mapCenter.lng},${mapCenter.lat}&preferNearPrecision=25000` : '';
-      const url = `https://api.mapy.com/v1/suggest?apikey=${MAPY_API_KEY}&query=${encodeURIComponent(query)}&lang=${language}&limit=6${near}`;
       try {
-        const res = await fetch(url);
-        const data = await res.json();
-        setResults(data.items || []);
+        // OSM Nominatim — search with local language names.
+        // We request both the user's language AND no language preference so
+        // Nominatim returns local names (Plzeň, not Pilsen).
+        // Also send a second request for the user's query language so searching
+        // "Pilsen" still finds Plzeň via Nominatim's name matching.
+        const near = mapCenter
+          ? `&lat=${mapCenter.lat}&lon=${mapCenter.lng}&bounded=0`
+          : '';
+        const base = `https://nominatim.openstreetmap.org/search?format=json&limit=6&addressdetails=1&namedetails=1${near}`;
+
+        // Two parallel fetches: local language + fallback for cross-language search
+        const [res1, res2] = await Promise.all([
+          fetch(`${base}&q=${encodeURIComponent(query)}&accept-language=cs,sk,de,pl,en`, {
+            headers: { 'User-Agent': 'SpotFinderApp/1.0' },
+          }),
+          fetch(`${base}&q=${encodeURIComponent(query)}&accept-language=${language}`, {
+            headers: { 'User-Agent': 'SpotFinderApp/1.0' },
+          }),
+        ]);
+
+        const [data1, data2] = await Promise.all([res1.json(), res2.json()]);
+
+        // Merge and deduplicate by place_id, preferring local names
+        const seen = new Set();
+        const merged = [...(data1 || []), ...(data2 || [])].filter(item => {
+          if (seen.has(item.place_id)) return false;
+          seen.add(item.place_id);
+          return true;
+        });
+
+        setResults(merged.map(item => {
+          // Prefer local name over English name
+          const localName = item.namedetails?.name
+            || item.namedetails?.['name:cs']
+            || item.namedetails?.['name:sk']
+            || item.display_name?.split(',')[0]
+            || item.name
+            || '';
+          const country  = item.address?.country || '';
+          const state    = item.address?.state || item.address?.county || '';
+          const subtitle = [state, country].filter(Boolean).join(', ');
+          return {
+            name:     localName,
+            label:    localName,
+            location: subtitle,
+            position: { lat: parseFloat(item.lat), lon: parseFloat(item.lon) },
+          };
+        }));
       } catch { setResults([]); }
       setLoading(false);
-    }, 300);
+    }, 400);
   }, [query]);
 
   const handleSelect = (item) => {

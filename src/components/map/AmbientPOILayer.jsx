@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { getPOIs } from '../../lib/offlineStorage.js';
+import { getDownloadedCountryAt, COUNTRIES } from '../../lib/offlineManager.js';
 import { Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 
@@ -170,33 +172,70 @@ export default function AmbientPOILayer({ onSelectPOI, selectedCategory }) {
       }
 
       try {
-        const features = await fetchGeoapifyPlaces(south, west, north, east, z, signal);
-        const result   = [];
-        const seen     = new Set();
+        let result = [];
+        const seen = new Set();
+        const isOffline = !navigator.onLine;
 
-        for (const feat of features) {
-          const [lon, lat] = feat.geometry?.coordinates || [];
-          if (!lat || !lon) continue;
+        // ── Offline POI data path ─────────────────────────────────────────────
+        // If we have pre-downloaded POIs for a country that covers this viewport,
+        // use them directly (and skip the Geoapify request entirely).
+        const centerLat = (south + north) / 2;
+        const centerLon = (west + east)   / 2;
 
-          const id = feat.properties?.place_id || `${lat.toFixed(5)}-${lon.toFixed(5)}`;
-          if (seen.has(id)) continue;
-          seen.add(id);
+        // We need the meta map to check which countries are downloaded.
+        // Try to read it from a module-level cache (refreshed on mount).
+        let usedOfflinePOIs = false;
+        if (isOffline || true) {  // Always prefer offline POIs if available
+          const { getAllMeta } = await import('../../lib/offlineStorage.js');
+          const meta = await getAllMeta();
+          const country = getDownloadedCountryAt(centerLat, centerLon, meta);
+          if (country && meta[country.code]?.hasPOIs) {
+            const offlinePOIs = await getPOIs(country.code);
+            if (offlinePOIs?.length) {
+              usedOfflinePOIs = true;
+              for (const poi of offlinePOIs) {
+                // Filter to viewport
+                if (poi.lat < south || poi.lat > north || poi.lon < west || poi.lon > east) continue;
+                if (seen.has(poi.id)) continue;
+                seen.add(poi.id);
+                // Match to a category hint
+                const fakeFeature = { properties: { categories: poi.categories || [], name: poi.name } };
+                const cat = detectCategory(fakeFeature);
+                if (!cat || z < cat.minZoom) continue;
+                result.push({ ...poi, _cat: cat, tags: { phone: poi.phone, website: poi.website } });
+              }
+            }
+          }
+        }
 
-          const cat = detectCategory(feat);
-          if (!cat) continue;
+        // ── Online Geoapify path ──────────────────────────────────────────────
+        if (!usedOfflinePOIs && !isOffline) {
+          const features = await fetchGeoapifyPlaces(south, west, north, east, z, signal);
 
-          const p = feat.properties || {};
-          result.push({
-            id, lat, lon,
-            name:    p.name || p.address_line1 || cat.key,
-            address: p.address_line2 || p.formatted || '',
-            tags: {
-              phone:         p.contact?.phone,
-              website:       p.website || p.contact?.website,
-              opening_hours: p.opening_hours,
-            },
-            _cat: cat,
-          });
+          for (const feat of features) {
+            const [lon, lat] = feat.geometry?.coordinates || [];
+            if (!lat || !lon) continue;
+
+            const id = feat.properties?.place_id || `${lat.toFixed(5)}-${lon.toFixed(5)}`;
+            if (seen.has(id)) continue;
+            seen.add(id);
+
+            const cat = detectCategory(feat);
+            if (!cat) continue;
+
+            const p = feat.properties || {};
+            result.push({
+              id, lat, lon,
+              name:    p.name || p.address_line1 || cat.key,
+              address: p.address_line2 || p.formatted || '',
+              tags: {
+                phone:         p.contact?.phone,
+                website:       p.website || p.contact?.website,
+                opening_hours: p.opening_hours,
+              },
+              _cat: cat,
+            });
+          }
         }
 
         reqCache.set(cacheKey, { data: result, ts: Date.now() });

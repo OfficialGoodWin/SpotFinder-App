@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">spotfinder</string>
+    <string name="title_activity_main">spotfinder</string>
+    <string name="package_name">com.spotfinder.app</string>
+    <string name="custom_url_scheme">com.spotfinder.app</string>
+</resources>
