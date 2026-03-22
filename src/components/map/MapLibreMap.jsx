@@ -426,7 +426,7 @@ export default function MapLibreMap({
         if (!map.getSource('eroutes')) {
           map.addSource('eroutes', { type: 'geojson', data: EROUTES_GEOJSON });
         }
-        // Add shield layer using same styleimagemissing mechanism as road shields
+        // Add shield layer — placed along the line, offset to sit beside road plate
         if (!map.getLayer('shield-euro')) {
           map.addLayer({
             id: 'shield-euro',
@@ -436,7 +436,9 @@ export default function MapLibreMap({
               'icon-image': ['concat', 'shield-euro-', ['get', 'ref']],
               'icon-allow-overlap': false,
               'icon-rotation-alignment': 'viewport',
-              'symbol-placement': 'point',
+              'symbol-placement': 'line',
+              'symbol-spacing': 320,  // match road shield spacing
+              'icon-offset': [22, 0], // offset right in screen space (beside road plate)
               'text-field': '',
             },
             paint: { 'icon-opacity': 1 },
