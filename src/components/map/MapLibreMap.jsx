@@ -27,7 +27,29 @@ const SHIELD_COLORS = {
   primary:   { bg: '#3a81fc' },
   secondary: { bg: '#3a81fc' },
   local:     { bg: '#b89060' },
-  euro:      { bg: '#2e7d32' },  // E50, E55 — green
+  euro:      { bg: '#2e7d32' },
+};
+
+// Road ref → E-route lookup (static mapping from official sources)
+// When drawing a road shield, if the ref has an E-route, draw it stacked below
+const EURO_ROUTES = {
+  // Czech motorways
+  'D1':['E50','E65'],'D2':['E65'],'D5':['E50'],'D8':['E55'],
+  'D11':['E67'],'D35':['E442'],'D46':['E462'],'D48':['E462'],'D49':['E462'],
+  // Czech expressways / R-roads (MO = Prague ring)
+  'MO':['E53'],'R10':['E65'],'R35':['E442'],
+  // Slovak D1
+  'D1/SK':['E571'],
+  // Key primary roads
+  '2':['E55'],'4':['E49'],'5':['E49'],'6':['E48'],'13':['E442'],
+  '35':['E442'],'50':['E442'],
+  // German Autobahns visible from CZ
+  'A3':['E56'],'A6':['E50'],'A9':['E51'],'A17':['E55'],
+  'A72':['E441'],'A93':['E53'],
+  // Austrian
+  'A1':['E60'],'A2':['E59'],'A4':['E60'],'A8':['E60'],
+  // Polish
+  'A1':['E75'],'A4':['E40'],'S3':['E65'],
 };
 
 // Detect if a ref is a local road (5+ digits = district/local road)
@@ -99,6 +121,54 @@ function drawRoadShield(ref, roadClass) {
   ctx.textAlign   = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(ref, W / 2, H / 2);
+
+  // 5. If this road has E-routes, draw a green shield stacked below
+  const euroRefs = EURO_ROUTES[ref];
+  if (euroRefs && euroRefs.length > 0) {
+    const euroText = euroRefs[0]; // show first E-route
+    const EFS   = FONT_SIZE - 1;
+    const EPX   = PADDING_X - 1;
+    const EPY   = PADDING_Y - 1;
+    const EB    = BORDER;
+    const EIG   = INNER_GAP;
+    const ER    = RADIUS - 1;
+    const EW    = Math.ceil(ctx.measureText(euroText).width + EPX * 2 + (EB + EIG) * 2);
+    const EH    = EFS + EPY * 2 + (EB + EIG) * 2;
+    const GAP   = 2; // gap between main shield and euro shield
+    const EX    = (W - EW) / 2;
+    const EY    = H + GAP;
+
+    // Expand canvas height to fit euro shield
+    const newH = H + GAP + EH;
+    // Can't easily resize canvas, so we use a separate canvas and composite
+    const c2 = document.createElement('canvas');
+    c2.width  = W * SCALE;
+    c2.height = newH * SCALE;
+    const ctx2 = c2.getContext('2d');
+    ctx2.scale(SCALE, SCALE);
+
+    // Copy main shield
+    ctx2.drawImage(canvas, 0, 0, W * SCALE, H * SCALE, 0, 0, W, H);
+
+    // Draw euro shield
+    function rr2(x, y, w, h, r) {
+      ctx2.beginPath();
+      ctx2.moveTo(x+r,y); ctx2.lineTo(x+w-r,y);
+      ctx2.arcTo(x+w,y,x+w,y+r,r); ctx2.lineTo(x+w,y+h-r);
+      ctx2.arcTo(x+w,y+h,x+w-r,y+h,r); ctx2.lineTo(x+r,y+h);
+      ctx2.arcTo(x,y+h,x,y+h-r,r); ctx2.lineTo(x,y+r);
+      ctx2.arcTo(x,y,x+r,y,r); ctx2.closePath();
+    }
+    ctx2.fillStyle = '#2e7d32'; rr2(EX,EY,EW,EH,ER); ctx2.fill();
+    ctx2.fillStyle = '#fff';    rr2(EX+EB,EY+EB,EW-EB*2,EH-EB*2,ER-1); ctx2.fill();
+    ctx2.fillStyle = '#2e7d32'; rr2(EX+EB+EIG,EY+EB+EIG,EW-(EB+EIG)*2,EH-(EB+EIG)*2,ER-2); ctx2.fill();
+    ctx2.fillStyle = '#fff';
+    ctx2.font = `bold ${EFS}px Arial, sans-serif`;
+    ctx2.textAlign = 'center'; ctx2.textBaseline = 'middle';
+    ctx2.fillText(euroText, W/2, EY + EH/2);
+
+    return { data: ctx2.getImageData(0, 0, W*SCALE, newH*SCALE).data, width: W*SCALE, height: newH*SCALE };
+  }
 
   return { data: ctx.getImageData(0, 0, W * SCALE, H * SCALE).data, width: W * SCALE, height: H * SCALE };
 }
@@ -341,25 +411,7 @@ export default function MapLibreMap({
     // Also call once after style loads to handle any already-queued requests
     map.once('load', () => {
       map.triggerRepaint();
-      // Add E-route GeoJSON source + shield layer
-      try {
-        map.addSource('eroutes', { type: 'geojson', data: EROUTES_GEOJSON });
-        map.addLayer({
-          id: 'shield-euro',
-          type: 'symbol',
-          source: 'eroutes',
-          layout: {
-            'icon-image': ['concat', 'shield-euro-', ['get', 'ref']],
-            'icon-allow-overlap': false,
-            'icon-rotation-alignment': 'viewport',
-            'symbol-placement': 'line',
-            'symbol-spacing': 320,
-            'icon-offset': [22, 0],
-            'text-field': '',
-          },
-          paint: { 'icon-opacity': 1 },
-        });
-      } catch(_) {}
+      // E-routes now embedded in road shields via EURO_ROUTES lookup
     });
 
     mapRef.current = map;
@@ -439,22 +491,7 @@ export default function MapLibreMap({
       map.setStyle(isDark ? darkStyle : lightStyle);
       map.once('idle', () => {
         map.triggerRepaint();
-        // Re-add E-routes after style reload
-        try {
-          if (!map.getSource('eroutes')) {
-            map.addSource('eroutes', { type: 'geojson', data: EROUTES_GEOJSON });
-            map.addLayer({
-              id: 'shield-euro', type: 'symbol', source: 'eroutes',
-              layout: {
-                'icon-image': ['concat', 'shield-euro-', ['get', 'ref']],
-                'icon-allow-overlap': false, 'icon-rotation-alignment': 'viewport',
-                'symbol-placement': 'line', 'symbol-spacing': 320,
-                'icon-offset': [22, 0], 'text-field': '',
-              },
-              paint: { 'icon-opacity': 1 },
-            });
-          }
-        } catch(_) {}
+        // E-routes embedded in shields, no separate layer needed
       });
     };
     if (!map.isStyleLoaded()) map.once('idle', doSwitch);
