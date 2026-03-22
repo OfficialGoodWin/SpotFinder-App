@@ -24,7 +24,7 @@ const LIGHT = {
   glacier:      '#e8f4f8',
   park:         '#cce8b0',
   cemetery:     '#d0ddc0',
-  residential:  '#ede8df',
+  residential:  '#ddd0b8',
   commercial:   '#ede0d8',
   industrial:   '#ddd4cc',
   hospital:     '#f0e0e0',
@@ -143,7 +143,7 @@ function style(dark = false) {
       lf('lc-ice',       c.glacier,   'landcover', ['==', 'class', 'ice']),
 
       // ── Landuse ───────────────────────────────────────────────────────────
-      lf('lu-residential', c.residential, 'landuse', ['in', 'class', 'residential', 'suburb', 'neighbourhood'], 0.35),
+      lf('lu-residential', c.residential, 'landuse', ['in', 'class', 'residential', 'suburb', 'neighbourhood'], 0.7),
       lf('lu-commercial',  c.commercial,  'landuse', ['in', 'class', 'commercial', 'retail'], 0.6),
       lf('lu-industrial',  c.industrial,  'landuse', ['==', 'class', 'industrial'], 0.7),
       lf('lu-cemetery',    c.cemetery,    'landuse', ['==', 'class', 'cemetery']),
@@ -197,7 +197,7 @@ function style(dark = false) {
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: { 'line-color': c.track, 'line-width': 1, 'line-dasharray': [4, 2] } },
       { id: 'r-path', type: 'line', source: 'v', 'source-layer': 'transportation',
-        filter: ['in', 'class', 'path', 'footway', 'pedestrian', 'cycleway'], minzoom: 13,
+        filter: ['in', 'class', 'path', 'footway', 'pedestrian', 'cycleway'], minzoom: 15,
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: { 'line-color': c.path, 'line-width': 0.8, 'line-dasharray': [3, 2] } },
       rl('r-street',    c.road,      ['in', 'class', 'street', 'street_limited', 'service', 'residential', 'living_street', 'unclassified', 'minor'], [0.4, 1.8], 13),
@@ -257,6 +257,7 @@ function style(dark = false) {
           'icon-rotation-alignment':'map',
           'icon-pitch-alignment':'map',
           'symbol-placement':'line',
+          'icon-keep-upright':false,
           'symbol-spacing':350,
           'text-field':'',
         },
@@ -272,6 +273,7 @@ function style(dark = false) {
           'icon-rotation-alignment':'map',
           'icon-pitch-alignment':'map',
           'symbol-placement':'line',
+          'icon-keep-upright':false,
           'symbol-spacing':320,
           'text-field':'',
         },
@@ -287,6 +289,7 @@ function style(dark = false) {
           'icon-rotation-alignment':'map',
           'icon-pitch-alignment':'map',
           'symbol-placement':'line',
+          'icon-keep-upright':false,
           'symbol-spacing':300,
           'text-field':'',
         },
@@ -302,6 +305,7 @@ function style(dark = false) {
           'icon-rotation-alignment':'map',
           'icon-pitch-alignment':'map',
           'symbol-placement':'line',
+          'icon-keep-upright':false,
           'symbol-spacing':280,
           'text-field':'',
         },
@@ -328,13 +332,13 @@ function style(dark = false) {
 
       // ── Place/settlement boundaries ──────────────────────────────────────
       { id: 'place-boundary', type: 'line', source: 'v', 'source-layer': 'boundary',
-        filter: ['in', 'admin_level', 8, 9, 10],
-        minzoom: 12,
+        filter: ['all', ['>=', 'admin_level', 6], ['<=', 'admin_level', 10]],
+        minzoom: 10,
         paint: {
           'line-color': dark ? '#7a5a3a' : '#cfb99f',
           'line-width': 1.0,
           'line-dasharray': [3, 2],
-          'line-opacity': 0.75,
+          'line-opacity': 0.85,
         } },
 
       // ── Place labels ──────────────────────────────────────────────────────
