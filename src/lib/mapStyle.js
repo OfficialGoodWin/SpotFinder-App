@@ -6,9 +6,9 @@
  */
 
 const FONTS = {
-  regular: ['Noto Sans Regular', 'Open Sans Regular', 'Arial Unicode MS Regular'],
-  bold:    ['Noto Sans Bold',    'Open Sans Bold',    'Arial Unicode MS Regular'],
-  italic:  ['Noto Sans Italic',  'Open Sans Italic',  'Arial Unicode MS Regular'],
+  regular: ['Noto Sans Regular'],
+  bold:    ['Noto Sans Bold'],
+  italic:  ['Noto Sans Italic'],
 };
 
 // ── Colour palette ────────────────────────────────────────────────────────────
@@ -143,7 +143,7 @@ function style(dark = false) {
       lf('lc-ice',       c.glacier,   'landcover', ['==', 'class', 'ice']),
 
       // ── Landuse ───────────────────────────────────────────────────────────
-      lf('lu-residential', c.residential, 'landuse', ['in', 'class', 'residential', 'suburb', 'neighbourhood'], 0.6),
+      lf('lu-residential', c.residential, 'landuse', ['in', 'class', 'residential', 'suburb', 'neighbourhood'], 0.35),
       lf('lu-commercial',  c.commercial,  'landuse', ['in', 'class', 'commercial', 'retail'], 0.6),
       lf('lu-industrial',  c.industrial,  'landuse', ['==', 'class', 'industrial'], 0.7),
       lf('lu-cemetery',    c.cemetery,    'landuse', ['==', 'class', 'cemetery']),
@@ -225,7 +225,7 @@ function style(dark = false) {
       // E-routes (E50 etc) are OSM route RELATIONS — not stored per-way in tiles, skip them
 
       // D1/D5/D7 motorway — RED shield
-      { id:'shield-motorway', type:'symbol', source:'v', 'source-layer':'roads',
+      { id:'shield-motorway', type:'symbol', source:'v', 'source-layer':'transportation_name',
         filter:['all',['==','kind','highway'],['==','kind_detail','motorway'],['has','shield_text']],
         minzoom:9,
         layout:{
@@ -239,7 +239,7 @@ function style(dark = false) {
         paint:{ 'icon-opacity':1 } },
 
       // R26, 48, MO trunk — BRIGHT BLUE shield
-      { id:'shield-trunk', type:'symbol', source:'v', 'source-layer':'roads',
+      { id:'shield-trunk', type:'symbol', source:'v', 'source-layer':'transportation_name',
         filter:['all',['==','kind','highway'],['==','kind_detail','trunk'],['has','shield_text']],
         minzoom:10,
         layout:{
@@ -252,7 +252,7 @@ function style(dark = false) {
         paint:{ 'icon-opacity':1 } },
 
       // 27, 9 primary — BRIGHT BLUE shield
-      { id:'shield-primary', type:'symbol', source:'v', 'source-layer':'roads',
+      { id:'shield-primary', type:'symbol', source:'v', 'source-layer':'transportation_name',
         filter:['all',['==','kind','highway'],['==','kind_detail','primary'],['has','shield_text']],
         minzoom:11,
         layout:{
@@ -265,7 +265,7 @@ function style(dark = false) {
         paint:{ 'icon-opacity':1 } },
 
       // 605, 431 secondary — BRIGHT BLUE shield
-      { id:'shield-secondary', type:'symbol', source:'v', 'source-layer':'roads',
+      { id:'shield-secondary', type:'symbol', source:'v', 'source-layer':'transportation_name',
         filter:['all',['in','kind_detail','secondary','tertiary'],['has','shield_text']],
         minzoom:13,
         layout:{
@@ -278,13 +278,13 @@ function style(dark = false) {
         paint:{ 'icon-opacity':1 } },
 
       // ── Road name labels ──────────────────────────────────────────────────
-      { id: 'lbl-primary', type: 'symbol', source: 'v', 'source-layer': 'roads',
-        filter: ['in', 'kind_detail', 'primary', 'trunk'], minzoom: 13,
+      { id: 'lbl-primary', type: 'symbol', source: 'v', 'source-layer': 'transportation_name',
+        filter: ['in', 'class', 'primary', 'trunk'], minzoom: 13,
         layout: { 'text-field': ['get', 'name'], 'text-font': FONTS.regular, 'text-size': 10,
           'symbol-placement': 'line', 'symbol-spacing': 250, 'text-max-angle': 30 },
         paint: { 'text-color': c.label, 'text-halo-color': c.bg, 'text-halo-width': 2 } },
-      { id: 'lbl-street', type: 'symbol', source: 'v', 'source-layer': 'roads',
-        filter: ['in', 'kind_detail', 'secondary', 'tertiary', 'residential', 'unclassified', 'service'], minzoom: 14,
+      { id: 'lbl-street', type: 'symbol', source: 'v', 'source-layer': 'transportation_name',
+        filter: ['in', 'class', 'secondary', 'tertiary', 'residential', 'unclassified', 'service'], minzoom: 14,
         layout: { 'text-field': ['get', 'name'], 'text-font': FONTS.regular, 'text-size': 10,
           'symbol-placement': 'line', 'symbol-spacing': 200, 'text-max-angle': 30 },
         paint: { 'text-color': c.labelMuted, 'text-halo-color': c.bg, 'text-halo-width': 1.5 } },
