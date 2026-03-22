@@ -178,6 +178,7 @@ function style(dark = false) {
       rc('rc-primary',   c.primaryLine,  'primary',    [1.5, 3.5]),
       rc('rc-secondary', c.secondaryLine,'secondary',  [1,   3]),
       rc('rc-tertiary',  c.tertiaryLine, 'tertiary',   [1.0, 3.0], 9),
+      rc('rc-local', c.roadLine, ['in', 'class', 'unclassified', 'minor'], [0.5, 2.0], 12),
       rc('rc-street',    c.roadLine,     ['in', 'class', 'street', 'street_limited', 'service', 'residential', 'living_street', 'unclassified', 'minor'], [0.5, 2.0], 13),
 
       // ── Roads — fills ─────────────────────────────────────────────────────
@@ -191,6 +192,8 @@ function style(dark = false) {
         paint: { 'line-color': c.path, 'line-width': 0.8, 'line-dasharray': [3, 2] } },
       rl('r-street',    c.road,      ['in', 'class', 'street', 'street_limited', 'service', 'residential', 'living_street', 'unclassified', 'minor'], [0.4, 1.8], 13),
       rl('r-tertiary',  c.tertiary,  'tertiary',  [0.5, 1.5], 10),
+      // Local/district roads (unclassified in OSM → long ref numbers like 50013)
+      rl('r-local', c.road, ['in', 'class', 'unclassified', 'minor'], [0.4, 1.8], 12),
       rl('r-secondary', c.secondary, 'secondary', [0.5, 2]),
       rl('r-primary',   c.primary,   'primary',   [1,   2.5]),
       rl('r-trunk',     c.trunk,     'trunk',     [1.5, 3]),
