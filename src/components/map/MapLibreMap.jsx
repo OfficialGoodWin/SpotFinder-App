@@ -22,12 +22,12 @@ import { getAllMeta, getPOIs, getTile } from '../../lib/offlineStorage.js';
 // unique ref once, then caches it.
 
 const SHIELD_COLORS = {
-  motorway: { bg: '#cc1111', border: '#cc1111' },  // D roads — red
-  trunk:    { bg: '#003d9e', border: '#003d9e' },  // R/numbered — blue
-  primary:  { bg: '#003d9e', border: '#003d9e' },  // 27, 9 — blue
-  secondary:{ bg: '#003d9e', border: '#003d9e' },  // 605, 431 — blue
-  tertiary: { bg: '#003d9e', border: '#003d9e' },  // smaller — blue
-  euro:     { bg: '#1a6e1a', border: '#1a6e1a' },  // E50 — green
+  motorway: { bg: '#cc1111' },  // D roads (D1, D5, D7) — red
+  trunk:    { bg: '#3a81fc' },  // MO, orbital/ring roads — blue (bright)
+  primary:  { bg: '#003d9e' },  // 27, 9, numbered — deep blue
+  secondary:{ bg: '#003d9e' },  // 605, 431 — deep blue
+  tertiary: { bg: '#003d9e' },  // local — deep blue
+  euro:     { bg: '#2e7d32' },  // E50, E49 — green
 };
 
 function drawRoadShield(ref, roadClass) {
@@ -215,56 +215,14 @@ async function fetchAmbientPOIs(south, west, north, east, zoom, signal) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-// ── Shield image factory ──────────────────────────────────────────────────────
-// Draws a road sign shield: solid bg + white inner border, 1px transparent gap
-// The image is a single pixel repeated — MapLibre's icon-text-fit stretches it
-function drawShield(bgColor, borderColor = '#ffffff') {
-  const size = 40;
-  const c    = document.createElement('canvas');
-  c.width    = size;
-  c.height   = size;
-  const ctx  = c.getContext('2d');
-  const r    = size * 0.22; // corner radius ratio
 
-  function roundRect(x, y, w, h, rad, color) {
-    ctx.beginPath();
-    ctx.moveTo(x + rad, y);
-    ctx.lineTo(x + w - rad, y);
-    ctx.quadraticCurveTo(x + w, y, x + w, y + rad);
-    ctx.lineTo(x + w, y + h - rad);
-    ctx.quadraticCurveTo(x + w, y + h, x + w - rad, y + h);
-    ctx.lineTo(x + rad, y + h);
-    ctx.quadraticCurveTo(x, y + h, x, y + h - rad);
-    ctx.lineTo(x, y + rad);
-    ctx.quadraticCurveTo(x, y, x + rad, y);
-    ctx.closePath();
-    ctx.fillStyle = color;
-    ctx.fill();
-  }
-
-  // Outer colored bg
-  roundRect(0, 0, size, size, r, bgColor);
-  // White inner border (3px inset)
-  roundRect(3, 3, size-6, size-6, r * 0.7, borderColor);
-  // Inner bg again (2px inside the white border)
-  roundRect(5, 5, size-10, size-10, r * 0.5, bgColor);
-
-  return { data: ctx.getImageData(0, 0, size, size).data, width: size, height: size };
-}
-
-function addShieldImages(map) {
-  const shields = [
-    { name: 'shield-red',   bg: '#cc1111' },
-    { name: 'shield-blue',  bg: '#003d9e' },
-    { name: 'shield-green', bg: '#2e7d32' },
-  ];
-  for (const { name, bg } of shields) {
-    try {
-      if (map.hasImage(name)) map.removeImage(name);
-      const { data, width, height } = drawShield(bg);
-      map.addImage(name, { width, height, data }, { sdf: false, pixelRatio: 2 });
-    } catch(_) {}
-  }
+function registerShieldListener(map) {
+  // Generate shield images on demand when MapLibre requests them
+  map.on('styleimagemissing', (e) => {
+    if (e.id && e.id.startsWith('shield-')) {
+      addShieldImage(map, e.id);
+    }
+  });
 }
 
 export default function MapLibreMap({
@@ -305,10 +263,8 @@ export default function MapLibreMap({
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
     map.on('click', e => { if (addMode) onMapClick?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }); });
 
-    // Add shield images — drawn on canvas so no sprite needed
-    // Each shield: solid color bg, outer rounded rect, white inner border, ready for icon-text-fit
-    map.once('load', () => addShieldImages(map));
-    map.on('style.load', () => addShieldImages(map));
+    // Register shield image listener — generates signs on demand via styleimagemissing
+    registerShieldListener(map);
 
     mapRef.current = map;
     setMapRef?.(map);
