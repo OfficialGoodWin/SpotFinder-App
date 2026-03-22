@@ -133,10 +133,11 @@ async function loadERoutes() {
   if (eRouteCache) return eRouteCache;
   try {
     const res = await fetch('/data/eroutes.json');
-    if (!res.ok) return [];
+    if (!res.ok) { console.warn('E-routes: HTTP', res.status); return []; }
     eRouteCache = await res.json();
+    console.log('E-routes loaded:', eRouteCache.length);
     return eRouteCache;
-  } catch (_) { return []; }
+  } catch (e) { console.warn('E-routes fetch error:', e.message); return []; }
 }
 
 function drawERouteShield(ref) {
@@ -443,8 +444,6 @@ export default function MapLibreMap({
       loadERoutes().then(routes => {
         if (!mapRef.current) return;
         routes.forEach(({ r, lat, lng }) => {
-          if (lat < bounds.getSouth() - pad || lat > bounds.getNorth() + pad ||
-              lng < bounds.getWest()  - pad || lng > bounds.getEast()  + pad) return;
           const el     = drawERouteShield(r);
           const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
             .setLngLat([lng, lat])
@@ -454,7 +453,8 @@ export default function MapLibreMap({
       });
     }
 
-    renderERoutes();
+    // Fire once map is fully ready
+    map.once('idle', renderERoutes);
     map.on('moveend', renderERoutes);
     map.on('zoomend', renderERoutes);
     return () => {

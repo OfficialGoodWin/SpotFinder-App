@@ -176,8 +176,18 @@ function style(dark = false) {
       rc('rc-motorway',  c.motorwayLine, 'motorway',   [2.5, 5]),
       rc('rc-trunk',     c.trunkLine,    'trunk',      [2,   4]),
       rc('rc-primary',   c.primaryLine,  'primary',    [1.5, 3.5]),
-      rc('rc-secondary', c.roadLine,     'secondary',  [0.8, 2.5]),
-      rc('rc-tertiary',  c.tertiaryLine, 'tertiary',   [1.0, 3.0], 9),
+      rc('rc-secondary', c.secondaryLine,'secondary',  [1,   3]),
+      // Override casing for local secondary roads
+      { id:'rc-secondary-local', type:'line', source:'v', 'source-layer':'transportation',
+        filter:['==','class','secondary'],
+        layout:{ 'line-join':'round', 'line-cap':'round' },
+        paint:{ 'line-color':['case',
+          ['all',['has','ref'],['>=',['length',['get','ref']],4]],
+          c.roadLine,
+          'rgba(0,0,0,0)'
+        ],
+        'line-width':['interpolate',['linear'],['zoom'],6,0.8,10,2.5,14,5,18,12] } },
+      rc('rc-tertiary',  c.roadLine,     'tertiary',   [0.8, 2.5], 9),
       rc('rc-local', c.roadLine, ['in', 'class', 'unclassified', 'minor'], [0.5, 2.0], 12),
       rc('rc-street',    c.roadLine,     ['in', 'class', 'street', 'street_limited', 'service', 'residential', 'living_street', 'unclassified', 'minor'], [0.5, 2.0], 13),
 
@@ -191,10 +201,20 @@ function style(dark = false) {
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: { 'line-color': c.path, 'line-width': 0.8, 'line-dasharray': [3, 2] } },
       rl('r-street',    c.road,      ['in', 'class', 'street', 'street_limited', 'service', 'residential', 'living_street', 'unclassified', 'minor'], [0.4, 1.8], 13),
-      rl('r-tertiary',  c.tertiary,  'tertiary',  [0.5, 1.5], 10),
+      rl('r-tertiary',  c.road,      'tertiary',  [0.4, 1.5], 10),
       // Local/district roads (unclassified in OSM → long ref numbers like 50013)
       rl('r-local', c.road, ['in', 'class', 'unclassified', 'minor'], [0.4, 1.8], 12),
-      rl('r-secondary', c.road,      'secondary', [0.5, 2]),  // white — plates show numbers
+      rl('r-secondary', c.secondary, 'secondary', [0.5, 2]),
+      // Override: secondary roads with 4+ digit numeric refs (2347, 10801) → white like streets
+      { id:'r-secondary-local', type:'line', source:'v', 'source-layer':'transportation',
+        filter:['==','class','secondary'],
+        layout:{ 'line-join':'round', 'line-cap':'round' },
+        paint:{ 'line-color':['case',
+          ['all',['has','ref'],['>=',['length',['get','ref']],4]],
+          c.road,
+          'rgba(0,0,0,0)'  // transparent if short ref — let golden show through
+        ],
+        'line-width':['interpolate',['linear'],['zoom'],6,0.5,10,2,14,4,18,11] } },
       rl('r-primary',   c.primary,   'primary',   [1,   2.5]),
       rl('r-trunk',     c.trunk,     'trunk',     [1.5, 3]),
       rl('r-motorway',  c.motorway,  'motorway',  [2,   4]),
@@ -234,7 +254,8 @@ function style(dark = false) {
         layout:{
           'icon-image':['concat','shield-motorway-',['get','ref']],
           'icon-allow-overlap':false,
-          'icon-ignore-placement':false,
+          'icon-rotation-alignment':'map',
+          'icon-pitch-alignment':'map',
           'symbol-placement':'line',
           'symbol-spacing':350,
           'text-field':'',
@@ -248,6 +269,8 @@ function style(dark = false) {
         layout:{
           'icon-image':['concat','shield-trunk-',['get','ref']],
           'icon-allow-overlap':false,
+          'icon-rotation-alignment':'map',
+          'icon-pitch-alignment':'map',
           'symbol-placement':'line',
           'symbol-spacing':320,
           'text-field':'',
@@ -261,6 +284,8 @@ function style(dark = false) {
         layout:{
           'icon-image':['concat','shield-primary-',['get','ref']],
           'icon-allow-overlap':false,
+          'icon-rotation-alignment':'map',
+          'icon-pitch-alignment':'map',
           'symbol-placement':'line',
           'symbol-spacing':300,
           'text-field':'',
@@ -274,6 +299,8 @@ function style(dark = false) {
         layout:{
           'icon-image':['concat','shield-secondary-',['get','ref']],
           'icon-allow-overlap':false,
+          'icon-rotation-alignment':'map',
+          'icon-pitch-alignment':'map',
           'symbol-placement':'line',
           'symbol-spacing':280,
           'text-field':'',
