@@ -230,35 +230,27 @@ function style(dark = false) {
       rc('rc-local', c.roadLine, ['in', 'class', 'unclassified', 'minor'], [0.5, 2.0], 12),
       rc('rc-street',    c.roadLine,     ['in', 'class', 'street', 'street_limited', 'service', 'residential', 'living_street', 'unclassified', 'minor'], [0.5, 2.0], 13),
 
-      // ── Bridges — thick OUTLINE on top of road fills ─────────────────────────
-      // Bridges are highlighted by a thick gray outline drawn over the road fills.
-      // Only layer > 0 are actual elevated structures (bridges at layer=0 are ground level).
-      // Side rails omitted because OSM data doesn't cleanly separate bridge decks
-      // from approach ramps in vector tiles.
-      { id:'bridge-motorway-outline', type:'line', source:'v', 'source-layer':'transportation',
-        filter:['all',['==','class','motorway'],['==','brunnel','bridge'],['>','layer',0]],
+      // ── Bridge outline (subtle) ───────────────────────────────────────────────
+      // Bridges get a very subtle lighter outline to suggest elevation.
+      // Uses layer>0 to avoid underpasses (layer=0 or negative).
+      { id:'bridge-outline', type:'line', source:'v', 'source-layer':'transportation',
+        filter:['all',['==','brunnel','bridge'],['>','layer',0]],
         minzoom:14,
         layout:{'line-join':'round','line-cap':'round'},
-        paint:{'line-color':'#888',
-          'line-width':['interpolate',['linear'],['zoom'],6,5,10,10,14,20,18,36]} },
-      { id:'bridge-trunk-outline', type:'line', source:'v', 'source-layer':'transportation',
-        filter:['all',['==','class','trunk'],['==','brunnel','bridge'],['>','layer',0]],
-        minzoom:14,
-        layout:{'line-join':'round','line-cap':'round'},
-        paint:{'line-color':'#888',
-          'line-width':['interpolate',['linear'],['zoom'],6,4,10,8,14,16,18,32]} },
-      { id:'bridge-primary-outline', type:'line', source:'v', 'source-layer':'transportation',
-        filter:['all',['==','class','primary'],['==','brunnel','bridge'],['>','layer',0]],
-        minzoom:14,
-        layout:{'line-join':'round','line-cap':'round'},
-        paint:{'line-color':'#999',
-          'line-width':['interpolate',['linear'],['zoom'],8,2.5,12,6,16,16]} },
-      { id:'bridge-other-outline', type:'line', source:'v', 'source-layer':'transportation',
-        filter:['all',['in','class','secondary','tertiary','street','residential'],['==','brunnel','bridge'],['>','layer',0]],
-        minzoom:15,
-        layout:{'line-join':'round','line-cap':'round'},
-        paint:{'line-color':'#aaa',
-          'line-width':['interpolate',['linear'],['zoom'],10,2,14,6,18,14]} },
+        paint:{'line-color':['case',
+          ['==',['get','class'],'motorway'], c.motorwayLine,
+          ['==',['get','class'],'trunk'], c.trunkLine,
+          ['==',['get','class'],'primary'], c.primaryLine,
+          ['==',['get','class'],'secondary'], c.secondaryLine,
+          c.roadLine
+        ],
+          'line-width':['case',
+            ['==',['get','class'],'motorway'],['interpolate',['linear'],['zoom'],6,1.2,10,2.5,14,5,18,9],
+            ['==',['get','class'],'trunk'],['interpolate',['linear'],['zoom'],6,1,10,2,14,4.5,18,8],
+            ['==',['get','class'],'primary'],['interpolate',['linear'],['zoom'],8,0.8,12,2,16,5],
+            ['==',['get','class'],'secondary'],['interpolate',['linear'],['zoom'],10,0.6,14,2,18,5],
+            ['interpolate',['linear'],['zoom'],10,0.5,14,1.5,18,4]
+          ]} },
 
       // ── Roads — fills ─────────────────────────────────────────────────────
       { id: 'r-track', type: 'line', source: 'v', 'source-layer': 'transportation',
