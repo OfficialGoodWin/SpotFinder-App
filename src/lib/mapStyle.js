@@ -231,26 +231,14 @@ function style(dark = false) {
       rc('rc-street',    c.roadLine,     ['in', 'class', 'street', 'street_limited', 'service', 'residential', 'living_street', 'unclassified', 'minor'], [0.5, 2.0], 13),
 
       // ── Bridge outline (subtle) ───────────────────────────────────────────────
-      // Bridges get a very subtle lighter outline to suggest elevation.
+      // Bridges get a very subtle outline to suggest elevation.
       // Uses layer>0 to avoid underpasses (layer=0 or negative).
       { id:'bridge-outline', type:'line', source:'v', 'source-layer':'transportation',
         filter:['all',['==','brunnel','bridge'],['>','layer',0]],
         minzoom:14,
         layout:{'line-join':'round','line-cap':'round'},
-        paint:{'line-color':['case',
-          ['==',['get','class'],'motorway'], c.motorwayLine,
-          ['==',['get','class'],'trunk'], c.trunkLine,
-          ['==',['get','class'],'primary'], c.primaryLine,
-          ['==',['get','class'],'secondary'], c.secondaryLine,
-          c.roadLine
-        ],
-          'line-width':['case',
-            ['==',['get','class'],'motorway'],['interpolate',['linear'],['zoom'],6,1.2,10,2.5,14,5,18,9],
-            ['==',['get','class'],'trunk'],['interpolate',['linear'],['zoom'],6,1,10,2,14,4.5,18,8],
-            ['==',['get','class'],'primary'],['interpolate',['linear'],['zoom'],8,0.8,12,2,16,5],
-            ['==',['get','class'],'secondary'],['interpolate',['linear'],['zoom'],10,0.6,14,2,18,5],
-            ['interpolate',['linear'],['zoom'],10,0.5,14,1.5,18,4]
-          ]} },
+        paint:{'line-color':'#b0a898',
+          'line-width':['interpolate',['linear'],['zoom'],14,1,18,3]} },
 
       // ── Roads — fills ─────────────────────────────────────────────────────
       { id: 'r-track', type: 'line', source: 'v', 'source-layer': 'transportation',
