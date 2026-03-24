@@ -230,37 +230,35 @@ function style(dark = false) {
       rc('rc-local', c.roadLine, ['in', 'class', 'unclassified', 'minor'], [0.5, 2.0], 12),
       rc('rc-street',    c.roadLine,     ['in', 'class', 'street', 'street_limited', 'service', 'residential', 'living_street', 'unclassified', 'minor'], [0.5, 2.0], 13),
 
-      // ── Bridges — gray SIDE RAILS using line-gap-width ───────────────────────
-      // line-gap-width = road width → only the side rails (line-width wide) are visible
-      // Only layer >= 1 are actual bridge decks; layer 0 or negative is underpass/ground level
-      { id:'bridge-motorway-side', type:'line', source:'v', 'source-layer':'transportation',
-        filter:['all',['==','class','motorway'],['==','brunnel','bridge'],['>=','layer',1]],
+      // ── Bridges — thick OUTLINE on top of road fills ─────────────────────────
+      // Bridges are highlighted by a thick gray outline drawn over the road fills.
+      // Only layer > 0 are actual elevated structures (bridges at layer=0 are ground level).
+      // Side rails omitted because OSM data doesn't cleanly separate bridge decks
+      // from approach ramps in vector tiles.
+      { id:'bridge-motorway-outline', type:'line', source:'v', 'source-layer':'transportation',
+        filter:['all',['==','class','motorway'],['==','brunnel','bridge'],['>','layer',0]],
         minzoom:14,
-        layout:{'line-join':'miter','line-cap':'butt'},
-        paint:{'line-color':'#777',
-          'line-width': 4,
-          'line-gap-width':['interpolate',['linear'],['zoom'],6,2,10,4,14,8,18,17]} },
-      { id:'bridge-trunk-side', type:'line', source:'v', 'source-layer':'transportation',
-        filter:['all',['==','class','trunk'],['==','brunnel','bridge'],['>=','layer',1]],
+        layout:{'line-join':'round','line-cap':'round'},
+        paint:{'line-color':'#888',
+          'line-width':['interpolate',['linear'],['zoom'],6,5,10,10,14,20,18,36]} },
+      { id:'bridge-trunk-outline', type:'line', source:'v', 'source-layer':'transportation',
+        filter:['all',['==','class','trunk'],['==','brunnel','bridge'],['>','layer',0]],
         minzoom:14,
-        layout:{'line-join':'miter','line-cap':'butt'},
-        paint:{'line-color':'#777',
-          'line-width': 3.5,
-          'line-gap-width':['interpolate',['linear'],['zoom'],6,1.5,10,3,14,7,18,15]} },
-      { id:'bridge-primary-side', type:'line', source:'v', 'source-layer':'transportation',
-        filter:['all',['==','class','primary'],['==','brunnel','bridge'],['>=','layer',1]],
+        layout:{'line-join':'round','line-cap':'round'},
+        paint:{'line-color':'#888',
+          'line-width':['interpolate',['linear'],['zoom'],6,4,10,8,14,16,18,32]} },
+      { id:'bridge-primary-outline', type:'line', source:'v', 'source-layer':'transportation',
+        filter:['all',['==','class','primary'],['==','brunnel','bridge'],['>','layer',0]],
         minzoom:14,
-        layout:{'line-join':'miter','line-cap':'butt'},
-        paint:{'line-color':'#777',
-          'line-width': 3,
-          'line-gap-width':['interpolate',['linear'],['zoom'],8,1,12,2.5,16,7]} },
-      { id:'bridge-other-side', type:'line', source:'v', 'source-layer':'transportation',
-        filter:['all',['in','class','secondary','tertiary','street','residential'],['==','brunnel','bridge'],['>=','layer',1]],
+        layout:{'line-join':'round','line-cap':'round'},
+        paint:{'line-color':'#999',
+          'line-width':['interpolate',['linear'],['zoom'],8,2.5,12,6,16,16]} },
+      { id:'bridge-other-outline', type:'line', source:'v', 'source-layer':'transportation',
+        filter:['all',['in','class','secondary','tertiary','street','residential'],['==','brunnel','bridge'],['>','layer',0]],
         minzoom:15,
-        layout:{'line-join':'miter','line-cap':'butt'},
-        paint:{'line-color':'#777',
-          'line-width': 2,
-          'line-gap-width':['interpolate',['linear'],['zoom'],10,1,14,3,18,7]} },
+        layout:{'line-join':'round','line-cap':'round'},
+        paint:{'line-color':'#aaa',
+          'line-width':['interpolate',['linear'],['zoom'],10,2,14,6,18,14]} },
 
       // ── Roads — fills ─────────────────────────────────────────────────────
       { id: 'r-track', type: 'line', source: 'v', 'source-layer': 'transportation',
