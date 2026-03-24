@@ -363,7 +363,8 @@ function style(dark = false) {
       ['==', 'oneway', 'yes'], 'arrow-forward',
       ['==', 'oneway', 'forward'], 'arrow-forward',
       ['==', 'oneway', 'reverse'], 'arrow-backward',
-      ['==', 'oneway', '-1'], 'arrow-backward'
+      ['==', 'oneway', '-1'], 'arrow-backward',
+      ''
     ],
     'icon-size': 0.3,
     'symbol-placement': 'line',
@@ -379,14 +380,14 @@ function style(dark = false) {
 { id: 'lane-markings', type: 'line', source: 'v', 'source-layer': 'transportation',
   filter: ['all',
     ['>=', 'lanes', 2],
-    ['any', ['==', 'country_code', 'CZ'], ['==', 'country_code', 'SK'], ['==', 'country_code', 'DE']],
-    ['>=', ['zoom'], 17]
+    ['any', ['==', 'country_code', 'CZ'], ['==', 'country_code', 'SK'], ['==', 'country_code', 'DE']]
   ],
+  minzoom: 17,
   layout: { 'line-cap': 'butt', 'line-join': 'round' },
   paint: {
     'line-color': '#fff',
     'line-width': 0.5,
-    'line-dasharray': ['step', ['get', 'lanes'], [1, 3], 3, [2, 4], 4, [3, 6]],
+    'line-dasharray': ['step', ['get', 'lanes'], ['literal', [1, 3]], 3, ['literal', [2, 4]], 4, ['literal', [3, 6]]],
     'line-offset': ['*', ['/', ['get', 'lanes'], 2], -1.5]
   }
 },
