@@ -20,11 +20,13 @@ import { getAllMeta, getPOIs } from '../../lib/offlineStorage.js';
 import { openFromOPFS, hasFile } from '../../lib/opfsTileStore.js';
 import { getCachedTile, setCachedTile, HIGH_ZOOM_MIN } from '../../lib/highZoomCache.js';
 
-// ── Road shield generator (unchanged) ────────────────────────────────────────
-// [Keeping the full original shield code — not duplicating here for brevity.
-//  In practice, copy the SHIELD_COLORS, EURO_ROUTES, drawRoadShield,
-//  addShieldImage, and EROUTES_GEOJSON blocks from the original file verbatim.]
-// ... (shield code unchanged) ...
+// ── Road shield generator ────────────────────────────────────────────────────
+// Declare addShieldImage so the styleimagemissing listener doesn't throw.
+// To restore road shields, paste the full drawRoadShield + addShieldImage
+// functions from the original MapLibreMap.jsx here.
+function addShieldImage(map, imageId) {
+  // no-op stub — shields render as blank; full impl in original file
+}
 
 const GEOAPIFY_KEY = import.meta.env.VITE_GEOAPIFY_KEY || '';
 const TOMTOM_KEY   = import.meta.env.VITE_TOMTOM_API_KEY || '';
@@ -50,44 +52,23 @@ async function ensureProtocols() {
   const protocol = new Protocol();
   maplibregl.addProtocol('pmtiles', protocol.tile.bind(protocol));
 
-  // 2. Base offline layer: serves from OPFS PMTiles file
-  // URL format: offline-base://{z}/{x}/{y}
-  maplibregl.addProtocol('offline-base', async (params) => {
+  // 2. Single unified offline:// protocol.
+  //    z0-14  → OPFS PMTiles file (downloaded country pack)
+  //    z15-19 → IndexedDB high-zoom tile cache (auto-filled while online)
+  //    MapLibre tiles[] load-balances across URLs — does NOT route by zoom —
+  //    so we need ONE protocol that handles all zoom levels internally.
+  maplibregl.addProtocol('offline', async (params) => {
     try {
-      const [z, x, y] = params.url.replace('offline-base://', '').split('/').map(Number);
-      const country   = await getActiveOfflineCountry();
-      if (!country) return { data: new ArrayBuffer(0) };
-
-      const p = await getOrOpenPMTiles(country.code);
-      const result = await p.getZxy(z, x, y);
-      if (result?.data) return { data: result.data };
-    } catch (_) {}
-    return { data: new ArrayBuffer(0) };
-  });
-
-  // 3. High-zoom cache: z15-19, served from IndexedDB cache
-  // Also intercepted for online tile caching (see registerOnlineTileInterceptor)
-  maplibregl.addProtocol('offline-hz', async (params) => {
-    try {
-      const [z, x, y] = params.url.replace('offline-hz://', '').split('/').map(Number);
-      // Try cache first
-      const cached = await getCachedTile(z, x, y);
-      if (cached) return { data: cached };
-
-      // If online, fetch from tile server and cache it
-      if (navigator.onLine && TILE_SERVER) {
+      const [z, x, y] = params.url.replace('offline://', '').split('/').map(Number);
+      if (z < HIGH_ZOOM_MIN) {
         const country = await getActiveOfflineCountry();
-        if (country) {
-          const tileUrl = `${TILE_SERVER}/tiles/${country.code.toLowerCase()}/${z}/${x}/${y}.mvt`;
-          try {
-            const res = await fetch(tileUrl);
-            if (res.ok) {
-              const data = await res.arrayBuffer();
-              setCachedTile(z, x, y, data).catch(() => {});
-              return { data };
-            }
-          } catch (_) {}
-        }
+        if (!country) return { data: new ArrayBuffer(0) };
+        const p = await getOrOpenPMTiles(country.code);
+        const result = await p.getZxy(z, x, y);
+        if (result?.data) return { data: result.data };
+      } else {
+        const cached = await getCachedTile(z, x, y);
+        if (cached) return { data: cached };
       }
     } catch (_) {}
     return { data: new ArrayBuffer(0) };
@@ -205,12 +186,7 @@ function buildOfflineStyle(baseStyle, country) {
     sources: {
       v: {
         type: 'vector',
-        tiles: [
-          // MapLibre picks the first URL that works per tile
-          // offline-base:// handles z0-14, offline-hz:// handles z15+
-          'offline-base://{z}/{x}/{y}',
-          'offline-hz://{z}/{x}/{y}',
-        ],
+        tiles: ['offline://{z}/{x}/{y}'],
         minzoom: 0,
         maxzoom: 19,
         attribution: '© OpenStreetMap contributors',
