@@ -230,15 +230,37 @@ function style(dark = false) {
       rc('rc-local', c.roadLine, ['in', 'class', 'unclassified', 'minor'], [0.5, 2.0], 12),
       rc('rc-street',    c.roadLine,     ['in', 'class', 'street', 'street_limited', 'service', 'residential', 'living_street', 'unclassified', 'minor'], [0.5, 2.0], 13),
 
-      // ── Bridge outline (subtle) ───────────────────────────────────────────────
-      // Bridges get a very subtle outline to suggest elevation.
-      // Uses layer>0 to avoid underpasses (layer=0 or negative).
-      { id:'bridge-outline', type:'line', source:'v', 'source-layer':'transportation',
-        filter:['all',['==','brunnel','bridge'],['>','layer',0]],
-        minzoom:14,
-        layout:{'line-join':'round','line-cap':'round'},
-        paint:{'line-color':'#b0a898',
-          'line-width':['interpolate',['linear'],['zoom'],14,1,18,3]} },
+      // ── Bridges — gray SIDE RAILS using line-gap-width ───────────────────────
+      // line-gap-width = road width → only the side rails (line-width wide) are visible
+      // Only layer >= 1 are actual bridge decks (elevated above ground level)
+      { id:'bridge-motorway-side', type:'line', source:'v', 'source-layer':'transportation',
+        filter:['all',['==','class','motorway'],['==','brunnel','bridge'],['>=','layer',1]],
+        minzoom:16,
+        layout:{'line-join':'miter','line-cap':'butt'},
+        paint:{'line-color':'#999',
+          'line-width': 1.5,
+          'line-gap-width':['interpolate',['linear'],['zoom'],6,2,10,4,14,8,18,17]} },
+      { id:'bridge-trunk-side', type:'line', source:'v', 'source-layer':'transportation',
+        filter:['all',['==','class','trunk'],['==','brunnel','bridge'],['>=','layer',1]],
+        minzoom:16,
+        layout:{'line-join':'miter','line-cap':'butt'},
+        paint:{'line-color':'#999',
+          'line-width': 1.5,
+          'line-gap-width':['interpolate',['linear'],['zoom'],6,1.5,10,3,14,7,18,15]} },
+      { id:'bridge-primary-side', type:'line', source:'v', 'source-layer':'transportation',
+        filter:['all',['==','class','primary'],['==','brunnel','bridge'],['>=','layer',1]],
+        minzoom:16,
+        layout:{'line-join':'miter','line-cap':'butt'},
+        paint:{'line-color':'#999',
+          'line-width': 1.5,
+          'line-gap-width':['interpolate',['linear'],['zoom'],8,1,12,2.5,16,7]} },
+      { id:'bridge-other-side', type:'line', source:'v', 'source-layer':'transportation',
+        filter:['all',['in','class','secondary','tertiary','street','residential'],['==','brunnel','bridge'],['>=','layer',1]],
+        minzoom:17,
+        layout:{'line-join':'miter','line-cap':'butt'},
+        paint:{'line-color':'#999',
+          'line-width': 1.5,
+          'line-gap-width':['interpolate',['linear'],['zoom'],10,1,14,3,18,7]} },
 
       // ── Roads — fills ─────────────────────────────────────────────────────
       { id: 'r-track', type: 'line', source: 'v', 'source-layer': 'transportation',
