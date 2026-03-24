@@ -469,64 +469,6 @@ function style(dark = false) {
   paint:{ 'icon-color': '#666', 'icon-halo-color': '#aaa', 'icon-halo-width': 1 }
 },
 
-// UNLOCKED: One-way arrows
-{ id: 'oneway-arrow', type: 'symbol', source: 'v', 'source-layer': 'transportation',
-  filter: ['!=', 'oneway', 'no'],
-  minzoom: 16,
-  layout: {
-    'icon-image': ['case',
-      ['==', 'oneway', 'yes'], 'arrow-forward',
-      ['==', 'oneway', 'forward'], 'arrow-forward',
-      ['==', 'oneway', 'reverse'], 'arrow-backward',
-      ['==', 'oneway', '-1'], 'arrow-backward'
-    ],
-    'icon-size': 0.3,
-    'symbol-placement': 'line',
-    'symbol-spacing': 50,
-    'icon-rotation-alignment': 'map',
-    'icon-allow-overlap': true,
-    'icon-ignore-placement': true
-  },
-  paint: { 'icon-color': '#fff', 'icon-halo-color': '#000', 'icon-halo-width': 1 }
-},
-
-// UNLOCKED: Lane markings CZ/SK/DE (OSM `lanes` tag support)
-{ id: 'lane-markings', type: 'line', source: 'v', 'source-layer': 'transportation',
-  filter: ['all',
-    ['>=', 'lanes', 2],
-    ['any', ['==', 'country_code', 'CZ'], ['==', 'country_code', 'SK'], ['==', 'country_code', 'DE']],
-    ['>=', ['zoom'], 17]
-  ],
-  layout: { 'line-cap': 'butt', 'line-join': 'round' },
-  paint: {
-    'line-color': '#fff',
-    'line-width': 0.5,
-    'line-dasharray': ['step', ['get', 'lanes'], [1, 3], 3, [2, 4], 4, [3, 6]],
-    'line-offset': ['*', ['/', ['get', 'lanes'], 2], -1.5]
-  }
-},
-
-// UNLOCKED: Planned roads gray texture
-{ id: 'planned-road-case', type: 'line', source: 'v', 'source-layer': 'transportation',
-  filter: ['any', ['==', 'highway', 'proposed'], ['==', 'highway', 'construction']],
-  minzoom: 10,
-  layout: { 'line-join': 'round', 'line-cap': 'round' },
-  paint: {
-    'line-color': '#888',
-    'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.5, 14, 4, 18, 10],
-    'line-dasharray': [3, 3]
-  }
-},
-{ id: 'planned-road-fill', type: 'line', source: 'v', 'source-layer': 'transportation',
-  filter: ['any', ['==', 'highway', 'proposed'], ['==', 'highway', 'construction']],
-  minzoom: 10,
-  layout: { 'line-join': 'round', 'line-cap': 'round' },
-  paint: {
-    'line-color': '#aaa',
-    'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.8, 14, 2.5, 18, 7],
-    'line-dasharray': [2, 2]
-  }
-},
 
       // ── Road name labels ──────────────────────────────────────────────────
       { id: 'lbl-primary', type: 'symbol', source: 'v', 'source-layer': 'transportation_name',
