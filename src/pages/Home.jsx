@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-import { Plus, Settings, Crosshair, HelpCircle, Trash2, WifiOff } from 'lucide-react';
+import { Plus, Settings, Crosshair, HelpCircle, Trash2, WifiOff, Crown } from 'lucide-react';
 import { getPublicSpots, createSpot, deleteSpot, updateSpot } from '@/api/firebaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
@@ -16,6 +16,7 @@ import SpotDetailModal from '../components/spots/SpotDetailModal';
 import NavigationPanel from '../components/navigation/NavigationPanel';
 import AuthModal from '../components/auth/AuthModal';
 import MySpotsPanel from '../components/spots/MySpotsPanel';
+import SubscriptionModal from '../components/SubscriptionModal.jsx';
 
 import SpotsPanel from '../components/spots/SpotsPanel';
 import POIPanel from '../components/spots/POIPanel';
@@ -58,6 +59,7 @@ export default function Home() {
   }, []);
   const [navRouteData, setNavRouteData] = useState({ coordinates: [], turns: [], currentStep: 0 });
   const [showSpots, setShowSpots] = useState(false);
+  const [showSubscription, setShowSubscription] = useState(false);
   const [fitBoundsData, setFitBoundsData] = useState(null);
   const [zoomToArea, setZoomToArea] = useState(null);
   const [deleteInput, setDeleteInput] = useState('');
@@ -303,6 +305,46 @@ export default function Home() {
         onShowAuth={() => setShowAuth(true)}
       />
 
+      {/* Go Elite button — desktop label + mobile icon */}
+      <div className="absolute top-4 right-4 z-[1004] md:flex hidden items-center gap-3">
+        {isAuthenticated ? (
+          <button
+            onClick={() => setShowSubscription(true)}
+            className="px-6 py-2.5 bg-gradient-to-r from-purple-500 via-purple-600 to-indigo-600 text-white rounded-2xl font-semibold text-sm shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all"
+          >
+            <Crown className="w-4 h-4 inline mr-1 mb-0.5" />
+            Go Elite
+          </button>
+        ) : (
+          <button
+            onClick={() => setShowSubscription(true)}
+            className="w-11 h-11 bg-gradient-to-r from-purple-500 via-purple-600 to-indigo-600 rounded-2xl shadow-lg flex items-center justify-center hover:shadow-xl active:scale-95 transition-all"
+            title="Upgrade to Elite"
+          >
+            <Crown className="w-5 h-5 text-white" />
+          </button>
+        )}
+      </div>
+
+      {/* Mobile Go Elite — bottom-left FAB */}
+      <div className="absolute bottom-28 left-6 z-[1004] md:hidden">
+        <button
+          onClick={() => setShowSubscription(true)}
+          className="w-16 h-16 bg-gradient-to-r from-purple-500 via-purple-600 to-indigo-600 rounded-3xl shadow-2xl flex items-center justify-center hover:shadow-3xl hover:scale-[1.05] active:scale-[0.97] transition-all"
+          title="Go Elite"
+        >
+          <Crown className="w-7 h-7 text-white" />
+        </button>
+      </div>
+
+      {/* Subscription modal */}
+      {showSubscription && (
+        <SubscriptionModal 
+          isOpen={showSubscription} 
+          onClose={() => setShowSubscription(false)} 
+        />
+      )}
+
       {/* Spots toggle — sits between search bar and layer switcher */}
       <SpotsPanel
         spots={spots}
@@ -494,6 +536,7 @@ export default function Home() {
       {/* Delete Account Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+ 
           <div className="bg-white dark:bg-card w-full max-w-sm rounded-3xl p-6 shadow-2xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
