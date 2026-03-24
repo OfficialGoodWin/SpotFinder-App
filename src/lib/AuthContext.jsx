@@ -10,7 +10,6 @@ export const AuthProvider = ({ children }) => {
   const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(true);
   const [authError, setAuthError] = useState(null);
   const [appPublicSettings, setAppPublicSettings] = useState(null);
-  const [subscriptionStatus, setSubscriptionStatus] = useState({ isElite: false, isUltra: false });
 
   useEffect(() => {
     // Set up Firebase auth state listener
@@ -24,37 +23,20 @@ export const AuthProvider = ({ children }) => {
     try {
       // Listen for auth state changes
       const { auth } = getFirebaseServices();
-      const unsubscribe = onAuthChange(async (firebaseUser) => {
+      const unsubscribe = onAuthChange((firebaseUser) => {
         try {
           if (firebaseUser) {
             const displayName = firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'User');
-            const userData = {
+            setUser({
               email: firebaseUser.email,
               id: firebaseUser.uid,
               displayName: displayName,
               photoURL: firebaseUser.photoURL
-            };
-            setUser(userData);
+            });
             setIsAuthenticated(true);
-
-            // Check subscription status
-            try {
-              const res = await fetch(`/api/subscription-status?userId=${firebaseUser.uid}`);
-              if (res.ok) {
-                const data = await res.json();
-                setSubscriptionStatus({
-                  isElite: data.isElite || false,
-                  isUltra: data.isUltra || false,
-                  subscription: data.subscription
-                });
-              }
-            } catch (e) {
-              console.warn('Subscription check failed:', e);
-            }
           } else {
             setUser(null);
             setIsAuthenticated(false);
-            setSubscriptionStatus({ isElite: false, isUltra: false });
           }
         } catch (err) {
           console.error('Error in auth state callback:', err);

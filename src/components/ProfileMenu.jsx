@@ -1,12 +1,9 @@
-import React, { useState } from 'react';
-import { LogOut, List, Trash2, User, Crown } from 'lucide-react';
+import React from 'react';
+import { LogOut, List, Trash2, User } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
-import SubscriptionModal from './SubscriptionModal.jsx';
 
 export default function ProfileMenu({ user, isAuthenticated, showMenu, onToggleMenu, onShowMySpots, onSignOut, onShowDeleteConfirm, onShowAuth }) {
   const { t } = useLanguage();
-  const [showSubscription, setShowSubscription] = useState(false);
-
   return (
     <div className="absolute top-4 right-4 z-[1003]">
       {isAuthenticated && user ? (
@@ -19,7 +16,7 @@ export default function ProfileMenu({ user, isAuthenticated, showMenu, onToggleM
               : <span className="text-sm font-bold text-blue-500">{user.displayName?.[0] || user.email?.[0] || '?'}</span>}
           </button>
           {showMenu && (
-            <div className="absolute top-full right-0 mt-2 w-56 bg-white dark:bg-card rounded-2xl shadow-2xl border border-gray-100 dark:border-border py-1.5 overflow-hidden">
+            <div className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-card rounded-2xl shadow-2xl border border-gray-100 dark:border-border py-1.5 overflow-hidden">
               <div className="px-4 py-2 border-b border-gray-100 dark:border-border">
                 <p className="text-xs font-semibold text-foreground truncate">{user.displayName || user.email}</p>
                 <p className="text-xs text-muted-foreground truncate">{user.email}</p>
@@ -28,12 +25,6 @@ export default function ProfileMenu({ user, isAuthenticated, showMenu, onToggleM
                 className="w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-foreground hover:bg-gray-50 dark:hover:bg-accent flex items-center gap-2.5 transition-colors">
                 <List className="w-4 h-4" /> {t('profile.mySpots')}
               </button>
-              
-              <button onClick={() => { setShowSubscription(true); onToggleMenu(); }}
-                className="w-full px-4 py-2.5 text-left text-sm bg-gradient-to-r from-purple-500 to-indigo-600 text-white hover:from-purple-600 hover:to-indigo-700 font-semibold flex items-center gap-2.5 transition-all active:scale-[0.98]">
-                <Crown className="w-4 h-4" /> Go Elite 💎
-              </button>
-
               <button onClick={() => { onSignOut(); onToggleMenu(); }}
                 className="w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-foreground hover:bg-gray-50 dark:hover:bg-accent flex items-center gap-2.5 transition-colors">
                 <LogOut className="w-4 h-4" /> {t('profile.signOut')}
@@ -54,9 +45,6 @@ export default function ProfileMenu({ user, isAuthenticated, showMenu, onToggleM
           <User className="w-5 h-5 text-gray-500 dark:text-muted-foreground" />
         </button>
       )}
-      
-      <SubscriptionModal isOpen={showSubscription} onClose={() => setShowSubscription(false)} />
     </div>
   );
 }
-

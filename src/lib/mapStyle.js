@@ -211,6 +211,32 @@ function style(dark = false) {
         paint:{'line-color':c.road,'line-opacity':0.3,
           'line-width':['interpolate',['linear'],['zoom'],10,1,14,3,18,7]} },
 
+      // ── Planned / Construction roads (highway=construction in OSM) ─────────
+      { id: 'r-construction-case', type: 'line', source: 'v', 'source-layer': 'transportation',
+        filter: ['==', 'class', 'construction'],
+        layout: { 'line-join': 'round', 'line-cap': 'butt' },
+        paint: { 'line-color': '#888',
+          'line-width': ['interpolate',['linear'],['zoom'], 8,4, 12,8, 16,16] } },
+      { id: 'r-construction-fill', type: 'line', source: 'v', 'source-layer': 'transportation',
+        filter: ['==', 'class', 'construction'],
+        layout: { 'line-join': 'round', 'line-cap': 'butt' },
+        paint: { 'line-color': dark ? '#666' : '#bbb',
+          'line-width': ['interpolate',['linear'],['zoom'], 8,3, 12,6, 16,13] } },
+      // Diagonal hatching — alternating stripes to indicate under-construction
+      { id: 'r-construction-hatch-a', type: 'line', source: 'v', 'source-layer': 'transportation',
+        filter: ['==', 'class', 'construction'],
+        layout: { 'line-join': 'round', 'line-cap': 'butt' },
+        paint: { 'line-color': '#999', 'line-opacity': 0.75,
+          'line-width': ['interpolate',['linear'],['zoom'], 8,2, 12,5, 16,11],
+          'line-dasharray': [6, 6] } },
+      { id: 'r-construction-hatch-b', type: 'line', source: 'v', 'source-layer': 'transportation',
+        filter: ['==', 'class', 'construction'],
+        layout: { 'line-join': 'round', 'line-cap': 'butt' },
+        paint: { 'line-color': dark ? '#ccc' : '#fff', 'line-opacity': 0.45,
+          'line-width': ['interpolate',['linear'],['zoom'], 8,1.5, 12,3.5, 16,8],
+          'line-dasharray': [6, 6],
+          'line-offset': ['interpolate',['linear'],['zoom'], 8,1.5, 12,3, 16,6] } },
+
       // ── Roads — casings ───────────────────────────────────────────────────
       rc('rc-motorway',  c.motorwayLine, 'motorway',   [2.5, 5]),
       rc('rc-trunk',     c.trunkLine,    'trunk',      [2,   4]),
@@ -232,34 +258,33 @@ function style(dark = false) {
 
       // ── Bridges — gray SIDE RAILS using line-gap-width ───────────────────────
       // line-gap-width = road width → only the side rails (line-width wide) are visible
-      // Use layer>0 to exclude ground-level roads (layer=0) and underpasses (layer<0)
       { id:'bridge-motorway-side', type:'line', source:'v', 'source-layer':'transportation',
-        filter:['all',['==','class','motorway'],['==','brunnel','bridge'],['>','layer',0]],
-        minzoom:17,
-        layout:{'line-join':'round','line-cap':'butt'},
-        paint:{'line-color':'#777',
-          'line-width': 3,
+        filter:['all',['==','class','motorway'],['==','brunnel','bridge'],['>=','layer',1]],
+        minzoom:14,
+        layout:{'line-join':'miter','line-cap':'butt'},
+        paint:{'line-color':'#999',
+          'line-width': 1.5,
           'line-gap-width':['interpolate',['linear'],['zoom'],6,2,10,4,14,8,18,17]} },
       { id:'bridge-trunk-side', type:'line', source:'v', 'source-layer':'transportation',
-        filter:['all',['==','class','trunk'],['==','brunnel','bridge'],['>','layer',0]],
-        minzoom:17,
-        layout:{'line-join':'round','line-cap':'butt'},
-        paint:{'line-color':'#777',
-          'line-width': 3,
+        filter:['all',['==','class','trunk'],['==','brunnel','bridge'],['>=','layer',1]],
+        minzoom:14,
+        layout:{'line-join':'miter','line-cap':'butt'},
+        paint:{'line-color':'#999',
+          'line-width': 1.5,
           'line-gap-width':['interpolate',['linear'],['zoom'],6,1.5,10,3,14,7,18,15]} },
       { id:'bridge-primary-side', type:'line', source:'v', 'source-layer':'transportation',
-        filter:['all',['==','class','primary'],['==','brunnel','bridge'],['>','layer',0]],
-        minzoom:17,
-        layout:{'line-join':'round','line-cap':'butt'},
-        paint:{'line-color':'#777',
-          'line-width': 3,
+        filter:['all',['==','class','primary'],['==','brunnel','bridge'],['>=','layer',1]],
+        minzoom:14,
+        layout:{'line-join':'miter','line-cap':'butt'},
+        paint:{'line-color':'#999',
+          'line-width': 1.5,
           'line-gap-width':['interpolate',['linear'],['zoom'],8,1,12,2.5,16,7]} },
       { id:'bridge-other-side', type:'line', source:'v', 'source-layer':'transportation',
-        filter:['all',['in','class','secondary','tertiary','street','residential'],['==','brunnel','bridge'],['>','layer',0]],
-        minzoom:18,
-        layout:{'line-join':'round','line-cap':'butt'},
-        paint:{'line-color':'#777',
-          'line-width': 3,
+        filter:['all',['in','class','secondary','tertiary','street','residential'],['==','brunnel','bridge'],['>=','layer',1]],
+        minzoom:15,
+        layout:{'line-join':'miter','line-cap':'butt'},
+        paint:{'line-color':'#999',
+          'line-width': 1.5,
           'line-gap-width':['interpolate',['linear'],['zoom'],10,1,14,3,18,7]} },
 
       // ── Roads — fills ─────────────────────────────────────────────────────
@@ -303,8 +328,110 @@ function style(dark = false) {
         paint:{'line-color':c.motorway,
           'line-width':['interpolate',['linear'],['zoom'],6,2,10,4,14,8,18,17]} },
 
+      // ── Lane dividers — white dashed lines at high zoom ──────────────────
+      // OSM `lanes` field: number of lanes for this road way.
+      // We draw (lanes-1) white dashed lines inside each road.
+      // Layer strategy: 3 offset layers cover up to 6 lanes per carriageway.
+      // line-offset is in screen pixels: negative=left, positive=right.
+      // Center divider (roads with any lanes data, or estimated 2+)
+      { id: 'lane-div-c', type: 'line', source: 'v', 'source-layer': 'transportation',
+        filter: ['all',
+          ['in', 'class', 'motorway','trunk','primary','secondary','tertiary','street','residential'],
+          ['!=', 'brunnel', 'tunnel'],
+          ['any', ['>=', ['coalesce', ['to-number', ['get', 'lanes'], 0], 0], 2],
+                  ['in', 'class', 'motorway', 'trunk']] ],
+        minzoom: 15,
+        layout: { 'line-join': 'round', 'line-cap': 'butt' },
+        paint: { 'line-color': '#ffffff', 'line-opacity': 0.55,
+          'line-width': ['interpolate',['linear'],['zoom'], 15,0.5, 17,0.8, 20,1.5],
+          'line-dasharray': ['literal', [6, 5]] } },
+      // Left offset divider (3+ lanes)
+      { id: 'lane-div-l', type: 'line', source: 'v', 'source-layer': 'transportation',
+        filter: ['all',
+          ['in', 'class', 'motorway','trunk','primary','secondary','tertiary'],
+          ['!=', 'brunnel', 'tunnel'],
+          ['>=', ['coalesce', ['to-number', ['get', 'lanes'], 0], 0], 3] ],
+        minzoom: 16,
+        layout: { 'line-join': 'round', 'line-cap': 'butt' },
+        paint: { 'line-color': '#ffffff', 'line-opacity': 0.5,
+          'line-width': ['interpolate',['linear'],['zoom'], 16,0.5, 18,1],
+          'line-offset': ['interpolate',['linear'],['zoom'], 16,-3, 18,-6, 20,-12],
+          'line-dasharray': ['literal', [6, 5]] } },
+      // Right offset divider (3+ lanes)
+      { id: 'lane-div-r', type: 'line', source: 'v', 'source-layer': 'transportation',
+        filter: ['all',
+          ['in', 'class', 'motorway','trunk','primary','secondary','tertiary'],
+          ['!=', 'brunnel', 'tunnel'],
+          ['>=', ['coalesce', ['to-number', ['get', 'lanes'], 0], 0], 3] ],
+        minzoom: 16,
+        layout: { 'line-join': 'round', 'line-cap': 'butt' },
+        paint: { 'line-color': '#ffffff', 'line-opacity': 0.5,
+          'line-width': ['interpolate',['linear'],['zoom'], 16,0.5, 18,1],
+          'line-offset': ['interpolate',['linear'],['zoom'], 16,3, 18,6, 20,12],
+          'line-dasharray': ['literal', [6, 5]] } },
+      // Far left (5+ lanes)
+      { id: 'lane-div-l2', type: 'line', source: 'v', 'source-layer': 'transportation',
+        filter: ['all',
+          ['in', 'class', 'motorway','trunk','primary'],
+          ['!=', 'brunnel', 'tunnel'],
+          ['>=', ['coalesce', ['to-number', ['get', 'lanes'], 0], 0], 5] ],
+        minzoom: 17,
+        layout: { 'line-join': 'round', 'line-cap': 'butt' },
+        paint: { 'line-color': '#ffffff', 'line-opacity': 0.45,
+          'line-width': ['interpolate',['linear'],['zoom'], 17,0.5, 20,1],
+          'line-offset': ['interpolate',['linear'],['zoom'], 17,-6, 20,-22],
+          'line-dasharray': ['literal', [6, 5]] } },
+      // Far right (5+ lanes)
+      { id: 'lane-div-r2', type: 'line', source: 'v', 'source-layer': 'transportation',
+        filter: ['all',
+          ['in', 'class', 'motorway','trunk','primary'],
+          ['!=', 'brunnel', 'tunnel'],
+          ['>=', ['coalesce', ['to-number', ['get', 'lanes'], 0], 0], 5] ],
+        minzoom: 17,
+        layout: { 'line-join': 'round', 'line-cap': 'butt' },
+        paint: { 'line-color': '#ffffff', 'line-opacity': 0.45,
+          'line-width': ['interpolate',['linear'],['zoom'], 17,0.5, 20,1],
+          'line-offset': ['interpolate',['linear'],['zoom'], 17,6, 20,22],
+          'line-dasharray': ['literal', [6, 5]] } },
+      // Lane count label (shows number of lanes at very high zoom)
+      { id: 'lane-count-label', type: 'symbol', source: 'v', 'source-layer': 'transportation',
+        filter: ['all',
+          ['in', 'class', 'motorway','trunk','primary','secondary'],
+          ['!=', 'brunnel', 'tunnel'],
+          ['>=', ['coalesce', ['to-number', ['get', 'lanes'], 0], 0], 2] ],
+        minzoom: 18,
+        layout: {
+          'symbol-placement': 'line',
+          'symbol-spacing': 400,
+          'text-field': ['concat', ['coalesce', ['get', 'lanes'], ''], '🔲'],
+          'text-font': ['Noto Sans Bold'],
+          'text-size': 9,
+          'text-rotation-alignment': 'viewport',
+          'text-allow-overlap': false },
+        paint: { 'text-color': '#fff', 'text-halo-color': 'rgba(0,0,0,0.4)', 'text-halo-width': 1 } },
 
-      // ── Buildings (after roads so they render on top of tunnels) ────────────
+      // ── One-way road arrows ───────────────────────────────────────────────
+      // Shows direction arrows on one-way roads (oneway=1 in OSM).
+      // Arrow image 'oneway-arrow' is registered in MapLibreMap.jsx on style load.
+      { id: 'oneway-arrows', type: 'symbol', source: 'v', 'source-layer': 'transportation',
+        filter: ['all',
+          ['==', ['get', 'oneway'], 1],
+          ['in', 'class', 'motorway','trunk','primary','secondary','tertiary',
+                          'street','residential','service','unclassified','minor'],
+          ['!=', 'brunnel', 'tunnel'] ],
+        minzoom: 14,
+        layout: {
+          'symbol-placement': 'line',
+          'symbol-spacing': ['interpolate',['linear'],['zoom'], 14,200, 17,140, 20,90],
+          'icon-image': 'oneway-arrow',
+          'icon-size': ['interpolate',['linear'],['zoom'], 14,0.5, 16,0.7, 18,1],
+          'icon-rotation-alignment': 'map',
+          'icon-keep-upright': false,
+          'icon-allow-overlap': false,
+        },
+        paint: { 'icon-opacity': 0.7 } },
+
+      // ── Buildings (after roads so they render on top of tunnels) ─────────
       { id: 'bldg-fill', type: 'fill', source: 'v', 'source-layer': 'building', minzoom: 13,
         paint: { 'fill-color': c.building,
           'fill-opacity': ['interpolate',['linear'],['zoom'], 13,0, 14,0.8, 16,1] } },
@@ -333,142 +460,66 @@ function style(dark = false) {
         filter: ['==', 'admin_level', 4], minzoom: 6,
         paint: { 'line-color': c.boundaryProv, 'line-width': 0.8, 'line-dasharray': [3, 2] } },
 
-// ── Planned roads (gray texture + dashed) ────────────────────────────────
-{ id: 'planned-road-case', type: 'line', source: 'v', 'source-layer': 'transportation',
-  filter: ['any', ['==', 'highway', 'proposed'], ['==', 'highway', 'construction']],
-  minzoom: 10,
-  layout: { 'line-join': 'round', 'line-cap': 'round' },
-  paint: {
-    'line-color': '#888',
-    'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.5, 14, 4, 18, 10],
-    'line-dasharray': [3, 3]
-  }
-},
-{ id: 'planned-road-fill', type: 'line', source: 'v', 'source-layer': 'transportation',
-  filter: ['any', ['==', 'highway', 'proposed'], ['==', 'highway', 'construction']],
-  minzoom: 10,
-  layout: { 'line-join': 'round', 'line-cap': 'round' },
-  paint: {
-    'line-color': '#aaa',
-    'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.8, 14, 2.5, 18, 7],
-    'line-dasharray': [2, 2]
-  }
-},
+      // ── Road shields (via styleimagemissing) ────────────────────────────────
+      // Image name: "shield-{class}-{ref}" e.g. "shield-motorway-D1"
+      // Uses ref field (OpenMapTiles/OpenFreeMap schema)
+      // E-routes (E50 etc) are OSM route RELATIONS — not stored per-way in tiles, skip them
 
-// ── One-way arrows (tiny arrows on oneway roads) ────────────────────────────
-{ id: 'oneway-arrow', type: 'symbol', source: 'v', 'source-layer': 'transportation',
-  filter: ['!=', 'oneway', 'no'],
-  minzoom: 16,
-  layout: {
-    'icon-image': ['case',
-      ['==', 'oneway', 'yes'], 'arrow-forward',
-      ['==', 'oneway', 'forward'], 'arrow-forward',
-      ['==', 'oneway', 'reverse'], 'arrow-backward',
-      ['==', 'oneway', '-1'], 'arrow-backward',
-      ''
-    ],
-    'icon-size': 0.3,
-    'symbol-placement': 'line',
-    'symbol-spacing': 50,
-    'icon-rotation-alignment': 'map',
-    'icon-allow-overlap': true,
-    'icon-ignore-placement': true
-  },
-  paint: { 'icon-color': '#fff', 'icon-halo-color': '#000', 'icon-halo-width': 1 }
-},
+      // D1/D5/D7 motorway — RED shield
+      { id:'shield-motorway', type:'symbol', source:'v', 'source-layer':'transportation_name',
+        filter:['all',['==','class','motorway'],['has','ref']],
+        minzoom:9,
+        layout:{
+          'icon-image':['concat','shield-motorway-',['get','ref']],
+          'icon-allow-overlap':false,
+          'icon-rotation-alignment':'viewport',
+          'symbol-placement':'line',
+          'symbol-spacing':350,
+          'text-field':'',
+        },
+        paint:{ 'icon-opacity':1 } },
 
-// ── Lane markings (CZ/SK/DE only, high zoom) ───────────────────────────────
-{ id: 'lane-markings', type: 'line', source: 'v', 'source-layer': 'transportation',
-  filter: ['all',
-    ['>=', 'lanes', 2],
-    ['any', ['==', 'country_code', 'CZ'], ['==', 'country_code', 'SK'], ['==', 'country_code', 'DE']]
-  ],
-  minzoom: 17,
-  layout: { 'line-cap': 'butt', 'line-join': 'round' },
-  paint: {
-    'line-color': '#fff',
-    'line-width': 0.5,
-    'line-dasharray': ['step', ['get', 'lanes'], ['literal', [1, 3]], 3, ['literal', [2, 4]], 4, ['literal', [3, 6]]],
-    'line-offset': ['*', ['/', ['get', 'lanes'], 2], -1.5]
-  }
-},
+      // R26, 48, MO trunk — BRIGHT BLUE shield
+      { id:'shield-trunk', type:'symbol', source:'v', 'source-layer':'transportation_name',
+        filter:['all',['==','class','trunk'],['has','ref']],
+        minzoom:10,
+        layout:{
+          'icon-image':['concat','shield-trunk-',['get','ref']],
+          'icon-allow-overlap':false,
+          'icon-rotation-alignment':'viewport',
+          'symbol-placement':'line',
+          'symbol-spacing':320,
+          'text-field':'',
+        },
+        paint:{ 'icon-opacity':1 } },
 
-// ── Road shields (via styleimagemissing) ────────────────────────────────
-// Image name: "shield-{class}-{ref}" e.g. "shield-motorway-D1"
-// Uses ref field (OpenMapTiles/OpenFreeMap schema)
-// E-routes (E50 etc) are OSM route RELATIONS — not stored per-way in tiles, skip them
+      // 27, 9, 54 primary — same zoom as highway (shows earlier)
+      { id:'shield-primary', type:'symbol', source:'v', 'source-layer':'transportation_name',
+        filter:['all',['==','class','primary'],['has','ref']],
+        minzoom:9,
+        layout:{
+          'icon-image':['concat','shield-primary-',['get','ref']],
+          'icon-allow-overlap':false,
+          'icon-rotation-alignment':'viewport',
+          'symbol-placement':'line',
+          'symbol-spacing':300,
+          'text-field':'',
+        },
+        paint:{ 'icon-opacity':1 } },
 
-// D1/D5/D7 motorway — RED shield (z9)
-{ id:'shield-motorway', type:'symbol', source:'v', 'source-layer':'transportation_name',
-  filter:['all',['==','class','motorway'],['has','ref']],
-  minzoom:9,
-  layout:{
-    'icon-image':['concat','shield-motorway-',['get','ref']],
-    'icon-allow-overlap':false,
-    'icon-rotation-alignment':'viewport',
-    'symbol-placement':'line',
-    'symbol-spacing':350,
-    'text-field':'',
-  },
-  paint:{ 'icon-opacity':1 } },
-
-// R26, 48, MO trunk — BRIGHT BLUE shield (z10)
-{ id:'shield-trunk', type:'symbol', source:'v', 'source-layer':'transportation_name',
-  filter:['all',['==','class','trunk'],['has','ref']],
-  minzoom:10,
-  layout:{
-    'icon-image':['concat','shield-trunk-',['get','ref']],
-    'icon-allow-overlap':false,
-    'icon-rotation-alignment':'viewport',
-    'symbol-placement':'line',
-    'symbol-spacing':320,
-    'text-field':'',
-  },
-  paint:{ 'icon-opacity':1 } },
-
-// 27, 9 primary — BRIGHT BLUE shield (z9 like motorways)
-{ id:'shield-primary', type:'symbol', source:'v', 'source-layer':'transportation_name',
-  filter:['all',['==','class','primary'],['has','ref']],
-  minzoom:9, // UNLOCKED: Primary roads (27,54,9) now visible from z9 like motorways
-  layout:{
-    'icon-image':['concat','shield-primary-',['get','ref']],
-    'icon-allow-overlap':false,
-    'icon-rotation-alignment':'viewport',
-    'symbol-placement':'line',
-    'symbol-spacing':300,
-    'text-field':'',
-  },
-  paint:{ 'icon-opacity':1 } },
-
-// 605, 431 secondary — BRIGHT BLUE shield (z13)
-{ id:'shield-secondary', type:'symbol', source:'v', 'source-layer':'transportation_name',
-  filter: ['all',['in','class','secondary','tertiary'],['has','ref']],
-  minzoom:13,
-  layout:{
-    'icon-image':['concat','shield-secondary-',['get','ref']],
-    'icon-allow-overlap':false,
-    'icon-rotation-alignment':'viewport',
-    'symbol-placement':'line',
-    'symbol-spacing':280,
-    'text-field':'',
-  },
-  paint:{ 'icon-opacity':1 } },
-
-// UNLOCKED: Gray shields for planned roads (TESTING)
-{ id:'shield-planned', type:'symbol', source:'v', 'source-layer':'transportation_name',
-  filter:['all',['any',['==','highway','proposed'],['==','highway','construction']],['has','ref']],
-  minzoom:11,
-  layout:{
-    'icon-image':['concat','shield-planned-',['get','ref']],
-    'icon-allow-overlap':false,
-    'icon-rotation-alignment':'viewport',
-    'symbol-placement':'line',
-    'symbol-spacing':300,
-    'text-field':'',
-  },
-  paint:{ 'icon-color': '#666', 'icon-halo-color': '#aaa', 'icon-halo-width': 1 }
-},
-
+      // 605, 431, 54 secondary/tertiary — visible from zoom 11 like highways
+      { id:'shield-secondary', type:'symbol', source:'v', 'source-layer':'transportation_name',
+        filter:['all',['in','class','secondary','tertiary'],['has','ref']],
+        minzoom:11,
+        layout:{
+          'icon-image':['concat','shield-secondary-',['get','ref']],
+          'icon-allow-overlap':false,
+          'icon-rotation-alignment':'viewport',
+          'symbol-placement':'line',
+          'symbol-spacing':280,
+          'text-field':'',
+        },
+        paint:{ 'icon-opacity':1 } },
 
       // ── Road name labels ──────────────────────────────────────────────────
       { id: 'lbl-primary', type: 'symbol', source: 'v', 'source-layer': 'transportation_name',
