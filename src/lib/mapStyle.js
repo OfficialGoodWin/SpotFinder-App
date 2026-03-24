@@ -329,102 +329,109 @@ function style(dark = false) {
           'line-width':['interpolate',['linear'],['zoom'],6,2,10,4,14,8,18,17]} },
 
       // ── Lane dividers — white dashed lines at high zoom ──────────────────
-      // OSM `lanes` field: number of lanes for this road way.
-      // We draw (lanes-1) white dashed lines inside each road.
-      // Layer strategy: 3 offset layers cover up to 6 lanes per carriageway.
-      // line-offset is in screen pixels: negative=left, positive=right.
-      // Center divider (roads with any lanes data, or estimated 2+)
-      { id: 'lane-div-c', type: 'line', source: 'v', 'source-layer': 'transportation',
-        filter: ['all',
-          ['in', 'class', 'motorway','trunk','primary','secondary','tertiary','street','residential'],
-          ['!=', 'brunnel', 'tunnel'],
-          ['any', ['>=', ['coalesce', ['to-number', ['get', 'lanes'], 0], 0], 2],
-                  ['in', 'class', 'motorway', 'trunk']] ],
+      // All filters use LEGACY syntax: ['>=', 'propertyName', value]
+      // (expression syntax like ['coalesce',...] is NOT allowed inside filters)
+      //
+      // Layer A — center divider on motorway/trunk always (they're always 2+ lanes)
+      { id: 'lane-div-c-hw', type: 'line', source: 'v', 'source-layer': 'transportation',
+        filter: ['all', ['in', 'class', 'motorway', 'trunk'], ['!=', 'brunnel', 'tunnel']],
         minzoom: 15,
         layout: { 'line-join': 'round', 'line-cap': 'butt' },
         paint: { 'line-color': '#ffffff', 'line-opacity': 0.55,
           'line-width': ['interpolate',['linear'],['zoom'], 15,0.5, 17,0.8, 20,1.5],
-          'line-dasharray': ['literal', [6, 5]] } },
-      // Left offset divider (3+ lanes)
+          'line-dasharray': [6, 5] } },
+      // Layer B — center divider on primary/secondary/etc when OSM lanes >= 2
+      { id: 'lane-div-c', type: 'line', source: 'v', 'source-layer': 'transportation',
+        filter: ['all',
+          ['in', 'class', 'primary', 'secondary', 'tertiary', 'street', 'residential'],
+          ['!=', 'brunnel', 'tunnel'],
+          ['>=', 'lanes', 2] ],
+        minzoom: 15,
+        layout: { 'line-join': 'round', 'line-cap': 'butt' },
+        paint: { 'line-color': '#ffffff', 'line-opacity': 0.5,
+          'line-width': ['interpolate',['linear'],['zoom'], 15,0.4, 17,0.7, 20,1.2],
+          'line-dasharray': [6, 5] } },
+      // Left offset divider (3+ lanes) — legacy ['>=', 'lanes', 3]
       { id: 'lane-div-l', type: 'line', source: 'v', 'source-layer': 'transportation',
         filter: ['all',
-          ['in', 'class', 'motorway','trunk','primary','secondary','tertiary'],
+          ['in', 'class', 'motorway', 'trunk', 'primary', 'secondary', 'tertiary'],
           ['!=', 'brunnel', 'tunnel'],
-          ['>=', ['coalesce', ['to-number', ['get', 'lanes'], 0], 0], 3] ],
+          ['>=', 'lanes', 3] ],
         minzoom: 16,
         layout: { 'line-join': 'round', 'line-cap': 'butt' },
         paint: { 'line-color': '#ffffff', 'line-opacity': 0.5,
           'line-width': ['interpolate',['linear'],['zoom'], 16,0.5, 18,1],
           'line-offset': ['interpolate',['linear'],['zoom'], 16,-3, 18,-6, 20,-12],
-          'line-dasharray': ['literal', [6, 5]] } },
+          'line-dasharray': [6, 5] } },
       // Right offset divider (3+ lanes)
       { id: 'lane-div-r', type: 'line', source: 'v', 'source-layer': 'transportation',
         filter: ['all',
-          ['in', 'class', 'motorway','trunk','primary','secondary','tertiary'],
+          ['in', 'class', 'motorway', 'trunk', 'primary', 'secondary', 'tertiary'],
           ['!=', 'brunnel', 'tunnel'],
-          ['>=', ['coalesce', ['to-number', ['get', 'lanes'], 0], 0], 3] ],
+          ['>=', 'lanes', 3] ],
         minzoom: 16,
         layout: { 'line-join': 'round', 'line-cap': 'butt' },
         paint: { 'line-color': '#ffffff', 'line-opacity': 0.5,
           'line-width': ['interpolate',['linear'],['zoom'], 16,0.5, 18,1],
           'line-offset': ['interpolate',['linear'],['zoom'], 16,3, 18,6, 20,12],
-          'line-dasharray': ['literal', [6, 5]] } },
-      // Far left (5+ lanes)
+          'line-dasharray': [6, 5] } },
+      // Far-left (5+ lanes)
       { id: 'lane-div-l2', type: 'line', source: 'v', 'source-layer': 'transportation',
         filter: ['all',
-          ['in', 'class', 'motorway','trunk','primary'],
+          ['in', 'class', 'motorway', 'trunk', 'primary'],
           ['!=', 'brunnel', 'tunnel'],
-          ['>=', ['coalesce', ['to-number', ['get', 'lanes'], 0], 0], 5] ],
+          ['>=', 'lanes', 5] ],
         minzoom: 17,
         layout: { 'line-join': 'round', 'line-cap': 'butt' },
         paint: { 'line-color': '#ffffff', 'line-opacity': 0.45,
           'line-width': ['interpolate',['linear'],['zoom'], 17,0.5, 20,1],
           'line-offset': ['interpolate',['linear'],['zoom'], 17,-6, 20,-22],
-          'line-dasharray': ['literal', [6, 5]] } },
-      // Far right (5+ lanes)
+          'line-dasharray': [6, 5] } },
+      // Far-right (5+ lanes)
       { id: 'lane-div-r2', type: 'line', source: 'v', 'source-layer': 'transportation',
         filter: ['all',
-          ['in', 'class', 'motorway','trunk','primary'],
+          ['in', 'class', 'motorway', 'trunk', 'primary'],
           ['!=', 'brunnel', 'tunnel'],
-          ['>=', ['coalesce', ['to-number', ['get', 'lanes'], 0], 0], 5] ],
+          ['>=', 'lanes', 5] ],
         minzoom: 17,
         layout: { 'line-join': 'round', 'line-cap': 'butt' },
         paint: { 'line-color': '#ffffff', 'line-opacity': 0.45,
           'line-width': ['interpolate',['linear'],['zoom'], 17,0.5, 20,1],
           'line-offset': ['interpolate',['linear'],['zoom'], 17,6, 20,22],
-          'line-dasharray': ['literal', [6, 5]] } },
-      // Lane count label (shows number of lanes at very high zoom)
+          'line-dasharray': [6, 5] } },
+      // Lane count label — only show when OSM has lanes data (use 'has' legacy filter)
       { id: 'lane-count-label', type: 'symbol', source: 'v', 'source-layer': 'transportation',
         filter: ['all',
-          ['in', 'class', 'motorway','trunk','primary','secondary'],
+          ['in', 'class', 'motorway', 'trunk', 'primary', 'secondary'],
           ['!=', 'brunnel', 'tunnel'],
-          ['>=', ['coalesce', ['to-number', ['get', 'lanes'], 0], 0], 2] ],
+          ['has', 'lanes'],
+          ['>=', 'lanes', 2] ],
         minzoom: 18,
         layout: {
           'symbol-placement': 'line',
           'symbol-spacing': 400,
-          'text-field': ['concat', ['coalesce', ['get', 'lanes'], ''], '🔲'],
+          'text-field': ['to-string', ['get', 'lanes']],
           'text-font': ['Noto Sans Bold'],
           'text-size': 9,
           'text-rotation-alignment': 'viewport',
           'text-allow-overlap': false },
-        paint: { 'text-color': '#fff', 'text-halo-color': 'rgba(0,0,0,0.4)', 'text-halo-width': 1 } },
+        paint: { 'text-color': '#ffffff', 'text-halo-color': 'rgba(0,0,0,0.5)', 'text-halo-width': 1.5 } },
 
       // ── One-way road arrows ───────────────────────────────────────────────
-      // Shows direction arrows on one-way roads (oneway=1 in OSM).
-      // Arrow image 'oneway-arrow' is registered in MapLibreMap.jsx on style load.
+      // 'oneway-arrow' image is registered in MapLibreMap.jsx on map load.
+      // Filter uses legacy property syntax: ['==', 'oneway', 1]
       { id: 'oneway-arrows', type: 'symbol', source: 'v', 'source-layer': 'transportation',
         filter: ['all',
-          ['==', ['get', 'oneway'], 1],
-          ['in', 'class', 'motorway','trunk','primary','secondary','tertiary',
-                          'street','residential','service','unclassified','minor'],
+          ['==', 'oneway', 1],
+          ['in', 'class', 'motorway', 'trunk', 'primary', 'secondary', 'tertiary',
+                          'street', 'residential', 'service', 'unclassified', 'minor'],
           ['!=', 'brunnel', 'tunnel'] ],
         minzoom: 14,
         layout: {
           'symbol-placement': 'line',
-          'symbol-spacing': ['interpolate',['linear'],['zoom'], 14,200, 17,140, 20,90],
+          'symbol-spacing': 200,
           'icon-image': 'oneway-arrow',
-          'icon-size': ['interpolate',['linear'],['zoom'], 14,0.5, 16,0.7, 18,1],
+          'icon-size': ['interpolate',['linear'],['zoom'], 14,0.5, 16,0.7, 18,1.0],
           'icon-rotation-alignment': 'map',
           'icon-keep-upright': false,
           'icon-allow-overlap': false,
