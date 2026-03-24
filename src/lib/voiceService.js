@@ -1,64 +1,66 @@
 /**
  * voiceService.js
  *
- * Unified text-to-speech for navigation instructions.
- * Uses Capacitor's native TTS plugin when available (best quality, best offline support),
- * falls back to the Web Speech API (always present in Android WebView).
+ * Offline-capable TTS for navigation instructions.
  *
- * Setup:
- *   npm install @capacitor-community/text-to-speech
- *   npx cap sync android
+ * Priority order:
+ *   1. Capacitor native TTS — detected via window.Capacitor at runtime (no npm install).
+ *      Works if @capacitor-community/text-to-speech is added to the Android project.
+ *   2. Web Speech API — always available in Android WebView and desktop Chrome.
+ *      Fully offline on Android (uses device TTS engine).
  *
- * Usage:
- *   import { speak, stopSpeaking, setLanguage, setMuted } from '@/lib/voiceService';
- *   speak('Turn left in 200 meters');
+ * No build-time imports of Capacitor plugins — safe to deploy on Vercel without
+ * the plugin installed as a JS dependency.
  */
 
-let _capacitorTTS = null;
-let _useCapacitor = false;
-let _muted        = false;
-let _lang         = 'en-US';
-let _rate         = 0.95;
+let _muted     = false;
+let _lang      = 'en-US';
+let _rate      = 0.95;
+let _nativeTTS = null;
+let _useNative = false;
+
+// ── Init ──────────────────────────────────────────────────────────────────────
 
 /**
- * Initialize the voice service.
- * Call once at app startup (or before first use).
- * Automatically detects Capacitor TTS availability.
+ * Call once at app startup. Detects native Capacitor TTS availability.
+ * Safe to call multiple times — subsequent calls are no-ops.
  */
 export async function initVoice() {
-  try {
-    // Dynamic import — doesn't crash if the plugin isn't installed
-    const mod = await import('@capacitor-community/text-to-speech');
-    _capacitorTTS = mod.TextToSpeech;
+  if (_nativeTTS !== null) return;
 
-    // Quick smoke test: getSupportedLanguages should resolve if the plugin is wired up
-    await _capacitorTTS.getSupportedLanguages();
-    _useCapacitor = true;
-    console.info('[voice] Using Capacitor TTS (native)');
+  try {
+    // Capacitor exposes plugins via window.Capacitor.Plugins at runtime — no import needed
+    const plugin = window?.Capacitor?.Plugins?.TextToSpeech;
+    if (plugin && typeof plugin.speak === 'function') {
+      await plugin.getSupportedLanguages?.();
+      _nativeTTS = plugin;
+      _useNative  = true;
+      console.info('[voice] Using native Capacitor TTS');
+    } else {
+      throw new Error('plugin not present');
+    }
   } catch (_) {
-    _useCapacitor = false;
-    console.info('[voice] Capacitor TTS unavailable, falling back to Web Speech API');
+    _nativeTTS = null;
+    _useNative  = false;
+    console.info('[voice] Using Web Speech API');
   }
 }
 
-/**
- * Set the BCP-47 language tag for speech (e.g. 'cs-CZ', 'en-US', 'de-DE').
- * Takes effect on the next speak() call.
- */
+// ── Configuration ─────────────────────────────────────────────────────────────
+
+/** Set BCP-47 language tag (e.g. 'cs-CZ', 'en-US'). Takes effect on next speak(). */
 export function setVoiceLanguage(lang) {
   _lang = lang || 'en-US';
 }
 
-/**
- * Set speech rate (0.5 = slow, 1.0 = normal, 1.5 = fast).
- */
+/** Set speech rate: 0.5 = slow, 1.0 = normal, 1.5 = fast. */
 export function setVoiceRate(rate) {
   _rate = Math.max(0.1, Math.min(2.0, rate));
 }
 
 /**
- * Mute or unmute voice output.
- * When muted, speak() calls are silently ignored.
+ * Mute or unmute. When muted, speak() is silently ignored.
+ * Calling setVoiceMuted(true) also stops any ongoing speech.
  */
 export function setVoiceMuted(muted) {
   _muted = muted;
@@ -67,32 +69,35 @@ export function setVoiceMuted(muted) {
 
 export function isVoiceMuted() { return _muted; }
 
+// ── Core functions ────────────────────────────────────────────────────────────
+
 /**
- * Speak a string aloud. Cancels any currently playing speech first.
- * Safe to call rapidly — always cancels the previous utterance.
+ * Speak a string. Cancels any ongoing speech first.
+ * Safe to call rapidly — always replaces the previous utterance.
  */
 export async function speak(text) {
   if (_muted || !text?.trim()) return;
 
-  if (_useCapacitor && _capacitorTTS) {
+  // 1. Native Capacitor TTS (Android: best quality, best offline support)
+  if (_useNative && _nativeTTS) {
     try {
-      await _capacitorTTS.stop();
-      await _capacitorTTS.speak({
-        text:  text.trim(),
-        lang:  _lang,
-        rate:  _rate,
-        pitch: 1.0,
-        volume: 1.0,
-        category: 'ambient', // doesn't interrupt music/calls
+      await _nativeTTS.stop?.();
+      await _nativeTTS.speak({
+        text:     text.trim(),
+        lang:     _lang,
+        rate:     _rate,
+        pitch:    1.0,
+        volume:   1.0,
+        category: 'ambient',
       });
       return;
     } catch (e) {
-      console.warn('[voice] Capacitor TTS error, falling back:', e.message);
-      _useCapacitor = false;
+      console.warn('[voice] Native TTS error, falling back:', e.message);
+      _useNative = false;
     }
   }
 
-  // Web Speech API fallback
+  // 2. Web Speech API — works offline on Android WebView via device TTS engine
   if ('speechSynthesis' in window) {
     window.speechSynthesis.cancel();
     const utt  = new SpeechSynthesisUtterance(text.trim());
@@ -104,39 +109,17 @@ export async function speak(text) {
   }
 }
 
-/**
- * Immediately stop any ongoing speech.
- */
+/** Stop any ongoing speech immediately. */
 export async function stopSpeaking() {
-  if (_useCapacitor && _capacitorTTS) {
-    try { await _capacitorTTS.stop(); } catch (_) {}
+  if (_useNative && _nativeTTS) {
+    try { await _nativeTTS.stop?.(); } catch (_) {}
   }
   if ('speechSynthesis' in window) {
     window.speechSynthesis.cancel();
   }
 }
 
-/**
- * Returns true if speech is currently playing.
- */
+/** Returns true if speech is currently playing. */
 export function isSpeaking() {
-  if ('speechSynthesis' in window) return window.speechSynthesis.speaking;
-  return false;
-}
-
-/**
- * Returns list of available language codes (best-effort, may be empty on some devices).
- */
-export async function getSupportedLanguages() {
-  if (_useCapacitor && _capacitorTTS) {
-    try {
-      const { languages } = await _capacitorTTS.getSupportedLanguages();
-      return languages;
-    } catch (_) {}
-  }
-  // Web Speech API
-  if ('speechSynthesis' in window) {
-    return window.speechSynthesis.getVoices().map(v => v.lang);
-  }
-  return [];
+  return 'speechSynthesis' in window && window.speechSynthesis.speaking;
 }
