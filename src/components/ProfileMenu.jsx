@@ -29,9 +29,8 @@ export default function ProfileMenu({ user, isAuthenticated, showMenu, onToggleM
                 <List className="w-4 h-4" /> {t('profile.mySpots')}
               </button>
               
-              {/* Go Elite Button */}
               <button onClick={() => { setShowSubscription(true); onToggleMenu(); }}
-                className="w-full px-4 py-2.5 text-left text-sm bg-gradient-to-r from-purple-500 to-indigo-600 text-white hover:from-purple-600 hover:to-indigo-700 font-semibold flex items-center gap-2.5 rounded-lg mx-2 my-1 shadow-lg hover:shadow-xl transition-all active:scale-[0.98]">
+                className="w-full px-4 py-2.5 text-left text-sm bg-gradient-to-r from-purple-500 to-indigo-600 text-white hover:from-purple-600 hover:to-indigo-700 font-semibold flex items-center gap-2.5 transition-all active:scale-[0.98]">
                 <Crown className="w-4 h-4" /> Go Elite 💎
               </button>
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useLanguage } from '@/lib/LanguageContext';
 import { X, Navigation, Share2, Camera, Star, Phone, Mail, Globe, MapPin, ChevronUp, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getPOIPhotos, getPOIRatings, addPOIPhoto, addPOIRating, uploadSpotImage, makePOIId } from '@/api/firebaseClient';
 
@@ -297,9 +298,9 @@ function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavig
       </div>
 
       <div className="flex items-center gap-2 px-4 pb-4">
-        <ActionBtn icon={Navigation} label="Navigate" onClick={onNavigate} color={category.color} />
-        <ActionBtn icon={Share2} label="Share" onClick={onShare} />
-        <ActionBtn icon={Camera} label="Add Photo" onClick={onAddPhoto} disabled={!user} />
+        <ActionBtn icon={Navigation} label={t('spotDetail.navigateHere')} onClick={onNavigate} color={category.color} />
+        <ActionBtn icon={Share2} label={t('spotDetail.share')} onClick={onShare} />
+        <ActionBtn icon={Camera} label={t('spotDetail.addPhoto')} onClick={onAddPhoto} disabled={!user} />
       </div>
     </div>
   );
@@ -410,7 +411,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
               )}
               {!ratingDone ? (
                 <div className="bg-gray-50 dark:bg-accent/40 rounded-2xl p-4">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Rate this place</p>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{t('spotDetail.rateThisPlace')}</p>
                   {user ? (
                     <>
                       <Stars value={ratingVal} size={28} interactive onRate={setRatingVal} />
@@ -450,7 +451,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
 
             {(phone || email || website || poi.lat) && (
               <>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Contact & Info</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{t('spotDetail.contactInfo')}</p>
                 {phone && <ContactRow icon={Phone} value={phone} href={`tel:${phone}`} />}
                 {email && <ContactRow icon={Mail} value={email} href={`mailto:${email}`} />}
                 {website && <ContactRow icon={Globe} value={website} href={website.startsWith('http') ? website : `https://${website}`} />}
@@ -525,6 +526,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 export default function POIDetailPanel({ poi, category, onClose, onNavigate, user }) {
+  const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   const [sfPhotos, setSfPhotos] = useState([]);
   const [sfRating, setSfRating] = useState({ ratings: [], avg: 0, count: 0 });
