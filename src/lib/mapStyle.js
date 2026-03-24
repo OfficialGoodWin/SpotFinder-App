@@ -429,7 +429,7 @@ function style(dark = false) {
 // 27, 9 primary — BRIGHT BLUE shield (z9 like motorways)
 { id:'shield-primary', type:'symbol', source:'v', 'source-layer':'transportation_name',
   filter:['all',['==','class','primary'],['has','ref']],
-  minzoom:9,
+  minzoom:9, // UNLOCKED: Primary roads (27,54,9) now visible from z9 like motorways
   layout:{
     'icon-image':['concat','shield-primary-',['get','ref']],
     'icon-allow-overlap':false,
@@ -442,7 +442,7 @@ function style(dark = false) {
 
 // 605, 431 secondary — BRIGHT BLUE shield (z13)
 { id:'shield-secondary', type:'symbol', source:'v', 'source-layer':'transportation_name',
-  filter:['all',['in','class','secondary','tertiary'],['has','ref']],
+  filter: ['all',['in','class','secondary','tertiary'],['has','ref']],
   minzoom:13,
   layout:{
     'icon-image':['concat','shield-secondary-',['get','ref']],
@@ -454,7 +454,7 @@ function style(dark = false) {
   },
   paint:{ 'icon-opacity':1 } },
 
-// Gray shields for planned roads
+// UNLOCKED: Gray shields for planned roads (TESTING)
 { id:'shield-planned', type:'symbol', source:'v', 'source-layer':'transportation_name',
   filter:['all',['any',['==','highway','proposed'],['==','highway','construction']],['has','ref']],
   minzoom:11,
@@ -467,6 +467,65 @@ function style(dark = false) {
     'text-field':'',
   },
   paint:{ 'icon-color': '#666', 'icon-halo-color': '#aaa', 'icon-halo-width': 1 }
+},
+
+// UNLOCKED: One-way arrows
+{ id: 'oneway-arrow', type: 'symbol', source: 'v', 'source-layer': 'transportation',
+  filter: ['!=', 'oneway', 'no'],
+  minzoom: 16,
+  layout: {
+    'icon-image': ['case',
+      ['==', 'oneway', 'yes'], 'arrow-forward',
+      ['==', 'oneway', 'forward'], 'arrow-forward',
+      ['==', 'oneway', 'reverse'], 'arrow-backward',
+      ['==', 'oneway', '-1'], 'arrow-backward'
+    ],
+    'icon-size': 0.3,
+    'symbol-placement': 'line',
+    'symbol-spacing': 50,
+    'icon-rotation-alignment': 'map',
+    'icon-allow-overlap': true,
+    'icon-ignore-placement': true
+  },
+  paint: { 'icon-color': '#fff', 'icon-halo-color': '#000', 'icon-halo-width': 1 }
+},
+
+// UNLOCKED: Lane markings CZ/SK/DE (OSM `lanes` tag support)
+{ id: 'lane-markings', type: 'line', source: 'v', 'source-layer': 'transportation',
+  filter: ['all',
+    ['>=', 'lanes', 2],
+    ['any', ['==', 'country_code', 'CZ'], ['==', 'country_code', 'SK'], ['==', 'country_code', 'DE']],
+    ['>=', ['zoom'], 17]
+  ],
+  layout: { 'line-cap': 'butt', 'line-join': 'round' },
+  paint: {
+    'line-color': '#fff',
+    'line-width': 0.5,
+    'line-dasharray': ['step', ['get', 'lanes'], [1, 3], 3, [2, 4], 4, [3, 6]],
+    'line-offset': ['*', ['/', ['get', 'lanes'], 2], -1.5]
+  }
+},
+
+// UNLOCKED: Planned roads gray texture
+{ id: 'planned-road-case', type: 'line', source: 'v', 'source-layer': 'transportation',
+  filter: ['any', ['==', 'highway', 'proposed'], ['==', 'highway', 'construction']],
+  minzoom: 10,
+  layout: { 'line-join': 'round', 'line-cap': 'round' },
+  paint: {
+    'line-color': '#888',
+    'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.5, 14, 4, 18, 10],
+    'line-dasharray': [3, 3]
+  }
+},
+{ id: 'planned-road-fill', type: 'line', source: 'v', 'source-layer': 'transportation',
+  filter: ['any', ['==', 'highway', 'proposed'], ['==', 'highway', 'construction']],
+  minzoom: 10,
+  layout: { 'line-join': 'round', 'line-cap': 'round' },
+  paint: {
+    'line-color': '#aaa',
+    'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.8, 14, 2.5, 18, 7],
+    'line-dasharray': [2, 2]
+  }
 },
 
       // ── Road name labels ──────────────────────────────────────────────────
