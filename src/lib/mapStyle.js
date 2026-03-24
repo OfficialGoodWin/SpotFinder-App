@@ -332,66 +332,140 @@ function style(dark = false) {
         filter: ['==', 'admin_level', 4], minzoom: 6,
         paint: { 'line-color': c.boundaryProv, 'line-width': 0.8, 'line-dasharray': [3, 2] } },
 
-      // ── Road shields (via styleimagemissing) ────────────────────────────────
-      // Image name: "shield-{class}-{ref}" e.g. "shield-motorway-D1"
-      // Uses ref field (OpenMapTiles/OpenFreeMap schema)
-      // E-routes (E50 etc) are OSM route RELATIONS — not stored per-way in tiles, skip them
+// ── Planned roads (gray texture + dashed) ────────────────────────────────
+{ id: 'planned-road-case', type: 'line', source: 'v', 'source-layer': 'transportation',
+  filter: ['any', ['==', 'highway', 'proposed'], ['==', 'highway', 'construction']],
+  minzoom: 10,
+  layout: { 'line-join': 'round', 'line-cap': 'round' },
+  paint: {
+    'line-color': '#888',
+    'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.5, 14, 4, 18, 10],
+    'line-dasharray': [3, 3]
+  }
+},
+{ id: 'planned-road-fill', type: 'line', source: 'v', 'source-layer': 'transportation',
+  filter: ['any', ['==', 'highway', 'proposed'], ['==', 'highway', 'construction']],
+  minzoom: 10,
+  layout: { 'line-join': 'round', 'line-cap': 'round' },
+  paint: {
+    'line-color': '#aaa',
+    'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.8, 14, 2.5, 18, 7],
+    'line-dasharray': [2, 2]
+  }
+},
 
-      // D1/D5/D7 motorway — RED shield
-      { id:'shield-motorway', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['all',['==','class','motorway'],['has','ref']],
-        minzoom:9,
-        layout:{
-          'icon-image':['concat','shield-motorway-',['get','ref']],
-          'icon-allow-overlap':false,
-          'icon-rotation-alignment':'viewport',
-          'symbol-placement':'line',
-          'symbol-spacing':350,
-          'text-field':'',
-        },
-        paint:{ 'icon-opacity':1 } },
+// ── One-way arrows (tiny arrows on oneway roads) ────────────────────────────
+{ id: 'oneway-arrow', type: 'symbol', source: 'v', 'source-layer': 'transportation',
+  filter: ['!=', 'oneway', 'no'],
+  minzoom: 16,
+  layout: {
+    'icon-image': ['case',
+      ['==', 'oneway', 'yes'], 'arrow-forward',
+      ['==', 'oneway', 'forward'], 'arrow-forward',
+      ['==', 'oneway', 'reverse'], 'arrow-backward',
+      ['==', 'oneway', '-1'], 'arrow-backward'
+    ],
+    'icon-size': 0.3,
+    'symbol-placement': 'line',
+    'symbol-spacing': 50,
+    'icon-rotation-alignment': 'map',
+    'icon-allow-overlap': true,
+    'icon-ignore-placement': true
+  },
+  paint: { 'icon-color': '#fff', 'icon-halo-color': '#000', 'icon-halo-width': 1 }
+},
 
-      // R26, 48, MO trunk — BRIGHT BLUE shield
-      { id:'shield-trunk', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['all',['==','class','trunk'],['has','ref']],
-        minzoom:10,
-        layout:{
-          'icon-image':['concat','shield-trunk-',['get','ref']],
-          'icon-allow-overlap':false,
-          'icon-rotation-alignment':'viewport',
-          'symbol-placement':'line',
-          'symbol-spacing':320,
-          'text-field':'',
-        },
-        paint:{ 'icon-opacity':1 } },
+// ── Lane markings (CZ/SK/DE only, high zoom) ───────────────────────────────
+{ id: 'lane-markings', type: 'line', source: 'v', 'source-layer': 'transportation',
+  filter: ['all',
+    ['>=', 'lanes', 2],
+    ['any', ['==', 'country_code', 'CZ'], ['==', 'country_code', 'SK'], ['==', 'country_code', 'DE']],
+    ['>=', ['zoom'], 17]
+  ],
+  layout: { 'line-cap': 'butt', 'line-join': 'round' },
+  paint: {
+    'line-color': '#fff',
+    'line-width': 0.5,
+    'line-dasharray': ['step', ['get', 'lanes'], [1, 3], 3, [2, 4], 4, [3, 6]],
+    'line-offset': ['*', ['/', ['get', 'lanes'], 2], -1.5]
+  }
+},
 
-      // 27, 9 primary — BRIGHT BLUE shield
-      { id:'shield-primary', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['all',['==','class','primary'],['has','ref']],
-        minzoom:11,
-        layout:{
-          'icon-image':['concat','shield-primary-',['get','ref']],
-          'icon-allow-overlap':false,
-          'icon-rotation-alignment':'viewport',
-          'symbol-placement':'line',
-          'symbol-spacing':300,
-          'text-field':'',
-        },
-        paint:{ 'icon-opacity':1 } },
+// ── Road shields (via styleimagemissing) ────────────────────────────────
+// Image name: "shield-{class}-{ref}" e.g. "shield-motorway-D1"
+// Uses ref field (OpenMapTiles/OpenFreeMap schema)
+// E-routes (E50 etc) are OSM route RELATIONS — not stored per-way in tiles, skip them
 
-      // 605, 431 secondary — BRIGHT BLUE shield
-      { id:'shield-secondary', type:'symbol', source:'v', 'source-layer':'transportation_name',
-        filter:['all',['in','class','secondary','tertiary'],['has','ref']],
-        minzoom:13,
-        layout:{
-          'icon-image':['concat','shield-secondary-',['get','ref']],
-          'icon-allow-overlap':false,
-          'icon-rotation-alignment':'viewport',
-          'symbol-placement':'line',
-          'symbol-spacing':280,
-          'text-field':'',
-        },
-        paint:{ 'icon-opacity':1 } },
+// D1/D5/D7 motorway — RED shield (z9)
+{ id:'shield-motorway', type:'symbol', source:'v', 'source-layer':'transportation_name',
+  filter:['all',['==','class','motorway'],['has','ref']],
+  minzoom:9,
+  layout:{
+    'icon-image':['concat','shield-motorway-',['get','ref']],
+    'icon-allow-overlap':false,
+    'icon-rotation-alignment':'viewport',
+    'symbol-placement':'line',
+    'symbol-spacing':350,
+    'text-field':'',
+  },
+  paint:{ 'icon-opacity':1 } },
+
+// R26, 48, MO trunk — BRIGHT BLUE shield (z10)
+{ id:'shield-trunk', type:'symbol', source:'v', 'source-layer':'transportation_name',
+  filter:['all',['==','class','trunk'],['has','ref']],
+  minzoom:10,
+  layout:{
+    'icon-image':['concat','shield-trunk-',['get','ref']],
+    'icon-allow-overlap':false,
+    'icon-rotation-alignment':'viewport',
+    'symbol-placement':'line',
+    'symbol-spacing':320,
+    'text-field':'',
+  },
+  paint:{ 'icon-opacity':1 } },
+
+// 27, 9 primary — BRIGHT BLUE shield (z9 like motorways)
+{ id:'shield-primary', type:'symbol', source:'v', 'source-layer':'transportation_name',
+  filter:['all',['==','class','primary'],['has','ref']],
+  minzoom:9,
+  layout:{
+    'icon-image':['concat','shield-primary-',['get','ref']],
+    'icon-allow-overlap':false,
+    'icon-rotation-alignment':'viewport',
+    'symbol-placement':'line',
+    'symbol-spacing':300,
+    'text-field':'',
+  },
+  paint:{ 'icon-opacity':1 } },
+
+// 605, 431 secondary — BRIGHT BLUE shield (z13)
+{ id:'shield-secondary', type:'symbol', source:'v', 'source-layer':'transportation_name',
+  filter:['all',['in','class','secondary','tertiary'],['has','ref']],
+  minzoom:13,
+  layout:{
+    'icon-image':['concat','shield-secondary-',['get','ref']],
+    'icon-allow-overlap':false,
+    'icon-rotation-alignment':'viewport',
+    'symbol-placement':'line',
+    'symbol-spacing':280,
+    'text-field':'',
+  },
+  paint:{ 'icon-opacity':1 } },
+
+// Gray shields for planned roads
+{ id:'shield-planned', type:'symbol', source:'v', 'source-layer':'transportation_name',
+  filter:['all',['any',['==','highway','proposed'],['==','highway','construction']],['has','ref']],
+  minzoom:11,
+  layout:{
+    'icon-image':['concat','shield-planned-',['get','ref']],
+    'icon-allow-overlap':false,
+    'icon-rotation-alignment':'viewport',
+    'symbol-placement':'line',
+    'symbol-spacing':300,
+    'text-field':'',
+  },
+  paint:{ 'icon-color': '#666', 'icon-halo-color': '#aaa', 'icon-halo-width': 1 }
+},
 
       // ── Road name labels ──────────────────────────────────────────────────
       { id: 'lbl-primary', type: 'symbol', source: 'v', 'source-layer': 'transportation_name',
