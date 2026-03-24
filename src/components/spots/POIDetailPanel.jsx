@@ -257,7 +257,7 @@ function ContactRow({ icon: Icon, value, href }) {
 }
 
 // ─── Mini bar ─────────────────────────────────────────────────────────────────
-function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavigate, onShare, onAddPhoto, user, onOpenLightbox }) {
+function MiniBar({ t, poi, category, sfRating, photoUrl, onExpand, onClose, onNavigate, onShare, onAddPhoto, user, onOpenLightbox }) {
   const avg = sfRating?.count > 0 ? sfRating.avg : 0;
   const count = sfRating?.count || 0;
 
@@ -307,7 +307,7 @@ function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavig
 }
 
 // ─── Full sheet ───────────────────────────────────────────────────────────────
-function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavigate, onShare, onAddPhoto, onSubmitRating, user, onOpenLightbox }) {
+function FullSheet({ t, poi, category, sfPhotos, sfRating, photos, onClose, onNavigate, onShare, onAddPhoto, onSubmitRating, user, onOpenLightbox }) {
   const [ratingVal, setRatingVal] = useState(0);
   const [ratingComment, setRatingComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -594,6 +594,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
   if (!poi) return null;
 
   const sharedProps = {
+    t,
     poi, category, sfPhotos, sfRating, photos,
     onClose, onNavigate: handleNavigate, onShare: handleShare,
     onAddPhoto: handleAddPhoto, user,
