@@ -1,68 +1,153 @@
 /**
- * OSRM (Open Source Routing Machine) Client
- * Stable, fast routing service. No API key needed.
- * Usage: const routeData = await getOSRMRoute(from, to, profile);
+ * osrmServiceClient.js
+ *
+ * Routing client with three-tier fallback:
+ *   1. Local OSRM server (localhost:5000) — set up via Android native service
+ *   2. Public OSRM demo server (router.project-osrm.org) — online only
+ *   3. Cached route from IndexedDB — offline fallback for pre-calculated routes
+ *
+ * Local OSRM setup: see android/app/src/main/java/com/spotfinder/app/OsrmService.java
+ * The Android service starts osrm-routed on device boot/app launch and listens on :5000.
  */
 
-const BASE_URL = 'https://router.project-osrm.org/route/v1';
+import { saveRoute, getCachedRoute } from '@/lib/routeCache';
+
+const LOCAL_OSRM_URL  = 'http://localhost:5000/route/v1';
+// Primary public OSRM server. If this fails we try the backup.
+// Both are operated by the OSRM project — they can be slow or rate-limited.
+// For production, host your own OSRM or use the Android native service.
+const REMOTE_OSRM_SERVERS = [
+  'https://router.project-osrm.org/route/v1',
+  'https://routing.openstreetmap.de/routed-car/route/v1',
+];
+const LOCAL_TIMEOUT_MS = 2000; // if local OSRM doesn't respond in 2s, skip it
+
+// ─── Main exported function ───────────────────────────────────────────────────
 
 export async function getOSRMRoute(from, to, profile = 'driving') {
-  const coordinates = `${from.lng},${from.lat};${to.lng},${to.lat}`;
-  const osrmProfiles = {
-    'driving-car': 'driving',
-    'cycling-regular': 'cycling',
-    'foot-hiking': 'foot'
-  };
-  const osrmProfile = osrmProfiles[profile] || 'driving';
-  const url = `${BASE_URL}/${osrmProfile}/${coordinates}?overview=full&steps=true&geometries=polyline&annotations=true`;
-  
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`OSRM API error (${response.status}): ${errorText}`);
-    }
+  const osrmProfile = PROFILE_MAP[profile] || 'driving';
+  const coords = `${from.lng},${from.lat};${to.lng},${to.lat}`;
+  const params  = '?overview=full&steps=true&geometries=polyline&annotations=true';
 
-    const data = await response.json();
-    return normalizeOSRMResponse(data);
-  } catch (err) {
-    console.error('OSRM API error:', err);
-    throw err;
+  // 1. Try local OSRM (running natively on Android)
+  if (await isLocalOSRMAvailable()) {
+    try {
+      const url  = `${LOCAL_OSRM_URL}/${osrmProfile}/${coords}${params}`;
+      const data = await fetchWithTimeout(url, LOCAL_TIMEOUT_MS);
+      const route = normalizeOSRMResponse(data);
+      // Cache every successful route for later offline use
+      saveRoute(from, to, profile, route).catch(() => {});
+      return route;
+    } catch (e) {
+      console.warn('[OSRM] Local server error:', e.message);
+    }
+  }
+
+  // 2. Try remote OSRM servers in order
+  for (const baseUrl of REMOTE_OSRM_SERVERS) {
+    try {
+      const url      = `${baseUrl}/${osrmProfile}/${coords}${params}`;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10000);
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+      if (!response.ok) throw new Error(`OSRM ${response.status}`);
+      const data  = await response.json();
+      const route = normalizeOSRMResponse(data);
+      saveRoute(from, to, profile, route).catch(() => {});
+      return route;
+    } catch (e) {
+      console.warn(`[OSRM] ${baseUrl} failed:`, e.message);
+    }
+  }
+
+  // 3. Serve from route cache (offline / all servers down)
+  const cached = await getCachedRoute(from, to, profile);
+  if (cached) {
+    console.info('[OSRM] Serving cached route');
+    return cached;
+  }
+
+  // Give a specific, actionable error
+  if (!navigator.onLine) {
+    throw new Error('No internet connection and no cached route for this destination. Calculate the route while online first.');
+  }
+  throw new Error('Routing servers unavailable. Check your connection or try again in a moment.');
+}
+
+// ─── Local OSRM availability check ───────────────────────────────────────────
+
+let _localAvailableCache = null;
+let _localLastCheck      = 0;
+const LOCAL_CHECK_TTL    = 10000; // re-check every 10s
+
+async function isLocalOSRMAvailable() {
+  const now = Date.now();
+  if (now - _localLastCheck < LOCAL_CHECK_TTL) return _localAvailableCache;
+
+  try {
+    // Lightweight health check: just fetch the OSRM root, expect any 200
+    await fetchWithTimeout('http://localhost:5000/', 1500);
+    _localAvailableCache = true;
+  } catch (_) {
+    _localAvailableCache = false;
+  }
+  _localLastCheck = now;
+  return _localAvailableCache;
+}
+
+async function fetchWithTimeout(url, ms) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  } finally {
+    clearTimeout(timer);
   }
 }
 
-function normalizeOSRMResponse(osrmResponse) {
-  const route = osrmResponse.routes[0];
+// ─── Profile mapping ──────────────────────────────────────────────────────────
+
+const PROFILE_MAP = {
+  'driving-car':     'driving',
+  'cycling-regular': 'cycling',
+  'foot-hiking':     'foot',
+  'driving':         'driving',
+  'cycling':         'cycling',
+  'foot':            'foot',
+};
+
+// ─── Response normalizer ──────────────────────────────────────────────────────
+
+function normalizeOSRMResponse(data) {
+  const route = data.routes?.[0];
   if (!route) throw new Error('No routes found');
 
-  const geometry = decodePolyline(route.geometry);
-  const rawSteps = extractStepsFromRoute(route);
-  
   return {
-    geometry,
-    distance: route.distance,
-    duration: route.duration,
-    steps: rawSteps
+    geometry:  decodePolyline(route.geometry),
+    distance:  route.distance,
+    duration:  route.duration,
+    steps:     extractStepsFromRoute(route),
   };
 }
 
 function extractStepsFromRoute(route) {
-  const steps = route.legs[0].steps
+  return (route.legs?.[0]?.steps ?? [])
     .map(step => {
-      const maneuver = step.maneuver;
+      const maneuver     = step.maneuver;
       const bearingBefore = maneuver.bearing_before ?? 0;
       const bearingAfter  = maneuver.bearing_after  ?? 0;
       const angleDiff     = bearingDiff(bearingBefore, bearingAfter);
 
-      // If OSRM calls this a continuation/name-change but the road actually
-      // bends significantly, promote it to a real turn instruction.
       let modifier     = maneuver.modifier || 'straight';
       let maneuverType = maneuver.type     || 'turn';
 
-      const FORCE_TURN_THRESHOLD = 25; // degrees — sharper than this = real turn
+      // Promote subtle OSRM steps to real turns when the angle demands it
       if (
-        Math.abs(angleDiff) >= FORCE_TURN_THRESHOLD &&
-        (maneuverType === 'new name'     ||
+        Math.abs(angleDiff) >= 25 &&
+        (maneuverType === 'new name' ||
          maneuverType === 'notification' ||
          (maneuverType === 'continue' && modifier === 'straight'))
       ) {
@@ -76,30 +161,24 @@ function extractStepsFromRoute(route) {
         bearingBefore,
         bearingAfter,
         angleDiff,
-        distance: step.distance,
-        lat: maneuver.location[1],
-        lng: maneuver.location[0],
+        distance:     step.distance,
+        lat:          maneuver.location[1],
+        lng:          maneuver.location[0],
         name:         step.name         || '',
-        ref:          step.ref          || '',   // e.g. "D5", "E50 D5"
-        destinations: step.destinations || '',   // e.g. "Praha;Plzeň"
+        ref:          step.ref          || '',
+        destinations: step.destinations || '',
         exits:        step.exits        || '',
-        exit:         maneuver.exit     || null, // roundabout exit number
+        exit:         maneuver.exit     || null,
         intersections: step.intersections,
       };
-
-      // Build the human-readable instruction from all available data
       normalizedStep.instruction = buildInstruction(normalizedStep);
-
       return normalizedStep;
     })
-    .filter(step => step.distance > 5);
-
-  return steps;
+    .filter(s => s.distance > 5);
 }
 
-// ─── Bearing helpers ─────────────────────────────────────────────────────────
+// ─── Bearing helpers ──────────────────────────────────────────────────────────
 
-/** Signed angle difference in degrees: negative = left, positive = right */
 function bearingDiff(before, after) {
   let diff = after - before;
   while (diff >  180) diff -= 360;
@@ -107,7 +186,6 @@ function bearingDiff(before, after) {
   return diff;
 }
 
-/** Map a signed angle to an OSRM-style modifier string */
 function modifierFromAngle(diff) {
   const abs = Math.abs(diff);
   const dir = diff < 0 ? 'left' : 'right';
@@ -117,10 +195,8 @@ function modifierFromAngle(diff) {
   return `sharp ${dir}`;
 }
 
-// ─── Map OSRM modifier → internal turn type (used by NavigationPanel) ────────
-
 export function mapOSRMModifier(modifier) {
-  const map = {
+  return {
     'sharp left':       'turn-left',
     'left':             'turn-left',
     'slight left':      'turn-left',
@@ -132,92 +208,45 @@ export function mapOSRMModifier(modifier) {
     'roundabout left':  'enter-roundabout',
     'roundabout right': 'enter-roundabout',
     'exit roundabout':  'exit-roundabout',
-    'use lane':         'straight'
-  };
-  return map[modifier] || 'straight';
+    'use lane':         'straight',
+  }[modifier] || 'straight';
 }
 
-// ─── Rich instruction builder ─────────────────────────────────────────────────
+// ─── Instruction builder ──────────────────────────────────────────────────────
 
-/**
- * Builds a full navigation instruction string from OSRM step data.
- *
- * Examples output:
- *   "Turn right onto Plzeňská"
- *   "Turn right onto D5 E50 direction Praha"
- *   "Turn right onto Strakonická (D5) direction Praha / Brno"
- *   "Take the 3rd exit at the roundabout onto Evropská"
- *   "Merge onto D0 direction Brno"
- *   "Head northeast on Václavské náměstí"
- *   "You have arrived at your destination"
- */
 function buildInstruction(step) {
   const { maneuverType, modifier, exit, name, ref, destinations, exits } = step;
-
   const roadLabel = buildRoadLabel(name, ref);
   const destLabel = buildDestLabel(destinations);
   const turnVerb  = buildTurnVerb(modifier);
 
   switch (maneuverType) {
-    case 'depart':
-      return buildDepartInstruction(step, roadLabel, destLabel);
-
-    case 'arrive':
-      return 'You have arrived at your destination';
-
+    case 'depart':     return buildDepartInstruction(step, roadLabel, destLabel);
+    case 'arrive':     return 'You have arrived at your destination';
     case 'turn':
     case 'new name':
-    case 'end of road':
-      return assembleTurn(turnVerb, roadLabel, destLabel);
-
-    case 'continue':
-      if (roadLabel) return `Continue on ${roadLabel}`;
-      return 'Continue straight';
-
-    case 'merge':
-      if (roadLabel) return `Merge onto ${roadLabel}${destLabel ? ` direction ${destLabel}` : ''}`;
-      return `Merge ${modifier || 'ahead'}`;
-
-    case 'on ramp':
-      return assembleTurn(turnVerb, roadLabel, destLabel, 'ramp');
-
+    case 'end of road': return assembleTurn(turnVerb, roadLabel, destLabel);
+    case 'continue':   return roadLabel ? `Continue on ${roadLabel}` : 'Continue straight';
+    case 'merge':      return roadLabel ? `Merge onto ${roadLabel}${destLabel ? ` direction ${destLabel}` : ''}` : `Merge ${modifier || 'ahead'}`;
+    case 'on ramp':    return assembleTurn(turnVerb, roadLabel, destLabel, 'ramp');
     case 'off ramp': {
       const exitStr = exits ? ` exit ${exits}` : '';
-      if (roadLabel) return `Take${exitStr} the exit onto ${roadLabel}${destLabel ? ` direction ${destLabel}` : ''}`;
-      return `Take${exitStr} the exit`;
+      return roadLabel ? `Take${exitStr} the exit onto ${roadLabel}${destLabel ? ` direction ${destLabel}` : ''}` : `Take${exitStr} the exit`;
     }
-
-    case 'fork':
-      return `Keep ${modifier?.includes('left') ? 'left' : 'right'} at the fork${destLabel ? ` toward ${destLabel}` : ''}`;
-
+    case 'fork': return `Keep ${modifier?.includes('left') ? 'left' : 'right'} at the fork${destLabel ? ` toward ${destLabel}` : ''}`;
     case 'roundabout':
     case 'rotary': {
-      const exitOrdinal = exit ? ordinal(exit) : '';
-      const exitPhrase  = exitOrdinal ? `Take the ${exitOrdinal} exit` : 'Take the exit';
+      const exitPhrase = exit ? `Take the ${ordinal(exit)} exit` : 'Take the exit';
       if (roadLabel) return `${exitPhrase} at the roundabout onto ${roadLabel}${destLabel ? ` direction ${destLabel}` : ''}`;
       if (destLabel) return `${exitPhrase} at the roundabout direction ${destLabel}`;
       return `${exitPhrase} at the roundabout`;
     }
-
-    case 'roundabout turn':
-      return assembleTurn(turnVerb, roadLabel, destLabel);
-
+    case 'roundabout turn':  return assembleTurn(turnVerb, roadLabel, destLabel);
     case 'exit roundabout':
-    case 'exit rotary':
-      if (roadLabel) return `Exit the roundabout onto ${roadLabel}${destLabel ? ` direction ${destLabel}` : ''}`;
-      return 'Exit the roundabout';
-
-    case 'notification':
-      if (roadLabel) return `Continue onto ${roadLabel}${destLabel ? ` direction ${destLabel}` : ''}`;
-      return 'Continue ahead';
-
-    default:
-      if (roadLabel) return `${turnVerb || 'Continue'} onto ${roadLabel}${destLabel ? ` direction ${destLabel}` : ''}`;
-      return turnVerb || 'Continue ahead';
+    case 'exit rotary':      return roadLabel ? `Exit the roundabout onto ${roadLabel}${destLabel ? ` direction ${destLabel}` : ''}` : 'Exit the roundabout';
+    default:                 return roadLabel ? `${turnVerb || 'Continue'} onto ${roadLabel}${destLabel ? ` direction ${destLabel}` : ''}` : turnVerb || 'Continue ahead';
   }
 }
-
-// ─── Instruction sub-builders ─────────────────────────────────────────────────
 
 function assembleTurn(verb, roadLabel, destLabel, context = '') {
   let action = verb || 'Turn';
@@ -236,30 +265,11 @@ function buildDepartInstruction(step, roadLabel, destLabel) {
   return parts.join(' ');
 }
 
-/**
- * Strips European route codes (E50, E49, E461 …) from a ref string,
- * keeping only national highway codes (D1, D5, R6, A1 …).
- *   "D5 E50"     → "D5"
- *   "D1 E65 E67" → "D1"
- *   "E50"        → ""
- *   "D6"         → "D6"
- */
 function filterRef(ref) {
   if (!ref) return '';
-  return ref
-    .split(/[\s;,/]+/)
-    .map(p => p.trim())
-    .filter(p => p && !/^E\d+$/i.test(p))
-    .join(' ')
-    .trim();
+  return ref.split(/[\s;,/]+/).map(p => p.trim()).filter(p => p && !/^E\d+$/i.test(p)).join(' ').trim();
 }
 
-/**
- * Sanitises a raw OSM road name:
- *   Real name ("Plzeňská")          → returned as-is
- *   Short numeric 1-3 digits ("15", "586") -> "Road 586"  (minor/regional road number)
- *   Long numeric 4+ digits ("10274") -> ""  (internal OSM ID, suppress entirely)
- */
 function cleanName(name) {
   const s = (name || '').trim();
   if (!s) return '';
@@ -267,78 +277,48 @@ function cleanName(name) {
   return s;
 }
 
-/**
- * Combines a sanitised road name and filtered ref into a single display label.
- *   ref="D5 E50", name=""            → "D5"
- *   ref="D5 E50", name="Strakonická" → "Strakonická (D5)"
- *   ref="",       name="Plzeňská"    → "Plzeňská"
- *   ref="D6",     name=""            → "D6"
- *   ref="",       name="586"         → "Road 586"
- *   ref="",       name="10274"       → ""  (suppressed)
- *   ref="D5",     name="10274"       → "D5"
- */
 function buildRoadLabel(name, ref) {
   const cleanRef  = filterRef(ref);
   const sanitised = cleanName(name);
-
   if (!cleanRef && !sanitised) return '';
-  if (!sanitised)              return cleanRef;
-  if (!cleanRef)               return sanitised;
-  if (sanitised === cleanRef)  return cleanRef;
-
+  if (!sanitised) return cleanRef;
+  if (!cleanRef)  return sanitised;
+  if (sanitised === cleanRef) return cleanRef;
   return `${sanitised} (${cleanRef})`;
 }
 
-/**
- * Formats destination signs for speech.
- * "Praha;Plzeň" → "Praha / Plzeň"  (max 2 destinations)
- */
 function buildDestLabel(destinations) {
   if (!destinations) return '';
-  return destinations
-    .split(/[;,]/)
-    .map(d => d.trim())
-    .filter(Boolean)
-    .slice(0, 2)
-    .join(' / ');
+  return destinations.split(/[;,]/).map(d => d.trim()).filter(Boolean).slice(0, 2).join(' / ');
 }
 
-/** Maps an OSRM modifier to a natural-language turn verb */
 function buildTurnVerb(modifier) {
-  switch (modifier) {
-    case 'sharp left':   return 'Turn sharp left';
-    case 'left':         return 'Turn left';
-    case 'slight left':  return 'Bear left';
-    case 'straight':     return 'Continue straight';
-    case 'slight right': return 'Bear right';
-    case 'right':        return 'Turn right';
-    case 'sharp right':  return 'Turn sharp right';
-    case 'u-turn':       return 'Make a U-turn';
-    default:             return 'Turn';
-  }
+  return {
+    'sharp left':   'Turn sharp left',
+    'left':         'Turn left',
+    'slight left':  'Bear left',
+    'straight':     'Continue straight',
+    'slight right': 'Bear right',
+    'right':        'Turn right',
+    'sharp right':  'Turn sharp right',
+    'u-turn':       'Make a U-turn',
+  }[modifier] || 'Turn';
 }
 
-/** Converts a bearing in degrees to an 8-point cardinal direction */
 function bearingToCardinal(bearing) {
-  const dirs = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'];
-  return dirs[Math.round(((bearing % 360) + 360) % 360 / 45) % 8];
+  return ['north','northeast','east','southeast','south','southwest','west','northwest'][Math.round(((bearing % 360) + 360) % 360 / 45) % 8];
 }
 
-/** Returns an ordinal string: 1→"1st", 2→"2nd", 3→"3rd", 4→"4th" … */
 function ordinal(n) {
-  const s = ['th', 'st', 'nd', 'rd'];
+  const s = ['th','st','nd','rd'];
   const v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
-// ─── Polyline decoder ─────────────────────────────────────────────────────────
-
 function decodePolyline(encoded) {
-  const precision = 5;
-  const factor = Math.pow(10, precision);
+  const factor = 1e5;
   let index = 0, lat = 0, lng = 0;
   const coordinates = [];
-
   while (index < encoded.length) {
     let result = 0, shift = 0, byte;
     do { byte = encoded.charCodeAt(index++) - 63; result |= (byte & 0x1f) << shift; shift += 5; } while (byte >= 0x20);
