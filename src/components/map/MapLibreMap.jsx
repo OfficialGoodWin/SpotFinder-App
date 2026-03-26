@@ -84,8 +84,8 @@ const EURO_ROUTES = {
 
 // Detect if a ref is a local road (5+ digits = district/local road)
 function getShieldClass(roadClass, ref) {
-  // 4+ digit pure numbers (2341, 18512, 00515) = local district roads → brown
-  if (ref && ref.length >= 4 && /^\d+$/.test(ref)) return 'local';
+  // 4+ digit numbers, optionally ending with a single letter (2341, 18512, 18052e, 17502a) = local district roads → brown
+  if (ref && ref.length >= 4 && /^\d+[a-zA-Z]?$/.test(ref)) return 'local';
   return roadClass;
 }
 

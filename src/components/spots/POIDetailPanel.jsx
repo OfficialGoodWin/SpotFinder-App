@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Navigation, Share2, Camera, Star, Phone, Mail, Globe, MapPin, ChevronUp, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getPOIPhotos, getPOIRatings, addPOIPhoto, addPOIRating, uploadSpotImage, makePOIId } from '@/api/firebaseClient';
+import { useLanguage } from '@/lib/LanguageContext';
 
 
 // ─── OSM tag helpers ──────────────────────────────────────────────────────────
@@ -10,9 +11,9 @@ function getEmail(tags = {}) { return tags.email || tags['contact:email'] || nul
 function getHours(tags = {}) { return tags.opening_hours || null; }
 function getDescription(tags = {}) { return tags.description || tags.note || null; }
 
-function parseOpenStatus(ohString) {
+function parseOpenStatus(ohString, t) {
   if (!ohString) return null;
-  if (ohString.toLowerCase().includes('24/7')) return { isOpen: true, label: 'Open 24/7' };
+  if (ohString.toLowerCase().includes('24/7')) return { isOpen: true, label: t('poiDetail.open247') };
   try {
     const now = new Date();
     const days = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
@@ -34,7 +35,7 @@ function parseOpenStatus(ohString) {
       const [oh, om] = open.split(':').map(Number);
       const [ch, cm] = close.split(':').map(Number);
       const isOpen = timeNow >= oh * 60 + om && timeNow < ch * 60 + cm;
-      return { isOpen, label: `${isOpen ? 'Open' : 'Closed'} · ${open}–${close}` };
+      return { isOpen, label: `${isOpen ? t('poiDetail.open') : t('poiDetail.closed')} · ${open}–${close}` };
     }
   } catch {}
   return null;
@@ -257,6 +258,7 @@ function ContactRow({ icon: Icon, value, href }) {
 
 // ─── Mini bar ─────────────────────────────────────────────────────────────────
 function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavigate, onShare, onAddPhoto, user, onOpenLightbox }) {
+  const { t } = useLanguage();
   const avg = sfRating?.count > 0 ? sfRating.avg : 0;
   const count = sfRating?.count || 0;
 
@@ -297,9 +299,9 @@ function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavig
       </div>
 
       <div className="flex items-center gap-2 px-4 pb-4">
-        <ActionBtn icon={Navigation} label="Navigate" onClick={onNavigate} color={category.color} />
-        <ActionBtn icon={Share2} label="Share" onClick={onShare} />
-        <ActionBtn icon={Camera} label="Add Photo" onClick={onAddPhoto} disabled={!user} />
+        <ActionBtn icon={Navigation} label={t('poiDetail.navigate')} onClick={onNavigate} color={category.color} />
+        <ActionBtn icon={Share2} label={t('poiDetail.share')} onClick={onShare} />
+        <ActionBtn icon={Camera} label={t('poiDetail.addPhoto')} onClick={onAddPhoto} disabled={!user} />
       </div>
     </div>
   );
@@ -307,6 +309,7 @@ function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavig
 
 // ─── Full sheet ───────────────────────────────────────────────────────────────
 function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavigate, onShare, onAddPhoto, onSubmitRating, user, onOpenLightbox }) {
+  const { t } = useLanguage();
   const [ratingVal, setRatingVal] = useState(0);
   const [ratingComment, setRatingComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -314,7 +317,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
 
   const tags = poi.tags || {};
   const phone = getPhone(tags), website = getWebsite(tags), email = getEmail(tags);
-  const ohRaw = getHours(tags), desc = getDescription(tags), status = parseOpenStatus(ohRaw);
+  const ohRaw = getHours(tags), desc = getDescription(tags), status = parseOpenStatus(ohRaw, t);
   const avg = sfRating?.count > 0 ? sfRating.avg : 0;
   const count = sfRating?.count || 0;
 
@@ -375,9 +378,9 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
             </div>
 
             <div className="flex gap-2 mb-5">
-              <ActionBtn icon={Navigation} label="Navigate" onClick={onNavigate} color={category.color} />
-              <ActionBtn icon={Share2} label="Share" onClick={onShare} />
-              <ActionBtn icon={Camera} label="Add Photo" onClick={onAddPhoto} disabled={!user} />
+              <ActionBtn icon={Navigation} label={t('poiDetail.navigate')} onClick={onNavigate} color={category.color} />
+              <ActionBtn icon={Share2} label={t('poiDetail.share')} onClick={onShare} />
+              <ActionBtn icon={Camera} label={t('poiDetail.addPhoto')} onClick={onAddPhoto} disabled={!user} />
             </div>
 
             <div className="h-px bg-gray-100 dark:bg-border mb-4" />
@@ -403,38 +406,38 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
                 <div className="flex items-center gap-2 mb-3">
                   <Stars value={avg} size={20} />
                   <span className="text-lg font-bold text-green-600 dark:text-green-400">{avg.toFixed(1)}</span>
-                  <span className="text-sm text-muted-foreground">({count} {count === 1 ? 'review' : 'reviews'})</span>
+                  <span className="text-sm text-muted-foreground">({count} {count === 1 ? t('poiDetail.review') : t('poiDetail.reviews')})</span>
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground mb-3">No ratings yet — be the first!</p>
+                <p className="text-sm text-muted-foreground mb-3">{t('poiDetail.noRatings')}</p>
               )}
               {!ratingDone ? (
                 <div className="bg-gray-50 dark:bg-accent/40 rounded-2xl p-4">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Rate this place</p>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{t('poiDetail.rateThisPlace')}</p>
                   {user ? (
                     <>
                       <Stars value={ratingVal} size={28} interactive onRate={setRatingVal} />
                       {ratingVal > 0 && (
                         <>
                           <textarea value={ratingComment} onChange={e => setRatingComment(e.target.value)}
-                            placeholder="Add a comment (optional)"
+                            placeholder={t('poiDetail.addComment')}
                             className="mt-3 w-full text-sm px-3 py-2 rounded-xl border border-gray-200 dark:border-border bg-white dark:bg-background text-foreground resize-none outline-none focus:ring-2 focus:ring-blue-300"
                             rows={2} />
                           <button onClick={handleRateSubmit} disabled={submitting}
                             className="mt-2 w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50"
                             style={{ background: category.color }}>
-                            {submitting ? 'Submitting…' : 'Submit Rating'}
+                            {submitting ? t('poiDetail.submitting') : t('poiDetail.submitRating')}
                           </button>
                         </>
                       )}
                     </>
                   ) : (
-                    <p className="text-xs text-muted-foreground">Sign in to rate this place</p>
+                    <p className="text-xs text-muted-foreground">{t('poiDetail.signInToRate')}</p>
                   )}
                 </div>
               ) : (
                 <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm font-medium">
-                  <Star className="w-4 h-4 fill-current" /> Thanks for your rating!
+                  <Star className="w-4 h-4 fill-current" /> {t('poiDetail.thanksRating')}
                 </div>
               )}
             </div>
@@ -450,7 +453,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
 
             {(phone || email || website || poi.lat) && (
               <>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Contact & Info</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{t('poiDetail.contactInfo')}</p>
                 {phone && <ContactRow icon={Phone} value={phone} href={`tel:${phone}`} />}
                 {email && <ContactRow icon={Mail} value={email} href={`mailto:${email}`} />}
                 {website && <ContactRow icon={Globe} value={website} href={website.startsWith('http') ? website : `https://${website}`} />}
@@ -464,8 +467,8 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
             {allPhotos.length > 0 && (
               <>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                  Photos ({allPhotos.length})
-                  {sfPhotos.length > 0 && <span className="text-green-600 dark:text-green-400 normal-case font-normal ml-1">· {sfPhotos.length} from SpotFinder</span>}
+                  {t('poiDetail.photos')} ({allPhotos.length})
+                  {sfPhotos.length > 0 && <span className="text-green-600 dark:text-green-400 normal-case font-normal ml-1">· {sfPhotos.length} {t('poiDetail.fromSpotFinder')}</span>}
                 </p>
                 <div className="grid grid-cols-3 gap-1.5 mb-4">
                   {allPhotos.map((p, i) => (
@@ -485,7 +488,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
                     <button onClick={onAddPhoto}
                       className="aspect-square rounded-xl border-2 border-dashed border-gray-300 dark:border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-gray-400 transition-colors">
                       <Camera className="w-5 h-5" />
-                      <span className="text-xs">Add</span>
+                      <span className="text-xs">{t('poiDetail.add')}</span>
                     </button>
                   )}
                 </div>
@@ -496,19 +499,19 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
               <button onClick={onAddPhoto}
                 className="w-full h-20 rounded-xl border-2 border-dashed border-gray-300 dark:border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-gray-400 transition-colors mb-4">
                 <Camera className="w-5 h-5" />
-                <span className="text-xs">Be the first to add a photo</span>
+                <span className="text-xs">{t('poiDetail.beFirstPhoto')}</span>
               </button>
             )}
 
             {sfRating?.ratings?.length > 0 && (
               <>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">SpotFinder Reviews</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{t('poiDetail.spotfinderReviews')}</p>
                 <div className="space-y-3">
                   {sfRating.ratings.slice(0, 5).map(r => (
                     <div key={r.id} className="bg-gray-50 dark:bg-accent/40 rounded-xl p-3">
                       <div className="flex items-center gap-2 mb-1">
                         <Stars value={r.rating} size={12} />
-                        <span className="text-xs text-muted-foreground">{r.created_by?.split('@')[0] || 'User'}</span>
+                        <span className="text-xs text-muted-foreground">{r.created_by?.split('@')[0] || t('poiDetail.review')}</span>
                       </div>
                       {r.comment && <p className="text-sm text-foreground">{r.comment}</p>}
                     </div>
@@ -525,6 +528,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 export default function POIDetailPanel({ poi, category, onClose, onNavigate, user }) {
+  const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   const [sfPhotos, setSfPhotos] = useState([]);
   const [sfRating, setSfRating] = useState({ ratings: [], avg: 0, count: 0 });
@@ -552,7 +556,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
     const url = `https://maps.google.com/?q=${poi.lat},${poi.lon}`;
     try {
       if (navigator.share) await navigator.share({ title: poi.name, text: poi.address || poi.name, url });
-      else if (navigator.clipboard) { await navigator.clipboard.writeText(`${poi.name}\n${url}`); alert('Link copied!'); }
+      else if (navigator.clipboard) { await navigator.clipboard.writeText(`${poi.name}\n${url}`); alert(t('poiDetail.linkCopied')); }
       else window.open(url, '_blank');
     } catch (e) { if (e.name !== 'AbortError') window.open(url, '_blank'); }
   };
