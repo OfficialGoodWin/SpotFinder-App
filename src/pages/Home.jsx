@@ -67,6 +67,7 @@ export default function Home() {
   const [currentPOIs, setCurrentPOIs] = useState([]);
   const [showPOIPanel, setShowPOIPanel] = useState(false);
   const [selectedPOI, setSelectedPOI] = useState(null);
+  const [selectedPOIDirectCat, setSelectedPOIDirectCat] = useState(null);
   const [poiLoading, setPoiLoading] = useState(false);
   const mapRef = useRef(null);
  
@@ -261,7 +262,13 @@ export default function Home() {
         userAccuracy={userAccuracy}
         selectedPOICategory={selectedPOICategory}
         onSelectPOI={(poi, cat) => {
-          if (cat) setSelectedPOICategory(cat);
+          if (cat) {
+            // Direct ambient dot click — store category just for the detail panel,
+            // do NOT set selectedPOICategory (that would trigger a full category load)
+            setSelectedPOIDirectCat(cat);
+          } else {
+            setSelectedPOIDirectCat(null);
+          }
           setSelectedPOI(poi);
         }}
         onPOIsLoaded={(pois) => setCurrentPOIs(pois)}
@@ -476,12 +483,12 @@ export default function Home() {
         />
       )}
 
-      {selectedPOI && selectedPOICategory && (
+      {selectedPOI && (selectedPOIDirectCat || selectedPOICategory) && (
         <POIDetailPanel
           poi={selectedPOI}
-          category={selectedPOICategory}
+          category={selectedPOIDirectCat || selectedPOICategory}
           user={user}
-          onClose={() => { setSelectedPOI(null); if (!showPOIPanel) setSelectedPOICategory(null); }}
+          onClose={() => { setSelectedPOI(null); setSelectedPOIDirectCat(null); if (!showPOIPanel) setSelectedPOICategory(null); }}
           onNavigate={(destination) => {
             if (!userPos) return alert(t('home.locationUnavailable'));
             startNavTo(destination);
