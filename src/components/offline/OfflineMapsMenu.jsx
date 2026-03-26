@@ -1,13 +1,14 @@
 /**
  * OfflineMapsMenu.jsx — PMTiles offline maps for all of Europe.
- * Download = one streaming file per country, full zoom 0-19.
+ * Download = one streaming file per country, full zoom 0-16.
  * Requires /offline/{CC}.pmtiles on your Vercel deployment.
  * Generate: pmtiles extract https://build.protomaps.com/20260319.pmtiles
- *             public/offline/CZ.pmtiles --bbox=12.09,48.55,18.87,51.06 --maxzoom=19
+ *             public/offline/CZ.pmtiles --bbox=12.09,48.55,18.87,51.06 --maxzoom=16
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Download, Trash2, MapPin, WifiOff, HardDrive, ChevronDown, ChevronUp, Info } from 'lucide-react';
-import { COUNTRIES, downloadCountryVectorTiles, downloadCountryPOIs, deleteCountry, scrubInvalidMeta, countTilesForCountry } from '../../lib/vectorTileDownloader.js';
+import { X, Download, Trash2, MapPin, WifiOff, HardDrive, ChevronDown, ChevronUp } from 'lucide-react';
+import { COUNTRIES, downloadCountryPOIs, deleteCountry, scrubInvalidMeta } from '../../lib/vectorTileDownloader.js';
+import { downloadCountryPMTiles } from '../../lib/offlineManager.js';
 import { getAllMeta, estimateStorageUsage } from '../../lib/offlineStorage.js';
 
 const GEOAPIFY_KEY = import.meta.env.VITE_GEOAPIFY_KEY || '';
@@ -128,7 +129,7 @@ function CountryRow({ country, meta, onDownload, onDelete, activeDownload }) {
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-500 text-white font-semibold text-sm hover:bg-blue-600 active:scale-[0.98] transition-all shadow-sm">
             <Download className="w-4 h-4" />
             Download Map
-            <span className="text-blue-100 font-normal text-xs">({sizeLabel} · zoom 0–19 · vector)</span>
+            <span className="text-blue-100 font-normal text-xs">({sizeLabel} · zoom 0–16)</span>
           </button>
           {GEOAPIFY_KEY && (
             <button onClick={() => { onDownload(country, 'pois'); setExpanded(false); }}
@@ -238,7 +239,7 @@ export default function OfflineMapsMenu({ onClose }) {
           <WifiOff className="w-5 h-5 text-blue-500" />
           <div>
             <h2 className="font-bold text-base leading-tight">Offline Maps</h2>
-            <p className="text-xs text-muted-foreground">All of Europe · Vector tiles · Zoom 0–19</p>
+            <p className="text-xs text-muted-foreground">All of Europe · Vector tiles · Zoom 0–16</p>
           </div>
         </div>
         <button onClick={onClose} className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-accent/60 flex items-center justify-center hover:bg-gray-200 active:scale-95 transition-all">
@@ -250,25 +251,8 @@ export default function OfflineMapsMenu({ onClose }) {
       <div className="mx-4 mt-3 px-3 py-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 shrink-0">
         <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
           <strong>One file per country</strong> — downloads in minutes, not hours. Uses{' '}
-          <strong>vector tiles</strong> (OpenMapTiles format) so zoom 0–19 is included in every download.
+          <strong>vector tiles</strong> (OpenMapTiles format) so zoom 0–16 is included in every download.
           Requires WiFi. Works fully offline after.
-        </p>
-      </div>
-
-      {/* OSM notice */}
-      <div className="mx-4 mt-2 px-3 py-2 rounded-xl bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 shrink-0 flex gap-2 items-start">
-        <Info className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400 shrink-0 mt-0.5" />
-        <p className="text-xs text-orange-700 dark:text-orange-300 leading-relaxed">
-          Offline maps use <strong>OpenStreetMap</strong> vector data (not Mapy.cz).
-          Online you still get Mapy.cz quality tiles.
-        </p>
-      </div>
-
-      {/* Pmtiles setup notice */}
-      <div className="mx-4 mt-2 px-3 py-2 rounded-xl bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 shrink-0">
-        <p className="text-xs text-yellow-800 dark:text-yellow-300 leading-relaxed">
-          <strong>Setup required:</strong> Generate PMTiles files and put them in <code>public/offline/</code>.
-          See <code>offlineManager.js</code> for the <code>pmtiles extract</code> command per country.
         </p>
       </div>
 
