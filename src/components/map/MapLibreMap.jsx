@@ -57,7 +57,6 @@ const EURO_ROUTES = {
   '6':  ['E48'],
   '10': ['E65'],
   '11': ['E75'],            // Ostrava–Mosty u Jablunkova
-  '13': ['E442'],
   '17': ['E442'],
   '20': ['E49'],
   '21': ['E49'],
@@ -65,6 +64,7 @@ const EURO_ROUTES = {
   '33': ['E67'],
   '35': ['E442'],
   '50': ['E50'],
+  '63': ['E442'],           // Teplice–Děčín
   // German Autobahns
   'A 3': ['E56'],
   'A 6': ['E50'],
@@ -456,6 +456,7 @@ export default function MapLibreMap({
   selectedPOICategory, onSelectPOI, onPOIsLoaded, onLoadingChange,
   navTarget, navRouteData,
   isDark, mapLayer,
+  adminPOIs, adminClosures, adminNavMode, onAdminMapClick,
 }) {
   const containerRef = useRef(null);
   const mapRef       = useRef(null);
@@ -800,6 +801,123 @@ export default function MapLibreMap({
     };
     if (map.isStyleLoaded()) addRoute(); else map.once('styledata', addRoute);
   }, [navTarget, navRouteData]);
+
+  // ── Traffic incident markers (TomTom incidents → MapLibre markers) ───────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !TOMTOM_KEY || mapLayer !== 'traffic') return;
+
+    const incidentMarkers = [];
+    let abortCtrl = new AbortController();
+
+    const ICON_SVG = {
+      closure: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="24" height="24"><circle cx="50" cy="50" r="48" fill="white"/><circle cx="50" cy="50" r="43" fill="#CC1111"/><rect x="14" y="38" width="72" height="24" rx="5" fill="white"/></svg>`,
+      works:   `<div style="background:#FF8C00;border-radius:4px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:16px">🚧</div>`,
+      lane:    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="24" height="24"><circle cx="50" cy="50" r="48" fill="white"/><circle cx="50" cy="50" r="43" fill="#FF8C00"/><text x="50" y="68" text-anchor="middle" font-size="52" fill="white" font-family="Arial">↕</text></svg>`,
+      accident:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 100" width="26" height="24"><polygon points="55,4 107,96 3,96" fill="#CC1111"/><polygon points="55,17 97,88 13,88" fill="white"/><text x="55" y="85" text-anchor="middle" font-size="52" fill="#CC1111" font-family="Arial" font-weight="bold">!</text></svg>`,
+      jam:     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 100" width="26" height="24"><polygon points="55,4 107,96 3,96" fill="#CC1111"/><polygon points="55,17 97,88 13,88" fill="white"/><text x="55" y="85" text-anchor="middle" font-size="38" fill="#CC1111" font-family="Arial">🚗</text></svg>`,
+    };
+
+    const makeEl = (type) => {
+      const div = document.createElement('div');
+      div.style.cssText = 'filter:drop-shadow(0 2px 4px rgba(0,0,0,.55));line-height:0;cursor:pointer';
+      div.innerHTML = ICON_SVG[type] || ICON_SVG.jam;
+      return div;
+    };
+
+    const isClosure = c => [8,14].includes(c);
+    const isJam     = c => [6,13].includes(c);
+    const isAccident= c => [1].includes(c);
+    const isWorks   = c => [9].includes(c);
+    const isLane    = c => [7].includes(c);
+
+    const load = async () => {
+      if (!map.isStyleLoaded()) return;
+      const bounds = map.getBounds();
+      const sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
+      const bbox = [sw.lng, sw.lat, ne.lng, ne.lat].map(n => n.toFixed(6)).join(',');
+      const fields = encodeURIComponent('{incidents{type,geometry{type,coordinates},properties{iconCategory,from,to,roadNumbers,events{description,iconCategory}}}}');
+      try {
+        const res = await fetch(`https://api.tomtom.com/traffic/services/5/incidentDetails?bbox=${bbox}&fields=${fields}&language=en-GB&timeValidityFilter=present&key=${TOMTOM_KEY}`, { signal: abortCtrl.signal });
+        if (!res.ok) return;
+        const data = await res.json();
+        // Remove old markers
+        incidentMarkers.forEach(m => m.remove());
+        incidentMarkers.length = 0;
+        for (const inc of data.incidents || []) {
+          const cat = inc.properties?.iconCategory;
+          if (!isClosure(cat) && !isJam(cat) && !isAccident(cat) && !isWorks(cat) && !isLane(cat)) continue;
+          const geo = inc.geometry;
+          if (!geo) continue;
+          const coords = geo.type === 'Point' ? geo.coordinates : geo.coordinates[Math.floor(geo.coordinates.length/2)];
+          const [lng, lat] = coords;
+          const type = isClosure(cat) ? 'closure' : isWorks(cat) ? 'works' : isLane(cat) ? 'lane' : isAccident(cat) ? 'accident' : 'jam';
+          const el = makeEl(type);
+          const p = inc.properties || {};
+          const road = p.roadNumbers?.[0] || '';
+          const popup = `<div style="font-size:13px;max-width:200px"><strong style="color:#CC1111">${type === 'closure' ? '⛔ Road Closed' : type === 'works' ? '🚧 Road Works' : type === 'lane' ? 'Lane Closed' : type === 'accident' ? '🚨 Accident' : '🚗 Traffic Jam'}</strong>${road ? `<div>🛣️ ${road}</div>` : ''}${p.from ? `<div>From: ${p.from}</div>` : ''}${p.to ? `<div>To: ${p.to}</div>` : ''}</div>`;
+          const mk = new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).setPopup(new maplibregl.Popup({ offset: 10 }).setHTML(popup)).addTo(map);
+          incidentMarkers.push(mk);
+        }
+      } catch(e) { if (e.name !== 'AbortError') console.warn('Incident fetch:', e.message); }
+    };
+
+    const onMove = () => { abortCtrl.abort(); abortCtrl = new AbortController(); setTimeout(load, 600); };
+    if (map.isStyleLoaded()) load(); else map.once('idle', load);
+    map.on('moveend', onMove);
+    return () => {
+      map.off('moveend', onMove);
+      abortCtrl.abort();
+      incidentMarkers.forEach(m => m.remove());
+    };
+  }, [mapLayer]);
+
+  // ── Admin overlays (custom POIs + closures) ──────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const markers = [];
+    const add = () => {
+      markers.forEach(m => m.remove());
+      markers.length = 0;
+      for (const poi of (adminPOIs || [])) {
+        const el = document.createElement('div');
+        el.style.cssText = 'font-size:22px;cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))';
+        el.textContent = poi.icon || '📍';
+        el.title = poi.name || 'Admin POI';
+        const mk = new maplibregl.Marker({ element: el }).setLngLat([poi.lon, poi.lat])
+          .setPopup(new maplibregl.Popup({ offset: 10 }).setHTML(`<b>${poi.name||''}</b>${poi.description ? `<br/>${poi.description}` : ''}`))
+          .addTo(map);
+        markers.push(mk);
+      }
+      for (const cl of (adminClosures || [])) {
+        const now = new Date();
+        const until = cl.until ? new Date(cl.until) : null;
+        if (until && until < now) continue; // expired
+        const el = document.createElement('div');
+        el.style.cssText = 'font-size:22px;cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))';
+        el.textContent = cl.icon || '⛔';
+        el.title = cl.label || 'Road Closure';
+        const untilStr = until ? ` (until ${until.toLocaleDateString()})` : '';
+        const mk = new maplibregl.Marker({ element: el }).setLngLat([cl.lon, cl.lat])
+          .setPopup(new maplibregl.Popup({ offset: 10 }).setHTML(`<b>${cl.label||'Road Closure'}</b>${untilStr}${cl.description ? `<br/>${cl.description}` : ''}`))
+          .addTo(map);
+        markers.push(mk);
+      }
+    };
+    if (map.isStyleLoaded()) add(); else map.once('idle', add);
+    return () => markers.forEach(m => m.remove());
+  }, [adminPOIs, adminClosures]);
+
+  // ── Admin map-click mode ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !adminNavMode) return;
+    const handler = (e) => { onAdminMapClick?.({ lat: e.lngLat.lat, lon: e.lngLat.lng }); };
+    map.on('click', handler);
+    map.getCanvas().style.cursor = 'crosshair';
+    return () => { map.off('click', handler); map.getCanvas().style.cursor = ''; };
+  }, [adminNavMode, onAdminMapClick]);
 
   // ── Traffic overlay (TomTom raster on top) ─────────────────────────────────
   useEffect(() => {

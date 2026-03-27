@@ -312,6 +312,74 @@ export const addPOIRating = async (poiId, rating, reviewText, userEmail) => {
   return { id: docRef.id };
 };
 
+// ─── Superadmin map editor ────────────────────────────────────────────────────
+const requireSuperAdmin = (user) => {
+  if (!user || user.email !== 'superadmin@spotfinder.cz') throw new Error('Unauthorized');
+};
+
+// Custom POIs
+export const getAdminPOIs = async () => {
+  const { db } = getFirebaseServices();
+  try {
+    const q = query(collection(db, 'admin_pois'), orderBy('created_at', 'desc'), limit(500));
+    return (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch { return []; }
+};
+export const addAdminPOI = async (user, data) => {
+  requireSuperAdmin(user);
+  const { db } = getFirebaseServices();
+  const payload = { ...data, created_at: new Date().toISOString(), created_by: user.email };
+  const ref = await addDoc(collection(db, 'admin_pois'), payload);
+  return { id: ref.id, ...payload };
+};
+export const deleteAdminPOI = async (user, id) => {
+  requireSuperAdmin(user);
+  const { db } = getFirebaseServices();
+  await deleteDoc(doc(db, 'admin_pois', id));
+};
+
+// Road closures
+export const getAdminClosures = async () => {
+  const { db } = getFirebaseServices();
+  try {
+    const q = query(collection(db, 'admin_closures'), orderBy('created_at', 'desc'), limit(500));
+    return (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch { return []; }
+};
+export const addAdminClosure = async (user, data) => {
+  requireSuperAdmin(user);
+  const { db } = getFirebaseServices();
+  const payload = { ...data, created_at: new Date().toISOString(), created_by: user.email };
+  const ref = await addDoc(collection(db, 'admin_closures'), payload);
+  return { id: ref.id, ...payload };
+};
+export const deleteAdminClosure = async (user, id) => {
+  requireSuperAdmin(user);
+  const { db } = getFirebaseServices();
+  await deleteDoc(doc(db, 'admin_closures', id));
+};
+
+// Navigation overrides
+export const getAdminNavOverrides = async () => {
+  const { db } = getFirebaseServices();
+  try {
+    const q = query(collection(db, 'admin_nav_overrides'), orderBy('created_at', 'desc'), limit(500));
+    return (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch { return []; }
+};
+export const addAdminNavOverride = async (user, data) => {
+  requireSuperAdmin(user);
+  const { db } = getFirebaseServices();
+  const payload = { ...data, created_at: new Date().toISOString(), created_by: user.email };
+  const ref = await addDoc(collection(db, 'admin_nav_overrides'), payload);
+  return { id: ref.id, ...payload };
+};
+export const deleteAdminNavOverride = async (user, id) => {
+  requireSuperAdmin(user);
+  const { db } = getFirebaseServices();
+  await deleteDoc(doc(db, 'admin_nav_overrides', id));
+};
+
 export const base44 = {
   auth: {
     me: async () => {

@@ -514,10 +514,10 @@ function style(dark = false) {
         },
         paint:{ 'icon-opacity':1 } },
 
-      // 605, 431, 54 secondary/tertiary — visible from zoom 11 like highways
+      // 605, 431, 54 secondary/tertiary — same start zoom as motorways so e.g. road 27 (E53) shows alongside D5
       { id:'shield-secondary', type:'symbol', source:'v', 'source-layer':'transportation_name',
         filter:['all',['in','class','secondary','tertiary'],['has','ref']],
-        minzoom:11,
+        minzoom:9,
         layout:{
           'icon-image':['concat','shield-secondary-',['get','ref']],
           'icon-allow-overlap':false,
