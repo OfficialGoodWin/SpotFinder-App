@@ -913,7 +913,7 @@ export default function MapLibreMap({
         markers.push(clMarker);
       }
     };
-    if (map.isStyleLoaded()) add(); else map.once('idle', add);
+    if (map.isStyleLoaded()) addMarkers(); else map.once('idle', addMarkers);
     return () => markers.forEach(m => m.remove());
   }, [adminPOIs, adminClosures]);
 
