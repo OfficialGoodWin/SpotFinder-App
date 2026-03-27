@@ -877,32 +877,40 @@ export default function MapLibreMap({
     const map = mapRef.current;
     if (!map) return;
     const markers = [];
-    const add = () => {
+    const addMarkers = () => {
       markers.forEach(m => m.remove());
       markers.length = 0;
-      for (const poi of (adminPOIs || [])) {
-        const el = document.createElement('div');
-        el.style.cssText = 'font-size:22px;cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))';
-        el.textContent = poi.icon || '📍';
-        el.title = poi.name || 'Admin POI';
-        const mk = new maplibregl.Marker({ element: el }).setLngLat([poi.lon, poi.lat])
-          .setPopup(new maplibregl.Popup({ offset: 10 }).setHTML(`<b>${poi.name||''}</b>${poi.description ? `<br/>${poi.description}` : ''}`))
+
+      for (const poi of adminPOIs || []) {
+        const poiEl = makeDot(poi.icon || ' ', poi.color || '#5A67D8', 28);
+        poiEl.title = poi.name || 'Admin POI';
+        const poiMarker = new maplibregl.Marker({ element: poiEl, anchor: 'bottom' })
+          .setLngLat([poi.lon, poi.lat])
+          .setPopup(
+            new maplibregl.Popup({ offset: 10 }).setHTML(
+              `<b>${poi.name || ''}</b>${poi.description ? `<br/>${poi.description}` : ''}`
+            )
+          )
           .addTo(map);
-        markers.push(mk);
+        markers.push(poiMarker);
       }
-      for (const cl of (adminClosures || [])) {
+
+      for (const cl of adminClosures || []) {
         const now = new Date();
-        const until = cl.until ? new Date(cl.until) : null;
-        if (until && until < now) continue; // expired
-        const el = document.createElement('div');
-        el.style.cssText = 'font-size:22px;cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))';
-        el.textContent = cl.icon || '⛔';
-        el.title = cl.label || 'Road Closure';
-        const untilStr = until ? ` (until ${until.toLocaleDateString()})` : '';
-        const mk = new maplibregl.Marker({ element: el }).setLngLat([cl.lon, cl.lat])
-          .setPopup(new maplibregl.Popup({ offset: 10 }).setHTML(`<b>${cl.label||'Road Closure'}</b>${untilStr}${cl.description ? `<br/>${cl.description}` : ''}`))
+        const untilDate = cl.until ? new Date(cl.until) : null;
+        if (untilDate && untilDate < now) continue;
+        const clEl = makeDot(cl.icon || ' ', cl.color || '#E74C3C', 28);
+        clEl.title = cl.label || 'Road Closure';
+        const untilStr = untilDate ? ` (until ${untilDate.toLocaleDateString()})` : '';
+        const clMarker = new maplibregl.Marker({ element: clEl, anchor: 'bottom' })
+          .setLngLat([cl.lon, cl.lat])
+          .setPopup(
+            new maplibregl.Popup({ offset: 10 }).setHTML(
+              `<b>${cl.label || 'Road Closure'}</b>${untilStr}${cl.description ? `<br/>${cl.description}` : ''}`
+            )
+          )
           .addTo(map);
-        markers.push(mk);
+        markers.push(clMarker);
       }
     };
     if (map.isStyleLoaded()) add(); else map.once('idle', add);
