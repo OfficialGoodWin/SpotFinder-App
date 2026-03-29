@@ -570,32 +570,38 @@ function NavTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
   );
 }
 
-// ─── Road Editor tab ──────────────────────────────────────────────────────────
-// Allows editing road number markings (the road ref number displayed on shields).
-// Each override stores: ref (original road number), newRef (replacement), roadClass, notes.
-// The MapLibreMap reads these overrides and applies them when drawing road shields.
-function RoadsTab({ user }) {
+// ─── Road Shield Marker tab ────────────────────────────────────────────────────
+// Places a visible road number shield marker at a specific location you pick on the map.
+// Use this to add a road sign marker at any point on a road section.
+// The marker shows the road number in the correct color (blue/red/brown).
+function RoadsTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
   const [items, setItems] = useState([]);
-  const [origRef, setOrigRef] = useState('');
-  const [newRef, setNewRef] = useState('');
+  const [roadRef, setRoadRef] = useState('');
   const [roadClass, setRoadClass] = useState('primary');
   const [notes, setNotes] = useState('');
+  const [lat, setLat] = useState('');
+  const [lon, setLon] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { getAdminRoadOverrides().then(setItems); }, []);
+  useEffect(() => {
+    if (pendingLatLon) { setLat(pendingLatLon.lat.toFixed(6)); setLon(pendingLatLon.lon.toFixed(6)); }
+  }, [pendingLatLon]);
 
   const save = async () => {
-    if (!origRef.trim() || !newRef.trim()) return;
+    if (!roadRef.trim() || !lat || !lon) return;
     setSaving(true);
     try {
       const item = await addAdminRoadOverride(user, {
-        origRef: origRef.trim().toUpperCase(),
-        newRef: newRef.trim().toUpperCase(),
-        roadClass: roadClass,
+        roadRef: roadRef.trim().toUpperCase(),
+        roadClass,
         notes: notes.trim(),
+        lat: parseFloat(lat),
+        lon: parseFloat(lon),
       });
       setItems(prev => [item, ...prev]);
-      setOrigRef(''); setNewRef(''); setNotes(''); setRoadClass('primary');
+      setRoadRef(''); setNotes(''); setLat(''); setLon(''); setRoadClass('primary');
+      onClear();
     } finally { setSaving(false); }
   };
 
@@ -606,39 +612,48 @@ function RoadsTab({ user }) {
 
   return (
     <div>
-      <SectionHead>Road Number Override</SectionHead>
+      <SectionHead>Add Road Shield Marker</SectionHead>
       <p className="text-xs text-muted-foreground mb-3">
-        Override how a road's number/ref is displayed on the map shield. The original ref from OSM data is replaced by the new ref you specify.
+        Place a road number shield marker at a specific location on the map. Pick the point on the
+        road where you want the sign to appear, type the road number, and choose the color style.
       </p>
-      <Field label="Original Road Ref (from OSM, e.g. '27')">
-        <Input value={origRef} onChange={setOrigRef} placeholder="e.g. 27" />
+      <Field label="Road number (e.g. 27, D5, E53)">
+        <Input value={roadRef} onChange={setRoadRef} placeholder="e.g. 27" />
       </Field>
-      <Field label="New Road Ref to display (e.g. '27a')">
-        <Input value={newRef} onChange={setNewRef} placeholder="e.g. 27a" />
-      </Field>
-      <Field label="Road Class">
+      <Field label="Shield color style">
         <Select value={roadClass} onChange={setRoadClass}>
-          <option value="motorway">Motorway (red)</option>
-          <option value="trunk">Trunk (blue)</option>
-          <option value="primary">Primary (blue)</option>
-          <option value="secondary">Secondary (blue)</option>
-          <option value="local">Local (brown)</option>
+          <option value="motorway">Motorway — red (D-roads)</option>
+          <option value="trunk">Trunk — dark blue (R-roads)</option>
+          <option value="primary">Primary — blue (numbered roads)</option>
+          <option value="secondary">Secondary — blue</option>
+          <option value="local">Local — brown (district roads)</option>
         </Select>
       </Field>
       <Field label="Notes (optional)">
-        <Textarea value={notes} onChange={setNotes} placeholder="Why this override? E.g. OSM has wrong number" />
+        <Textarea value={notes} onChange={setNotes} placeholder="e.g. Road 27 sign at Klatovy junction" rows={1} />
       </Field>
-      <button onClick={save} disabled={saving || !origRef.trim() || !newRef.trim()}
+      <Field label="Location — click on the map where this sign should appear">
+        <div className="flex gap-2 mb-2">
+          <Input value={lat} onChange={setLat} placeholder="Latitude" type="number" className="flex-1" />
+          <Input value={lon} onChange={setLon} placeholder="Longitude" type="number" className="flex-1" />
+        </div>
+        <button onClick={onRequestMapClick}
+          className="w-full py-2 rounded-xl border-2 border-dashed border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400 text-sm font-medium hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
+          🗺️ Click on map to place marker
+        </button>
+      </Field>
+      <button onClick={save} disabled={saving || !roadRef.trim() || !lat || !lon}
         className="w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-indigo-700 active:scale-95 transition-all">
-        {saving ? 'Saving…' : '+ Add Road Override'}
+        {saving ? 'Saving…' : '+ Place Road Marker'}
       </button>
 
       {items.length > 0 && (
         <>
-          <SectionHead>Existing Road Overrides ({items.length})</SectionHead>
+          <SectionHead>Existing Road Markers ({items.length})</SectionHead>
           {items.map(it => (
-            <ListItem key={it.id} icon="🛣️" title={`${it.origRef} → ${it.newRef}`}
-              subtitle={[it.roadClass, it.notes].filter(Boolean).join(' · ')}
+            <ListItem key={it.id} icon="🛣️"
+              title={`Road ${it.roadRef}`}
+              subtitle={[it.roadClass, it.notes, it.lat ? `${it.lat.toFixed(4)}, ${it.lon.toFixed(4)}` : ''].filter(Boolean).join(' · ')}
               onDelete={() => remove(it.id)} />
           ))}
         </>
@@ -648,32 +663,70 @@ function RoadsTab({ user }) {
 }
 
 // ─── E-Routes tab ─────────────────────────────────────────────────────────────
-// Allows editing the E-route (European route) assignments for road refs.
-// E.g. road 27 should NOT have E53 for the full road, only on the section from Železná Ruda to Plzeň.
-// Each override: roadRef, action (add/remove/set), eRoutes (comma-separated), segmentDesc.
-function ERoutesTab({ user }) {
+// How it works:
+//   The map draws E-route shields based on the EURO_ROUTES lookup (e.g. "27" → E53 on every road 27 sign).
+//   Here you can:
+//   1. Remove E53 from road 27's global shields (so it disappears from ALL road 27 signs).
+//   2. Place a standalone E53 marker at specific points along the road where E53 actually applies.
+//
+// For road 27 + E53 only from Železná Ruda to Plzeň:
+//   → Step 1: Add a "Remove E-route from shields" entry for road 27 / E53.
+//   → Step 2: Add E53 marker points along the Železná Ruda→Plzeň section (one every ~10 km is enough).
+function ERoutesTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
   const [items, setItems] = useState([]);
-  const [roadRef, setRoadRef] = useState('');
-  const [action, setAction] = useState('set');
-  const [eRoutes, setERoutes] = useState('');
-  const [segmentDesc, setSegmentDesc] = useState('');
+
+  // "Remove from shields" form
+  const [removeRef, setRemoveRef] = useState('');
+  const [removeERoute, setRemoveERoute] = useState('');
+
+  // "Place E-route marker" form
+  const [markerERoute, setMarkerERoute] = useState('');
+  const [markerRoadRef, setMarkerRoadRef] = useState('');
+  const [markerLat, setMarkerLat] = useState('');
+  const [markerLon, setMarkerLon] = useState('');
+  const [markerNote, setMarkerNote] = useState('');
+
+  const [activeForm, setActiveForm] = useState('remove'); // 'remove' | 'marker'
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { getAdminERouteOverrides().then(setItems); }, []);
 
-  const save = async () => {
-    if (!roadRef.trim()) return;
+  useEffect(() => {
+    if (pendingLatLon && activeForm === 'marker') {
+      setMarkerLat(pendingLatLon.lat.toFixed(6));
+      setMarkerLon(pendingLatLon.lon.toFixed(6));
+    }
+  }, [pendingLatLon, activeForm]);
+
+  const saveRemove = async () => {
+    if (!removeRef.trim()) return;
     setSaving(true);
     try {
-      const parsedRoutes = eRoutes.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
       const item = await addAdminERouteOverride(user, {
-        roadRef: roadRef.trim().toUpperCase(),
-        action,
-        eRoutes: parsedRoutes,
-        segmentDesc: segmentDesc.trim(),
+        type: 'shield_remove',
+        roadRef: removeRef.trim().toUpperCase(),
+        eRoute: removeERoute.trim().toUpperCase() || null, // null = remove all E-routes from this road
       });
       setItems(prev => [item, ...prev]);
-      setRoadRef(''); setERoutes(''); setSegmentDesc(''); setAction('set');
+      setRemoveRef(''); setRemoveERoute('');
+    } finally { setSaving(false); }
+  };
+
+  const saveMarker = async () => {
+    if (!markerERoute.trim() || !markerLat || !markerLon) return;
+    setSaving(true);
+    try {
+      const item = await addAdminERouteOverride(user, {
+        type: 'marker',
+        eRoute: markerERoute.trim().toUpperCase(),
+        roadRef: markerRoadRef.trim().toUpperCase(),
+        lat: parseFloat(markerLat),
+        lon: parseFloat(markerLon),
+        note: markerNote.trim(),
+      });
+      setItems(prev => [item, ...prev]);
+      setMarkerERoute(''); setMarkerRoadRef(''); setMarkerLat(''); setMarkerLon(''); setMarkerNote('');
+      onClear();
     } finally { setSaving(false); }
   };
 
@@ -682,52 +735,103 @@ function ERoutesTab({ user }) {
     setItems(prev => prev.filter(x => x.id !== id));
   };
 
+  const shieldItems = items.filter(i => i.type === 'shield_remove');
+  const markerItems = items.filter(i => i.type === 'marker');
+
   return (
     <div>
-      <SectionHead>E-Route Override</SectionHead>
-      <p className="text-xs text-muted-foreground mb-3">
-        Control which European route designations (E53, E50, etc.) appear on road shields.
-        For example: road 27 should only show E53 from Železná Ruda to Plzeň, not on the whole road.
-      </p>
-
-      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl p-3 mb-3">
-        <p className="text-xs font-semibold text-amber-700 dark:text-amber-300 mb-1">Current defaults (from code):</p>
-        <p className="text-xs text-amber-600 dark:text-amber-400">Road 27 → E53 (full road) · Use "remove" action to disable</p>
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-xl p-3 mb-3">
+        <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">How to set E53 only from Železná Ruda to Plzeň on road 27:</p>
+        <ol className="text-xs text-blue-600 dark:text-blue-400 list-decimal list-inside space-y-0.5">
+          <li>Use "Remove from shields" → type road ref <b>27</b>, E-route <b>E53</b> → removes E53 from all road 27 signs.</li>
+          <li>Use "Place E-route marker" → type E53, click points along road 27 between Železná Ruda and Plzeň.</li>
+        </ol>
       </div>
 
-      <Field label="Road Ref (e.g. '27', 'D5', 'A 6')">
-        <Input value={roadRef} onChange={setRoadRef} placeholder="e.g. 27" />
-      </Field>
-      <Field label="Action">
-        <Select value={action} onChange={setAction}>
-          <option value="set">Set — replace all E-routes with these</option>
-          <option value="add">Add — add these E-routes to existing</option>
-          <option value="remove">Remove — remove all E-routes from this road</option>
-        </Select>
-      </Field>
-      {action !== 'remove' && (
-        <Field label="E-Routes (comma-separated, e.g. 'E53, E50')">
-          <Input value={eRoutes} onChange={setERoutes} placeholder="e.g. E53" />
-        </Field>
-      )}
-      <Field label="Segment description (optional)">
-        <Textarea value={segmentDesc} onChange={setSegmentDesc}
-          placeholder="e.g. Only from Železná Ruda to Plzeň, not the whole road 27" />
-      </Field>
-      <button onClick={save} disabled={saving || !roadRef.trim() || (action !== 'remove' && !eRoutes.trim())}
-        className="w-full py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-emerald-700 active:scale-95 transition-all">
-        {saving ? 'Saving…' : '+ Save E-Route Override'}
-      </button>
+      {/* Tab switcher */}
+      <div className="flex gap-2 mb-3">
+        <button onClick={() => setActiveForm('remove')}
+          className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all ${activeForm === 'remove' ? 'bg-red-500 text-white' : 'bg-gray-100 dark:bg-accent text-muted-foreground hover:bg-gray-200'}`}>
+          ❌ Remove from shields
+        </button>
+        <button onClick={() => setActiveForm('marker')}
+          className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all ${activeForm === 'marker' ? 'bg-emerald-600 text-white' : 'bg-gray-100 dark:bg-accent text-muted-foreground hover:bg-gray-200'}`}>
+          📍 Place E-route marker
+        </button>
+      </div>
 
-      {items.length > 0 && (
+      {activeForm === 'remove' && (
         <>
-          <SectionHead>Existing E-Route Overrides ({items.length})</SectionHead>
-          {items.map(it => (
-            <ListItem key={it.id} icon="🟢"
-              title={`${it.roadRef}: ${it.action === 'remove' ? '❌ Remove all E-routes' : `${it.action} ${it.eRoutes?.join(', ')}`}`}
-              subtitle={it.segmentDesc || ''}
-              onDelete={() => remove(it.id)} />
-          ))}
+          <p className="text-xs text-muted-foreground mb-2">
+            Removes an E-route from the road number shields. After doing this, the E-route no longer appears
+            on the road's sign — you then place individual markers where it should still be visible.
+          </p>
+          <Field label="Road ref to modify (e.g. 27)">
+            <Input value={removeRef} onChange={setRemoveRef} placeholder="e.g. 27" />
+          </Field>
+          <Field label="E-route to remove (leave blank = remove ALL E-routes from this road)">
+            <Input value={removeERoute} onChange={setRemoveERoute} placeholder="e.g. E53 — or leave blank to remove all" />
+          </Field>
+          <button onClick={saveRemove} disabled={saving || !removeRef.trim()}
+            className="w-full py-2.5 rounded-xl bg-red-500 text-white text-sm font-semibold disabled:opacity-40 hover:bg-red-600 active:scale-95 transition-all">
+            {saving ? 'Saving…' : '❌ Remove E-route from shields'}
+          </button>
+
+          {shieldItems.length > 0 && (
+            <>
+              <SectionHead>Shield removals ({shieldItems.length})</SectionHead>
+              {shieldItems.map(it => (
+                <ListItem key={it.id} icon="❌"
+                  title={`Road ${it.roadRef}: remove ${it.eRoute || 'all E-routes'} from shields`}
+                  subtitle=""
+                  onDelete={() => remove(it.id)} />
+              ))}
+            </>
+          )}
+        </>
+      )}
+
+      {activeForm === 'marker' && (
+        <>
+          <p className="text-xs text-muted-foreground mb-2">
+            Places a green E-route marker at a specific point on the map. Add one every ~10 km along
+            the road section where this E-route applies.
+          </p>
+          <Field label="E-route to show (e.g. E53)">
+            <Input value={markerERoute} onChange={setMarkerERoute} placeholder="e.g. E53" />
+          </Field>
+          <Field label="Road ref this belongs to (optional, for your reference)">
+            <Input value={markerRoadRef} onChange={setMarkerRoadRef} placeholder="e.g. 27" />
+          </Field>
+          <Field label="Note (optional)">
+            <Input value={markerNote} onChange={setMarkerNote} placeholder="e.g. Road 27 near Klatovy" />
+          </Field>
+          <Field label="Location — click the map where this marker should appear">
+            <div className="flex gap-2 mb-2">
+              <Input value={markerLat} onChange={setMarkerLat} placeholder="Latitude" type="number" className="flex-1" />
+              <Input value={markerLon} onChange={setMarkerLon} placeholder="Longitude" type="number" className="flex-1" />
+            </div>
+            <button onClick={onRequestMapClick}
+              className="w-full py-2 rounded-xl border-2 border-dashed border-emerald-300 dark:border-emerald-700 text-emerald-600 dark:text-emerald-400 text-sm font-medium hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors">
+              🗺️ Click on map to place marker
+            </button>
+          </Field>
+          <button onClick={saveMarker} disabled={saving || !markerERoute.trim() || !markerLat || !markerLon}
+            className="w-full py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-emerald-700 active:scale-95 transition-all">
+            {saving ? 'Saving…' : '+ Place E-route marker'}
+          </button>
+
+          {markerItems.length > 0 && (
+            <>
+              <SectionHead>E-route markers ({markerItems.length})</SectionHead>
+              {markerItems.map(it => (
+                <ListItem key={it.id} icon="🟢"
+                  title={`${it.eRoute}${it.roadRef ? ` on road ${it.roadRef}` : ''}`}
+                  subtitle={[it.note, it.lat ? `${it.lat.toFixed(4)}, ${it.lon.toFixed(4)}` : ''].filter(Boolean).join(' · ')}
+                  onDelete={() => remove(it.id)} />
+              ))}
+            </>
+          )}
         </>
       )}
     </div>
@@ -812,10 +916,12 @@ export default function SuperAdminEditor({ user, onClose, onAdminDataChange }) {
                   onRequestMapClick={requestMapClick} onClear={clearPending} />
               )}
               {tab === 'roads' && (
-                <RoadsTab user={user} />
+                <RoadsTab user={user} pendingLatLon={pendingLatLon}
+                  onRequestMapClick={requestMapClick} onClear={clearPending} />
               )}
               {tab === 'eroutes' && (
-                <ERoutesTab user={user} />
+                <ERoutesTab user={user} pendingLatLon={pendingLatLon}
+                  onRequestMapClick={requestMapClick} onClear={clearPending} />
               )}
             </div>
           </>

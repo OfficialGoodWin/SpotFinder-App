@@ -457,27 +457,26 @@ export default function MapLibreMap({
   const [offlineCountry, setOfflineCountry] = useState('');
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  // ── Apply admin E-route overrides ─────────────────────────────────────────
+  // ── Apply admin E-route shield removals ───────────────────────────────────
   useEffect(() => {
     if (!adminERouteOverrides?.length) return;
-    // Reset to base EURO_ROUTES and apply overrides
     for (const ov of adminERouteOverrides) {
+      if (ov.type !== 'shield_remove') continue;
       const ref = ov.roadRef;
-      if (ov.action === 'remove') {
+      if (!ref) continue;
+      if (ov.eRoute) {
+        // Remove only this specific E-route from the road's shield
+        const existing = EURO_ROUTES[ref];
+        if (existing) {
+          EURO_ROUTES[ref] = existing.filter(e => e !== ov.eRoute);
+          if (EURO_ROUTES[ref].length === 0) delete EURO_ROUTES[ref];
+        }
+      } else {
+        // Remove ALL E-routes from this road's shield
         delete EURO_ROUTES[ref];
-      } else if (ov.action === 'set') {
-        EURO_ROUTES[ref] = ov.eRoutes || [];
-      } else if (ov.action === 'add') {
-        const existing = EURO_ROUTES[ref] || [];
-        const toAdd = (ov.eRoutes || []).filter(e => !existing.includes(e));
-        EURO_ROUTES[ref] = [...existing, ...toAdd];
       }
     }
-    // Clear shield image cache so regenerated
-    if (mapRef.current) {
-      const map = mapRef.current;
-      map.triggerRepaint();
-    }
+    if (mapRef.current) mapRef.current.triggerRepaint();
   }, [adminERouteOverrides]);
 
   // ── Init ───────────────────────────────────────────────────────────────────
@@ -1001,6 +1000,74 @@ const addAdminMarkers = () => {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminPOIs, adminClosures]);
+
+  // ── E-route markers + custom road shield markers ─────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const overlayMarkers = [];
+
+    const addOverlays = () => {
+      overlayMarkers.forEach(m => m.remove());
+      overlayMarkers.length = 0;
+
+      // E-route point markers (type === 'marker')
+      for (const ov of adminERouteOverrides || []) {
+        if (ov.type !== 'marker') continue;
+        if (!ov.lat || !ov.lon || !ov.eRoute) continue;
+
+        // Draw a green E-route shield
+        const el = document.createElement('div');
+        el.style.cssText = `
+          background:#2e7d32;border:2px solid white;border-radius:3px;
+          color:white;font-size:10px;font-weight:bold;padding:2px 5px;
+          box-shadow:0 2px 5px rgba(0,0,0,0.4);cursor:default;white-space:nowrap;
+          font-family:Arial,sans-serif;letter-spacing:0.5px;
+        `;
+        el.textContent = ov.eRoute;
+        if (ov.note || ov.roadRef) {
+          el.title = [ov.roadRef ? `Road ${ov.roadRef}` : '', ov.note].filter(Boolean).join(' — ');
+        }
+
+        const mk = new maplibregl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([ov.lon, ov.lat])
+          .addTo(map);
+        overlayMarkers.push(mk);
+      }
+
+      // Custom road shield markers (adminRoadOverrides — each has lat/lon)
+      for (const ov of adminRoadOverrides || []) {
+        if (!ov.lat || !ov.lon || !ov.roadRef) continue;
+
+        // Determine color by roadClass
+        const bgColors = {
+          motorway: '#c0392b', trunk: '#1a5276', primary: '#1a5276',
+          secondary: '#1a5276', local: '#6E4B1F',
+        };
+        const bg = bgColors[ov.roadClass] || bgColors.primary;
+
+        const el = document.createElement('div');
+        el.style.cssText = `
+          background:${bg};border:1.5px solid white;border-radius:3px;
+          color:white;font-size:10px;font-weight:bold;padding:2px 5px;
+          box-shadow:0 2px 5px rgba(0,0,0,0.4);cursor:default;white-space:nowrap;
+          font-family:Arial,sans-serif;
+        `;
+        el.textContent = ov.roadRef;
+        if (ov.notes) el.title = ov.notes;
+
+        const mk = new maplibregl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([ov.lon, ov.lat])
+          .addTo(map);
+        overlayMarkers.push(mk);
+      }
+    };
+
+    if (map.isStyleLoaded()) addOverlays();
+    else map.once('idle', addOverlays);
+
+    return () => { overlayMarkers.forEach(m => m.remove()); };
+  }, [adminERouteOverrides, adminRoadOverrides]);
 
   // ── Admin map-click mode ──────────────────────────────────────────────────────
   useEffect(() => {

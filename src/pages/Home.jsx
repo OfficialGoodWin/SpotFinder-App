@@ -81,13 +81,13 @@ export default function Home() {
   const [adminRoadOverrides, setAdminRoadOverrides] = useState([]);
   const adminMapClickRef = useRef(null);
 
+  // Load admin map data for all users (POIs, closures, E-route markers visible to everyone)
   useEffect(() => {
-    if (!isSuperAdmin) return;
     getAdminPOIs().then(setAdminPOIs);
     getAdminClosures().then(setAdminClosures);
     getAdminERouteOverrides().then(setAdminERouteOverrides);
     getAdminRoadOverrides().then(setAdminRoadOverrides);
-  }, [isSuperAdmin]);
+  }, []);
   const mapRef = useRef(null);
  
  
