@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-import { Plus, Settings, Crosshair, HelpCircle, Trash2, WifiOff } from 'lucide-react';
-import { getPublicSpots, createSpot, deleteSpot, updateSpot } from '@/api/firebaseClient';
+import { Plus, Settings, Crosshair, HelpCircle, Trash2, WifiOff, Sparkles } from 'lucide-react';
+import SubscriptionModal from '../components/SubscriptionModal';
+import { getPublicSpots, createSpot, deleteSpot, updateSpot, getAdminPOIs, getAdminClosures } from '@/api/firebaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
 import { useNavigate } from 'react-router-dom';
@@ -10,6 +11,7 @@ import { useLanguage } from '@/lib/LanguageContext';
 import MapLayerSwitcher from '../components/map/MapLayerSwitcher';
 import SearchBar from '../components/map/SearchBar';
 import MapLibreMap from '../components/map/MapLibreMap';
+import SuperAdminEditor from '../components/map/SuperAdminEditor';
 import AddSpotModal from '../components/spots/AddSpotModal';
 import EditSpotModal from '../components/spots/EditSpotModal';
 import SpotDetailModal from '../components/spots/SpotDetailModal';
@@ -49,6 +51,7 @@ export default function Home() {
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showSubscription, setShowSubscription] = useState(false);
   const [showOffline, setShowOffline] = useState(false);
   const [offlineMeta, setOfflineMeta] = useState({});
 
@@ -65,7 +68,22 @@ export default function Home() {
   const [currentPOIs, setCurrentPOIs] = useState([]);
   const [showPOIPanel, setShowPOIPanel] = useState(false);
   const [selectedPOI, setSelectedPOI] = useState(null);
+  const [selectedPOIDirectCat, setSelectedPOIDirectCat] = useState(null);
   const [poiLoading, setPoiLoading] = useState(false);
+
+  // ── Superadmin editor state ────────────────────────────────────────────────
+  const isSuperAdmin = user?.email === 'superadmin@spotfinder.cz';
+  const [showAdminEditor, setShowAdminEditor] = useState(false);
+  const [adminPOIs, setAdminPOIs] = useState([]);
+  const [adminClosures, setAdminClosures] = useState([]);
+  const [adminNavMode, setAdminNavMode] = useState(false);
+  const adminMapClickRef = useRef(null);
+
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    getAdminPOIs().then(setAdminPOIs);
+    getAdminClosures().then(setAdminClosures);
+  }, [isSuperAdmin]);
   const mapRef = useRef(null);
  
  
@@ -259,7 +277,13 @@ export default function Home() {
         userAccuracy={userAccuracy}
         selectedPOICategory={selectedPOICategory}
         onSelectPOI={(poi, cat) => {
-          if (cat) setSelectedPOICategory(cat);
+          if (cat) {
+            // Direct ambient dot click — store category just for the detail panel,
+            // do NOT set selectedPOICategory (that would trigger a full category load)
+            setSelectedPOIDirectCat(cat);
+          } else {
+            setSelectedPOIDirectCat(null);
+          }
           setSelectedPOI(poi);
         }}
         onPOIsLoaded={(pois) => setCurrentPOIs(pois)}
@@ -268,6 +292,10 @@ export default function Home() {
         navRouteData={navRouteData}
         isDark={isDark}
         mapLayer={mapLayer}
+        adminPOIs={adminPOIs}
+        adminClosures={adminClosures}
+        adminNavMode={adminNavMode}
+        onAdminMapClick={(coords) => { adminMapClickRef.current?.(coords); }}
       />
  
       {/* Search bar */}
@@ -373,6 +401,15 @@ export default function Home() {
             >
               <Settings className="w-5 h-5" />
             </button>
+            {isSuperAdmin && (
+              <button
+                onClick={() => setShowAdminEditor(v => !v)}
+                className={`w-10 h-10 rounded-xl flex items-center justify-center active:scale-95 transition-all text-base ${showAdminEditor ? 'bg-red-100 dark:bg-red-900/40 text-red-600' : 'bg-gray-100 dark:bg-accent/60 text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent'}`}
+                title="Map Editor (Superadmin)"
+              >
+                🛠️
+              </button>
+            )}
             <button
               onClick={() => setShowOffline(true)}
               className={`w-10 h-10 rounded-xl flex items-center justify-center active:scale-95 transition-all relative
@@ -474,12 +511,12 @@ export default function Home() {
         />
       )}
 
-      {selectedPOI && selectedPOICategory && (
+      {selectedPOI && (selectedPOIDirectCat || selectedPOICategory) && (
         <POIDetailPanel
           poi={selectedPOI}
-          category={selectedPOICategory}
+          category={selectedPOIDirectCat || selectedPOICategory}
           user={user}
-          onClose={() => { setSelectedPOI(null); if (!showPOIPanel) setSelectedPOICategory(null); }}
+          onClose={() => { setSelectedPOI(null); setSelectedPOIDirectCat(null); if (!showPOIPanel) setSelectedPOICategory(null); }}
           onNavigate={(destination) => {
             if (!userPos) return alert(t('home.locationUnavailable'));
             startNavTo(destination);
@@ -489,6 +526,31 @@ export default function Home() {
  
       {showSettings && (
         <SettingsModal onClose={() => setShowSettings(false)} />
+      )}
+
+      {isSuperAdmin && showAdminEditor && (
+        <SuperAdminEditor
+          user={user}
+          onClose={() => setShowAdminEditor(false)}
+          onAdminDataChange={({ handleMapClick, adminNavMode: mode }) => {
+            adminMapClickRef.current = (coords) => {
+              handleMapClick(coords);
+              // Refresh lists after a short delay so new item shows up
+              setTimeout(() => {
+                getAdminPOIs().then(setAdminPOIs);
+                getAdminClosures().then(setAdminClosures);
+              }, 800);
+            };
+            setAdminNavMode(mode);
+          }}
+        />
+      )}
+
+      {showSubscription && (
+        <SubscriptionModal
+          onClose={() => setShowSubscription(false)}
+          user={user}
+        />
       )}
  
       {/* Delete Account Confirmation Modal */}
