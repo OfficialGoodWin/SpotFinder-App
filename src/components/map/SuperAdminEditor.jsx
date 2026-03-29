@@ -1,23 +1,63 @@
 /**
  * SuperAdminEditor.jsx
  * Full map editor for superadmin@spotfinder.cz
- * Tabs: Custom POIs · Road Closures · Nav Overrides
+ * Tabs: Custom POIs · Road Closures · Nav Overrides · Road Editor · E-Routes
  */
 import { useState, useEffect, useCallback } from 'react';
-import { X, MapPin, AlertTriangle, Navigation, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, MapPin, AlertTriangle, Navigation, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   getAdminPOIs, addAdminPOI, deleteAdminPOI,
   getAdminClosures, addAdminClosure, deleteAdminClosure,
   getAdminNavOverrides, addAdminNavOverride, deleteAdminNavOverride,
+  getAdminRoadOverrides, addAdminRoadOverride, deleteAdminRoadOverride,
+  getAdminERouteOverrides, addAdminERouteOverride, deleteAdminERouteOverride,
 } from '@/api/firebaseClient';
-
-const TABS = [
-  { id: 'pois',     label: 'Custom POIs',    Icon: MapPin },
-  { id: 'closures', label: 'Road Closures',  Icon: AlertTriangle },
-  { id: 'nav',      label: 'Nav Overrides',  Icon: Navigation },
+// Category options for the POI dropdown — keys match AMBIENT_CATEGORIES keys in ambientCategories.js
+const CATEGORY_OPTIONS = [
+  { key: 'restaurant',  label: 'Restaurant',     icon: '🍽️', color: '#E74C3C' },
+  { key: 'cafe',        label: 'Cafe',           icon: '☕', color: '#8B4513' },
+  { key: 'bar',         label: 'Bar',            icon: '🍺', color: '#D68910' },
+  { key: 'supermarket', label: 'Supermarket',    icon: '🏪', color: '#27AE60' },
+  { key: 'bakery',      label: 'Bakery',         icon: '🥖', color: '#D4A574' },
+  { key: 'hotel',       label: 'Hotel',          icon: '🏨', color: '#2980B9' },
+  { key: 'museum',      label: 'Museum',         icon: '🏛️', color: '#34495E' },
+  { key: 'heritage',    label: 'Castle/Heritage',icon: '🏰', color: '#95A5A6' },
+  { key: 'hospital',    label: 'Hospital',       icon: '🏥', color: '#C0392B' },
+  { key: 'pharmacy',    label: 'Pharmacy',       icon: '💊', color: '#E67E22' },
+  { key: 'bank',        label: 'Bank',           icon: '🏦', color: '#F39C12' },
+  { key: 'atm',         label: 'ATM',            icon: '💳', color: '#16A085' },
+  { key: 'parking',     label: 'Parking',        icon: '🅿️', color: '#3498DB' },
+  { key: 'fuel',        label: 'Gas Station',    icon: '⛽', color: '#E74C3C' },
+  { key: 'charging',    label: 'EV Charging',    icon: '🔌', color: '#27AE60' },
+  { key: 'train',       label: 'Train Station',  icon: '🚆', color: '#34495E' },
+  { key: 'school',      label: 'School',         icon: '🏫', color: '#4A90E2' },
+  { key: 'shop',        label: 'Shop',           icon: '🛍️', color: '#9B59B6' },
+  { key: 'police',      label: 'Police',         icon: '👮', color: '#2C3E50' },
+  { key: 'fire',        label: 'Fire Station',   icon: '🚒', color: '#E74C3C' },
+  { key: 'dentist',     label: 'Dentist',        icon: '🦷', color: '#16A085' },
+  { key: 'vet',         label: 'Veterinary',     icon: '🐾', color: '#27AE60' },
+  { key: 'gym',         label: 'Gym',            icon: '💪', color: '#E74C3C' },
+  { key: 'cinema',      label: 'Cinema',         icon: '🎬', color: '#9B59B6' },
+  { key: 'library',     label: 'Library',        icon: '📚', color: '#8E44AD' },
+  { key: 'church',      label: 'Church',         icon: '⛪', color: '#7F8C8D' },
+  { key: 'playground',  label: 'Playground',     icon: '🎮', color: '#F1C40F' },
+  { key: 'post',        label: 'Post Office',    icon: '📮', color: '#F39C12' },
+  { key: 'carservice',  label: 'Car Service',    icon: '🔧', color: '#E67E22' },
+  { key: 'toilet',      label: 'Toilet',         icon: '🚻', color: '#3498DB' },
+  { key: 'busstop',     label: 'Bus Stop',       icon: '🚌', color: '#F39C12' },
+  { key: 'speedcamera', label: 'Speed Camera',   icon: '📷', color: '#C0392B' },
+  { key: 'viewpoint',   label: 'Viewpoint',      icon: '🏔️', color: '#16A085' },
+  { key: 'custom',      label: 'Other / Custom', icon: '📍', color: '#6B7280' },
 ];
 
-const POI_ICONS = ['📍','🏠','🏪','🏥','⛽','🅿️','🎭','🍽️','☕','🏔','🌊','🎪','🏛','🚏','🛒','⚠️','ℹ️','🔧'];
+const TABS = [
+  { id: 'pois',     label: 'Custom POIs',   Icon: MapPin },
+  { id: 'closures', label: 'Road Closures', Icon: AlertTriangle },
+  { id: 'nav',      label: 'Nav Overrides', Icon: Navigation },
+  { id: 'roads',    label: 'Road Numbers',  Icon: AlertTriangle },
+  { id: 'eroutes',  label: 'E-Routes',      Icon: Navigation },
+];
+
 const CLOSURE_ICONS = ['⛔','🚧','⚠️','🚦','🔒','🛑','🚨','🏗️','🔴'];
 
 // ─── Pill ─────────────────────────────────────────────────────────────────────
@@ -69,6 +109,18 @@ function Textarea({ value, onChange, placeholder, rows = 2 }) {
   );
 }
 
+function Select({ value, onChange, children }) {
+  return (
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className="w-full text-sm px-3 py-2 rounded-xl border border-gray-200 dark:border-border bg-white dark:bg-background text-foreground outline-none focus:ring-2 focus:ring-blue-300"
+    >
+      {children}
+    </select>
+  );
+}
+
 // ─── Icon picker ──────────────────────────────────────────────────────────────
 function IconPicker({ icons, value, onChange }) {
   return (
@@ -104,9 +156,13 @@ function POIsTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
   const [items, setItems] = useState([]);
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
-  const [icon, setIcon] = useState('📍');
+  const [category, setCategory] = useState('restaurant');
   const [lat, setLat] = useState('');
   const [lon, setLon] = useState('');
+  const [street, setStreet] = useState('');
+  const [houseNumber, setHouseNumber] = useState('');
+  const [city, setCity] = useState('');
+  const [postcode, setPostcode] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { getAdminPOIs().then(setItems); }, []);
@@ -118,13 +174,29 @@ function POIsTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
     }
   }, [pendingLatLon]);
 
+  const selectedCat = CATEGORY_OPTIONS.find(c => c.key === category) || CATEGORY_OPTIONS[0];
+
   const save = async () => {
     if (!name.trim() || !lat || !lon) return;
     setSaving(true);
     try {
-      const item = await addAdminPOI(user, { name: name.trim(), description: desc.trim(), icon, lat: parseFloat(lat), lon: parseFloat(lon) });
+      const item = await addAdminPOI(user, {
+        name: name.trim(),
+        description: desc.trim(),
+        category,
+        icon: selectedCat.icon,
+        color: selectedCat.color,
+        lat: parseFloat(lat),
+        lon: parseFloat(lon),
+        street: street.trim(),
+        houseNumber: houseNumber.trim(),
+        city: city.trim(),
+        postcode: postcode.trim(),
+      });
       setItems(prev => [item, ...prev]);
-      setName(''); setDesc(''); setLat(''); setLon(''); setIcon('📍');
+      setName(''); setDesc(''); setLat(''); setLon('');
+      setStreet(''); setHouseNumber(''); setCity(''); setPostcode('');
+      setCategory('restaurant');
       onClear();
     } finally { setSaving(false); }
   };
@@ -137,14 +209,36 @@ function POIsTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
   return (
     <div>
       <SectionHead>Add New POI</SectionHead>
+      <Field label="Category">
+        <Select value={category} onChange={setCategory}>
+          {CATEGORY_OPTIONS.map(opt => (
+            <option key={opt.key} value={opt.key}>{opt.icon} {opt.label}</option>
+          ))}
+        </Select>
+        {selectedCat && (
+          <div className="mt-1.5 flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full flex items-center justify-center text-sm" style={{ background: selectedCat.color }}>
+              {selectedCat.icon}
+            </div>
+            <span className="text-xs text-muted-foreground">Will use {selectedCat.label} color ({selectedCat.color})</span>
+          </div>
+        )}
+      </Field>
       <Field label="Name">
         <Input value={name} onChange={setName} placeholder="e.g. Hidden viewpoint" />
       </Field>
       <Field label="Description (optional)">
         <Textarea value={desc} onChange={setDesc} placeholder="Short description…" />
       </Field>
-      <Field label="Icon">
-        <IconPicker icons={POI_ICONS} value={icon} onChange={setIcon} />
+      <Field label="Address">
+        <div className="flex gap-2 mb-2">
+          <Input value={street} onChange={setStreet} placeholder="Street" className="flex-1" />
+          <Input value={houseNumber} onChange={setHouseNumber} placeholder="No." className="w-20" />
+        </div>
+        <div className="flex gap-2">
+          <Input value={city} onChange={setCity} placeholder="Village / City" className="flex-1" />
+          <Input value={postcode} onChange={setPostcode} placeholder="PSČ" className="w-28" />
+        </div>
       </Field>
       <Field label="Location">
         <div className="flex gap-2 mb-2">
@@ -164,11 +258,19 @@ function POIsTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
       {items.length > 0 && (
         <>
           <SectionHead>Existing POIs ({items.length})</SectionHead>
-          {items.map(it => (
-            <ListItem key={it.id} icon={it.icon || '📍'} title={it.name}
-              subtitle={`${it.lat?.toFixed(4)}, ${it.lon?.toFixed(4)}`}
-              onDelete={() => remove(it.id)} />
-          ))}
+          {items.map(it => {
+            const cat = CATEGORY_OPTIONS.find(c => c.key === it.category);
+            const icon = cat?.icon || it.icon || '📍';
+            const addressParts = [it.street, it.houseNumber, it.city, it.postcode].filter(Boolean);
+            return (
+              <ListItem key={it.id} icon={icon} title={it.name}
+                subtitle={[
+                  cat?.label || it.category || 'Custom',
+                  addressParts.length ? addressParts.join(', ') : `${it.lat?.toFixed(4)}, ${it.lon?.toFixed(4)}`,
+                ].filter(Boolean).join(' · ')}
+                onDelete={() => remove(it.id)} />
+            );
+          })}
         </>
       )}
     </div>
@@ -265,7 +367,6 @@ function ClosuresTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
 const DIRECTIONS = ['straight','slight_left','left','sharp_left','slight_right','right','sharp_right','u_turn'];
 const DIR_LABELS = { straight:'⬆ Straight', slight_left:'↖ Slight Left', left:'← Left', sharp_left:'⤾ Sharp Left', slight_right:'↗ Slight Right', right:'→ Right', sharp_right:'⤿ Sharp Right', u_turn:'↩ U-Turn' };
 
-// Languages to auto-translate to (BCP-47 codes supported by MyMemory)
 const NAV_TRANSLATE_LANGS = ['cs','pl','de','sk','it','fr','ru','uk','hu','ro','es','bg'];
 
 async function translateMyMemory(text, targetLang) {
@@ -316,11 +417,10 @@ function NavTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
     if (!instruction.trim() || !lat || !lon) return;
     setSaving(true);
     try {
-      // Auto-translate the English instruction into all supported app languages
       const translations = await buildTranslations(instruction.trim());
       const item = await addAdminNavOverride(user, {
         road: road.trim(), direction, instruction: instruction.trim(),
-        translations,   // stored as { en: '...', cs: '...', de: '...', etc. }
+        translations,
         towards: towards.trim(), lat: parseFloat(lat), lon: parseFloat(lon),
         radius: parseFloat(radius) || 100,
       });
@@ -393,6 +493,170 @@ function NavTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
   );
 }
 
+// ─── Road Editor tab ──────────────────────────────────────────────────────────
+// Allows editing road number markings (the road ref number displayed on shields).
+// Each override stores: ref (original road number), newRef (replacement), roadClass, notes.
+// The MapLibreMap reads these overrides and applies them when drawing road shields.
+function RoadsTab({ user }) {
+  const [items, setItems] = useState([]);
+  const [origRef, setOrigRef] = useState('');
+  const [newRef, setNewRef] = useState('');
+  const [roadClass, setRoadClass] = useState('primary');
+  const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { getAdminRoadOverrides().then(setItems); }, []);
+
+  const save = async () => {
+    if (!origRef.trim() || !newRef.trim()) return;
+    setSaving(true);
+    try {
+      const item = await addAdminRoadOverride(user, {
+        origRef: origRef.trim().toUpperCase(),
+        newRef: newRef.trim().toUpperCase(),
+        roadClass: roadClass,
+        notes: notes.trim(),
+      });
+      setItems(prev => [item, ...prev]);
+      setOrigRef(''); setNewRef(''); setNotes(''); setRoadClass('primary');
+    } finally { setSaving(false); }
+  };
+
+  const remove = async (id) => {
+    await deleteAdminRoadOverride(user, id);
+    setItems(prev => prev.filter(x => x.id !== id));
+  };
+
+  return (
+    <div>
+      <SectionHead>Road Number Override</SectionHead>
+      <p className="text-xs text-muted-foreground mb-3">
+        Override how a road's number/ref is displayed on the map shield. The original ref from OSM data is replaced by the new ref you specify.
+      </p>
+      <Field label="Original Road Ref (from OSM, e.g. '27')">
+        <Input value={origRef} onChange={setOrigRef} placeholder="e.g. 27" />
+      </Field>
+      <Field label="New Road Ref to display (e.g. '27a')">
+        <Input value={newRef} onChange={setNewRef} placeholder="e.g. 27a" />
+      </Field>
+      <Field label="Road Class">
+        <Select value={roadClass} onChange={setRoadClass}>
+          <option value="motorway">Motorway (red)</option>
+          <option value="trunk">Trunk (blue)</option>
+          <option value="primary">Primary (blue)</option>
+          <option value="secondary">Secondary (blue)</option>
+          <option value="local">Local (brown)</option>
+        </Select>
+      </Field>
+      <Field label="Notes (optional)">
+        <Textarea value={notes} onChange={setNotes} placeholder="Why this override? E.g. OSM has wrong number" />
+      </Field>
+      <button onClick={save} disabled={saving || !origRef.trim() || !newRef.trim()}
+        className="w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-indigo-700 active:scale-95 transition-all">
+        {saving ? 'Saving…' : '+ Add Road Override'}
+      </button>
+
+      {items.length > 0 && (
+        <>
+          <SectionHead>Existing Road Overrides ({items.length})</SectionHead>
+          {items.map(it => (
+            <ListItem key={it.id} icon="🛣️" title={`${it.origRef} → ${it.newRef}`}
+              subtitle={[it.roadClass, it.notes].filter(Boolean).join(' · ')}
+              onDelete={() => remove(it.id)} />
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── E-Routes tab ─────────────────────────────────────────────────────────────
+// Allows editing the E-route (European route) assignments for road refs.
+// E.g. road 27 should NOT have E53 for the full road, only on the section from Železná Ruda to Plzeň.
+// Each override: roadRef, action (add/remove/set), eRoutes (comma-separated), segmentDesc.
+function ERoutesTab({ user }) {
+  const [items, setItems] = useState([]);
+  const [roadRef, setRoadRef] = useState('');
+  const [action, setAction] = useState('set');
+  const [eRoutes, setERoutes] = useState('');
+  const [segmentDesc, setSegmentDesc] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { getAdminERouteOverrides().then(setItems); }, []);
+
+  const save = async () => {
+    if (!roadRef.trim()) return;
+    setSaving(true);
+    try {
+      const parsedRoutes = eRoutes.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+      const item = await addAdminERouteOverride(user, {
+        roadRef: roadRef.trim().toUpperCase(),
+        action,
+        eRoutes: parsedRoutes,
+        segmentDesc: segmentDesc.trim(),
+      });
+      setItems(prev => [item, ...prev]);
+      setRoadRef(''); setERoutes(''); setSegmentDesc(''); setAction('set');
+    } finally { setSaving(false); }
+  };
+
+  const remove = async (id) => {
+    await deleteAdminERouteOverride(user, id);
+    setItems(prev => prev.filter(x => x.id !== id));
+  };
+
+  return (
+    <div>
+      <SectionHead>E-Route Override</SectionHead>
+      <p className="text-xs text-muted-foreground mb-3">
+        Control which European route designations (E53, E50, etc.) appear on road shields.
+        For example: road 27 should only show E53 from Železná Ruda to Plzeň, not on the whole road.
+      </p>
+
+      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl p-3 mb-3">
+        <p className="text-xs font-semibold text-amber-700 dark:text-amber-300 mb-1">Current defaults (from code):</p>
+        <p className="text-xs text-amber-600 dark:text-amber-400">Road 27 → E53 (full road) · Use "remove" action to disable</p>
+      </div>
+
+      <Field label="Road Ref (e.g. '27', 'D5', 'A 6')">
+        <Input value={roadRef} onChange={setRoadRef} placeholder="e.g. 27" />
+      </Field>
+      <Field label="Action">
+        <Select value={action} onChange={setAction}>
+          <option value="set">Set — replace all E-routes with these</option>
+          <option value="add">Add — add these E-routes to existing</option>
+          <option value="remove">Remove — remove all E-routes from this road</option>
+        </Select>
+      </Field>
+      {action !== 'remove' && (
+        <Field label="E-Routes (comma-separated, e.g. 'E53, E50')">
+          <Input value={eRoutes} onChange={setERoutes} placeholder="e.g. E53" />
+        </Field>
+      )}
+      <Field label="Segment description (optional)">
+        <Textarea value={segmentDesc} onChange={setSegmentDesc}
+          placeholder="e.g. Only from Železná Ruda to Plzeň, not the whole road 27" />
+      </Field>
+      <button onClick={save} disabled={saving || !roadRef.trim() || (action !== 'remove' && !eRoutes.trim())}
+        className="w-full py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-emerald-700 active:scale-95 transition-all">
+        {saving ? 'Saving…' : '+ Save E-Route Override'}
+      </button>
+
+      {items.length > 0 && (
+        <>
+          <SectionHead>Existing E-Route Overrides ({items.length})</SectionHead>
+          {items.map(it => (
+            <ListItem key={it.id} icon="🟢"
+              title={`${it.roadRef}: ${it.action === 'remove' ? '❌ Remove all E-routes' : `${it.action} ${it.eRoutes?.join(', ')}`}`}
+              subtitle={it.segmentDesc || ''}
+              onDelete={() => remove(it.id)} />
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Main editor ──────────────────────────────────────────────────────────────
 export default function SuperAdminEditor({ user, onClose, onAdminDataChange }) {
   const [tab, setTab] = useState('pois');
@@ -400,7 +664,6 @@ export default function SuperAdminEditor({ user, onClose, onAdminDataChange }) {
   const [pendingLatLon, setPendingLatLon] = useState(null);
   const [adminNavMode, setAdminNavMode] = useState(false);
 
-  // Called by MapLibreMap when in adminNavMode and user clicks map
   const handleMapClick = useCallback((coords) => {
     setPendingLatLon(coords);
     setAdminNavMode(false);
@@ -408,12 +671,11 @@ export default function SuperAdminEditor({ user, onClose, onAdminDataChange }) {
 
   const requestMapClick = () => {
     setAdminNavMode(true);
-    setCollapsed(true); // collapse panel so user can see map
+    setCollapsed(true);
   };
 
   const clearPending = () => setPendingLatLon(null);
 
-  // Expose handleMapClick and adminNavMode to parent via callback
   useEffect(() => {
     onAdminDataChange?.({ handleMapClick, adminNavMode });
   }, [adminNavMode, handleMapClick]);
@@ -422,7 +684,6 @@ export default function SuperAdminEditor({ user, onClose, onAdminDataChange }) {
     <div className="fixed left-0 right-0 z-[2000] flex flex-col"
       style={{ bottom: 56, maxHeight: collapsed ? 60 : '80vh' }}>
 
-      {/* Drag handle / header */}
       <div className="mx-auto w-full max-w-md bg-white dark:bg-card rounded-t-3xl shadow-2xl border-t border-gray-100 dark:border-border overflow-hidden flex flex-col"
         style={{ maxHeight: collapsed ? 60 : '80vh' }}>
 
@@ -451,7 +712,6 @@ export default function SuperAdminEditor({ user, onClose, onAdminDataChange }) {
 
         {!collapsed && (
           <>
-            {/* Tabs */}
             <div className="flex gap-2 px-4 py-2 border-b border-gray-100 dark:border-border flex-shrink-0 overflow-x-auto">
               {TABS.map(({ id, label, Icon }) => (
                 <button key={id} onClick={() => setTab(id)}
@@ -461,7 +721,6 @@ export default function SuperAdminEditor({ user, onClose, onAdminDataChange }) {
               ))}
             </div>
 
-            {/* Tab content */}
             <div className="overflow-y-auto overscroll-contain flex-1 px-4 py-3">
               {tab === 'pois' && (
                 <POIsTab user={user} pendingLatLon={pendingLatLon}
@@ -474,6 +733,12 @@ export default function SuperAdminEditor({ user, onClose, onAdminDataChange }) {
               {tab === 'nav' && (
                 <NavTab user={user} pendingLatLon={pendingLatLon}
                   onRequestMapClick={requestMapClick} onClear={clearPending} />
+              )}
+              {tab === 'roads' && (
+                <RoadsTab user={user} />
+              )}
+              {tab === 'eroutes' && (
+                <ERoutesTab user={user} />
               )}
             </div>
           </>

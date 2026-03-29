@@ -22,10 +22,11 @@ const SpotsBtnIcon = () => (
   </svg>
 );
 
-export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, onToggleSpots, onSelectCategory }) {
+export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, onToggleSpots, onSelectCategory, spots = [], onSelectSpot }) {
   const { t, language } = useLanguage();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
+  const [spotResults, setSpotResults] = useState([]);
   const [poiCategories, setPoiCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -54,6 +55,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
 
   const closeDropdown = () => {
     setResults([]);
+    setSpotResults([]);
     setPoiCategories([]);
     setFocused(false);
   };
@@ -61,10 +63,20 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
   useEffect(() => {
     if (!query.trim()) {
       setResults([]);
+      setSpotResults([]);
       setPoiCategories([]);
       return;
     }
     setPoiCategories(filterCategories(query, language));
+
+    // Search spots by title and description
+    const q = query.toLowerCase();
+    const matched = (spots || []).filter(s => {
+      if (s.title?.toLowerCase().includes(q)) return true;
+      if (s.description?.toLowerCase().includes(q)) return true;
+      return false;
+    }).slice(0, 5);
+    setSpotResults(matched);
 
     clearTimeout(debounce.current);
     debounce.current = setTimeout(async () => {
@@ -185,7 +197,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
     else startListening();
   };
 
-  const showDropdown = focused && (poiCategories.length > 0 || results.length > 0 || (loading && !!query));
+  const showDropdown = focused && (poiCategories.length > 0 || results.length > 0 || spotResults.length > 0 || (loading && !!query));
 
   return (
     <div ref={containerRef} className="absolute top-4 left-4 z-[1002]" style={{ right: '3.75rem' }}>
@@ -284,7 +296,27 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
               );
             })}
 
-            {loading && !!query && !results.length && !poiCategories.length && (
+            {spotResults.map((spot, i) => (
+              <div key={`spot-${i}`} className="flex items-center hover:bg-gray-50 dark:hover:bg-accent transition-colors">
+                <button
+                  onMouseDown={e => { e.preventDefault(); onSelectSpot?.(spot); setQuery(spot.title || ''); closeDropdown(); }}
+                  onTouchEnd={e => { e.preventDefault(); onSelectSpot?.(spot); setQuery(spot.title || ''); closeDropdown(); }}
+                  className="flex-1 text-left px-4 py-2.5 flex items-center gap-3"
+                >
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-green-100 dark:bg-green-900/30">
+                    <span className="text-lg">📍</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-800 dark:text-foreground truncate">{spot.title || 'Spot'}</p>
+                    {spot.description && (
+                      <p className="text-xs text-gray-400 dark:text-muted-foreground truncate">{spot.description}</p>
+                    )}
+                  </div>
+                </button>
+              </div>
+            ))}
+
+            {loading && !!query && !results.length && !poiCategories.length && !spotResults.length && (
               <div className="px-4 py-2 text-xs text-gray-400 dark:text-muted-foreground">{t('search.searching')}</div>
             )}
           </div>

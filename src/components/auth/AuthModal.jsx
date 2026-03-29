@@ -4,6 +4,11 @@ import { loginWithEmail, registerWithEmail, loginWithGoogle, isRestrictedBrowser
 import { useAuth } from '@/lib/AuthContext';
 import { useLanguage } from '@/lib/LanguageContext';
 
+// Client-side brute-force protection: track failed attempts per session
+const loginAttempts = { count: 0, lockedUntil: 0 };
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_MS = 5 * 60 * 1000; // 5 minutes
+
 export default function AuthModal({ onClose, onSuccess = () => {} }) {
   const { t } = useLanguage();
   const [tab, setTab] = useState('login');
@@ -13,26 +18,71 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [restricted, setRestricted] = useState(false);
+  const [lockoutRemaining, setLockoutRemaining] = useState(0);
   const { checkUserAuth } = useAuth();
 
   useEffect(() => { setRestricted(isRestrictedBrowser()); }, []);
 
+  // Countdown timer for lockout
+  useEffect(() => {
+    if (!lockoutRemaining) return;
+    const id = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((loginAttempts.lockedUntil - Date.now()) / 1000));
+      setLockoutRemaining(remaining);
+      if (!remaining) clearInterval(id);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [lockoutRemaining]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Check lockout
+    if (Date.now() < loginAttempts.lockedUntil) {
+      const remaining = Math.ceil((loginAttempts.lockedUntil - Date.now()) / 1000);
+      setLockoutRemaining(remaining);
+      setError(`Too many failed attempts. Please wait ${remaining}s before trying again.`);
+      return;
+    }
+
     setLoading(true); setError('');
     try {
       tab === 'login' ? await loginWithEmail(email, password) : await registerWithEmail(email, password);
+      // Reset attempts on success
+      loginAttempts.count = 0;
+      loginAttempts.lockedUntil = 0;
       await checkUserAuth(); onSuccess(); onClose();
     } catch (err) {
-      const codes = {
-        'auth/invalid-email': t('auth.invalidEmail'),
-        'auth/user-not-found': t('auth.userNotFound'),
-        'auth/wrong-password': t('auth.wrongPassword'),
-        'auth/email-already-in-use': t('auth.emailInUse'),
-        'auth/weak-password': t('auth.weakPassword'),
-        'auth/invalid-credential': t('auth.invalidCredential'),
-      };
-      setError(codes[err.code] || err.message || t('auth.somethingWrong'));
+      // Track failed login attempts (only for login tab, not registration)
+      if (tab === 'login') {
+        loginAttempts.count += 1;
+        if (loginAttempts.count >= MAX_ATTEMPTS) {
+          loginAttempts.lockedUntil = Date.now() + LOCKOUT_MS;
+          const remaining = Math.ceil(LOCKOUT_MS / 1000);
+          setLockoutRemaining(remaining);
+          setError(`Too many failed attempts. Account temporarily locked for ${Math.round(LOCKOUT_MS / 60000)} minutes.`);
+          setLoading(false);
+          return;
+        }
+        const attemptsLeft = MAX_ATTEMPTS - loginAttempts.count;
+        const codes = {
+          'auth/invalid-email': t('auth.invalidEmail'),
+          'auth/user-not-found': t('auth.userNotFound'),
+          'auth/wrong-password': `${t('auth.wrongPassword')} (${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} left)`,
+          'auth/email-already-in-use': t('auth.emailInUse'),
+          'auth/weak-password': t('auth.weakPassword'),
+          'auth/invalid-credential': `${t('auth.invalidCredential')} (${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} left)`,
+          'auth/too-many-requests': 'Too many requests. Your account has been temporarily locked by the server. Try again later.',
+        };
+        setError(codes[err.code] || err.message || t('auth.somethingWrong'));
+      } else {
+        const codes = {
+          'auth/invalid-email': t('auth.invalidEmail'),
+          'auth/email-already-in-use': t('auth.emailInUse'),
+          'auth/weak-password': t('auth.weakPassword'),
+        };
+        setError(codes[err.code] || err.message || t('auth.somethingWrong'));
+      }
     } finally { setLoading(false); }
   };
 
@@ -136,7 +186,12 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
             </div>
           </div>
           {error && <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-xl"><p className="text-sm text-red-600 dark:text-red-400">{error}</p></div>}
-          <button type="submit" disabled={loading}
+          {lockoutRemaining > 0 && (
+            <div className="p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-xl">
+              <p className="text-sm text-orange-700 dark:text-orange-300 font-semibold">🔒 Locked — try again in {lockoutRemaining}s</p>
+            </div>
+          )}
+          <button type="submit" disabled={loading || lockoutRemaining > 0}
             className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold rounded-2xl transition-all flex items-center justify-center gap-2 disabled:opacity-50">
             {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               : <>{tab === 'login' ? t('auth.signIn') : t('auth.createAccount')}<ArrowRight className="w-5 h-5" /></>}

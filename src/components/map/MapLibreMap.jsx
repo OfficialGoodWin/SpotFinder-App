@@ -35,7 +35,8 @@ const SHIELD_COLORS = {
 
 // Road ref → E-route lookup (static mapping from official sources)
 // When drawing a road shield, if the ref has an E-route, draw it stacked below
-const EURO_ROUTES = {
+// This is mutable so admin overrides can be applied at runtime.
+let EURO_ROUTES = {
   // ── Czech motorways — source: OSM int_ref field, way-count weighted ─────────
   'D0': ['E50'],            // Prague ring (also E48,E55,E65 — E50 dominant)
   'MO': ['E50'],            // same road different ref
@@ -442,6 +443,7 @@ export default function MapLibreMap({
   navTarget, navRouteData,
   isDark, mapLayer,
   adminPOIs, adminClosures, adminNavMode, onAdminMapClick,
+  adminERouteOverrides, adminRoadOverrides,
 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
@@ -452,6 +454,29 @@ export default function MapLibreMap({
   const [offlineActive, setOfflineActive] = useState(false);
   const [offlineCountry, setOfflineCountry] = useState('');
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  // ── Apply admin E-route overrides ─────────────────────────────────────────
+  useEffect(() => {
+    if (!adminERouteOverrides?.length) return;
+    // Reset to base EURO_ROUTES and apply overrides
+    for (const ov of adminERouteOverrides) {
+      const ref = ov.roadRef;
+      if (ov.action === 'remove') {
+        delete EURO_ROUTES[ref];
+      } else if (ov.action === 'set') {
+        EURO_ROUTES[ref] = ov.eRoutes || [];
+      } else if (ov.action === 'add') {
+        const existing = EURO_ROUTES[ref] || [];
+        const toAdd = (ov.eRoutes || []).filter(e => !existing.includes(e));
+        EURO_ROUTES[ref] = [...existing, ...toAdd];
+      }
+    }
+    // Clear shield image cache so regenerated
+    if (mapRef.current) {
+      const map = mapRef.current;
+      map.triggerRepaint();
+    }
+  }, [adminERouteOverrides]);
 
   // ── Init ───────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -869,30 +894,26 @@ const addAdminMarkers = () => {
   const zoom = map.getZoom();
   if (zoom < 13) return;
 
-  console.log('🔍 AMBIENT_CATEGORIES:', AMBIENT_CATEGORIES);
-  console.log('🔍 Admin POIs:', adminPOIs);
-
   for (const poi of adminPOIs || []) {
     const categoryKey = (poi.category || '').toLowerCase().trim();
-    console.log(`🔍 POI: "${poi.name}" | Category: "${poi.category}" | Key: "${categoryKey}"`);
-    
-    let catConfig = AMBIENT_CATEGORIES.find(c => {
-      console.log(`   Checking against: key="${c.key}", name="${c.name}", color="${c.color}"`);
-      return c.key === categoryKey || c.name.toLowerCase() === categoryKey;
-    });
 
-    console.log(`   ✅ Matched config:`, catConfig);
+    // First try matching by key (preferred - admin panel stores exact keys)
+    let catConfig = AMBIENT_CATEGORIES.find(c => c.key === categoryKey);
+    // Fallback: match by name (case-insensitive)
+    if (!catConfig) catConfig = AMBIENT_CATEGORIES.find(c => c.name?.toLowerCase() === categoryKey);
 
     if (!catConfig) {
       catConfig = {
-        key: categoryKey,
+        key: categoryKey || 'custom',
         name: poi.category ? poi.category.charAt(0).toUpperCase() + poi.category.slice(1) : 'POI',
-        icon: '📍',
-        color: '#6B7280',
+        icon: poi.icon || '📍',
+        color: poi.color || '#6B7280',
         minZoom: 13,
       };
-      console.log(`   ⚠️ Created fallback config:`, catConfig);
     }
+
+    // Use the stored color/icon if the admin explicitly set them (from CATEGORY_OPTIONS)
+    if (poi.color) catConfig = { ...catConfig, color: poi.color, icon: poi.icon || catConfig.icon };
 
     if (zoom < catConfig.minZoom) continue;
 
