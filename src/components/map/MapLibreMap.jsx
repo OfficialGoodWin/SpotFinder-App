@@ -863,44 +863,45 @@ export default function MapLibreMap({
     if (!map) return;
     const adminMarkers = [];
 
-    const addAdminMarkers = () => {
+const addAdminMarkers = () => {
   adminMarkers.forEach(m => m.remove());
   adminMarkers.length = 0;
   const zoom = map.getZoom();
   if (zoom < 13) return;
 
+  console.log('🔍 AMBIENT_CATEGORIES:', AMBIENT_CATEGORIES);
+  console.log('🔍 Admin POIs:', adminPOIs);
+
   for (const poi of adminPOIs || []) {
-    // Match category more flexibly against AMBIENT_CATEGORIES
     const categoryKey = (poi.category || '').toLowerCase().trim();
-    let catConfig = AMBIENT_CATEGORIES.find(c => 
-      c.key === categoryKey || 
-      c.name.toLowerCase() === categoryKey ||
-      c.geo?.split(',').some(g => g.trim().toLowerCase() === categoryKey)
-    );
+    console.log(`🔍 POI: "${poi.name}" | Category: "${poi.category}" | Key: "${categoryKey}"`);
     
-    // If no match found, try to find by partial match or use a neutral color instead of fallback
+    let catConfig = AMBIENT_CATEGORIES.find(c => {
+      console.log(`   Checking against: key="${c.key}", name="${c.name}", color="${c.color}"`);
+      return c.key === categoryKey || c.name.toLowerCase() === categoryKey;
+    });
+
+    console.log(`   ✅ Matched config:`, catConfig);
+
     if (!catConfig) {
-      // Create a neutral category instead of using index 0
       catConfig = {
         key: categoryKey,
         name: poi.category ? poi.category.charAt(0).toUpperCase() + poi.category.slice(1) : 'POI',
         icon: '📍',
-        color: '#6B7280', // neutral gray instead of purple
+        color: '#6B7280',
         minZoom: 13,
       };
+      console.log(`   ⚠️ Created fallback config:`, catConfig);
     }
-    
+
     if (zoom < catConfig.minZoom) continue;
-    
+
     const color = catConfig.color;
     const icon = catConfig.icon;
     const size = zoom >= 16 ? 32 : zoom >= 14 ? 28 : 24;
     const el = makeDot(icon, color, size);
-    
-    // Set title to actual category name
     el.title = catConfig.name;
 
-    // Format address details for display
     const addressParts = [];
     if (poi.houseNumber) addressParts.push(poi.houseNumber);
     if (poi.street) addressParts.push(poi.street);
@@ -908,7 +909,6 @@ export default function MapLibreMap({
     if (poi.postcode) addressParts.push(poi.postcode);
     const addressLine = addressParts.filter(Boolean).join(', ');
 
-    // Enhanced tooltip with all address details
     const tooltipHTML = `
       <div style="min-width:220px;font-size:13px;line-height:1.4">
         <div style="font-weight:600;color:${color};margin-bottom:4px;font-size:14px">
@@ -925,57 +925,42 @@ export default function MapLibreMap({
             ${poi.postcode ? `<div>📮 ${poi.postcode}</div>` : ''}
           </div>
         ` : ''}
-        ${poi.description ? `<div style="font-size:11px;color:#888;margin-top:4px;padding-top:4px;border-top:1px solid #eee">${poi.description}</div>` : ''}
       </div>
     `;
 
-    el.setAttribute('data-tooltip', tooltipHTML);
-
-    // Synthetic category for selection
     const syntheticCat = {
       key: 'admin_poi',
       icon: catConfig.icon,
       color: catConfig.color,
       name: catConfig.name,
       minZoom: catConfig.minZoom,
-      geoapifyCategory: poi.category,
     };
-    
+
     const syntheticPOI = {
       id: `admin_poi_${poi.id}`,
       lat: poi.lat,
       lon: poi.lon,
       name: poi.name || catConfig.name,
-      address: addressLine || poi.description || '',
+      address: addressLine || '',
       street: poi.street || '',
       houseNumber: poi.houseNumber || '',
       city: poi.city || '',
       postcode: poi.postcode || '',
-      tags: { description: poi.description },
+      tags: {},
       _cat: syntheticCat,
       _isAdminPOI: true,
     };
 
     const mk = new maplibregl.Marker({ element: el, anchor: 'bottom' })
       .setLngLat([poi.lon, poi.lat])
-      .setPopup(
-        new maplibregl.Popup({ 
-          offset: [0, -size/2], 
-          className: 'admin-poi-popup',
-          maxWidth: '300px'
-        }).setHTML(tooltipHTML)
-      )
+      .setPopup(new maplibregl.Popup({ offset: [0, -size/2], className: 'admin-poi-popup' }).setHTML(tooltipHTML))
       .addTo(map);
-    
-    el.addEventListener('click', e => { 
-      e.stopPropagation(); 
-      onSelectPOI?.(syntheticPOI, syntheticCat); 
-    });
-    
+
+    el.addEventListener('click', e => { e.stopPropagation(); onSelectPOI?.(syntheticPOI, syntheticCat); });
     adminMarkers.push(mk);
   }
 
-  // ... rest of the closure code remains the same
+  // Closures code here...
 };
 
     if (map.isStyleLoaded()) {
