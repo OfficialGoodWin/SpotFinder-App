@@ -13,8 +13,10 @@ import maplibregl from 'maplibre-gl';
 import { Protocol } from 'pmtiles';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { lightStyle, darkStyle } from '../../lib/mapStyle.js';
+import { AMBIENT_CATEGORIES } from '../../lib/ambientCategories.js';
 import { COUNTRIES, isPointInCountry, getDownloadedCountryAt, vtKey } from '../../lib/vectorTileDownloader.js';
 import { getAllMeta, getPOIs, getTile } from '../../lib/offlineStorage.js';
+
 
 // ── Road shield generator ─────────────────────────────────────────────────────
 // Draws a real road sign on an offscreen canvas and returns ImageData.
@@ -314,31 +316,14 @@ function ensureProtocols() {
 }
 
 // ── Ambient POI categories ────────────────────────────────────────────────────
-const AMBIENT_CATS = [
-  { key:'train',       minZoom:13, icon:'🚆', color:'#34495E', geo:'public_transport.train' },
-  { key:'fuel',        minZoom:13, icon:'⛽', color:'#E74C3C', geo:'service.vehicle.fuel' },
-  { key:'charging',    minZoom:13, icon:'🔌', color:'#27AE60', geo:'service.vehicle.charging_station' },
-  { key:'hotel',       minZoom:13, icon:'🏨', color:'#2980B9', geo:'accommodation.hotel' },
-  { key:'museum',      minZoom:13, icon:'🏛️', color:'#34495E', geo:'entertainment.museum' },
-  { key:'heritage',    minZoom:13, icon:'🏰', color:'#95A5A6', geo:'heritage' },
-  { key:'hospital',    minZoom:13, icon:'🏥', color:'#C0392B', geo:'healthcare.hospital' },
-  { key:'restaurant',  minZoom:15, icon:'🍽️', color:'#E74C3C', geo:'catering.restaurant' },
-  { key:'cafe',        minZoom:15, icon:'☕', color:'#8B4513', geo:'catering.cafe' },
-  { key:'bar',         minZoom:15, icon:'🍺', color:'#D68910', geo:'catering.bar' },
-  { key:'pharmacy',    minZoom:15, icon:'💊', color:'#E67E22', geo:'healthcare.pharmacy' },
-  { key:'bank',        minZoom:15, icon:'🏦', color:'#F39C12', geo:'service.financial.bank' },
-  { key:'supermarket', minZoom:15, icon:'🏪', color:'#27AE60', geo:'commercial.supermarket' },
-  { key:'atm',         minZoom:16, icon:'💳', color:'#16A085', geo:'service.financial.atm' },
-  { key:'bakery',      minZoom:16, icon:'🥖', color:'#D4A574', geo:'commercial.food_and_drink' },
-  { key:'parking',     minZoom:16, icon:'🅿️', color:'#3498DB', geo:'parking' },
-];
-const GEO_LOOKUP = new Map(AMBIENT_CATS.map(c => [c.geo, c]));
+const GEO_LOOKUP = new Map(AMBIENT_CATEGORIES.map(c => [c.geo, c]));
 
 function detectCat(feat) {
   const cats = [...(feat.properties?.categories || [])].sort((a, b) => b.length - a.length);
   for (const c of cats) { if (GEO_LOOKUP.has(c)) return GEO_LOOKUP.get(c); }
   return null;
 }
+
 
 // ── Marker DOM element helpers ────────────────────────────────────────────────
 function makeDot(emoji, color, size = 28) {
@@ -882,37 +867,58 @@ export default function MapLibreMap({
       adminMarkers.forEach(m => m.remove());
       adminMarkers.length = 0;
       const zoom = map.getZoom();
-      // Match regular POI visibility — only show at zoom >= 13
       if (zoom < 13) return;
 
       for (const poi of adminPOIs || []) {
-        // Use a consistent purple tone matching the admin theme
-        const color = '#7C3AED';
-        const size  = zoom >= 16 ? 32 : zoom >= 14 ? 28 : 24;
-        const el    = makeDot(poi.icon || '📍', color, size);
-        el.title    = poi.name || 'Custom POI';
+        // Find matching AMBIENT category by poi.category key (e.g. "restaurant")
+        const categoryKey = (poi.category || '').toLowerCase().trim();
+        const catConfig = AMBIENT_CATEGORIES.find(c => c.key === categoryKey) || AMBIENT_CATEGORIES[0];
+        if (zoom < catConfig.minZoom) continue;
+        const color = catConfig.color;
+        const icon = catConfig.icon;
+        const size = zoom >= 16 ? 32 : zoom >= 14 ? 28 : 24;
+        const el = makeDot(icon, color, size);
+        el.title = catConfig.name;
 
-        // Synthetic category object so POIDetailPanel works identically to ambient POIs
+        // Enhanced tooltip with address details (house/street/city/PSČ)
+        const addressLines = [];
+        if (poi.description) addressLines.push(poi.description);
+        if (poi.street) addressLines.push(poi.street);
+        if (poi.houseNumber) addressLines.push(poi.houseNumber);
+        if (poi.city) addressLines.push(poi.city);
+        if (poi.postcode) addressLines.push(poi.postcode);
+        const tooltipHTML = `
+          <div style="min-width:200px;font-size:13px;line-height:1.3">
+            <div style="font-weight:600;color:${color};margin-bottom:4px">${catConfig.name}</div>
+            <div style="font-weight:500;margin-bottom:2px">${poi.name || catConfig.name}</div>
+            ${addressLines.length ? `<div style="font-size:12px;color:#666">${addressLines.join(', ')}</div>` : ''}
+          </div>
+        `;
+
+        el.setAttribute('data-tooltip', tooltipHTML);
+
+        // Synthetic category matching ambient POIs
         const syntheticCat = {
-          key:   'admin_poi',
-          icon:  poi.icon || '📍',
-          color: color,
-          name:  'Custom POI',
-          minZoom: 13,
+          key: 'admin_poi',
+          icon: catConfig.icon,
+          color: catConfig.color,
+          name: catConfig.name,
+          minZoom: catConfig.minZoom,
         };
         const syntheticPOI = {
-          id:          `admin_poi_${poi.id}`,
-          lat:         poi.lat,
-          lon:         poi.lon,
-          name:        poi.name || 'Custom POI',
-          address:     poi.description || '',
-          tags:        {},
-          _cat:        syntheticCat,
+          id: `admin_poi_${poi.id}`,
+          lat: poi.lat,
+          lon: poi.lon,
+          name: poi.name || catConfig.name,
+          address: poi.description || addressLines.join(', ') || '',
+          tags: {},
+          _cat: syntheticCat,
           _isAdminPOI: true,
         };
 
         const mk = new maplibregl.Marker({ element: el, anchor: 'bottom' })
           .setLngLat([poi.lon, poi.lat])
+          .setPopup(new maplibregl.Popup({ offset: [0, -size/2], className: 'admin-poi-popup' }).setHTML(tooltipHTML))
           .addTo(map);
         el.addEventListener('click', e => { e.stopPropagation(); onSelectPOI?.(syntheticPOI, syntheticCat); });
         adminMarkers.push(mk);
@@ -922,28 +928,27 @@ export default function MapLibreMap({
         const now = new Date();
         const untilDate = cl.until ? new Date(cl.until) : null;
         if (untilDate && untilDate < now) continue;
-        // Use closure orange-red matching TomTom incident color
         const color = '#D97706';
-        const size  = zoom >= 16 ? 32 : zoom >= 14 ? 28 : 24;
-        const el    = makeDot(cl.icon || '⛔', color, size);
-        el.title    = cl.label || 'Road Closure';
+        const size = zoom >= 16 ? 32 : zoom >= 14 ? 28 : 24;
+        const el = makeDot(cl.icon || '⛔', color, size);
+        el.title = cl.label || 'Road Closure';
 
         const untilStr = untilDate ? ` · until ${untilDate.toLocaleDateString()}` : ' · Permanent';
         const syntheticCat = {
-          key:   'admin_closure',
-          icon:  cl.icon || '⛔',
-          color: color,
-          name:  'Road Closure',
+          key: 'admin_closure',
+          icon: cl.icon || '⛔',
+          color,
+          name: 'Road Closure',
           minZoom: 13,
         };
         const syntheticPOI = {
-          id:          `admin_closure_${cl.id}`,
-          lat:         cl.lat,
-          lon:         cl.lon,
-          name:        cl.label || 'Road Closure',
-          address:     (cl.description || '') + untilStr,
-          tags:        {},
-          _cat:        syntheticCat,
+          id: `admin_closure_${cl.id}`,
+          lat: cl.lat,
+          lon: cl.lon,
+          name: cl.label || 'Road Closure',
+          address: (cl.description || '') + untilStr,
+          tags: {},
+          _cat: syntheticCat,
           _isAdminClosure: true,
         };
 
