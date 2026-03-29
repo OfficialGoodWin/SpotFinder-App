@@ -4,9 +4,9 @@
  * Tabs: Custom POIs · Road Closures · Nav Overrides · Road Editor · E-Routes
  */
 import { useState, useEffect, useCallback } from 'react';
-import { X, MapPin, AlertTriangle, Navigation, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, MapPin, AlertTriangle, Navigation, Trash2, ChevronDown, ChevronUp, Pencil, Check } from 'lucide-react';
 import {
-  getAdminPOIs, addAdminPOI, deleteAdminPOI,
+  getAdminPOIs, addAdminPOI, updateAdminPOI, deleteAdminPOI,
   getAdminClosures, addAdminClosure, deleteAdminClosure,
   getAdminNavOverrides, addAdminNavOverride, deleteAdminNavOverride,
   getAdminRoadOverrides, addAdminRoadOverride, deleteAdminRoadOverride,
@@ -136,7 +136,7 @@ function IconPicker({ icons, value, onChange }) {
 }
 
 // ─── List item ────────────────────────────────────────────────────────────────
-function ListItem({ icon, title, subtitle, onDelete }) {
+function ListItem({ icon, title, subtitle, onDelete, onEdit }) {
   return (
     <div className="flex items-start gap-2 bg-gray-50 dark:bg-accent/40 rounded-xl p-3 mb-2">
       <span className="text-xl flex-shrink-0 mt-0.5">{icon}</span>
@@ -144,6 +144,11 @@ function ListItem({ icon, title, subtitle, onDelete }) {
         <p className="text-sm font-semibold text-foreground truncate">{title}</p>
         {subtitle && <p className="text-xs text-muted-foreground truncate">{subtitle}</p>}
       </div>
+      {onEdit && (
+        <button onClick={onEdit} className="w-7 h-7 flex-shrink-0 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-500 flex items-center justify-center hover:bg-blue-100 transition-colors">
+          <Pencil className="w-3.5 h-3.5" />
+        </button>
+      )}
       <button onClick={onDelete} className="w-7 h-7 flex-shrink-0 rounded-full bg-red-50 dark:bg-red-900/30 text-red-500 flex items-center justify-center hover:bg-red-100 transition-colors">
         <Trash2 className="w-3.5 h-3.5" />
       </button>
@@ -151,78 +156,25 @@ function ListItem({ icon, title, subtitle, onDelete }) {
   );
 }
 
-// ─── Custom POIs tab ─────────────────────────────────────────────────────────
-function POIsTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
-  const [items, setItems] = useState([]);
-  const [name, setName] = useState('');
-  const [desc, setDesc] = useState('');
-  const [category, setCategory] = useState('restaurant');
-  const [lat, setLat] = useState('');
-  const [lon, setLon] = useState('');
-  const [street, setStreet] = useState('');
-  const [houseNumber, setHouseNumber] = useState('');
-  const [city, setCity] = useState('');
-  const [postcode, setPostcode] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => { getAdminPOIs().then(setItems); }, []);
-
-  useEffect(() => {
-    if (pendingLatLon) {
-      setLat(pendingLatLon.lat.toFixed(6));
-      setLon(pendingLatLon.lon.toFixed(6));
-    }
-  }, [pendingLatLon]);
-
+// ─── POI form fields (shared between add and edit) ────────────────────────────
+function POIForm({ name, setName, desc, setDesc, category, setCategory, lat, setLat, lon, setLon,
+  street, setStreet, houseNumber, setHouseNumber, city, setCity, postcode, setPostcode,
+  onRequestMapClick, saving, onSave, saveLabel }) {
   const selectedCat = CATEGORY_OPTIONS.find(c => c.key === category) || CATEGORY_OPTIONS[0];
-
-  const save = async () => {
-    if (!name.trim() || !lat || !lon) return;
-    setSaving(true);
-    try {
-      const item = await addAdminPOI(user, {
-        name: name.trim(),
-        description: desc.trim(),
-        category,
-        icon: selectedCat.icon,
-        color: selectedCat.color,
-        lat: parseFloat(lat),
-        lon: parseFloat(lon),
-        street: street.trim(),
-        houseNumber: houseNumber.trim(),
-        city: city.trim(),
-        postcode: postcode.trim(),
-      });
-      setItems(prev => [item, ...prev]);
-      setName(''); setDesc(''); setLat(''); setLon('');
-      setStreet(''); setHouseNumber(''); setCity(''); setPostcode('');
-      setCategory('restaurant');
-      onClear();
-    } finally { setSaving(false); }
-  };
-
-  const remove = async (id) => {
-    await deleteAdminPOI(user, id);
-    setItems(prev => prev.filter(x => x.id !== id));
-  };
-
   return (
-    <div>
-      <SectionHead>Add New POI</SectionHead>
+    <>
       <Field label="Category">
         <Select value={category} onChange={setCategory}>
           {CATEGORY_OPTIONS.map(opt => (
             <option key={opt.key} value={opt.key}>{opt.icon} {opt.label}</option>
           ))}
         </Select>
-        {selectedCat && (
-          <div className="mt-1.5 flex items-center gap-2">
-            <div className="w-6 h-6 rounded-full flex items-center justify-center text-sm" style={{ background: selectedCat.color }}>
-              {selectedCat.icon}
-            </div>
-            <span className="text-xs text-muted-foreground">Will use {selectedCat.label} color ({selectedCat.color})</span>
+        <div className="mt-1.5 flex items-center gap-2">
+          <div className="w-6 h-6 rounded-full flex items-center justify-center text-sm" style={{ background: selectedCat.color }}>
+            {selectedCat.icon}
           </div>
-        )}
+          <span className="text-xs text-muted-foreground">{selectedCat.label} — {selectedCat.color}</span>
+        </div>
       </Field>
       <Field label="Name">
         <Input value={name} onChange={setName} placeholder="e.g. Hidden viewpoint" />
@@ -250,10 +202,131 @@ function POIsTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
           📌 Click on map to pick location
         </button>
       </Field>
-      <button onClick={save} disabled={saving || !name.trim() || !lat || !lon}
+      <button onClick={onSave} disabled={saving || !name.trim() || !lat || !lon}
         className="w-full py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-blue-700 active:scale-95 transition-all">
-        {saving ? 'Saving…' : '+ Add POI'}
+        {saving ? 'Saving…' : saveLabel}
       </button>
+    </>
+  );
+}
+
+// ─── Custom POIs tab ─────────────────────────────────────────────────────────
+function POIsTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
+  const [items, setItems] = useState([]);
+  const [editingId, setEditingId] = useState(null); // null = add mode, id = edit mode
+
+  // Form fields
+  const [name, setName] = useState('');
+  const [desc, setDesc] = useState('');
+  const [category, setCategory] = useState('restaurant');
+  const [lat, setLat] = useState('');
+  const [lon, setLon] = useState('');
+  const [street, setStreet] = useState('');
+  const [houseNumber, setHouseNumber] = useState('');
+  const [city, setCity] = useState('');
+  const [postcode, setPostcode] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { getAdminPOIs().then(setItems); }, []);
+
+  useEffect(() => {
+    if (pendingLatLon) {
+      setLat(pendingLatLon.lat.toFixed(6));
+      setLon(pendingLatLon.lon.toFixed(6));
+    }
+  }, [pendingLatLon]);
+
+  const clearForm = () => {
+    setName(''); setDesc(''); setLat(''); setLon('');
+    setStreet(''); setHouseNumber(''); setCity(''); setPostcode('');
+    setCategory('restaurant'); setEditingId(null);
+  };
+
+  const startEdit = (it) => {
+    setEditingId(it.id);
+    setName(it.name || '');
+    setDesc(it.description || '');
+    setCategory(it.category || 'restaurant');
+    setLat(it.lat?.toString() || '');
+    setLon(it.lon?.toString() || '');
+    setStreet(it.street || '');
+    setHouseNumber(it.houseNumber || '');
+    setCity(it.city || '');
+    setPostcode(it.postcode || '');
+    // Scroll to top of the form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const selectedCat = CATEGORY_OPTIONS.find(c => c.key === category) || CATEGORY_OPTIONS[0];
+
+  const saveNew = async () => {
+    if (!name.trim() || !lat || !lon) return;
+    setSaving(true);
+    try {
+      const item = await addAdminPOI(user, {
+        name: name.trim(), description: desc.trim(), category,
+        icon: selectedCat.icon, color: selectedCat.color,
+        lat: parseFloat(lat), lon: parseFloat(lon),
+        street: street.trim(), houseNumber: houseNumber.trim(),
+        city: city.trim(), postcode: postcode.trim(),
+      });
+      setItems(prev => [item, ...prev]);
+      clearForm(); onClear();
+    } finally { setSaving(false); }
+  };
+
+  const saveEdit = async () => {
+    if (!name.trim() || !lat || !lon) return;
+    setSaving(true);
+    try {
+      await updateAdminPOI(user, editingId, {
+        name: name.trim(), description: desc.trim(), category,
+        icon: selectedCat.icon, color: selectedCat.color,
+        lat: parseFloat(lat), lon: parseFloat(lon),
+        street: street.trim(), houseNumber: houseNumber.trim(),
+        city: city.trim(), postcode: postcode.trim(),
+      });
+      setItems(prev => prev.map(x => x.id === editingId
+        ? { ...x, name: name.trim(), description: desc.trim(), category,
+            icon: selectedCat.icon, color: selectedCat.color,
+            lat: parseFloat(lat), lon: parseFloat(lon),
+            street: street.trim(), houseNumber: houseNumber.trim(),
+            city: city.trim(), postcode: postcode.trim() }
+        : x
+      ));
+      clearForm(); onClear();
+    } finally { setSaving(false); }
+  };
+
+  const remove = async (id) => {
+    if (!confirm('Delete this POI?')) return;
+    await deleteAdminPOI(user, id);
+    setItems(prev => prev.filter(x => x.id !== id));
+    if (editingId === id) clearForm();
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <SectionHead>{editingId ? '✏️ Edit POI' : 'Add New POI'}</SectionHead>
+        {editingId && (
+          <button onClick={clearForm} className="text-xs text-muted-foreground underline">Cancel edit</button>
+        )}
+      </div>
+
+      <POIForm
+        name={name} setName={setName} desc={desc} setDesc={setDesc}
+        category={category} setCategory={setCategory}
+        lat={lat} setLat={setLat} lon={lon} setLon={setLon}
+        street={street} setStreet={setStreet}
+        houseNumber={houseNumber} setHouseNumber={setHouseNumber}
+        city={city} setCity={setCity}
+        postcode={postcode} setPostcode={setPostcode}
+        onRequestMapClick={onRequestMapClick}
+        saving={saving}
+        onSave={editingId ? saveEdit : saveNew}
+        saveLabel={editingId ? '✓ Save changes' : '+ Add POI'}
+      />
 
       {items.length > 0 && (
         <>
@@ -262,13 +335,17 @@ function POIsTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
             const cat = CATEGORY_OPTIONS.find(c => c.key === it.category);
             const icon = cat?.icon || it.icon || '📍';
             const addressParts = [it.street, it.houseNumber, it.city, it.postcode].filter(Boolean);
+            const isEditing = editingId === it.id;
             return (
-              <ListItem key={it.id} icon={icon} title={it.name}
-                subtitle={[
-                  cat?.label || it.category || 'Custom',
-                  addressParts.length ? addressParts.join(', ') : `${it.lat?.toFixed(4)}, ${it.lon?.toFixed(4)}`,
-                ].filter(Boolean).join(' · ')}
-                onDelete={() => remove(it.id)} />
+              <div key={it.id} className={`rounded-xl mb-2 ${isEditing ? 'ring-2 ring-blue-400' : ''}`}>
+                <ListItem icon={icon} title={it.name}
+                  subtitle={[
+                    cat?.label || it.category || 'Custom',
+                    addressParts.length ? addressParts.join(', ') : `${it.lat?.toFixed(4)}, ${it.lon?.toFixed(4)}`,
+                  ].filter(Boolean).join(' · ')}
+                  onEdit={() => isEditing ? clearForm() : startEdit(it)}
+                  onDelete={() => remove(it.id)} />
+              </div>
             );
           })}
         </>

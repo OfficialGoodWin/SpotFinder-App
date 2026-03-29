@@ -317,7 +317,9 @@ function ensureProtocols() {
 }
 
 // ── Ambient POI categories ────────────────────────────────────────────────────
-const GEO_LOOKUP = new Map(AMBIENT_CATEGORIES.map(c => [c.geo, c]));
+// Only include entries that have a Geoapify geo string (null = admin-only categories)
+const AMBIENT_CATS = AMBIENT_CATEGORIES.filter(c => c.geo);
+const GEO_LOOKUP = new Map(AMBIENT_CATS.map(c => [c.geo, c]));
 
 function detectCat(feat) {
   const cats = [...(feat.properties?.categories || [])].sort((a, b) => b.length - a.length);

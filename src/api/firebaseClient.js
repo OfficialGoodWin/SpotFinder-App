@@ -332,6 +332,13 @@ export const addAdminPOI = async (user, data) => {
   const ref = await addDoc(collection(db, 'admin_pois'), payload);
   return { id: ref.id, ...payload };
 };
+export const updateAdminPOI = async (user, id, data) => {
+  requireSuperAdmin(user);
+  const { db } = getFirebaseServices();
+  const payload = { ...data, updated_at: new Date().toISOString() };
+  await updateDoc(doc(db, 'admin_pois', id), payload);
+  return { id, ...payload };
+};
 export const deleteAdminPOI = async (user, id) => {
   requireSuperAdmin(user);
   const { db } = getFirebaseServices();

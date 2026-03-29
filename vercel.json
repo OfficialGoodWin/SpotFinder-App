@@ -38,6 +38,10 @@
       "destination": "https://maps.googleapis.com/maps/api/place/:path*"
     },
     {
+      "source": "/nominatim/:path*",
+      "destination": "https://nominatim.openstreetmap.org/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

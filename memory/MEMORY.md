@@ -22,6 +22,11 @@
 - CATEGORY_OPTIONS in SuperAdminEditor.jsx defines the dropdown (31 categories)
 - MapLibreMap uses `poi.color` first, then falls back to AMBIENT_CATEGORIES lookup
 
+## Known Bugs Fixed
+- `AMBIENT_CATS` was undefined in MapLibreMap.jsx — fixed by defining `const AMBIENT_CATS = AMBIENT_CATEGORIES.filter(c => c.geo)` before `fetchAmbientPOIs`
+- `GEO_LOOKUP` must only include entries with non-null `geo` field — new admin-only categories have `geo: null`
+- Nominatim CORS: add `/nominatim/:path*` rewrite in vercel.json, use `/nominatim/search` in SearchBar
+
 ## Road Shields / E-Routes
 - `EURO_ROUTES` object in MapLibreMap.jsx (now `let`, mutable) maps road refs to E-route arrays
 - Admin E-route overrides stored in `admin_eroute_overrides` collection

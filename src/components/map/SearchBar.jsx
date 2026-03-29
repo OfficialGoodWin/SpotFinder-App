@@ -90,16 +90,13 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
         const near = mapCenter
           ? `&lat=${mapCenter.lat}&lon=${mapCenter.lng}&bounded=0`
           : '';
-        const base = `https://nominatim.openstreetmap.org/search?format=json&limit=6&addressdetails=1&namedetails=1${near}`;
+        // Use /nominatim proxy (defined in vercel.json) to avoid CORS issues
+        const base = `/nominatim/search?format=json&limit=6&addressdetails=1&namedetails=1${near}`;
 
         // Two parallel fetches: local language + fallback for cross-language search
         const [res1, res2] = await Promise.all([
-          fetch(`${base}&q=${encodeURIComponent(query)}&accept-language=cs,sk,de,pl,en`, {
-            headers: { 'User-Agent': 'SpotFinderApp/1.0' },
-          }),
-          fetch(`${base}&q=${encodeURIComponent(query)}&accept-language=${language}`, {
-            headers: { 'User-Agent': 'SpotFinderApp/1.0' },
-          }),
+          fetch(`${base}&q=${encodeURIComponent(query)}&accept-language=cs,sk,de,pl,en`),
+          fetch(`${base}&q=${encodeURIComponent(query)}&accept-language=${language}`),
         ]);
 
         const [data1, data2] = await Promise.all([res1.json(), res2.json()]);
