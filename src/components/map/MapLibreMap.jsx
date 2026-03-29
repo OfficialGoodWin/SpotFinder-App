@@ -864,95 +864,94 @@ export default function MapLibreMap({
     const adminMarkers = [];
 
     const addAdminMarkers = () => {
+      // Clear old markers
       adminMarkers.forEach(m => m.remove());
       adminMarkers.length = 0;
 
       const zoom = map.getZoom();
       if (zoom < 13) return;
 
+      // ---------- ADMIN CUSTOM POIs ----------
       for (const poi of adminPOIs || []) {
-        // === BETTER CATEGORY MATCHING ===
-        const categoryKey = (poi.category || '').toLowerCase().trim();
+        // Try to map the admin POI to an ambient category:
+        //  - first by Geoapify-style category codes in poi.categories (if you have them)
+        //  - then by simple key in poi.category / poi.type / poi.kind etc.
+        let catConfig =
+          (poi.categories && detectCat({ properties: { categories: poi.categories } })) ||
+          AMBIENT_CATEGORIES.find(c =>
+            c.key &&
+            (c.key.toLowerCase() === String(poi.category || '').toLowerCase() ||
+             c.key.toLowerCase() === String(poi.type || '').toLowerCase() ||
+             c.key.toLowerCase() === String(poi.kind || '').toLowerCase())
+          ) ||
+          // fallback – first ambient category (whatever you use as default)
+          AMBIENT_CATEGORIES[0];
 
-        let catConfig = AMBIENT_CATEGORIES.find(c =>
-          c.key?.toLowerCase() === categoryKey ||
-          c.name?.toLowerCase() === categoryKey ||
-          c.geo?.toLowerCase() === categoryKey
-        );
+        if (zoom < catConfig.minZoom) continue;
 
-        // Fallback - don't use AMBIENT_CATEGORIES[0] (which is probably purple)
-        if (!catConfig) {
-          catConfig = {
-            key: 'other',
-            name: 'Místo',
-            icon: '📍',
-            color: '#6B7280',        // neutral gray instead of purple
-            minZoom: 13
-          };
-        }
+        const color = catConfig.color;
+        const icon  = catConfig.icon;
+        const size  = zoom >= 16 ? 32 : zoom >= 14 ? 28 : 24;
 
-        const size = zoom >= 16 ? 32 : zoom >= 14 ? 28 : 24;
-        const el = makeDot(catConfig.icon, catConfig.color, size);
+        const el = makeDot(icon, color, size);
 
-        // === FIXED: Show actual name, not just category ===
-        el.title = poi.name || catConfig.name;
+        // Title in browser tooltip: prefer explicit POI name, otherwise category name
+        const displayName = poi.name || catConfig.name || 'Custom POI';
+        el.title = displayName;
 
-        // === Build address like ambient POIs (house number + street + city + PSČ) ===
-        const addressParts = [];
-        if (poi.houseNumber) addressParts.push(poi.houseNumber);
-        if (poi.street) addressParts.push(poi.street);
-        if (poi.city) addressParts.push(poi.city);
-        if (poi.postcode || poi.psč) addressParts.push(poi.postcode || poi.psč);
+        // Build a nice address string: "Street 123, City 110 00"
+        const line1 = [poi.street, poi.houseNumber].filter(Boolean).join(' ');
+        const line2 = [poi.city, poi.postcode].filter(Boolean).join(' ');
+        const address = [line1, line2].filter(Boolean).join(', ');
 
-        const addressLine = addressParts.length
-          ? addressParts.join(', ')
-          : (poi.description || '');
+        // Also allow a free-form description to be shown if you use it
+        const fullAddress = address || poi.description || '';
 
-        const popupHTML = `
-      <div style="min-width:220px;font-size:13px;line-height:1.35">
-        <div style="font-weight:700;color:${catConfig.color};margin-bottom:3px;">
-          ${catConfig.name}
-        </div>
-        <div style="font-weight:600;font-size:15px;margin-bottom:5px;">
-          ${poi.name || 'Neznámé místo'}
-        </div>
-        ${addressLine ? `
-          <div style="color:#444;font-size:12.2px;">
-            ${addressLine}
+        // This is what your pop-up / dropdown can show in small mode
+        const tooltipHTML = `
+          <div style="min-width:200px;font-size:13px;line-height:1.3">
+            <div style="font-weight:600;color:${color};margin-bottom:4px">${catConfig.name}</div>
+            <div style="font-weight:500;margin-bottom:2px">${displayName}</div>
+            ${fullAddress
+              ? `<div style="font-size:12px;color:#666">${fullAddress}</div>`
+              : ''}
           </div>
-        ` : ''}
-      </div>
-    `;
+        `;
 
+        // Synthetic POI object passed to onSelectPOI → used by your dropdown UI
         const syntheticCat = {
-          key: 'admin_poi',
-          icon: catConfig.icon,
+          key:   catConfig.key || 'admin_poi',
+          icon:  catConfig.icon,
           color: catConfig.color,
-          name: catConfig.name,
+          name:  catConfig.name,
           minZoom: catConfig.minZoom,
         };
 
         const syntheticPOI = {
-          id: `admin_poi_${poi.id}`,
-          lat: poi.lat,
-          lon: poi.lon,
-          name: poi.name,
-          address: addressLine,
-          ...poi,
-          _cat: syntheticCat,
+          id:      `admin_poi_${poi.id}`,
+          lat:     poi.lat,
+          lon:     poi.lon,
+          name:    displayName,
+          address: fullAddress,          // <- this is what list "small mode" uses under the name
+          tags: {
+            street:      poi.street,
+            housenumber: poi.houseNumber,
+            city:        poi.city,
+            postcode:    poi.postcode,
+            description: poi.description,
+          },
+          _cat:        syntheticCat,
           _isAdminPOI: true,
         };
 
-        const mk = new maplibregl.Marker({
-          element: el,
-          anchor: 'bottom'
-        })
+        const mk = new maplibregl.Marker({ element: el, anchor: 'bottom' })
           .setLngLat([poi.lon, poi.lat])
-          .setPopup(new maplibregl.Popup({
-            offset: [0, -size / 2 + 2],
-            closeButton: false,
-            className: 'admin-poi-popup'
-          }).setHTML(popupHTML))
+          .setPopup(
+            new maplibregl.Popup({
+              offset: [0, -size / 2],
+              className: 'admin-poi-popup',
+            }).setHTML(tooltipHTML)
+          )
           .addTo(map);
 
         el.addEventListener('click', e => {
@@ -963,15 +962,68 @@ export default function MapLibreMap({
         adminMarkers.push(mk);
       }
 
-      // ... (your closures code can stay the same)
-    };
-    if (map.isStyleLoaded()) addAdminMarkers(); else map.once('idle', addAdminMarkers);
+      // ---------- ADMIN CLOSURES ----------
+      for (const cl of adminClosures || []) {
+        const now = new Date();
+        const untilDate = cl.until ? new Date(cl.until) : null;
+        if (untilDate && untilDate < now) continue;
 
-    // Re-render when zoom changes so minzoom is respected
+        const color = '#D97706';
+        const size  = zoom >= 16 ? 32 : zoom >= 14 ? 28 : 24;
+
+        const el = makeDot(cl.icon || '⛔', color, size);
+        el.title = cl.label || 'Road Closure';
+
+        const untilStr = untilDate
+          ? ` · until ${untilDate.toLocaleDateString()}`
+          : ' · Permanent';
+
+        const syntheticCat = {
+          key:   'admin_closure',
+          icon:  cl.icon || '⛔',
+          color,
+          name:  'Road Closure',
+          minZoom: 13,
+        };
+
+        const syntheticPOI = {
+          id:      `admin_closure_${cl.id}`,
+          lat:     cl.lat,
+          lon:     cl.lon,
+          name:    cl.label || 'Road Closure',
+          address: (cl.description || '') + untilStr,
+          tags: {},
+          _cat: syntheticCat,
+          _isAdminClosure: true,
+        };
+
+        const mk = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat([cl.lon, cl.lat])
+          .addTo(map);
+
+        el.addEventListener('click', e => {
+          e.stopPropagation();
+          onSelectPOI?.(syntheticPOI, syntheticCat);
+        });
+
+        adminMarkers.push(mk);
+      }
+    };
+
+    if (map.isStyleLoaded()) {
+      addAdminMarkers();
+    } else {
+      map.once('idle', addAdminMarkers);
+    }
+
     const onZoom = () => addAdminMarkers();
     map.on('zoomend', onZoom);
-    return () => { map.off('zoomend', onZoom); adminMarkers.forEach(m => m.remove()); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    return () => {
+      map.off('zoomend', onZoom);
+      adminMarkers.forEach(m => m.remove());
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminPOIs, adminClosures]);
 
   // ── Admin map-click mode ──────────────────────────────────────────────────────
