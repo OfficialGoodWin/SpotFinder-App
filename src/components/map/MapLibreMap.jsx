@@ -876,45 +876,92 @@ export default function MapLibreMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const markers = [];
-    const addMarkers = () => {
-      markers.forEach(m => m.remove());
-      markers.length = 0;
+    const adminMarkers = [];
+
+    const addAdminMarkers = () => {
+      adminMarkers.forEach(m => m.remove());
+      adminMarkers.length = 0;
+      const zoom = map.getZoom();
+      // Match regular POI visibility — only show at zoom >= 13
+      if (zoom < 13) return;
 
       for (const poi of adminPOIs || []) {
-        const poiEl = makeDot(poi.icon || ' ', poi.color || '#5A67D8', 28);
-        poiEl.title = poi.name || 'Admin POI';
-        const poiMarker = new maplibregl.Marker({ element: poiEl, anchor: 'bottom' })
+        // Use a consistent purple tone matching the admin theme
+        const color = '#7C3AED';
+        const size  = zoom >= 16 ? 32 : zoom >= 14 ? 28 : 24;
+        const el    = makeDot(poi.icon || '📍', color, size);
+        el.title    = poi.name || 'Custom POI';
+
+        // Synthetic category object so POIDetailPanel works identically to ambient POIs
+        const syntheticCat = {
+          key:   'admin_poi',
+          icon:  poi.icon || '📍',
+          color: color,
+          name:  'Custom POI',
+          minZoom: 13,
+        };
+        const syntheticPOI = {
+          id:          `admin_poi_${poi.id}`,
+          lat:         poi.lat,
+          lon:         poi.lon,
+          name:        poi.name || 'Custom POI',
+          address:     poi.description || '',
+          tags:        {},
+          _cat:        syntheticCat,
+          _isAdminPOI: true,
+        };
+
+        const mk = new maplibregl.Marker({ element: el, anchor: 'bottom' })
           .setLngLat([poi.lon, poi.lat])
-          .setPopup(
-            new maplibregl.Popup({ offset: 10 }).setHTML(
-              `<b>${poi.name || ''}</b>${poi.description ? `<br/>${poi.description}` : ''}`
-            )
-          )
           .addTo(map);
-        markers.push(poiMarker);
+        el.addEventListener('click', e => { e.stopPropagation(); onSelectPOI?.(syntheticPOI, syntheticCat); });
+        adminMarkers.push(mk);
       }
 
       for (const cl of adminClosures || []) {
         const now = new Date();
         const untilDate = cl.until ? new Date(cl.until) : null;
         if (untilDate && untilDate < now) continue;
-        const clEl = makeDot(cl.icon || ' ', cl.color || '#E74C3C', 28);
-        clEl.title = cl.label || 'Road Closure';
-        const untilStr = untilDate ? ` (until ${untilDate.toLocaleDateString()})` : '';
-        const clMarker = new maplibregl.Marker({ element: clEl, anchor: 'bottom' })
+        // Use closure orange-red matching TomTom incident color
+        const color = '#D97706';
+        const size  = zoom >= 16 ? 32 : zoom >= 14 ? 28 : 24;
+        const el    = makeDot(cl.icon || '⛔', color, size);
+        el.title    = cl.label || 'Road Closure';
+
+        const untilStr = untilDate ? ` · until ${untilDate.toLocaleDateString()}` : ' · Permanent';
+        const syntheticCat = {
+          key:   'admin_closure',
+          icon:  cl.icon || '⛔',
+          color: color,
+          name:  'Road Closure',
+          minZoom: 13,
+        };
+        const syntheticPOI = {
+          id:          `admin_closure_${cl.id}`,
+          lat:         cl.lat,
+          lon:         cl.lon,
+          name:        cl.label || 'Road Closure',
+          address:     (cl.description || '') + untilStr,
+          tags:        {},
+          _cat:        syntheticCat,
+          _isAdminClosure: true,
+        };
+
+        const mk = new maplibregl.Marker({ element: el, anchor: 'bottom' })
           .setLngLat([cl.lon, cl.lat])
-          .setPopup(
-            new maplibregl.Popup({ offset: 10 }).setHTML(
-              `<b>${cl.label || 'Road Closure'}</b>${untilStr}${cl.description ? `<br/>${cl.description}` : ''}`
-            )
-          )
           .addTo(map);
-        markers.push(clMarker);
+        el.addEventListener('click', e => { e.stopPropagation(); onSelectPOI?.(syntheticPOI, syntheticCat); });
+        adminMarkers.push(mk);
       }
     };
-    if (map.isStyleLoaded()) addMarkers(); else map.once('idle', addMarkers);
-    return () => markers.forEach(m => m.remove());
+
+    if (map.isStyleLoaded()) addAdminMarkers(); else map.once('idle', addAdminMarkers);
+
+    // Re-render when zoom changes so minzoom is respected
+    const onZoom = () => addAdminMarkers();
+    map.on('zoomend', onZoom);
+    return () => { map.off('zoomend', onZoom); adminMarkers.forEach(m => m.remove()); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminPOIs, adminClosures]);
 
   // ── Admin map-click mode ──────────────────────────────────────────────────────

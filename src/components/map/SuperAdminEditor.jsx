@@ -265,6 +265,33 @@ function ClosuresTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
 const DIRECTIONS = ['straight','slight_left','left','sharp_left','slight_right','right','sharp_right','u_turn'];
 const DIR_LABELS = { straight:'⬆ Straight', slight_left:'↖ Slight Left', left:'← Left', sharp_left:'⤾ Sharp Left', slight_right:'↗ Slight Right', right:'→ Right', sharp_right:'⤿ Sharp Right', u_turn:'↩ U-Turn' };
 
+// Languages to auto-translate to (BCP-47 codes supported by MyMemory)
+const NAV_TRANSLATE_LANGS = ['cs','pl','de','sk','it','fr','ru','uk','hu','ro','es','bg'];
+
+async function translateMyMemory(text, targetLang) {
+  try {
+    const r = await fetch(
+      `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|${targetLang}`
+    );
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d.responseData?.translatedText || null;
+  } catch { return null; }
+}
+
+async function buildTranslations(instructionEn) {
+  const result = { en: instructionEn };
+  await Promise.all(
+    NAV_TRANSLATE_LANGS.map(async (lang) => {
+      const translated = await translateMyMemory(instructionEn, lang);
+      if (translated && translated.toLowerCase() !== instructionEn.toLowerCase()) {
+        result[lang] = translated;
+      }
+    })
+  );
+  return result;
+}
+
 function NavTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
   const [items, setItems] = useState([]);
   const [road, setRoad] = useState('');
@@ -289,8 +316,11 @@ function NavTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
     if (!instruction.trim() || !lat || !lon) return;
     setSaving(true);
     try {
+      // Auto-translate the English instruction into all supported app languages
+      const translations = await buildTranslations(instruction.trim());
       const item = await addAdminNavOverride(user, {
         road: road.trim(), direction, instruction: instruction.trim(),
+        translations,   // stored as { en: '...', cs: '...', de: '...', etc. }
         towards: towards.trim(), lat: parseFloat(lat), lon: parseFloat(lon),
         radius: parseFloat(radius) || 100,
       });
@@ -325,8 +355,9 @@ function NavTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
       <Field label="Towards (place name shown on sign)">
         <Input value={towards} onChange={setTowards} placeholder="e.g. Stříbro, Tachov" />
       </Field>
-      <Field label="Custom instruction text (spoken)">
+      <Field label="Custom instruction text (type in English — auto-translated to all languages)">
         <Input value={instruction} onChange={setInstruction} placeholder="e.g. Turn right towards Stříbro" />
+        <p className="text-[11px] text-muted-foreground mt-1">✅ Will be auto-translated into cs, de, pl, sk, fr, it, ru, uk, hu, ro, es, bg on save.</p>
       </Field>
       <Field label="Trigger radius (metres)">
         <Input value={radius} onChange={setRadius} placeholder="100" type="number" />
@@ -343,7 +374,7 @@ function NavTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
       </Field>
       <button onClick={save} disabled={saving || !instruction.trim() || !lat || !lon}
         className="w-full py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-green-700 active:scale-95 transition-all">
-        {saving ? 'Saving…' : '+ Add Override'}
+        {saving ? '🌐 Translating & Saving…' : '+ Add Override'}
       </button>
 
       {items.length > 0 && (
