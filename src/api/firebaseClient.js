@@ -332,6 +332,13 @@ export const addAdminPOI = async (user, data) => {
   const ref = await addDoc(collection(db, 'admin_pois'), payload);
   return { id: ref.id, ...payload };
 };
+export const updateAdminPOI = async (user, id, data) => {
+  requireSuperAdmin(user);
+  const { db } = getFirebaseServices();
+  const payload = { ...data, updated_at: new Date().toISOString() };
+  await updateDoc(doc(db, 'admin_pois', id), payload);
+  return { id, ...payload };
+};
 export const deleteAdminPOI = async (user, id) => {
   requireSuperAdmin(user);
   const { db } = getFirebaseServices();
@@ -378,6 +385,48 @@ export const deleteAdminNavOverride = async (user, id) => {
   requireSuperAdmin(user);
   const { db } = getFirebaseServices();
   await deleteDoc(doc(db, 'admin_nav_overrides', id));
+};
+
+// Road number overrides
+export const getAdminRoadOverrides = async () => {
+  const { db } = getFirebaseServices();
+  try {
+    const q = query(collection(db, 'admin_road_overrides'), orderBy('created_at', 'desc'), limit(500));
+    return (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch { return []; }
+};
+export const addAdminRoadOverride = async (user, data) => {
+  requireSuperAdmin(user);
+  const { db } = getFirebaseServices();
+  const payload = { ...data, created_at: new Date().toISOString(), created_by: user.email };
+  const ref = await addDoc(collection(db, 'admin_road_overrides'), payload);
+  return { id: ref.id, ...payload };
+};
+export const deleteAdminRoadOverride = async (user, id) => {
+  requireSuperAdmin(user);
+  const { db } = getFirebaseServices();
+  await deleteDoc(doc(db, 'admin_road_overrides', id));
+};
+
+// E-route overrides
+export const getAdminERouteOverrides = async () => {
+  const { db } = getFirebaseServices();
+  try {
+    const q = query(collection(db, 'admin_eroute_overrides'), orderBy('created_at', 'desc'), limit(500));
+    return (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch { return []; }
+};
+export const addAdminERouteOverride = async (user, data) => {
+  requireSuperAdmin(user);
+  const { db } = getFirebaseServices();
+  const payload = { ...data, created_at: new Date().toISOString(), created_by: user.email };
+  const ref = await addDoc(collection(db, 'admin_eroute_overrides'), payload);
+  return { id: ref.id, ...payload };
+};
+export const deleteAdminERouteOverride = async (user, id) => {
+  requireSuperAdmin(user);
+  const { db } = getFirebaseServices();
+  await deleteDoc(doc(db, 'admin_eroute_overrides', id));
 };
 
 export const base44 = {

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 import { Plus, Settings, Crosshair, HelpCircle, Trash2, WifiOff, Sparkles } from 'lucide-react';
 import SubscriptionModal from '../components/SubscriptionModal';
-import { getPublicSpots, createSpot, deleteSpot, updateSpot, getAdminPOIs, getAdminClosures } from '@/api/firebaseClient';
+import { getPublicSpots, createSpot, deleteSpot, updateSpot, getAdminPOIs, getAdminClosures, getAdminERouteOverrides, getAdminRoadOverrides } from '@/api/firebaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
 import { useNavigate } from 'react-router-dom';
@@ -77,13 +77,17 @@ export default function Home() {
   const [adminPOIs, setAdminPOIs] = useState([]);
   const [adminClosures, setAdminClosures] = useState([]);
   const [adminNavMode, setAdminNavMode] = useState(false);
+  const [adminERouteOverrides, setAdminERouteOverrides] = useState([]);
+  const [adminRoadOverrides, setAdminRoadOverrides] = useState([]);
   const adminMapClickRef = useRef(null);
 
+  // Load admin map data for all users (POIs, closures, E-route markers visible to everyone)
   useEffect(() => {
-    if (!isSuperAdmin) return;
     getAdminPOIs().then(setAdminPOIs);
     getAdminClosures().then(setAdminClosures);
-  }, [isSuperAdmin]);
+    getAdminERouteOverrides().then(setAdminERouteOverrides);
+    getAdminRoadOverrides().then(setAdminRoadOverrides);
+  }, []);
   const mapRef = useRef(null);
  
  
@@ -295,6 +299,8 @@ export default function Home() {
         adminPOIs={adminPOIs}
         adminClosures={adminClosures}
         adminNavMode={adminNavMode}
+        adminERouteOverrides={adminERouteOverrides}
+        adminRoadOverrides={adminRoadOverrides}
         onAdminMapClick={(coords) => { adminMapClickRef.current?.(coords); }}
       />
  
@@ -304,6 +310,12 @@ export default function Home() {
         mapCenter={mapCenter}
         showSpots={showSpots}
         onToggleSpots={() => setShowSpots(v => !v)}
+        spots={spots}
+        onSelectSpot={(spot) => {
+          setSelectedSpot(spot);
+          setFlyTo([spot.lat, spot.lng]);
+          setTimeout(() => setFlyTo(null), 1000);
+        }}
         onNavigate={(destination) => {
           if (!userPos) return alert(t('home.locationUnavailable'));
           startNavTo(destination);
@@ -539,6 +551,8 @@ export default function Home() {
               setTimeout(() => {
                 getAdminPOIs().then(setAdminPOIs);
                 getAdminClosures().then(setAdminClosures);
+                getAdminERouteOverrides().then(setAdminERouteOverrides);
+                getAdminRoadOverrides().then(setAdminRoadOverrides);
               }, 800);
             };
             setAdminNavMode(mode);

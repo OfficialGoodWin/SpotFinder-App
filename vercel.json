@@ -4,6 +4,16 @@
   "devCommand": "npm run dev",
   "headers": [
     {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "X-XSS-Protection", "value": "1; mode=block" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "geolocation=(self), microphone=(self), camera=(self)" }
+      ]
+    },
+    {
       "source": "/manifest.json",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=3600" }
@@ -20,6 +30,10 @@
     {
       "source": "/gplaces/:path*",
       "destination": "https://maps.googleapis.com/maps/api/place/:path*"
+    },
+    {
+      "source": "/nominatim/:path*",
+      "destination": "https://nominatim.openstreetmap.org/:path*"
     },
     {
 <<<<<<< Updated upstream
