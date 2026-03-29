@@ -2,27 +2,78 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Allow anyone to read public spots
-    match /spots/{spotId} {
-      allow read: if true;
-      // Allow authenticated users to create spots
-      allow create: if request.auth != null;
-      // Allow spot owners to update their own spots
-      allow update: if request.auth != null && resource.data.created_by == request.auth.token.email;
-      // Allow spot owners to delete their own spots
-      allow delete: if request.auth != null && resource.data.created_by == request.auth.token.email;
-    }
-    
-    // Allow authenticated users to read and create ratings
-    match /ratings/{ratingId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function isAuth() { return request.auth != null; }
+    function isSuperAdmin() {
+      return isAuth() && request.auth.token.email == 'superadmin@spotfinder.cz';
     }
 
-    // Allow anyone (including guests) to submit feedback
+    // ── Public spots ─────────────────────────────────────────────────────────
+    match /spots/{spotId} {
+      allow read: if true;
+      allow create: if isAuth();
+      allow update: if isAuth() && resource.data.created_by == request.auth.token.email;
+      allow delete: if isAuth() && (
+        resource.data.created_by == request.auth.token.email || isSuperAdmin()
+      );
+    }
+
+    // ── Ratings ──────────────────────────────────────────────────────────────
+    match /ratings/{ratingId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+    }
+
+    // ── POI community photos and ratings (public read, auth write) ────────────
+    match /poi_photos/{docId} {
+      allow read: if true;
+      allow create: if isAuth();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /poi_ratings/{docId} {
+      allow read: if true;
+      allow create: if isAuth();
+      allow delete: if isSuperAdmin();
+    }
+
+    // ── IP bans (superadmin only) ─────────────────────────────────────────────
+    match /ip_bans/{ip} {
+      allow read: if isSuperAdmin();
+      allow write: if isSuperAdmin();
+    }
+
+    // ── Admin-only collections ────────────────────────────────────────────────
+    match /admin_pois/{docId} {
+      allow read: if true;           // everyone can read custom POIs to display on map
+      allow write: if isSuperAdmin();
+    }
+
+    match /admin_closures/{docId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /admin_nav_overrides/{docId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /admin_road_overrides/{docId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /admin_eroute_overrides/{docId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    // ── Feedback (public submit, admin read) ─────────────────────────────────
     match /feedback/{docId} {
       allow create: if true;
+      allow read, delete: if isSuperAdmin();
     }
   }
 }

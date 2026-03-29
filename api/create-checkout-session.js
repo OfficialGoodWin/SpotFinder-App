@@ -15,12 +15,40 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2024-06-20',
 });
 
+// Simple in-memory rate limiter (resets on cold start, good enough for serverless)
+const rateLimitMap = new Map();
+const RATE_LIMIT = 10;       // max requests
+const RATE_WINDOW = 60000;   // per 60 seconds
+
+function isRateLimited(ip) {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip) || { count: 0, start: now };
+  if (now - entry.start > RATE_WINDOW) {
+    rateLimitMap.set(ip, { count: 1, start: now });
+    return false;
+  }
+  entry.count += 1;
+  rateLimitMap.set(ip, entry);
+  return entry.count > RATE_LIMIT;
+}
+
+const ALLOWED_ORIGINS = ['https://spotfinder.cz', 'https://www.spotfinder.cz'];
+
 export default async function handler(req, res) {
-  // CORS headers — allow requests from your own domain only
-  const origin = req.headers.origin || '*';
-  res.setHeader('Access-Control-Allow-Origin', origin);
+  // CORS — restrict to own domain in production
+  const origin = req.headers.origin || '';
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : (origin.startsWith('http://localhost') ? origin : 'https://spotfinder.cz');
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Vary', 'Origin');
+
+  // Rate limiting
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
+  if (isRateLimited(ip)) {
+    res.setHeader('Retry-After', '60');
+    return res.status(429).json({ message: 'Too many requests. Please try again later.' });
+  }
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();

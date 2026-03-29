@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx firebase-tools deploy --only firestore:rules)",
+      "Bash(npx firebase-tools projects:list)",
+      "Bash(npx firebase-tools deploy --only firestore:rules --project spotfinderapp-cdc7b)"
+    ]
+  }
+}
