@@ -606,8 +606,14 @@ function RoadsTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
   };
 
   const remove = async (id) => {
-    await deleteAdminRoadOverride(user, id);
-    setItems(prev => prev.filter(x => x.id !== id));
+    if (!confirm('Delete this road marker?')) return;
+    try {
+      await deleteAdminRoadOverride(user, id);
+      setItems(prev => prev.filter(x => x.id !== id));
+    } catch (err) {
+      console.error('Failed to delete road marker:', err);
+      alert('Failed to delete road marker');
+    }
   };
 
   return (

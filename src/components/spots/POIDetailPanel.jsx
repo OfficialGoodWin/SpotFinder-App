@@ -264,7 +264,7 @@ function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavig
 
   return (
     <div className="fixed left-0 right-0 z-[1200] bg-white dark:bg-card shadow-2xl border-t border-gray-100 dark:border-border rounded-t-2xl"
-      style={{ bottom: 56 }}>
+      style={{ bottom: 0 }}>
       <button className="w-full flex justify-center pt-2.5 pb-0" onClick={onExpand}>
         <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-border" />
       </button>
@@ -298,7 +298,7 @@ function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavig
         <ChevronUp className="w-4 h-4 text-muted-foreground flex-shrink-0 mr-8" />
       </div>
 
-      <div className="flex items-center gap-2 px-4 pb-4">
+      <div className="flex items-center gap-2 px-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
         <ActionBtn icon={Navigation} label={t('poiDetail.navigate')} onClick={onNavigate} color={category.color} />
         <ActionBtn icon={Share2} label={t('poiDetail.share')} onClick={onShare} />
         <ActionBtn icon={Camera} label={t('poiDetail.addPhoto')} onClick={onAddPhoto} disabled={!user} />
@@ -368,7 +368,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
         </div>
 
         <div className="overflow-y-auto overscroll-contain" style={{ maxHeight: 'calc(92vh - 200px)' }}>
-          <div className="px-5 pt-4 pb-10">
+          <div className="px-5 pt-4" style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
             <h1 className="text-xl font-bold text-foreground leading-tight">{poi.name}</h1>
             <div className="mt-1.5 mb-4">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-white"

@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "179466659021",
+    "project_id": "spotfinderapp-cdc7b",
+    "storage_bucket": "spotfinderapp-cdc7b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:179466659021:android:027f82e10e6ef919d23584",
+        "android_client_info": {
+          "package_name": "com.spotfinder.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "179466659021-6aih4fd3rrnp39730s365knqsijlrbtt.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBhqIZwRdYZL9zGJRSIJm7z1VCVyydplNE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "179466659021-6aih4fd3rrnp39730s365knqsijlrbtt.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

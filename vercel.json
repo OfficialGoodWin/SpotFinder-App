@@ -36,13 +36,6 @@
       "destination": "https://nominatim.openstreetmap.org/:path*"
     },
     {
-<<<<<<< Updated upstream
-=======
-      "source": "/tiles/:path*",
-      "destination": "https://github.com/yourusername/SpotFinder/releases/download/maps-v1/:path*"
-    },
-    {
->>>>>>> Stashed changes
       "source": "/(.*)",
       "destination": "/index.html"
     }

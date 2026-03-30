@@ -273,7 +273,7 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 dark:border-border flex gap-3 flex-wrap">
+        <div className="px-6 py-4 border-t border-gray-100 dark:border-border flex gap-3 flex-wrap" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
           {(isOwner || isSuperAdmin) && (
             <>
               {isOwner && (

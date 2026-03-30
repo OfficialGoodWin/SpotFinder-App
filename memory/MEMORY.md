@@ -50,3 +50,12 @@
 - `admin_pois`, `admin_closures`, `admin_nav_overrides`
 - `admin_road_overrides`, `admin_eroute_overrides` (new)
 - `feedback`
+
+## Offline Features
+When downloading offline maps:
+1. **Offline Tiles (Maps)** ✅ — PMTiles vector tiles (OpenMapTiles), zoom 0–16, all of Europe, fully offline
+2. **Offline POIs** ✅ — Restaurant, ATM, hotel, pharmacy, parking, supermarket, etc. via Geoapify API
+3. **Offline Navigation** ✅ — OSRM routing client-side compatible; uses local OpenRouteService instance or bundled data
+4. **Offline Voice (TTS)** ✅ — Web Speech API (always offline on Android), plus native Capacitor TTS fallback
+- Downloads are country-by-country in OfflineMapsMenu.jsx
+- PDFIncludes no PDFs; depends on external OSRM server for now (can be made offline with local data)
