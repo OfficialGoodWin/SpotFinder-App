@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/lib/LanguageContext';
  
 import MapLayerSwitcher from '../components/map/MapLayerSwitcher';
+import ZoomSlider from '../components/map/ZoomSlider';
 import SearchBar from '../components/map/SearchBar';
 import MapLibreMap from '../components/map/MapLibreMap';
 import SuperAdminEditor from '../components/map/SuperAdminEditor';
@@ -367,6 +368,9 @@ export default function Home() {
  
  
  
+      {/* Zoom half-circle slider — right edge */}
+      <ZoomSlider mapRef={mapRef} />
+
       {/* Bottom bar */}
       <div className="absolute bottom-0 inset-x-0 z-[1000]">
         {/* FAB — green + floating above bar */}

@@ -12,7 +12,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import maplibregl from 'maplibre-gl';
 import { Protocol } from 'pmtiles';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { lightStyle, darkStyle } from '../../lib/mapStyle.js';
+import { lightStyle, darkStyle, outdoorStyle, winterStyle } from '../../lib/mapStyle.js';
 import { AMBIENT_CATEGORIES } from '../../lib/ambientCategories.js';
 import { COUNTRIES, isPointInCountry, getDownloadedCountryAt, vtKey } from '../../lib/vectorTileDownloader.js';
 import { getAllMeta, getPOIs, getTile } from '../../lib/offlineStorage.js';
@@ -436,6 +436,14 @@ function reRegisterShieldListener(map) {
   });
 }
 
+function getMapStyle(mapLayer, isDark) {
+  switch (mapLayer) {
+    case 'outdoor': return outdoorStyle(isDark);
+    case 'winter':  return winterStyle(isDark);
+    default:        return isDark ? darkStyle : lightStyle;
+  }
+}
+
 export default function MapLibreMap({
   center, flyTo, fitBoundsData, zoomToArea, setMapRef,
   addMode, onMapClick,
@@ -486,7 +494,7 @@ export default function MapLibreMap({
 
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: isDark ? darkStyle : lightStyle,
+      style: getMapStyle(mapLayer, isDark),
       center: [center.lng, center.lat],
       zoom: 13,
       minZoom: 3,
@@ -535,7 +543,7 @@ export default function MapLibreMap({
     async function checkOffline() {
       if (isOnline) {
         if (offlineActive) {
-          map.setStyle(isDark ? darkStyle : lightStyle);
+          map.setStyle(getMapStyle(mapLayer, isDark));
           setOfflineActive(false);
           setOfflineCountry('');
         }
@@ -556,7 +564,7 @@ export default function MapLibreMap({
       if (found) {
         // Switch to offline-vt:// source — served from IndexedDB
         const offlineStyle = {
-          ...(isDark ? darkStyle : lightStyle),
+          ...getMapStyle(mapLayer, isDark),
           sources: {
             v: {
               type: 'vector',
@@ -576,22 +584,21 @@ export default function MapLibreMap({
 
     checkOffline();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOnline, isDark]);
+  }, [isOnline, isDark, mapLayer]);
 
   // ── Dark mode ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current;
     if (!map || offlineActive) return;
     const doSwitch = () => {
-      map.setStyle(isDark ? darkStyle : lightStyle);
+      map.setStyle(getMapStyle(mapLayer, isDark));
       map.once('idle', () => {
         map.triggerRepaint();
-        // E-routes embedded in shields, no separate layer needed
       });
     };
     if (!map.isStyleLoaded()) map.once('idle', doSwitch);
     else doSwitch();
-  }, [isDark, offlineActive]);
+  }, [isDark, offlineActive, mapLayer]);
 
   // ── Cursor ─────────────────────────────────────────────────────────────────
   useEffect(() => {
