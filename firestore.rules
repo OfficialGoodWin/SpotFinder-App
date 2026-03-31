@@ -39,7 +39,13 @@ service cloud.firestore {
     // ── POI data - public read for map display ────────────────────────────────
     match /pois/{document=**} {
       allow read: if true;
-      allow write: if false;  // Block writes to prevent "Block POI failed"
+      allow write: if isSuperAdmin();  // Allow superadmin to write to POIs
+    }
+
+    // ── Deleted ambient POIs (superadmin blocklist) ───────────────────────────
+    match /admin_deleted_pois/{docId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
     }
 
     // ── IP bans (superadmin only) ─────────────────────────────────────────────

@@ -127,16 +127,40 @@ const PLATE_LOOKUP = {
   '605': 'D2', '18701': 'D2', '27': 'E53', 'E53': 'E53',
   // Czech motorways/expressways → add more as needed
   'D0': 'D0', 'D1': 'D1', 'D2': 'D2', 'D5': 'D5', 'D8': 'D8', 
-  'R10': 'R10', 'R35': 'R35', 'R48': 'R48'
+  'R10': 'R10', 'R35': 'R35', 'R48': 'R48',
+  // Add more road numbers as needed
+  'E50': 'E50', 'E65': 'E65', 'E75': 'E75', 'E462': 'E462',
+  'E442': 'E442', 'E55': 'E55', 'E49': 'E49', 'E48': 'E48',
+  'E67': 'E67', 'E40': 'E40', 'E59': 'E59', 'E461': 'E461'
+};
+
+// Direction labels for major cities
+const DIRECTION_LABELS = {
+  'Brno': 'Brno',
+  'Praha': 'Praha',
+  'Plzeň': 'Plzeň',
+  'Ostrava': 'Ostrava',
+  'Olomouc': 'Olomouc',
+  'Liberec': 'Liberec',
+  'Hradec': 'Hradec Králové',
+  'Pardubice': 'Pardubice',
+  'České': 'České Budějovice',
+  'Jihlava': 'Jihlava',
+  'Zlín': 'Zlín',
+  'Karlovy': 'Karlovy Vary'
 };
 
 function filterRef(ref) {
   if (!ref) return '';
   const parts = ref.split(/[\s;,/]+/).map(p => p.trim()).filter(Boolean);
-  return parts.filter(p => {
+  return parts.map(p => {
     const plate = PLATE_LOOKUP[p];
-    return plate ? `${p} (${plate})` : p && !/^E\d+$/i.test(p);
-  }).join(' ').trim();
+    if (plate) {
+      // Return road number with plate styling
+      return `<span class="px-1 py-0.5 bg-blue-600 text-white rounded font-bold text-xs">${plate}</span>`;
+    }
+    return p && !/^E\d+$/i.test(p) ? p : '';
+  }).filter(Boolean).join(' ').trim();
 }
 function cleanName(name) {
   const s = (name || '').trim();
@@ -147,11 +171,23 @@ function cleanName(name) {
 function buildRoadLabel(name, ref) {
   const cleanRef = filterRef(ref);
   const sanitised = cleanName(name);
+  
+  // Check for direction labels
+  let direction = '';
+  if (sanitised) {
+    for (const [key, value] of Object.entries(DIRECTION_LABELS)) {
+      if (sanitised.includes(key)) {
+        direction = ` <span class="text-green-500">→ ${value}</span>`;
+        break;
+      }
+    }
+  }
+  
   if (!cleanRef && !sanitised) return '';
   if (!sanitised) return cleanRef;
-  if (!cleanRef)  return sanitised;
-  if (sanitised === cleanRef) return cleanRef;
-  return `${sanitised} (${cleanRef})`;
+  if (!cleanRef) return sanitised + direction;
+  if (sanitised === cleanRef) return cleanRef + direction;
+  return `${sanitised} ${cleanRef}${direction}`;
 }
 
 // ─── Distance / time formatters ───────────────────────────────────────────────
@@ -434,15 +470,35 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
     setLoading(false);
   };
 
-  const fetchRoute = async () => {
+  const fetchRoute = async (subMode = 'fastest') => {
     setLoading(true); setIsNavigating(false); isNavigatingRef.current = false;
     setSteps([]); stepsRef.current = []; setAllRoutes([]);
 
     // FIX: pass profile key directly — no more .replace('-', '/') which broke cycling/walking
     const profile = ROUTE_TYPE_KEYS.find(r => r.id === routeType)?.profile || 'driving-car';
+    
+    // Apply route options based on carSubMode
+    const options = {};
+    if (routeType === 'car_fast') {
+      switch (subMode) {
+        case 'fastest':
+          options.preference = 'fastest';
+          break;
+        case 'shortest':
+          options.preference = 'shortest';
+          break;
+        case 'eco':
+          options.preference = 'recommended';
+          break;
+        case 'ev':
+          options.preference = 'recommended';
+          options.vehicle_type = 'electric';
+          break;
+      }
+    }
 
     try {
-      const result = await getOSRMRoute(from, to, profile);
+      const result = await getOSRMRoute(from, to, profile, options);
 
       if (!result?.geometry?.length) throw new Error('No route geometry');
 
@@ -497,7 +553,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
       // Walking fallback only if car route fails
       if (profile === 'driving-car') {
         try {
-          const walk = await getOSRMRoute(from, to, 'foot-hiking');
+          const walk = await getOSRMRoute(from, to, 'foot-hiking', {});
           const routes = [walk];
           setAllRoutes(routes);
           updateRouteDisplay(routes, 0);
@@ -634,13 +690,13 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
                 </div>
                 <div className="w-px h-10 bg-gray-300 dark:bg-border" />
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-foreground">{formatTime(route?.properties?.duration || 0)}</p>
-                  <p className="text-xs text-muted-foreground">Time</p>
+                  <p className="text-2xl font-bold text-foreground">{etaString}</p>
+                  <p className="text-xs text-muted-foreground">ETA</p>
                 </div>
                 <div className="w-px h-10 bg-gray-300 dark:bg-border" />
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-foreground">{etaString}</p>
-                  <p className="text-xs text-muted-foreground">ETA</p>
+                  <p className="text-2xl font-bold text-foreground">{formatTime(route?.properties?.duration || 0)}</p>
+                  <p className="text-xs text-muted-foreground">Time</p>
                 </div>
               </div>
 
@@ -714,11 +770,18 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
             {/* Center: time remaining + ETA */}
             <div className="flex-1 flex flex-col items-center">
               <p className="text-2xl font-black text-foreground leading-none">
-                {formatTime(route?.properties?.duration || 0)}
+                {etaString}
               </p>
-              <p className="text-xs text-muted-foreground mt-0.5">Time</p>
-                  <p className="text-xs text-muted-foreground">ETA</p>
-                </div>
+              <p className="text-xs text-muted-foreground mt-0.5">ETA</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                <button 
+                  onClick={() => setUse24hTime(!use24hTime)} 
+                  className="text-xs underline text-primary"
+                >
+                  {use24hTime ? '12h' : '24h'}
+                </button>
+              </p>
+            </div>
 
             {/* Right: distance to destination */}
             <div className="flex flex-col items-end flex-shrink-0">
@@ -734,10 +797,10 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
             <div className="px-4 pb-8 border-t border-border pt-3 flex flex-col gap-2">
               {/* Cancel navigation */}
               <button
-onClick={handleCancelNav}
-          className="w-full py-3 rounded-2xl bg-red-500 text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all">
-          <X className="w-4 h-4" /> Cancel Navigation
-        </button>
+                onClick={() => onClose(true)}
+                className="w-full py-3 rounded-2xl bg-red-500 text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all">
+                <X className="w-4 h-4" /> Cancel Navigation
+              </button>
 
               <div className="grid grid-cols-2 gap-2">
                 {/* Change map style */}

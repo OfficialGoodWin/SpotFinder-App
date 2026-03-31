@@ -141,17 +141,16 @@ function PlanCard({ plan, user, onClose }) {
       }}
     >
       {/* Popular badge */}
-{plan.popular && (
+      {/* Header */}
+      <div className="p-6 pb-4">
+        {plan.popular && (
           <div
             className="absolute top-1.5 right-1.5 px-3 py-1 rounded-full text-xs font-bold tracking-wide z-30 backdrop-blur-sm"
             style={{ background: plan.badgeBg, color: plan.accentColor, border: `1px solid ${plan.borderColor}` }}
           >
           ✦ MOST POPULAR
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="p-6 pb-4">
+          </div>
+        )}
         <div className="flex items-center gap-3 mb-2">
           <div
             className="w-10 h-10 rounded-2xl flex items-center justify-center"
@@ -267,7 +266,8 @@ export default function SubscriptionModal({ onClose, user }) {
         style={{ 
           background: isDark ? '#0a0a0a' : '#ffffff', 
           border: isDark ? '1px solid #222' : '1px solid #e5e7eb', 
-          maxHeight: '92vh' 
+          maxHeight: '92vh',
+          color: isDark ? '#ffffff' : '#000000'
         }}
       >
         {/* Close button */}

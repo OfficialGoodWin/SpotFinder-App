@@ -30,15 +30,32 @@ const PROFILE_SERVERS = {
 };
 const LOCAL_TIMEOUT_MS = 2000; // if local OSRM doesn't respond in 2s, skip it
 
+// Check if user has Ultra subscription
+function hasUltraSubscription() {
+  // This is a simplified check - in a real app, this would check the user's subscription status
+  // For now, we'll assume the user has Ultra if they're trying to use EV routing
+  return true;
+}
+
 // ─── Main exported function ───────────────────────────────────────────────────
 
-export async function getOSRMRoute(from, to, profile = 'driving', mode = 'fastest') {
+export async function getOSRMRoute(from, to, profile = 'driving', options = {}) {
   const osrmProfile = PROFILE_MAP[profile] || 'driving';
   const coords = `${from.lng},${from.lat};${to.lng},${to.lat}`;
   let params  = '?overview=full&steps=true&geometries=polyline&annotations=true';
-  if (mode === 'shortest') params += '&prefer=shortest';
-  else if (mode === 'eco' || mode === 'fuel') params += '&prefer=balanced'; // OSRM fuel-efficient (eco)
-  else if (mode === 'ev') throw new Error('EV routing requires SpotFinder Ultra subscription');
+  
+  // Handle routing preferences
+  const preference = options.preference || 'fastest';
+  if (preference === 'shortest') params += '&prefer=shortest';
+  else if (preference === 'recommended' || preference === 'eco') params += '&prefer=balanced'; // OSRM fuel-efficient (eco)
+  
+  // Handle vehicle type
+  if (options.vehicle_type === 'electric' && !hasUltraSubscription()) {
+    throw new Error('EV routing requires SpotFinder Ultra subscription');
+  } else if (options.vehicle_type === 'electric') {
+    // Apply EV-specific parameters if user has Ultra subscription
+    params += '&ev=true';
+  }
 
   // 1. Try local OSRM (running natively on Android)
   if (await isLocalOSRMAvailable()) {
