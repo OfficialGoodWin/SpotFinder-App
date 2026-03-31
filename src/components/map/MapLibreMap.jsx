@@ -381,13 +381,14 @@ async function fetchAmbientPOIs(south, west, north, east, zoom, signal) {
 // Registered once on map load; survives style changes via 'styleimagemissing'.
 function createOnewayArrowImage() {
   const W = 20, H = 20;
+  // Gray arrow color — subtle, visible on all road colors
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, W, H);
 
-  // Draw a solid right-pointing arrow (chevron/triangle)
-  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  // Draw a solid right-pointing arrow (chevron/triangle) in gray
+  ctx.fillStyle = 'rgba(136,136,136,0.85)';
   ctx.beginPath();
   // Head: right-pointing filled triangle
   ctx.moveTo(14, H / 2);
@@ -397,7 +398,7 @@ function createOnewayArrowImage() {
   ctx.fill();
 
   // Tail line
-  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+  ctx.strokeStyle = 'rgba(136,136,136,0.85)';
   ctx.lineWidth = 2.5;
   ctx.lineCap = 'round';
   ctx.beginPath();
@@ -454,6 +455,7 @@ export default function MapLibreMap({
   isDark, mapLayer,
   adminPOIs, adminClosures, adminNavMode, onAdminMapClick,
   adminERouteOverrides, adminRoadOverrides,
+  deletedAmbientPOIIds = [],
 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
@@ -461,6 +463,12 @@ export default function MapLibreMap({
   const routeAdded = useRef(false);
   const poiAbort = useRef(null);
   const poiTimer = useRef(null);
+  // ── addMode ref — avoids stale closure in map.on('click') ─────────────────
+  const addModeRef = useRef(addMode);
+  useEffect(() => { addModeRef.current = addMode; }, [addMode]);
+  // ── deletedAmbientPOIIds ref — so ambient POI effect can read latest value ─
+  const deletedAmbientPOIIdsRef = useRef(deletedAmbientPOIIds);
+  useEffect(() => { deletedAmbientPOIIdsRef.current = deletedAmbientPOIIds; }, [deletedAmbientPOIIds]);
   const [offlineActive, setOfflineActive] = useState(false);
   const [offlineCountry, setOfflineCountry] = useState('');
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -504,7 +512,8 @@ export default function MapLibreMap({
     });
 
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
-    map.on('click', e => { if (addMode) onMapClick?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }); });
+    // Use ref so the handler always reads the current addMode value (avoids stale closure)
+    map.on('click', e => { if (addModeRef.current) onMapClick?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }); });
 
     // Register shield image listener — generates signs on demand via styleimagemissing
     registerShieldListener(map);
@@ -732,6 +741,9 @@ export default function MapLibreMap({
       clear();
       for (const poi of pois) {
         const size = zoom >= 16 ? 32 : zoom >= 14 ? 28 : 24;
+        // Filter out superadmin-blocked ambient POIs
+        const blockedId = `${poi.lat?.toFixed(5)}_${poi.lon?.toFixed(5)}_${(poi.name || '').replace(/\s+/g, '_')}`;
+        if (deletedAmbientPOIIdsRef.current.includes(blockedId)) continue;
         const el = makeDot(poi._cat.icon, poi._cat.color, size);
         const mk = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([poi.lon, poi.lat]).addTo(map);
         el.addEventListener('click', e => { e.stopPropagation(); onSelectPOI?.(poi, poi._cat); });

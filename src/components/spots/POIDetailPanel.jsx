@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Navigation, Share2, Camera, Star, Phone, Mail, Globe, MapPin, ChevronUp, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Navigation, Share2, Camera, Star, Phone, Mail, Globe, MapPin, ChevronUp, Clock, ChevronLeft, ChevronRight, Ban } from 'lucide-react';
 import { getPOIPhotos, getPOIRatings, addPOIPhoto, addPOIRating, uploadSpotImage, makePOIId } from '@/api/firebaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 
@@ -257,7 +257,7 @@ function ContactRow({ icon: Icon, value, href }) {
 }
 
 // ─── Mini bar ─────────────────────────────────────────────────────────────────
-function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavigate, onShare, onAddPhoto, user, onOpenLightbox }) {
+function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavigate, onShare, onAddPhoto, user, onOpenLightbox, isSuperAdmin, onBlockPOI }) {
   const { t } = useLanguage();
   const avg = sfRating?.count > 0 ? sfRating.avg : 0;
   const count = sfRating?.count || 0;
@@ -302,13 +302,16 @@ function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavig
         <ActionBtn icon={Navigation} label={t('poiDetail.navigate')} onClick={onNavigate} color={category.color} />
         <ActionBtn icon={Share2} label={t('poiDetail.share')} onClick={onShare} />
         <ActionBtn icon={Camera} label={t('poiDetail.addPhoto')} onClick={onAddPhoto} disabled={!user} />
+        {isSuperAdmin && (
+          <ActionBtn icon={Ban} label="Block POI" onClick={onBlockPOI} color="#ef4444" />
+        )}
       </div>
     </div>
   );
 }
 
 // ─── Full sheet ───────────────────────────────────────────────────────────────
-function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavigate, onShare, onAddPhoto, onSubmitRating, user, onOpenLightbox }) {
+function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavigate, onShare, onAddPhoto, onSubmitRating, user, onOpenLightbox, isSuperAdmin, onBlockPOI }) {
   const { t } = useLanguage();
   const [ratingVal, setRatingVal] = useState(0);
   const [ratingComment, setRatingComment] = useState('');
@@ -381,6 +384,9 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
               <ActionBtn icon={Navigation} label={t('poiDetail.navigate')} onClick={onNavigate} color={category.color} />
               <ActionBtn icon={Share2} label={t('poiDetail.share')} onClick={onShare} />
               <ActionBtn icon={Camera} label={t('poiDetail.addPhoto')} onClick={onAddPhoto} disabled={!user} />
+              {isSuperAdmin && (
+                <ActionBtn icon={Ban} label="Block POI" onClick={onBlockPOI} color="#ef4444" />
+              )}
             </div>
 
             <div className="h-px bg-gray-100 dark:bg-border mb-4" />
@@ -527,7 +533,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
-export default function POIDetailPanel({ poi, category, onClose, onNavigate, user }) {
+export default function POIDetailPanel({ poi, category, onClose, onNavigate, user, isSuperAdmin, onBlockPOI }) {
   const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   const [sfPhotos, setSfPhotos] = useState([]);
@@ -586,6 +592,12 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
   };
 
   const handleNavigate = () => { onNavigate?.({ lat: poi.lat, lng: poi.lon, label: poi.name }); onClose(); };
+  const handleBlockPOI = () => {
+    if (window.confirm(`Block "${poi.name}" from ever appearing again?`)) {
+      onBlockPOI?.(poi);
+      onClose();
+    }
+  };
 
   // All photos merged for lightbox
   const allPhotoUrls = [
@@ -600,6 +612,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
     onClose, onNavigate: handleNavigate, onShare: handleShare,
     onAddPhoto: handleAddPhoto, user,
     onOpenLightbox: (i) => setLightboxIndex(i),
+    isSuperAdmin, onBlockPOI: handleBlockPOI,
   };
 
   return (

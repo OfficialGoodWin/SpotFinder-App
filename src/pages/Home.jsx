@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 import { Plus, Settings, Crosshair, HelpCircle, Trash2, WifiOff, Sparkles } from 'lucide-react';
 import SubscriptionModal from '../components/SubscriptionModal';
-import { getPublicSpots, createSpot, deleteSpot, updateSpot, getAdminPOIs, getAdminClosures, getAdminERouteOverrides, getAdminRoadOverrides } from '@/api/firebaseClient';
+import { getPublicSpots, createSpot, deleteSpot, updateSpot, getAdminPOIs, getAdminClosures, getAdminERouteOverrides, getAdminRoadOverrides, getDeletedAmbientPOIs, addDeletedAmbientPOI } from '@/api/firebaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
 import { useNavigate } from 'react-router-dom';
@@ -71,6 +71,21 @@ export default function Home() {
   const [selectedPOI, setSelectedPOI] = useState(null);
   const [selectedPOIDirectCat, setSelectedPOIDirectCat] = useState(null);
   const [poiLoading, setPoiLoading] = useState(false);
+
+  // ── Deleted ambient POIs (superadmin blocklist) ────────────────────────────
+  const [deletedAmbientPOIIds, setDeletedAmbientPOIIds] = useState([]);
+  useEffect(() => {
+    getDeletedAmbientPOIs().then(docs => setDeletedAmbientPOIIds(docs.map(d => d.poiId)));
+  }, []);
+
+  const handleBlockAmbientPOI = async (poi) => {
+    if (!user) return;
+    const poiId = `${poi.lat?.toFixed(5)}_${poi.lon?.toFixed(5)}_${(poi.name || '').replace(/\s+/g, '_')}`;
+    try {
+      await addDeletedAmbientPOI(user, { poiId, name: poi.name || '', lat: poi.lat, lon: poi.lon });
+      setDeletedAmbientPOIIds(prev => [...prev, poiId]);
+    } catch (e) { console.error('Block POI failed:', e); }
+  };
 
   // ── Superadmin editor state ────────────────────────────────────────────────
   const isSuperAdmin = user?.email === 'superadmin@spotfinder.cz';
@@ -303,6 +318,7 @@ export default function Home() {
         adminERouteOverrides={adminERouteOverrides}
         adminRoadOverrides={adminRoadOverrides}
         onAdminMapClick={(coords) => { adminMapClickRef.current?.(coords); }}
+        deletedAmbientPOIIds={deletedAmbientPOIIds}
       />
  
       {/* Search bar */}
@@ -481,7 +497,7 @@ export default function Home() {
           from={navFrom}
           to={{ lat: navTarget.lat, lng: navTarget.lng }}
           toLabel={navTarget.label}
-          onClose={() => { setNavTarget(null); setNavFrom(null); }}
+          onClose={() => { setNavTarget(null); setNavFrom(null); setNavRouteData({ coordinates: [], turns: [], currentStep: 0 }); }}
           onRouteReady={() => {}}
           onRouteData={(data) => {
             setNavRouteData(data);
@@ -532,11 +548,13 @@ export default function Home() {
           poi={selectedPOI}
           category={selectedPOIDirectCat || selectedPOICategory}
           user={user}
+          isSuperAdmin={isSuperAdmin}
           onClose={() => { setSelectedPOI(null); setSelectedPOIDirectCat(null); if (!showPOIPanel) setSelectedPOICategory(null); }}
           onNavigate={(destination) => {
             if (!userPos) return alert(t('home.locationUnavailable'));
             startNavTo(destination);
           }}
+          onBlockPOI={handleBlockAmbientPOI}
         />
       )}
  

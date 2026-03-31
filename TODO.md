@@ -1,12 +1,18 @@
-# SpotFinder-App: Fix Custom POI Marker Colors & Display
+# SpotFinder Fix & Feature TODO
 
-## Implementation Tracking
+## Fixes
+- [x] 1. Fix: Can't add spots (stale closure in MapLibreMap addMode click handler)
+- [x] 2. Fix: Navigation blue line stays after closing NavigationPanel
+- [x] 3. Fix: One-way road arrows should be gray (not white)
 
-**✅ PLAN APPROVED** - Implementing step-by-step
+## Features
+- [x] 4. Feature: Superadmin can delete ambient POIs (never reload them)
+- [x] 5. Feature: Edit existing admin POIs with custom icons/colors
+- [x] 6. Feature: Blocked POIs tab in SuperAdminEditor
 
-### Remaining Steps
-- [ ] **1. Create this TODO.md** ← DONE
-- [ ] **2. Edit MapLibreMap.jsx** - Replace POI_CATEGORIES → AMBIENT_CATEGORIES.find(c => c.key === categoryKey)
-- [ ] **3. Test markers** - restaurant=🍽️ red, cafe=☕ brown, etc. + full address tooltip
-- [ ] **4. Update TODO.md** - Mark complete
-- [ ] **5. attempt_completion**
+## Files Edited
+- [x] src/api/firebaseClient.js — added getDeletedAmbientPOIs, addDeletedAmbientPOI, removeDeletedAmbientPOI
+- [x] src/components/map/MapLibreMap.jsx — addModeRef fix, gray arrows, deletedAmbientPOIIds prop + filter
+- [x] src/pages/Home.jsx — navRouteData clear on close, deletedAmbientPOIIds state+load, handleBlockAmbientPOI, prop passing
+- [x] src/components/spots/POIDetailPanel.jsx — Block POI button for superadmin
+- [x] src/components/map/SuperAdminEditor.jsx — BlockedPOIsTab, customIcon/customColor fields in POIForm

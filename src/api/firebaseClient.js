@@ -429,6 +429,29 @@ export const deleteAdminERouteOverride = async (user, id) => {
   await deleteDoc(doc(db, 'admin_eroute_overrides', id));
 };
 
+// ── Deleted Ambient POIs (superadmin blocklist) ───────────────────────────────
+// Stores a blocklist of ambient POI IDs (lat+lon+name hash) that should never
+// be shown again. Loaded once on app start and cached client-side.
+export const getDeletedAmbientPOIs = async () => {
+  const { db } = getFirebaseServices();
+  try {
+    const q = query(collection(db, 'admin_deleted_pois'), orderBy('created_at', 'desc'), limit(1000));
+    return (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch { return []; }
+};
+export const addDeletedAmbientPOI = async (user, data) => {
+  requireSuperAdmin(user);
+  const { db } = getFirebaseServices();
+  const payload = { ...data, created_at: new Date().toISOString(), created_by: user.email };
+  const ref = await addDoc(collection(db, 'admin_deleted_pois'), payload);
+  return { id: ref.id, ...payload };
+};
+export const removeDeletedAmbientPOI = async (user, id) => {
+  requireSuperAdmin(user);
+  const { db } = getFirebaseServices();
+  await deleteDoc(doc(db, 'admin_deleted_pois', id));
+};
+
 export const base44 = {
   auth: {
     me: async () => {

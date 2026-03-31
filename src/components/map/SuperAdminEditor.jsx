@@ -4,13 +4,14 @@
  * Tabs: Custom POIs · Road Closures · Nav Overrides · Road Editor · E-Routes
  */
 import { useState, useEffect, useCallback } from 'react';
-import { X, MapPin, AlertTriangle, Navigation, Trash2, ChevronDown, ChevronUp, Pencil, Check } from 'lucide-react';
+import { X, MapPin, AlertTriangle, Navigation, Trash2, ChevronDown, ChevronUp, Pencil, Check, Ban } from 'lucide-react';
 import {
   getAdminPOIs, addAdminPOI, updateAdminPOI, deleteAdminPOI,
   getAdminClosures, addAdminClosure, deleteAdminClosure,
   getAdminNavOverrides, addAdminNavOverride, deleteAdminNavOverride,
   getAdminRoadOverrides, addAdminRoadOverride, deleteAdminRoadOverride,
   getAdminERouteOverrides, addAdminERouteOverride, deleteAdminERouteOverride,
+  getDeletedAmbientPOIs, removeDeletedAmbientPOI,
 } from '@/api/firebaseClient';
 // Category options for the POI dropdown — keys match AMBIENT_CATEGORIES keys in ambientCategories.js
 const CATEGORY_OPTIONS = [
@@ -56,6 +57,7 @@ const TABS = [
   { id: 'nav',      label: 'Nav Overrides', Icon: Navigation },
   { id: 'roads',    label: 'Road Numbers',  Icon: AlertTriangle },
   { id: 'eroutes',  label: 'E-Routes',      Icon: Navigation },
+  { id: 'blocked',  label: 'Blocked POIs',  Icon: Ban },
 ];
 
 const CLOSURE_ICONS = ['⛔','🚧','⚠️','🚦','🔒','🛑','🚨','🏗️','🔴'];
@@ -159,8 +161,11 @@ function ListItem({ icon, title, subtitle, onDelete, onEdit }) {
 // ─── POI form fields (shared between add and edit) ────────────────────────────
 function POIForm({ name, setName, desc, setDesc, category, setCategory, lat, setLat, lon, setLon,
   street, setStreet, houseNumber, setHouseNumber, city, setCity, postcode, setPostcode,
+  customIcon, setCustomIcon, customColor, setCustomColor,
   onRequestMapClick, saving, onSave, saveLabel }) {
   const selectedCat = CATEGORY_OPTIONS.find(c => c.key === category) || CATEGORY_OPTIONS[0];
+  const effectiveIcon = customIcon || selectedCat.icon;
+  const effectiveColor = customColor || selectedCat.color;
   return (
     <>
       <Field label="Category">
@@ -170,10 +175,33 @@ function POIForm({ name, setName, desc, setDesc, category, setCategory, lat, set
           ))}
         </Select>
         <div className="mt-1.5 flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full flex items-center justify-center text-sm" style={{ background: selectedCat.color }}>
-            {selectedCat.icon}
+          <div className="w-6 h-6 rounded-full flex items-center justify-center text-sm" style={{ background: effectiveColor }}>
+            {effectiveIcon}
           </div>
-          <span className="text-xs text-muted-foreground">{selectedCat.label} — {selectedCat.color}</span>
+          <span className="text-xs text-muted-foreground">{selectedCat.label} — {effectiveColor}</span>
+        </div>
+      </Field>
+      <Field label="Custom Icon (emoji, optional — overrides category icon)">
+        <div className="flex gap-2 items-center">
+          <Input value={customIcon} onChange={setCustomIcon} placeholder="e.g. 🏕️ or leave blank" className="flex-1" />
+          {customIcon && (
+            <button onClick={() => setCustomIcon('')} className="text-xs text-red-500 underline whitespace-nowrap">Clear</button>
+          )}
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-1">Paste any emoji to use as the marker icon.</p>
+      </Field>
+      <Field label="Custom Color (hex, optional — overrides category color)">
+        <div className="flex gap-2 items-center">
+          <input
+            type="color"
+            value={customColor || selectedCat.color}
+            onChange={e => setCustomColor(e.target.value)}
+            className="w-10 h-9 rounded-lg border border-gray-200 dark:border-border cursor-pointer p-0.5 bg-white dark:bg-background"
+          />
+          <Input value={customColor} onChange={setCustomColor} placeholder={selectedCat.color} className="flex-1" />
+          {customColor && (
+            <button onClick={() => setCustomColor('')} className="text-xs text-red-500 underline whitespace-nowrap">Reset</button>
+          )}
         </div>
       </Field>
       <Field label="Name">
@@ -225,6 +253,8 @@ function POIsTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
   const [houseNumber, setHouseNumber] = useState('');
   const [city, setCity] = useState('');
   const [postcode, setPostcode] = useState('');
+  const [customIcon, setCustomIcon] = useState('');
+  const [customColor, setCustomColor] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { getAdminPOIs().then(setItems); }, []);
@@ -239,7 +269,8 @@ function POIsTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
   const clearForm = () => {
     setName(''); setDesc(''); setLat(''); setLon('');
     setStreet(''); setHouseNumber(''); setCity(''); setPostcode('');
-    setCategory('restaurant'); setEditingId(null);
+    setCategory('restaurant'); setCustomIcon(''); setCustomColor('');
+    setEditingId(null);
   };
 
   const startEdit = (it) => {
@@ -253,11 +284,15 @@ function POIsTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
     setHouseNumber(it.houseNumber || '');
     setCity(it.city || '');
     setPostcode(it.postcode || '');
+    setCustomIcon(it.customIcon || '');
+    setCustomColor(it.customColor || '');
     // Scroll to top of the form
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const selectedCat = CATEGORY_OPTIONS.find(c => c.key === category) || CATEGORY_OPTIONS[0];
+  const effectiveIcon = customIcon || selectedCat.icon;
+  const effectiveColor = customColor || selectedCat.color;
 
   const saveNew = async () => {
     if (!name.trim() || !lat || !lon) return;
@@ -265,7 +300,8 @@ function POIsTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
     try {
       const item = await addAdminPOI(user, {
         name: name.trim(), description: desc.trim(), category,
-        icon: selectedCat.icon, color: selectedCat.color,
+        icon: effectiveIcon, color: effectiveColor,
+        customIcon: customIcon || null, customColor: customColor || null,
         lat: parseFloat(lat), lon: parseFloat(lon),
         street: street.trim(), houseNumber: houseNumber.trim(),
         city: city.trim(), postcode: postcode.trim(),
@@ -281,14 +317,16 @@ function POIsTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
     try {
       await updateAdminPOI(user, editingId, {
         name: name.trim(), description: desc.trim(), category,
-        icon: selectedCat.icon, color: selectedCat.color,
+        icon: effectiveIcon, color: effectiveColor,
+        customIcon: customIcon || null, customColor: customColor || null,
         lat: parseFloat(lat), lon: parseFloat(lon),
         street: street.trim(), houseNumber: houseNumber.trim(),
         city: city.trim(), postcode: postcode.trim(),
       });
       setItems(prev => prev.map(x => x.id === editingId
         ? { ...x, name: name.trim(), description: desc.trim(), category,
-            icon: selectedCat.icon, color: selectedCat.color,
+            icon: effectiveIcon, color: effectiveColor,
+            customIcon: customIcon || null, customColor: customColor || null,
             lat: parseFloat(lat), lon: parseFloat(lon),
             street: street.trim(), houseNumber: houseNumber.trim(),
             city: city.trim(), postcode: postcode.trim() }
@@ -322,6 +360,8 @@ function POIsTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
         houseNumber={houseNumber} setHouseNumber={setHouseNumber}
         city={city} setCity={setCity}
         postcode={postcode} setPostcode={setPostcode}
+        customIcon={customIcon} setCustomIcon={setCustomIcon}
+        customColor={customColor} setCustomColor={setCustomColor}
         onRequestMapClick={onRequestMapClick}
         saving={saving}
         onSave={editingId ? saveEdit : saveNew}
@@ -333,7 +373,7 @@ function POIsTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
           <SectionHead>Existing POIs ({items.length})</SectionHead>
           {items.map(it => {
             const cat = CATEGORY_OPTIONS.find(c => c.key === it.category);
-            const icon = cat?.icon || it.icon || '📍';
+            const icon = it.customIcon || cat?.icon || it.icon || '📍';
             const addressParts = [it.street, it.houseNumber, it.city, it.postcode].filter(Boolean);
             const isEditing = editingId === it.id;
             return (
@@ -838,6 +878,53 @@ function ERoutesTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
   );
 }
 
+// ─── Blocked Ambient POIs tab ─────────────────────────────────────────────────
+function BlockedPOIsTab({ user }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    getDeletedAmbientPOIs().then(docs => { setItems(docs); setLoading(false); });
+  }, []);
+
+  const unblock = async (id) => {
+    if (!confirm('Unblock this POI? It will appear on the map again.')) return;
+    await removeDeletedAmbientPOI(user, id);
+    setItems(prev => prev.filter(x => x.id !== id));
+  };
+
+  return (
+    <div>
+      <SectionHead>Blocked Ambient POIs ({items.length})</SectionHead>
+      <p className="text-xs text-muted-foreground mb-3">
+        These POIs have been blocked and will never appear on the map again.
+        Click the trash icon to unblock a POI and allow it to appear again.
+      </p>
+      {loading && <p className="text-xs text-muted-foreground">Loading…</p>}
+      {!loading && items.length === 0 && (
+        <div className="text-center py-8">
+          <span className="text-3xl">✅</span>
+          <p className="text-sm text-muted-foreground mt-2">No blocked POIs</p>
+          <p className="text-xs text-muted-foreground mt-1">Block POIs by tapping them on the map and pressing "Block POI"</p>
+        </div>
+      )}
+      {items.map(it => (
+        <ListItem
+          key={it.id}
+          icon="🚫"
+          title={it.name || it.poiId || 'Unknown POI'}
+          subtitle={[
+            it.lat && it.lon ? `${Number(it.lat).toFixed(4)}, ${Number(it.lon).toFixed(4)}` : '',
+            it.created_by ? `Blocked by ${it.created_by.split('@')[0]}` : '',
+          ].filter(Boolean).join(' · ')}
+          onDelete={() => unblock(it.id)}
+        />
+      ))}
+    </div>
+  );
+}
+
 // ─── Main editor ──────────────────────────────────────────────────────────────
 export default function SuperAdminEditor({ user, onClose, onAdminDataChange }) {
   const [tab, setTab] = useState('pois');
@@ -922,6 +1009,9 @@ export default function SuperAdminEditor({ user, onClose, onAdminDataChange }) {
               {tab === 'eroutes' && (
                 <ERoutesTab user={user} pendingLatLon={pendingLatLon}
                   onRequestMapClick={requestMapClick} onClear={clearPending} />
+              )}
+              {tab === 'blocked' && (
+                <BlockedPOIsTab user={user} />
               )}
             </div>
           </>
