@@ -8,7 +8,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Download, Trash2, MapPin, WifiOff, HardDrive, ChevronDown, ChevronUp } from 'lucide-react';
 import { COUNTRIES, downloadCountryPOIs, deleteCountry, scrubInvalidMeta } from '../../lib/vectorTileDownloader.js';
-import { downloadCountryPMTiles } from '../../lib/offlineManager.js';
+import { downloadCountryPMTiles, GITHUB_AVAILABLE } from '../../lib/offlineManager.js';
 import { getAllMeta, estimateStorageUsage } from '../../lib/offlineStorage.js';
 
 const GEOAPIFY_KEY = import.meta.env.VITE_GEOAPIFY_KEY || '';
@@ -92,19 +92,23 @@ function StatusBadge({ meta }) {
 
 function CountryRow({ country, meta, onDownload, onDelete, activeDownload }) {
   const [expanded, setExpanded] = useState(false);
-  const isActive   = activeDownload?.code === country.code;
-  const downloaded = !!meta;
-  const sizeLabel  = country.sizeMB >= 1000 ? `~${(country.sizeMB/1000).toFixed(1)} GB` : `~${country.sizeMB} MB`;
+  const isActive     = activeDownload?.code === country.code;
+  const downloaded   = !!meta;
+  const available    = GITHUB_AVAILABLE.has(country.code);
+  const sizeLabel    = country.sizeMB >= 1000 ? `~${(country.sizeMB/1000).toFixed(1)} GB` : `~${country.sizeMB} MB`;
 
   return (
     <div className={`rounded-xl border overflow-hidden transition-all
-      ${downloaded ? 'border-green-300 dark:border-green-700 bg-green-50/40 dark:bg-green-950/20' : 'border-border bg-card'}`}>
+      ${downloaded ? 'border-green-300 dark:border-green-700 bg-green-50/40 dark:bg-green-950/20' : available ? 'border-border bg-card' : 'border-border bg-card opacity-60'}`}>
       <div className="flex items-center gap-3 px-3 py-2.5">
         <span className="text-xl leading-none select-none">{country.flag}</span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-medium text-sm">{country.name}</span>
             {!isActive && <StatusBadge meta={meta} />}
+            {!downloaded && !isActive && !available && (
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-accent text-muted-foreground">Not yet available</span>
+            )}
           </div>
           {isActive && activeDownload.progress && <ProgressBar {...activeDownload.progress} />}
         </div>
@@ -114,12 +118,12 @@ function CountryRow({ country, meta, onDownload, onDelete, activeDownload }) {
               className="px-2.5 py-1 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs font-medium hover:bg-red-200 active:scale-95 transition-all">
               Cancel
             </button>
-          ) : (
+          ) : (available || downloaded) ? (
             <button onClick={() => setExpanded(e => !e)}
               className="p-1.5 rounded-lg bg-gray-100 dark:bg-accent/50 text-muted-foreground hover:bg-gray-200 active:scale-95 transition-all">
               {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
-          )}
+          ) : null}
         </div>
       </div>
 

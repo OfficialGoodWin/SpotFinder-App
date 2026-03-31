@@ -621,6 +621,68 @@ function rl(id, color, classFilter, [min, mid], minzoom) {
       'line-width': ['interpolate',['linear'],['zoom'], 6,min, 10,mid, 14,mid*2, 18,mid*5.5] } };
 }
 
+// Alternative map styles using different tile sources
+export const outdoorStyle = {
+  version: 8,
+  name: 'SpotFinder Outdoor',
+  glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+  sprite: 'https://protomaps.github.io/basemaps-assets/sprites/v4/light',
+  sources: {
+    v: {
+      type: 'vector',
+      url: 'https://tiles.openfreemap.org/planet',
+      attribution: '© <a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>',
+    },
+  },
+  layers: [
+    // Similar to light style but with enhanced green/brown for outdoor features
+    { id: 'bg', type: 'background', paint: { 'background-color': '#e8f0e0' } },
+    // Emphasize natural features
+    { id: 'lc-wood', type: 'fill', source: 'v', 'source-layer': 'landcover', filter: ['in', 'class', 'wood', 'forest'],
+      paint: { 'fill-color': '#90c85e', 'fill-opacity': 1 } },
+    { id: 'lc-grass', type: 'fill', source: 'v', 'source-layer': 'landcover', filter: ['in', 'class', 'grass', 'meadow'],
+      paint: { 'fill-color': '#c0e8a0', 'fill-opacity': 1 } },
+    { id: 'lc-wetland', type: 'fill', source: 'v', 'source-layer': 'landcover', filter: ['==', 'class', 'wetland'],
+      paint: { 'fill-color': '#a8d8c8', 'fill-opacity': 1 } },
+    { id: 'water', type: 'fill', source: 'v', 'source-layer': 'water',
+      paint: { 'fill-color': '#7ab8d8' } },
+    { id: 'lbl-city', type: 'symbol', source: 'v', 'source-layer': 'place', filter: ['in', 'class', 'city', 'capital'],
+      minzoom: 5, layout: { 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Bold'],
+        'text-size': ['interpolate',['linear'],['zoom'], 5,10, 8,13, 12,18], 'text-max-width': 8 },
+      paint: { 'text-color': '#2a5a1a', 'text-halo-color': '#e8f0e0', 'text-halo-width': 2 } },
+  ],
+};
+
+export const winterStyle = {
+  version: 8,
+  name: 'SpotFinder Winter',
+  glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+  sprite: 'https://protomaps.github.io/basemaps-assets/sprites/v4/light',
+  sources: {
+    v: {
+      type: 'vector',
+      url: 'https://tiles.openfreemap.org/planet',
+      attribution: '© <a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>',
+    },
+  },
+  layers: [
+    // Winter theme: whites, light blues, icy colors
+    { id: 'bg', type: 'background', paint: { 'background-color': '#f8f8f8' } },
+    { id: 'lc-ice', type: 'fill', source: 'v', 'source-layer': 'landcover', filter: ['==', 'class', 'ice'],
+      paint: { 'fill-color': '#f0f8ff', 'fill-opacity': 1 } },
+    { id: 'lc-grass', type: 'fill', source: 'v', 'source-layer': 'landcover', filter: ['in', 'class', 'grass', 'meadow'],
+      paint: { 'fill-color': '#f0f0f0', 'fill-opacity': 0.8 } },
+    { id: 'lc-wood', type: 'fill', source: 'v', 'source-layer': 'landcover', filter: ['in', 'class', 'wood', 'forest'],
+      paint: { 'fill-color': '#e0e8f0', 'fill-opacity': 1 } },
+    { id: 'water', type: 'fill', source: 'v', 'source-layer': 'water',
+      paint: { 'fill-color': '#b8d8f0' } },
+    { id: 'lbl-city', type: 'symbol', source: 'v', 'source-layer': 'place', filter: ['in', 'class', 'city', 'capital'],
+      minzoom: 5, layout: { 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Bold'],
+        'text-size': ['interpolate',['linear'],['zoom'], 5,10, 8,13, 12,18], 'text-max-width': 8 },
+      paint: { 'text-color': '#334466', 'text-halo-color': '#f8f8f8', 'text-halo-width': 2 } },
+  ],
+};
+
 export const lightStyle = style(false);
 export const darkStyle  = style(true);
 export default lightStyle;

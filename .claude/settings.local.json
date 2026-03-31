@@ -3,7 +3,11 @@
     "allow": [
       "Bash(npx firebase-tools deploy --only firestore:rules)",
       "Bash(npx firebase-tools projects:list)",
-      "Bash(npx firebase-tools deploy --only firestore:rules --project spotfinderapp-cdc7b)"
+      "Bash(npx firebase-tools deploy --only firestore:rules --project spotfinderapp-cdc7b)",
+      "Bash(gh release list --repo OfficialGoodWin/SpotFinder-App)",
+      "Bash(curl -s \"https://api.github.com/repos/OfficialGoodWin/SpotFinder-App/releases\")",
+      "WebFetch(domain:api.github.com)",
+      "Bash(curl -s \"https://api.github.com/repos/OfficialGoodWin/SpotFinder-App/releases/302511808/assets\")"
     ]
   }
 }

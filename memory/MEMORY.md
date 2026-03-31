@@ -58,4 +58,15 @@ When downloading offline maps:
 3. **Offline Navigation** ✅ — OSRM routing client-side compatible; uses local OpenRouteService instance or bundled data
 4. **Offline Voice (TTS)** ✅ — Web Speech API (always offline on Android), plus native Capacitor TTS fallback
 - Downloads are country-by-country in OfflineMapsMenu.jsx
-- PDFIncludes no PDFs; depends on external OSRM server for now (can be made offline with local data)
+- Includes no PDFs; depends on external OSRM server for now (can be made offline with local data)
+
+## Recent Fixes (Session)
+1. **Offline tiles fallback** — Updated `downloadCountryPMTiles` in offlineManager.js: tries local `/offline/{code}.pmtiles` first, falls back to GitHub release only if country is in `GITHUB_AVAILABLE` set. Currently only `CZ` is on GitHub releases (maps-v1 tag). Countries not available show "Not yet available" in the UI.
+2. **Android white screen** — Added `preserveDrawingBuffer: true` and `antialias: true` to map initialization to fix WebGL context loss
+3. **Mobile zoom slider** — Added vertical zoom slider on right side of map with +/- buttons
+4. **Map styles** — Added `getMapStyle()` function supporting:
+   - `basic` (light/dark toggle)
+   - `outdoor` (green emphasis)
+   - `winter` (icy blues/whites)
+   - `aerial` & `traffic` (via layer switcher)
+   - Styles update with dark mode and layer selection

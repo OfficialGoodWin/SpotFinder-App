@@ -88,22 +88,35 @@ async function deleteCountryFile(code) {
 
 // ── PMTiles streaming download ────────────────────────────────────────────────
 
+// Only CZ is currently available on GitHub releases — add more as they are uploaded
+export const GITHUB_AVAILABLE = new Set(['CZ']);
+const GITHUB_BASE = 'https://github.com/OfficialGoodWin/SpotFinder-App/releases/download/maps-v1';
+
 export async function downloadCountryPMTiles({ country, onProgress, abortRef }) {
-  const url  = `/offline/${country.code}.pmtiles`;
   const ctrl = new AbortController();
   const cancelWatch = setInterval(() => { if (abortRef?.current) ctrl.abort(); }, 200);
 
-  try {
-    const res = await fetch(url, { signal: ctrl.signal });
+  // Build URL list to try in order
+  const urls = [`/offline/${country.code}.pmtiles`];
+  if (GITHUB_AVAILABLE.has(country.code)) {
+    urls.push(`${GITHUB_BASE}/${country.code}.pmtiles`);
+  }
 
-    if (res.status === 404) {
+  let res = null;
+  let url = null;
+  try {
+    for (const candidate of urls) {
+      const r = await fetch(candidate, { signal: ctrl.signal });
+      if (r.ok) { res = r; url = candidate; break; }
+    }
+
+    if (!res) {
+      const tried = urls.join(', ');
       throw new Error(
-        `PMTiles file not found for ${country.name}. ` +
-        `Run: pmtiles extract https://build.protomaps.com/20260319.pmtiles ` +
-        `public/offline/${country.code}.pmtiles --bbox=${country.bbox.join(',')} --maxzoom=19`
+        `PMTiles not available for ${country.name}. Tried: ${tried}. ` +
+        `Upload ${country.code}.pmtiles to the GitHub maps-v1 release to enable offline download.`
       );
     }
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
     const contentLength = parseInt(res.headers.get('Content-Length') || '0', 10);
     const totalMB = contentLength > 0 ? contentLength / 1024 / 1024 : country.sizeMB;

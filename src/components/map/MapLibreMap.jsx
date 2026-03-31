@@ -12,7 +12,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import maplibregl from 'maplibre-gl';
 import { Protocol } from 'pmtiles';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { lightStyle, darkStyle } from '../../lib/mapStyle.js';
+import { lightStyle, darkStyle, outdoorStyle, winterStyle } from '../../lib/mapStyle.js';
 import { AMBIENT_CATEGORIES } from '../../lib/ambientCategories.js';
 import { COUNTRIES, isPointInCountry, getDownloadedCountryAt, vtKey } from '../../lib/vectorTileDownloader.js';
 import { getAllMeta, getPOIs, getTile } from '../../lib/offlineStorage.js';
@@ -316,6 +316,15 @@ function ensureProtocols() {
   protocolsRegistered = true;
 }
 
+// ── Style selector ────────────────────────────────────────────────────────────
+function getMapStyle(isDark, mapLayer) {
+  // If a special layer is selected, use that, otherwise use dark/light
+  if (mapLayer === 'outdoor') return outdoorStyle;
+  if (mapLayer === 'winter') return winterStyle;
+  // For 'basic', 'aerial', 'traffic' — use light/dark base
+  return isDark ? darkStyle : lightStyle;
+}
+
 // ── Ambient POI categories ────────────────────────────────────────────────────
 // Only include entries that have a Geoapify geo string (null = admin-only categories)
 const AMBIENT_CATS = AMBIENT_CATEGORIES.filter(c => c.geo);
@@ -493,6 +502,10 @@ export default function MapLibreMap({
       maxZoom: 22,
       attributionControl: false,
       pitchWithRotate: false,
+      // Android fix: enable preserveDrawingBuffer to prevent canvas loss on context change
+      preserveDrawingBuffer: true,
+      // Improve rendering stability on Android
+      antialias: true,
     });
 
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
@@ -535,7 +548,7 @@ export default function MapLibreMap({
     async function checkOffline() {
       if (isOnline) {
         if (offlineActive) {
-          map.setStyle(isDark ? darkStyle : lightStyle);
+          map.setStyle(getMapStyle(isDark, mapLayer));
           setOfflineActive(false);
           setOfflineCountry('');
         }
@@ -555,8 +568,9 @@ export default function MapLibreMap({
 
       if (found) {
         // Switch to offline-vt:// source — served from IndexedDB
+        const baseStyle = getMapStyle(isDark, mapLayer);
         const offlineStyle = {
-          ...(isDark ? darkStyle : lightStyle),
+          ...baseStyle,
           sources: {
             v: {
               type: 'vector',
@@ -576,14 +590,14 @@ export default function MapLibreMap({
 
     checkOffline();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOnline, isDark]);
+  }, [isOnline, isDark, mapLayer]);
 
   // ── Dark mode ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current;
     if (!map || offlineActive) return;
     const doSwitch = () => {
-      map.setStyle(isDark ? darkStyle : lightStyle);
+      map.setStyle(getMapStyle(isDark, mapLayer));
       map.once('idle', () => {
         map.triggerRepaint();
         // E-routes embedded in shields, no separate layer needed
@@ -591,7 +605,7 @@ export default function MapLibreMap({
     };
     if (!map.isStyleLoaded()) map.once('idle', doSwitch);
     else doSwitch();
-  }, [isDark, offlineActive]);
+  }, [isDark, mapLayer, offlineActive]);
 
   // ── Cursor ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1129,9 +1143,98 @@ const addAdminMarkers = () => {
     if (map.isStyleLoaded()) add(); else map.once('styledata', add);
   }, [mapLayer]);
 
+  const handleZoomSlide = (e) => {
+    const newZoom = parseFloat(e.target.value);
+    if (mapRef.current) mapRef.current.setZoom(newZoom);
+  };
+
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+
+      {/* Mobile zoom slider on right side */}
+      <div style={{
+        position: 'absolute',
+        right: 12,
+        top: '50%',
+        transform: 'translateY(-50%)',
+        zIndex: 20,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '8px',
+        background: 'rgba(255, 255, 255, 0.9)',
+        padding: '8px',
+        borderRadius: '8px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+        backdropFilter: 'blur(4px)',
+      }}>
+        {/* Zoom out button */}
+        <button
+          onClick={() => mapRef.current?.setZoom((mapRef.current?.getZoom() || 13) - 1)}
+          style={{
+            width: '32px',
+            height: '32px',
+            border: 'none',
+            borderRadius: '4px',
+            background: '#f0f0f0',
+            cursor: 'pointer',
+            fontSize: '18px',
+            lineHeight: '1',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'background 0.2s',
+          }}
+          onMouseEnter={(e) => e.target.style.background = '#e0e0e0'}
+          onMouseLeave={(e) => e.target.style.background = '#f0f0f0'}
+        >
+          −
+        </button>
+
+        {/* Zoom slider (vertical) */}
+        <input
+          type="range"
+          min="3"
+          max="22"
+          step="0.1"
+          value={mapRef.current?.getZoom() || 13}
+          onChange={handleZoomSlide}
+          style={{
+            width: '32px',
+            height: '120px',
+            cursor: 'pointer',
+            writingMode: 'bt-lr',
+            WebkitAppearance: 'slider-vertical',
+            appearance: 'slider-vertical',
+          }}
+          title="Zoom level"
+        />
+
+        {/* Zoom in button */}
+        <button
+          onClick={() => mapRef.current?.setZoom((mapRef.current?.getZoom() || 13) + 1)}
+          style={{
+            width: '32px',
+            height: '32px',
+            border: 'none',
+            borderRadius: '4px',
+            background: '#f0f0f0',
+            cursor: 'pointer',
+            fontSize: '18px',
+            lineHeight: '1',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'background 0.2s',
+          }}
+          onMouseEnter={(e) => e.target.style.background = '#e0e0e0'}
+          onMouseLeave={(e) => e.target.style.background = '#f0f0f0'}
+        >
+          +
+        </button>
+      </div>
+
       {!isOnline && (
         <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 10, pointerEvents: 'none' }}>
           <span style={{
