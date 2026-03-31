@@ -8,18 +8,14 @@ export default function RouteOverlay({ routeCoordinates, turnMarkers, currentSte
   }
 
   const getTurnIcon = (type, isCurrentStep) => {
-    // Determine arrow color based on road color
-    // For white roads: use gray arrows
-    // For green roads: use white arrows
+    // Use emoji arrows instead of SVG to avoid ref errors
     const getArrowSVG = () => {
-      const arrowColor = type === 'road-white' ? '#666666' : '#ffffff';
-      
       if (type === 'turn-left') {
-        return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${arrowColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M17 7l-10 10M7 7l10 10"/></svg>`;
+        return '↙️';
       } else if (type === 'turn-right') {
-        return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${arrowColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M17 17L7 7"/></svg>`;
+        return '↗️';
       } else {
-        return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${arrowColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`;
+        return '⬆️';
       }
     };
 
