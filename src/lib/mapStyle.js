@@ -436,7 +436,8 @@ function style(dark = false) {
           'icon-keep-upright': false,
           'icon-allow-overlap': false,
         },
-        paint: { 'icon-opacity': 0.85 }
+        paint: { 'icon-opacity': 0.85 },
+      },
 
       // ── Buildings (after roads so they render on top of tunnels) ─────────
       { id: 'bldg-fill', type: 'fill', source: 'v', 'source-layer': 'building', minzoom: 13,
