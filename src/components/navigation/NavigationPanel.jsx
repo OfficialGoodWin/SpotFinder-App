@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Car, Bike, PersonStanding, Volume2, VolumeX, ArrowLeft, ArrowRight, ArrowUp, CircleArrowRight } from 'lucide-react';
+import { X, Car, Bike, PersonStanding, Volume2, VolumeX, ArrowLeft, ArrowRight, ArrowUp, CircleArrowRight, ChevronUp, ChevronDown, Settings, Layers, MapPin, Zap, Crown, Gauge, Navigation } from 'lucide-react';
 import { getOSRMRoute, mapOSRMModifier } from '@/api/osrmServiceClient';
 import { useLanguage } from '@/lib/LanguageContext';
 
@@ -182,21 +182,25 @@ async function isDestinationOnClosedRoad(_lat, _lng) {
   return false;
 }
 
-export default function NavigationPanel({ from, to, toLabel, onClose, onRouteReady, onRouteData, userPosition }) {
+export default function NavigationPanel({ from, to, toLabel, onClose, onRouteReady, onRouteData, userPosition, onNavigatingChange, isSuperAdmin, userSubscription, onOpenSettings, onChangeMapLayer }) {
   const { t, language } = useLanguage();
   const [routeType, setRouteType] = useState('car_fast');
+  const [carSubMode, setCarSubMode] = useState('fastest'); // 'fastest' | 'shortest'
   const [route, setRoute] = useState(null);
   const [steps, setSteps] = useState([]);
   const [loading, setLoading] = useState(false);
   const [muted, setMuted] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [drawerExpanded, setDrawerExpanded] = useState(false);
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [turnMarkers, setTurnMarkers] = useState([]);
   const [allRoutes, setAllRoutes] = useState([]);
   const [selectedRouteIdx, setSelectedRouteIdx] = useState(0);
   const [routeLocked, setRouteLocked] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [gpsSpeed, setGpsSpeed] = useState(0);       // km/h from GPS deltas
+  const [speedLimit, setSpeedLimit] = useState(90);  // estimated from road type
 
   const lastSpokenStep = useRef(-1);
   const routeDebounceTimer = useRef(null);
@@ -215,6 +219,43 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
   useEffect(() => { stepsRef.current = steps; }, [steps]);
   useEffect(() => { currentStepRef.current = currentStep; }, [currentStep]);
   useEffect(() => { isNavigatingRef.current = isNavigating; }, [isNavigating]);
+  // Notify parent when navigation state changes
+  useEffect(() => { onNavigatingChange?.(isNavigating); }, [isNavigating]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── GPS speed from position deltas ────────────────────────────────────────
+  const prevPosRef = useRef(null);
+  const prevPosTimeRef = useRef(null);
+  useEffect(() => {
+    if (!userPosition || !isNavigating) return;
+    const now = Date.now();
+    if (prevPosRef.current && prevPosTimeRef.current) {
+      const dt = (now - prevPosTimeRef.current) / 1000; // seconds
+      if (dt > 0.5 && dt < 10) {
+        const dist = haversineDistance(prevPosRef.current, userPosition);
+        const speedMs = dist / dt;
+        setGpsSpeed(Math.round(speedMs * 3.6)); // m/s → km/h
+      }
+    }
+    prevPosRef.current = userPosition;
+    prevPosTimeRef.current = now;
+  }, [userPosition, isNavigating]);
+
+  // ── Speed limit from current step road type ───────────────────────────────
+  useEffect(() => {
+    const step = stepsRef.current[currentStepRef.current];
+    if (!step) return;
+    const ref = (step._raw?.ref || '').toUpperCase();
+    const name = (step._raw?.name || '').toLowerCase();
+    if (/^D\d|^A\d|motorway/i.test(ref) || name.includes('dálnice') || name.includes('autobahn')) {
+      setSpeedLimit(130);
+    } else if (/^E\d|trunk/i.test(ref)) {
+      setSpeedLimit(110);
+    } else if (/^I\d|^II\d|primary|secondary/i.test(ref) || name.includes('silnice')) {
+      setSpeedLimit(90);
+    } else {
+      setSpeedLimit(50);
+    }
+  }, [currentStep]);
 
   // ── Convert OSRM steps → localized turns ──────────────────────────────────
   const convertOSRMStepsToTurns = useCallback((osrmSteps) => {
@@ -479,6 +520,18 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
   const step = steps[currentStep];
   const TurnIcon = step ? (TURN_ICONS[step.type] || TURN_ICONS.default) : ArrowUp;
 
+  // ── Subscription gate helper ──────────────────────────────────────────────
+  const hasElite = isSuperAdmin || userSubscription === 'elite' || userSubscription === 'ultra';
+  const hasUltra = isSuperAdmin || userSubscription === 'ultra';
+
+  // ── ETA string ────────────────────────────────────────────────────────────
+  const etaString = (() => {
+    const dur = route?.properties?.duration || 0;
+    if (!dur) return '--:--';
+    const eta = new Date(Date.now() + dur * 1000);
+    return eta.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  })();
+
   // ── Pre-navigation screen ─────────────────────────────────────────────────
   if (!isNavigating) {
     return (
@@ -502,7 +555,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
           ) : steps.length > 0 ? (
             <>
               {/* Route type selector */}
-              <div className="flex gap-2 mb-4">
+              <div className="flex gap-2 mb-3">
                 {ROUTE_TYPE_KEYS.map(rt => {
                   const Icon = rt.icon;
                   return (
@@ -516,6 +569,37 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
                 })}
               </div>
 
+              {/* Car sub-modes: Fastest / Shortest */}
+              {routeType === 'car_fast' && (
+                <div className="flex gap-2 mb-3">
+                  {[{ id: 'fastest', label: '⚡ Fastest' }, { id: 'shortest', label: '📏 Shortest' }].map(m => (
+                    <button key={m.id} onClick={() => setCarSubMode(m.id)}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors
+                        ${carSubMode === m.id ? 'bg-blue-500 text-white' : 'bg-muted text-muted-foreground hover:bg-accent'}`}>
+                      {m.label}
+                    </button>
+                  ))}
+                  {/* Elite: Fuel-efficient */}
+                  <button
+                    onClick={() => hasElite ? setCarSubMode('fuel') : null}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1
+                      ${carSubMode === 'fuel' ? 'bg-green-600 text-white' : hasElite ? 'bg-muted text-muted-foreground hover:bg-accent' : 'bg-muted/50 text-muted-foreground/50 cursor-not-allowed'}`}
+                    title={hasElite ? 'Fuel-efficient route' : 'SpotFinder Elite required'}>
+                    <Zap className="w-3 h-3" />
+                    {hasElite ? 'Eco' : '🔒 Eco'}
+                  </button>
+                </div>
+              )}
+
+              {/* Ultra: EV route planning */}
+              {routeType === 'car_fast' && (
+                <div className={`mb-3 px-3 py-2 rounded-xl flex items-center gap-2 text-xs font-semibold
+                  ${hasUltra ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-700/40' : 'bg-muted/40 text-muted-foreground/60 border border-border/40'}`}>
+                  <Crown className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span>{hasUltra ? '⚡ EV Route: charger stops every 300 km (+2h/stop)' : '🔒 EV Route Planning — SpotFinder Ultra'}</span>
+                </div>
+              )}
+
               {/* Distance / duration */}
               <div className="flex items-center justify-center gap-8 mb-4 py-3 bg-gray-50 dark:bg-accent rounded-xl">
                 <div className="text-center">
@@ -526,6 +610,11 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
                 <div className="text-center">
                   <p className="text-2xl font-bold text-foreground">{formatTime(route?.properties?.duration || 0)}</p>
                   <p className="text-xs text-muted-foreground">{t('navPanel.duration')}</p>
+                </div>
+                <div className="w-px h-10 bg-gray-300 dark:bg-border" />
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-foreground">{etaString}</p>
+                  <p className="text-xs text-muted-foreground">ETA</p>
                 </div>
               </div>
 
@@ -548,57 +637,132 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
 
   // ── Active navigation screen ──────────────────────────────────────────────
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[1500] pointer-events-none">
-      {/* Current instruction banner */}
+    <>
+      {/* ── TOP: Green turn-indicator pill ─────────────────────────────────── */}
       {step && (
-        <div className="mx-3 mb-2 bg-primary text-primary-foreground rounded-2xl shadow-2xl px-4 py-3 flex items-center gap-4 pointer-events-auto">
-          <div className="w-12 h-12 bg-primary/90 rounded-xl flex items-center justify-center flex-shrink-0">
-            <TurnIcon className="w-7 h-7 text-primary-foreground" />
+        <div className="fixed top-4 inset-x-3 z-[1600] pointer-events-auto">
+          <div className="bg-green-500 text-white rounded-2xl shadow-2xl px-4 py-3 flex items-center gap-3">
+            <div className="w-11 h-11 bg-green-600 rounded-xl flex items-center justify-center flex-shrink-0">
+              <TurnIcon className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-base leading-tight truncate">{step.instruction}</p>
+              <p className="text-green-100 text-sm font-medium">{formatDist(step.distance)}</p>
+            </div>
+            <button onClick={() => setMuted(m => !m)} className="p-2 rounded-xl bg-green-600 flex-shrink-0">
+              {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            </button>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-bold text-base leading-tight">{step.instruction}</p>
-            <p className="text-blue-200 dark:text-blue-300 text-sm">{formatDist(step.distance)}</p>
-          </div>
-          <button onClick={() => setMuted(m => !m)} className="p-2 rounded-xl bg-blue-500 flex-shrink-0">
-            {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-          </button>
         </div>
       )}
 
-      <div className="bg-card rounded-t-3xl shadow-2xl px-4 pt-4 pb-8 pointer-events-auto">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <p className="text-sm text-muted-foreground font-medium">{t('navPanel.navigatingTo')}</p>
-            <p className="font-bold text-foreground truncate max-w-[200px]">{toLabel}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            {route && (
-              <div className="text-right">
-                <p className="font-bold text-foreground text-sm">{formatDist(route.properties?.distance || 0)}</p>
-                <p className="text-xs text-muted-foreground">{formatTime(route.properties?.duration || 0)}</p>
-              </div>
-            )}
-            <button onClick={onClose} className="p-2 rounded-full bg-gray-100 dark:bg-accent">
-              <X className="w-5 h-5 text-gray-600 dark:text-foreground" />
-            </button>
-          </div>
-        </div>
+      {/* ── BOTTOM: Slide-up drawer ─────────────────────────────────────────── */}
+      <div className="fixed inset-x-0 bottom-0 z-[1500] pointer-events-none">
+        <div className="pointer-events-auto bg-card rounded-t-3xl shadow-2xl">
+          {/* Drag handle */}
+          <button
+            onClick={() => setDrawerExpanded(e => !e)}
+            className="w-full flex flex-col items-center pt-2 pb-1"
+            aria-label="Toggle drawer"
+          >
+            <div className="w-10 h-1 bg-gray-300 dark:bg-border rounded-full mb-1" />
+            {drawerExpanded
+              ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              : <ChevronUp className="w-4 h-4 text-muted-foreground" />}
+          </button>
 
-        {/* Step counter + prev/next */}
-        {steps.length > 1 && (
-          <div className="flex items-center justify-between">
-            <button onClick={() => goToStep(Math.max(0, currentStep - 1))} disabled={currentStep === 0}
-              className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-accent disabled:opacity-30 text-sm font-medium text-foreground">
-              {t('navPanel.prev')}
-            </button>
-            <span className="text-xs text-muted-foreground">{currentStep + 1} / {steps.length}</span>
-            <button onClick={() => goToStep(Math.min(steps.length - 1, currentStep + 1))} disabled={currentStep === steps.length - 1}
-              className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-accent disabled:opacity-30 text-sm font-medium text-foreground">
-              {t('navPanel.next')}
-            </button>
+          {/* ── Collapsed row: speedometer | stats | distance ─────────────── */}
+          <div className="flex items-center px-4 pb-4 gap-3">
+            {/* Left: GPS speed + speed limit */}
+            <div className="flex flex-col items-center justify-center w-16 flex-shrink-0">
+              <div className="relative w-14 h-14 flex items-center justify-center">
+                {/* Speed limit badge */}
+                <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full border-2 border-red-500 bg-white dark:bg-card flex items-center justify-center z-10">
+                  <span className="text-[9px] font-black text-red-600">{speedLimit}</span>
+                </div>
+                {/* Speedometer circle */}
+                <div className="w-14 h-14 rounded-full border-4 border-blue-500 flex flex-col items-center justify-center bg-blue-50 dark:bg-blue-900/20">
+                  <span className="text-lg font-black text-blue-600 dark:text-blue-400 leading-none">{gpsSpeed}</span>
+                  <span className="text-[9px] text-blue-500 font-semibold leading-none">km/h</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Center: time remaining + ETA */}
+            <div className="flex-1 flex flex-col items-center">
+              <p className="text-2xl font-black text-foreground leading-none">
+                {formatTime(route?.properties?.duration || 0)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">ETA {etaString}</p>
+            </div>
+
+            {/* Right: distance to destination */}
+            <div className="flex flex-col items-end flex-shrink-0">
+              <p className="text-xl font-bold text-foreground leading-none">
+                {formatDist(route?.properties?.distance || 0)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">{t('navPanel.distance')}</p>
+            </div>
           </div>
-        )}
+
+          {/* ── Expanded panel ────────────────────────────────────────────── */}
+          {drawerExpanded && (
+            <div className="px-4 pb-8 border-t border-border pt-3 flex flex-col gap-2">
+              {/* Cancel navigation */}
+              <button
+                onClick={onClose}
+                className="w-full py-3 rounded-2xl bg-red-500 text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all">
+                <X className="w-4 h-4" /> Cancel Navigation
+              </button>
+
+              <div className="grid grid-cols-2 gap-2">
+                {/* Change map style */}
+                <button
+                  onClick={() => { onChangeMapLayer?.(); setDrawerExpanded(false); }}
+                  className="py-3 rounded-2xl bg-muted text-foreground font-semibold text-sm flex items-center justify-center gap-2 hover:bg-accent active:scale-[0.98] transition-all">
+                  <Layers className="w-4 h-4" /> Map Style
+                </button>
+
+                {/* Settings */}
+                <button
+                  onClick={() => { onOpenSettings?.(); setDrawerExpanded(false); }}
+                  className="py-3 rounded-2xl bg-muted text-foreground font-semibold text-sm flex items-center justify-center gap-2 hover:bg-accent active:scale-[0.98] transition-all">
+                  <Settings className="w-4 h-4" /> Settings
+                </button>
+
+                {/* Find Nearby on Route */}
+                <button
+                  className="py-3 rounded-2xl bg-muted text-foreground font-semibold text-sm flex items-center justify-center gap-2 hover:bg-accent active:scale-[0.98] transition-all">
+                  <MapPin className="w-4 h-4" /> Nearby on Route
+                </button>
+
+                {/* Mute / unmute */}
+                <button
+                  onClick={() => setMuted(m => !m)}
+                  className="py-3 rounded-2xl bg-muted text-foreground font-semibold text-sm flex items-center justify-center gap-2 hover:bg-accent active:scale-[0.98] transition-all">
+                  {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                  {muted ? 'Unmute' : 'Mute'}
+                </button>
+              </div>
+
+              {/* Step counter */}
+              {steps.length > 1 && (
+                <div className="flex items-center justify-between mt-1">
+                  <button onClick={() => goToStep(Math.max(0, currentStep - 1))} disabled={currentStep === 0}
+                    className="px-4 py-2 rounded-xl bg-gray-100 dark:bg-accent disabled:opacity-30 text-sm font-medium text-foreground">
+                    {t('navPanel.prev')}
+                  </button>
+                  <span className="text-xs text-muted-foreground">{currentStep + 1} / {steps.length}</span>
+                  <button onClick={() => goToStep(Math.min(steps.length - 1, currentStep + 1))} disabled={currentStep === steps.length - 1}
+                    className="px-4 py-2 rounded-xl bg-gray-100 dark:bg-accent disabled:opacity-30 text-sm font-medium text-foreground">
+                    {t('navPanel.next')}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

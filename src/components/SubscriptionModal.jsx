@@ -66,8 +66,8 @@ const PLANS = [
     mutedColor: '#86efac',
     borderColor: '#166534',
     badgeBg: 'rgba(22,101,52,0.4)',
-    monthly: { price: '$9.99', priceId: PRICES.ultra_monthly, period: '/month' },
-    yearly:  { price: '$49.99', priceId: PRICES.ultra_yearly,  period: '/year', saving: 'Save $69.89' },
+    monthly: { price: '$7.99', priceId: PRICES.ultra_monthly, period: '/month' },
+    yearly:  { price: '$45.99', priceId: PRICES.ultra_yearly,  period: '/year', saving: 'Save $49.89' },
     features: [
       'Everything in Elite',
       'Unlimited offline maps',

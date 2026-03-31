@@ -44,6 +44,7 @@ export default function Home() {
   const [selectedSpot, setSelectedSpot] = useState(null);
   const [editingSpot, setEditingSpot] = useState(null);
   const [navTarget, setNavTarget] = useState(null);
+  const [isActivelyNavigating, setIsActivelyNavigating] = useState(false);
   const [navFrom, setNavFrom] = useState(null); // snapshot of start position, never changes mid-nav
   const [flyTo, setFlyTo] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
@@ -358,6 +359,8 @@ export default function Home() {
         onSignOut={handleSignOut}
         onShowDeleteConfirm={() => setShowDeleteConfirm(true)}
         onShowAuth={() => setShowAuth(true)}
+        onShowSubscription={() => setShowSubscription(true)}
+        isSuperAdmin={isSuperAdmin}
       />
 
       {/* Spots toggle — sits between search bar and layer switcher */}
@@ -387,8 +390,8 @@ export default function Home() {
       {/* Zoom half-circle slider — right edge */}
       <ZoomSlider mapRef={mapRef} />
 
-      {/* Bottom bar */}
-      <div className="absolute bottom-0 inset-x-0 z-[1000]">
+      {/* Bottom bar — hidden during active navigation (drawer replaces it) */}
+      <div className={`absolute bottom-0 inset-x-0 z-[1000] transition-transform duration-300 ${isActivelyNavigating ? 'translate-y-full pointer-events-none' : ''}`}>
         {/* FAB — green + floating above bar */}
         <div className="absolute left-1/2 -translate-x-1/2 z-10 pointer-events-none" style={{ bottom: '100%', marginBottom: '-36px' }}>
           <button
@@ -497,8 +500,13 @@ export default function Home() {
           from={navFrom}
           to={{ lat: navTarget.lat, lng: navTarget.lng }}
           toLabel={navTarget.label}
-          onClose={() => { setNavTarget(null); setNavFrom(null); setNavRouteData({ coordinates: [], turns: [], currentStep: 0 }); }}
+          onClose={() => { setNavTarget(null); setNavFrom(null); setNavRouteData({ coordinates: [], turns: [], currentStep: 0 }); setIsActivelyNavigating(false); }}
           onRouteReady={() => {}}
+          onNavigatingChange={setIsActivelyNavigating}
+          isSuperAdmin={isSuperAdmin}
+          userSubscription={null}
+          onOpenSettings={() => setShowSettings(true)}
+          onChangeMapLayer={() => {/* MapLayerSwitcher is in toolbar — just open it */}}
           onRouteData={(data) => {
             setNavRouteData(data);
             // Fit map to show full route

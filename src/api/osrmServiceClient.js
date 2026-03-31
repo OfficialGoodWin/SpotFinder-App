@@ -13,13 +13,21 @@
 import { saveRoute, getCachedRoute } from '@/lib/routeCache';
 
 const LOCAL_OSRM_URL  = 'http://localhost:5000/route/v1';
-// Primary public OSRM server. If this fails we try the backup.
-// Both are operated by the OSRM project — they can be slow or rate-limited.
-// For production, host your own OSRM or use the Android native service.
-const REMOTE_OSRM_SERVERS = [
-  'https://router.project-osrm.org/route/v1',
-  'https://routing.openstreetmap.de/routed-car/route/v1',
-];
+// Profile-specific public OSRM servers.
+// router.project-osrm.org only supports driving.
+// routing.openstreetmap.de has separate backends per profile.
+const PROFILE_SERVERS = {
+  driving: [
+    'https://router.project-osrm.org/route/v1/driving',
+    'https://routing.openstreetmap.de/routed-car/route/v1/driving',
+  ],
+  cycling: [
+    'https://routing.openstreetmap.de/routed-bike/route/v1/cycling',
+  ],
+  foot: [
+    'https://routing.openstreetmap.de/routed-foot/route/v1/foot',
+  ],
+};
 const LOCAL_TIMEOUT_MS = 2000; // if local OSRM doesn't respond in 2s, skip it
 
 // ─── Main exported function ───────────────────────────────────────────────────
@@ -35,7 +43,6 @@ export async function getOSRMRoute(from, to, profile = 'driving') {
       const url  = `${LOCAL_OSRM_URL}/${osrmProfile}/${coords}${params}`;
       const data = await fetchWithTimeout(url, LOCAL_TIMEOUT_MS);
       const route = normalizeOSRMResponse(data);
-      // Cache every successful route for later offline use
       saveRoute(from, to, profile, route).catch(() => {});
       return route;
     } catch (e) {
@@ -43,10 +50,12 @@ export async function getOSRMRoute(from, to, profile = 'driving') {
     }
   }
 
-  // 2. Try remote OSRM servers in order
-  for (const baseUrl of REMOTE_OSRM_SERVERS) {
+  // 2. Try profile-specific remote OSRM servers
+  // Each profile has its own backend — profile is already embedded in the base URL
+  const servers = PROFILE_SERVERS[osrmProfile] || PROFILE_SERVERS.driving;
+  for (const baseUrl of servers) {
     try {
-      const url      = `${baseUrl}/${osrmProfile}/${coords}${params}`;
+      const url = `${baseUrl}/${coords}${params}`;
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 10000);
       const response = await fetch(url, { signal: controller.signal });

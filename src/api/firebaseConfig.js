@@ -21,12 +21,12 @@
 //   }
 
 export const firebaseConfig = {
-  apiKey: "AIzaSyCJfu6SSuKJoDtLSJvNz491a8YtWznCDMk",
-  authDomain: "spotfinderapp-cdc7b.firebaseapp.com",
-  projectId: "spotfinderapp-cdc7b",
-  storageBucket: "spotfinderapp-cdc7b.firebasestorage.app",
-  messagingSenderId: "179466659021",
-  appId: "1:179466659021:web:f93b90b96948a264d23584"
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY            || "AIzaSyCJfu6SSuKJoDtLSJvNz491a8YtWznCDMk",
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN        || "spotfinderapp-cdc7b.firebaseapp.com",
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID         || "spotfinderapp-cdc7b",
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET     || "spotfinderapp-cdc7b.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "179466659021",
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID             || "1:179466659021:web:f93b90b96948a264d23584",
 };
 
 export default firebaseConfig;
