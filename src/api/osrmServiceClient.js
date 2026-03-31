@@ -42,20 +42,19 @@ function hasUltraSubscription() {
 export async function getOSRMRoute(from, to, profile = 'driving', options = {}) {
   const osrmProfile = PROFILE_MAP[profile] || 'driving';
   const coords = `${from.lng},${from.lat};${to.lng},${to.lat}`;
-  let params  = '?overview=full&steps=true&geometries=polyline&annotations=true';
-  
-  // Handle routing preferences
+  const paramsBase = '?overview=full&steps=true&geometries=polyline&annotations=true';
+
+  // NOTE: Public OSRM instances (router.project-osrm.org, routing.openstreetmap.de)
+  // do NOT support custom params like `prefer=...` or `ev=true` and will respond 400.
+  // We still accept these options at the UI level, but we must not send them to OSRM.
   const preference = options.preference || 'fastest';
-  if (preference === 'shortest') params += '&prefer=shortest';
-  else if (preference === 'recommended' || preference === 'eco') params += '&prefer=balanced'; // OSRM fuel-efficient (eco)
-  
-  // Handle vehicle type
-  if (options.vehicle_type === 'electric' && !hasUltraSubscription()) {
+  const vehicleType = options.vehicle_type || 'default';
+
+  if (vehicleType === 'electric' && !hasUltraSubscription()) {
     throw new Error('EV routing requires SpotFinder Ultra subscription');
-  } else if (options.vehicle_type === 'electric') {
-    // Apply EV-specific parameters if user has Ultra subscription
-    params += '&ev=true';
   }
+
+  const params = paramsBase;
 
   // 1. Try local OSRM (running natively on Android)
   if (await isLocalOSRMAvailable()) {
@@ -86,7 +85,8 @@ export async function getOSRMRoute(from, to, profile = 'driving', options = {}) 
       saveRoute(from, to, profile, route).catch(() => {});
       return route;
     } catch (e) {
-      console.warn(`[OSRM] ${baseUrl} failed:`, e.message);
+      // Provide extra context for debugging "OSRM 400" reports.
+      console.warn(`[OSRM] ${baseUrl} failed:`, e.message, { osrmProfile, preference, vehicleType });
     }
   }
 

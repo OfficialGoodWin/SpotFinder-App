@@ -412,7 +412,8 @@ function createOnewayArrowImage() {
 function addOnewayArrow(map) {
   if (map.hasImage('oneway-arrow')) return;
   const imgData = createOnewayArrowImage();
-  map.addImage('oneway-arrow', { width: 20, height: 20, data: imgData.data });
+  // Use SDF so `icon-color` can tint it per-feature (data-driven styling).
+  map.addImage('oneway-arrow', { width: 20, height: 20, data: imgData.data }, { sdf: true });
 }
 
 function registerShieldListener(map) {
