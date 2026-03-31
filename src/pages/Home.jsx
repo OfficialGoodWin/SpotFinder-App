@@ -500,7 +500,7 @@ export default function Home() {
           from={navFrom}
           to={{ lat: navTarget.lat, lng: navTarget.lng }}
           toLabel={navTarget.label}
-          onClose={() => { setNavTarget(null); setNavFrom(null); setNavRouteData({ coordinates: [], turns: [], currentStep: 0 }); setIsActivelyNavigating(false); }}
+          onClose={(clearRoute) => { setNavTarget(null); setNavFrom(null); if (clearRoute) setNavRouteData({ coordinates: [], turns: [], currentStep: 0 }); setIsActivelyNavigating(false); }}
           onRouteReady={() => {}}
           onNavigatingChange={setIsActivelyNavigating}
           isSuperAdmin={isSuperAdmin}

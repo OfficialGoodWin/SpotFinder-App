@@ -12,6 +12,7 @@
  */
 
 import React, { useState } from 'react';
+import { useTheme } from '@/lib/ThemeContext';
 import { X, Zap, Crown, Check, Sparkles, Shield } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 
@@ -140,11 +141,11 @@ function PlanCard({ plan, user, onClose }) {
       }}
     >
       {/* Popular badge */}
-      {plan.popular && (
-        <div
-          className="absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-bold tracking-wide z-10"
-          style={{ background: plan.badgeBg, color: plan.accentColor, border: `1px solid ${plan.borderColor}` }}
-        >
+{plan.popular && (
+          <div
+            className="absolute top-1.5 right-1.5 px-3 py-1 rounded-full text-xs font-bold tracking-wide z-30 backdrop-blur-sm"
+            style={{ background: plan.badgeBg, color: plan.accentColor, border: `1px solid ${plan.borderColor}` }}
+          >
           ✦ MOST POPULAR
         </div>
       )}
@@ -258,11 +259,16 @@ function PlanCard({ plan, user, onClose }) {
 
 // ── Main modal ────────────────────────────────────────────────────────────────
 export default function SubscriptionModal({ onClose, user }) {
+  const { isDark } = useTheme();
   return (
     <div className="fixed inset-0 z-[2500] flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
       <div
         className="relative w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl"
-        style={{ background: '#0a0a0a', border: '1px solid #222', maxHeight: '92vh' }}
+        style={{ 
+          background: isDark ? '#0a0a0a' : '#ffffff', 
+          border: isDark ? '1px solid #222' : '1px solid #e5e7eb', 
+          maxHeight: '92vh' 
+        }}
       >
         {/* Close button */}
         <button

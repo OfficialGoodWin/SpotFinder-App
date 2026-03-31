@@ -25,17 +25,21 @@ service cloud.firestore {
       allow create: if isAuth();
     }
 
-    // ── POI community photos and ratings (public read, auth write) ────────────
+    // ── POI community data (public read) ────────────
     match /poi_photos/{docId} {
       allow read: if true;
-      allow create: if isAuth();
-      allow delete: if isSuperAdmin();
+      allow create, update, delete: if isSuperAdmin();
     }
 
     match /poi_ratings/{docId} {
       allow read: if true;
-      allow create: if isAuth();
-      allow delete: if isSuperAdmin();
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    // ── POI data - public read for map display ────────────────────────────────
+    match /pois/{document=**} {
+      allow read: if true;
+      allow write: if false;  // Block writes to prevent "Block POI failed"
     }
 
     // ── IP bans (superadmin only) ─────────────────────────────────────────────
@@ -77,3 +81,4 @@ service cloud.firestore {
     }
   }
 }
+

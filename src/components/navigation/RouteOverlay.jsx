@@ -3,7 +3,7 @@ import { Polyline, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 
 export default function RouteOverlay({ routeCoordinates, turnMarkers, currentStep }) {
-  if (!routeCoordinates || routeCoordinates.length === 0) {
+  if (!routeCoordinates?.length || routeCoordinates.length === 0) {
     return null;
   }
 

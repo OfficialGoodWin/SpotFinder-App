@@ -172,6 +172,12 @@ export default function POILayer({ category, onNavigate, onPOIsLoaded, onLoading
         clearTimeout(timeoutId);
         if (err.name === 'AbortError') return;
         console.error('POI load error:', err.message);
+        // Graceful fallback for Firebase/permissions
+        if (err.message.includes('FirebaseError') || err.message.includes('permission')) {
+          const fallback = [];
+          setPois(fallback);
+          onPOIsLoaded?.(fallback);
+        }
         onLoadingChange?.(false);
       }
     };

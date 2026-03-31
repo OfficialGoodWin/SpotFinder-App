@@ -99,6 +99,13 @@ export const onAuthChange = (callback) => {
   const { auth } = getFirebaseServices();
   return onAuthStateChanged(auth, callback);
 };
+
+// ── POI Error Handler ─────────────────────────────────────────────────────────
+export const handlePOIError = (error, poiData) => {
+  console.warn('[Firebase POI] Access blocked or service unavailable:', error.message);
+  console.warn('Falling back to:', poiData?.length || 0, 'cached/local POIs');
+  return { blocked: true, fallback: poiData || [] };
+};
  
 // Compress image with canvas and return base64 data URL (stored in Firestore)
 // Max output size ~600KB — well within Firestore 1MB document limit

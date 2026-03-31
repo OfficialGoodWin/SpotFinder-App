@@ -32,10 +32,13 @@ const LOCAL_TIMEOUT_MS = 2000; // if local OSRM doesn't respond in 2s, skip it
 
 // ─── Main exported function ───────────────────────────────────────────────────
 
-export async function getOSRMRoute(from, to, profile = 'driving') {
+export async function getOSRMRoute(from, to, profile = 'driving', mode = 'fastest') {
   const osrmProfile = PROFILE_MAP[profile] || 'driving';
   const coords = `${from.lng},${from.lat};${to.lng},${to.lat}`;
-  const params  = '?overview=full&steps=true&geometries=polyline&annotations=true';
+  let params  = '?overview=full&steps=true&geometries=polyline&annotations=true';
+  if (mode === 'shortest') params += '&prefer=shortest';
+  else if (mode === 'eco' || mode === 'fuel') params += '&prefer=balanced'; // OSRM fuel-efficient (eco)
+  else if (mode === 'ev') throw new Error('EV routing requires SpotFinder Ultra subscription');
 
   // 1. Try local OSRM (running natively on Android)
   if (await isLocalOSRMAvailable()) {

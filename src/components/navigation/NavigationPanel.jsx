@@ -123,14 +123,25 @@ function localizeInstruction(step, t) {
 }
 
 // Road label helpers (same logic as osrmServiceClient)
+const PLATE_LOOKUP = {
+  '605': 'D2', '18701': 'D2', '27': 'E53', 'E53': 'E53',
+  // Czech motorways/expressways → add more as needed
+  'D0': 'D0', 'D1': 'D1', 'D2': 'D2', 'D5': 'D5', 'D8': 'D8', 
+  'R10': 'R10', 'R35': 'R35', 'R48': 'R48'
+};
+
 function filterRef(ref) {
   if (!ref) return '';
-  return ref.split(/[\s;,/]+/).map(p => p.trim()).filter(p => p && !/^E\d+$/i.test(p)).join(' ').trim();
+  const parts = ref.split(/[\s;,/]+/).map(p => p.trim()).filter(Boolean);
+  return parts.filter(p => {
+    const plate = PLATE_LOOKUP[p];
+    return plate ? `${p} (${plate})` : p && !/^E\d+$/i.test(p);
+  }).join(' ').trim();
 }
 function cleanName(name) {
   const s = (name || '').trim();
   if (!s) return '';
-  if (/^\d+$/.test(s)) return s.length <= 3 ? `Road ${s}` : '';
+  if (/^\d{1,4}$/.test(s)) return s;
   return s;
 }
 function buildRoadLabel(name, ref) {
@@ -185,7 +196,7 @@ async function isDestinationOnClosedRoad(_lat, _lng) {
 export default function NavigationPanel({ from, to, toLabel, onClose, onRouteReady, onRouteData, userPosition, onNavigatingChange, isSuperAdmin, userSubscription, onOpenSettings, onChangeMapLayer }) {
   const { t, language } = useLanguage();
   const [routeType, setRouteType] = useState('car_fast');
-  const [carSubMode, setCarSubMode] = useState('fastest'); // 'fastest' | 'shortest'
+  const [carSubMode, setCarSubMode] = useState('fastest'); // 'fastest' | 'shortest' | 'eco' | 'ev'
   const [route, setRoute] = useState(null);
   const [steps, setSteps] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -201,6 +212,17 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
   const [retryCount, setRetryCount] = useState(0);
   const [gpsSpeed, setGpsSpeed] = useState(0);       // km/h from GPS deltas
   const [speedLimit, setSpeedLimit] = useState(90);  // estimated from road type
+  const [use24hTime, setUse24hTime] = useState(false);
+
+  // Persist 24h preference
+  useEffect(() => {
+    const saved = localStorage.getItem('spotfinder.use24hTime');
+    if (saved !== null) setUse24hTime(JSON.parse(saved));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('spotfinder.use24hTime', JSON.stringify(use24hTime));
+  }, [use24hTime]);
 
   const lastSpokenStep = useRef(-1);
   const routeDebounceTimer = useRef(null);
@@ -498,8 +520,8 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
     lastFetchedCoords.current = null;
     setLoading(true);
     clearTimeout(routeDebounceTimer.current);
-    routeDebounceTimer.current = setTimeout(fetchRoute, 300);
-  }, [routeType]); // eslint-disable-line react-hooks/exhaustive-deps
+    routeDebounceTimer.current = setTimeout(() => fetchRoute(carSubMode), 300);
+  }, [routeType, carSubMode]); // eslint-disable-line react-hooks/exhaustive-deps // eslint-disable-line react-hooks/exhaustive-deps
 
   const startNavigation = () => {
     setIsNavigating(true); isNavigatingRef.current = true;
@@ -529,7 +551,11 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
     const dur = route?.properties?.duration || 0;
     if (!dur) return '--:--';
     const eta = new Date(Date.now() + dur * 1000);
-    return eta.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return eta.toLocaleTimeString([], { 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      hour12: !use24hTime 
+    });
   })();
 
   // ── Pre-navigation screen ─────────────────────────────────────────────────
@@ -569,30 +595,30 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
                 })}
               </div>
 
-              {/* Car sub-modes: Fastest / Shortest */}
-              {routeType === 'car_fast' && (
+              {/* Car sub-modes: Fastest / Shortest / Eco */}
+              {routeType === 'car_fast' && !isNavigating && (
                 <div className="flex gap-2 mb-3">
-                  {[{ id: 'fastest', label: '⚡ Fastest' }, { id: 'shortest', label: '📏 Shortest' }].map(m => (
+                  {[{ id: 'fastest', label: '⚡ Fastest' }, { id: 'shortest', label: '📏 Shortest' }, { id: 'eco', label: '🌿 Eco' }].map(m => (
                     <button key={m.id} onClick={() => setCarSubMode(m.id)}
                       className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors
                         ${carSubMode === m.id ? 'bg-blue-500 text-white' : 'bg-muted text-muted-foreground hover:bg-accent'}`}>
                       {m.label}
                     </button>
                   ))}
-                  {/* Elite: Fuel-efficient */}
+                  {/* Ultra: EV */}
                   <button
-                    onClick={() => hasElite ? setCarSubMode('fuel') : null}
+                    onClick={() => hasUltra ? setCarSubMode('ev') : null}
                     className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1
-                      ${carSubMode === 'fuel' ? 'bg-green-600 text-white' : hasElite ? 'bg-muted text-muted-foreground hover:bg-accent' : 'bg-muted/50 text-muted-foreground/50 cursor-not-allowed'}`}
-                    title={hasElite ? 'Fuel-efficient route' : 'SpotFinder Elite required'}>
+                      ${carSubMode === 'ev' ? 'bg-emerald-600 text-white' : hasUltra ? 'bg-muted text-muted-foreground hover:bg-accent' : 'bg-muted/50 text-muted-foreground/50 cursor-not-allowed'}`}
+                    title={hasUltra ? 'EV route planning' : 'SpotFinder Ultra required'}>
                     <Zap className="w-3 h-3" />
-                    {hasElite ? 'Eco' : '🔒 Eco'}
+                    {hasUltra ? 'EV' : '🔒 EV'}
                   </button>
                 </div>
               )}
 
               {/* Ultra: EV route planning */}
-              {routeType === 'car_fast' && (
+              {routeType === 'car_fast' && !isNavigating && (
                 <div className={`mb-3 px-3 py-2 rounded-xl flex items-center gap-2 text-xs font-semibold
                   ${hasUltra ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-700/40' : 'bg-muted/40 text-muted-foreground/60 border border-border/40'}`}>
                   <Crown className="w-3.5 h-3.5 flex-shrink-0" />
@@ -609,7 +635,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
                 <div className="w-px h-10 bg-gray-300 dark:bg-border" />
                 <div className="text-center">
                   <p className="text-2xl font-bold text-foreground">{formatTime(route?.properties?.duration || 0)}</p>
-                  <p className="text-xs text-muted-foreground">{t('navPanel.duration')}</p>
+                  <p className="text-xs text-muted-foreground">Time</p>
                 </div>
                 <div className="w-px h-10 bg-gray-300 dark:bg-border" />
                 <div className="text-center">
@@ -649,9 +675,6 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
               <p className="font-bold text-base leading-tight truncate">{step.instruction}</p>
               <p className="text-green-100 text-sm font-medium">{formatDist(step.distance)}</p>
             </div>
-            <button onClick={() => setMuted(m => !m)} className="p-2 rounded-xl bg-green-600 flex-shrink-0">
-              {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-            </button>
           </div>
         </div>
       )}
@@ -693,8 +716,9 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
               <p className="text-2xl font-black text-foreground leading-none">
                 {formatTime(route?.properties?.duration || 0)}
               </p>
-              <p className="text-xs text-muted-foreground mt-0.5">ETA {etaString}</p>
-            </div>
+              <p className="text-xs text-muted-foreground mt-0.5">Time</p>
+                  <p className="text-xs text-muted-foreground">ETA</p>
+                </div>
 
             {/* Right: distance to destination */}
             <div className="flex flex-col items-end flex-shrink-0">
@@ -710,10 +734,10 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
             <div className="px-4 pb-8 border-t border-border pt-3 flex flex-col gap-2">
               {/* Cancel navigation */}
               <button
-                onClick={onClose}
-                className="w-full py-3 rounded-2xl bg-red-500 text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all">
-                <X className="w-4 h-4" /> Cancel Navigation
-              </button>
+onClick={handleCancelNav}
+          className="w-full py-3 rounded-2xl bg-red-500 text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all">
+          <X className="w-4 h-4" /> Cancel Navigation
+        </button>
 
               <div className="grid grid-cols-2 gap-2">
                 {/* Change map style */}
@@ -731,18 +755,13 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
                 </button>
 
                 {/* Find Nearby on Route */}
-                <button
-                  className="py-3 rounded-2xl bg-muted text-foreground font-semibold text-sm flex items-center justify-center gap-2 hover:bg-accent active:scale-[0.98] transition-all">
-                  <MapPin className="w-4 h-4" /> Nearby on Route
+<button
+                  disabled
+                  className="py-3 rounded-2xl bg-muted/50 text-muted-foreground/70 font-semibold text-sm flex items-center justify-center gap-2 cursor-not-allowed"
+                  title="Coming soon in SpotFinder Ultra">
+                  <MapPin className="w-4 h-4" /> Nearby on Route 🔒
                 </button>
 
-                {/* Mute / unmute */}
-                <button
-                  onClick={() => setMuted(m => !m)}
-                  className="py-3 rounded-2xl bg-muted text-foreground font-semibold text-sm flex items-center justify-center gap-2 hover:bg-accent active:scale-[0.98] transition-all">
-                  {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                  {muted ? 'Unmute' : 'Mute'}
-                </button>
               </div>
 
               {/* Step counter */}

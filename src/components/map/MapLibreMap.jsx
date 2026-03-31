@@ -387,8 +387,15 @@ function createOnewayArrowImage() {
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, W, H);
 
-  // Draw a solid right-pointing arrow (chevron/triangle) in gray
-  ctx.fillStyle = 'rgba(136,136,136,0.85)';
+  // Bug 4: Dynamic arrow color based on road
+  let arrowColor;
+  if (EURO_ROUTES[ref]) {
+    arrowColor = '#ffffff'; // white arrow on green E-roads
+  } else {
+    const isLightRoad = roadClass === 'motorway' || roadClass === 'trunk' || roadClass === 'primary';
+    arrowColor = isLightRoad ? 'rgba(40,40,40,0.9)' : 'rgba(136,136,136,0.85)'; // dark on white roads, gray otherwise
+  }
+  ctx.fillStyle = arrowColor;
   ctx.beginPath();
   // Head: right-pointing filled triangle
   ctx.moveTo(14, H / 2);
