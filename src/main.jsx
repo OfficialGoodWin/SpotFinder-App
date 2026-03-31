@@ -7,12 +7,14 @@ import '@/index.css'
 window.addEventListener('error', (event) => {
   try {
     const err = event?.error;
+    try { navigator.sendBeacon?.('http://127.0.0.1:7263/ingest/053377fc-69ae-42c1-8e31-75a19d8aad14', JSON.stringify({sessionId:'1220c6',runId:'pre-fix',hypothesisId:'G',location:'src/main.jsx:11',message:'window.error',data:{message:String(event?.message||''),filename:String(event?.filename||''),lineno:event?.lineno,colno:event?.colno,stack:err?.stack?String(err.stack).slice(0,2000):null},timestamp:Date.now()})); } catch (_) { }
     fetch('http://127.0.0.1:7263/ingest/053377fc-69ae-42c1-8e31-75a19d8aad14',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1220c6'},body:JSON.stringify({sessionId:'1220c6',runId:'pre-fix',hypothesisId:'G',location:'src/main.jsx:11',message:'window.error',data:{message:String(event?.message||''),filename:String(event?.filename||''),lineno:event?.lineno,colno:event?.colno,stack:err?.stack?String(err.stack).slice(0,2000):null},timestamp:Date.now()})}).catch(()=>{});
   } catch (_) { }
 });
 window.addEventListener('unhandledrejection', (event) => {
   try {
     const r = event?.reason;
+    try { navigator.sendBeacon?.('http://127.0.0.1:7263/ingest/053377fc-69ae-42c1-8e31-75a19d8aad14', JSON.stringify({sessionId:'1220c6',runId:'pre-fix',hypothesisId:'G',location:'src/main.jsx:18',message:'window.unhandledrejection',data:{reasonType:typeof r,reasonMessage:r?.message?String(r.message):String(r??''),reasonStack:r?.stack?String(r.stack).slice(0,2000):null},timestamp:Date.now()})); } catch (_) { }
     fetch('http://127.0.0.1:7263/ingest/053377fc-69ae-42c1-8e31-75a19d8aad14',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1220c6'},body:JSON.stringify({sessionId:'1220c6',runId:'pre-fix',hypothesisId:'G',location:'src/main.jsx:18',message:'window.unhandledrejection',data:{reasonType:typeof r,reasonMessage:r?.message?String(r.message):String(r??''),reasonStack:r?.stack?String(r.stack).slice(0,2000):null},timestamp:Date.now()})}).catch(()=>{});
   } catch (_) { }
 });
