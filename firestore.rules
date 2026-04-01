@@ -12,9 +12,12 @@ service cloud.firestore {
     // ── Public spots ─────────────────────────────────────────────────────────
     match /spots/{spotId} {
       allow read: if true;
-      allow create: if isAuth();
-      allow update: if isAuth() && resource.data.created_by == request.auth.token.email;
-      allow delete: if isAuth() && (
+      allow create: if true;
+      allow update: if request.auth != null && (
+        resource.data.created_by == request.auth.token.email ||
+        resource.data.created_by == 'anonymous'
+      );
+      allow delete: if request.auth != null && (
         resource.data.created_by == request.auth.token.email || isSuperAdmin()
       );
     }
