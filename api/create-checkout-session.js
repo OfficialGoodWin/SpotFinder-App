@@ -32,12 +32,25 @@ function isRateLimited(ip) {
   return entry.count > RATE_LIMIT;
 }
 
-const ALLOWED_ORIGINS = ['https://spotfinder.cz', 'https://www.spotfinder.cz'];
+const ALLOWED_ORIGINS = [
+  'https://spotfinder.cz',
+  'https://www.spotfinder.cz',
+];
+
+function isAllowedOrigin(origin) {
+  if (!origin) return false;
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  if (origin.startsWith('http://localhost')) return true;
+  // Allow all Vercel preview deployments (*.vercel.app)
+  if (/^https:\/\/[a-z0-9-]+-officialgoodwins-projects\.vercel\.app$/.test(origin)) return true;
+  if (/^https:\/\/spot-finder-app[a-z0-9-]*\.vercel\.app$/.test(origin)) return true;
+  return false;
+}
 
 export default async function handler(req, res) {
-  // CORS — restrict to own domain in production
+  // CORS — restrict to own domain in production, allow preview deployments
   const origin = req.headers.origin || '';
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : (origin.startsWith('http://localhost') ? origin : 'https://spotfinder.cz');
+  const allowedOrigin = isAllowedOrigin(origin) ? origin : 'https://spotfinder.cz';
   res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');

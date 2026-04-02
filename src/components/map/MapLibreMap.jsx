@@ -513,11 +513,7 @@ export default function MapLibreMap({
     });
 
     // #region agent log
-    try {
-      const s = map?.getStyle?.();
-      try { navigator.sendBeacon?.('http://127.0.0.1:7263/ingest/053377fc-69ae-42c1-8e31-75a19d8aad14', JSON.stringify({sessionId:'1220c6',runId:'pre-fix',hypothesisId:'A',location:'src/components/map/MapLibreMap.jsx:~510',message:'map.init',data:{isDark:!!isDark,mapLayer:String(mapLayer||''),center:{lat:center?.lat,lng:center?.lng},styleType:typeof getMapStyle(mapLayer,isDark),styleVersion:s?.version,hasSources:s?.sources?Object.keys(s.sources).length:null},timestamp:Date.now()})); } catch (_) { }
-      fetch('http://127.0.0.1:7263/ingest/053377fc-69ae-42c1-8e31-75a19d8aad14',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1220c6'},body:JSON.stringify({sessionId:'1220c6',runId:'pre-fix',hypothesisId:'A',location:'src/components/map/MapLibreMap.jsx:~510',message:'map.init',data:{isDark:!!isDark,mapLayer:String(mapLayer||''),center:{lat:center?.lat,lng:center?.lng},styleType:typeof getMapStyle(mapLayer,isDark),styleVersion:s?.version,hasSources:s?.sources?Object.keys(s.sources).length:null},timestamp:Date.now()})}).catch(()=>{});
-    } catch (_) { }
+    // telemetry removed
     // #endregion
 
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
@@ -536,25 +532,7 @@ export default function MapLibreMap({
     map.on('style.load', addImages);
 
     // #region agent log
-    map.once('load', () => {
-      try {
-        try { navigator.sendBeacon?.('http://127.0.0.1:7263/ingest/053377fc-69ae-42c1-8e31-75a19d8aad14', JSON.stringify({sessionId:'1220c6',runId:'pre-fix',hypothesisId:'B',location:'src/components/map/MapLibreMap.jsx:~532',message:'map.load',data:{isStyleLoaded:!!map.isStyleLoaded(),zoom:map.getZoom?.(),center:map.getCenter?.()},timestamp:Date.now()})); } catch (_) { }
-        fetch('http://127.0.0.1:7263/ingest/053377fc-69ae-42c1-8e31-75a19d8aad14',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1220c6'},body:JSON.stringify({sessionId:'1220c6',runId:'pre-fix',hypothesisId:'B',location:'src/components/map/MapLibreMap.jsx:~532',message:'map.load',data:{isStyleLoaded:!!map.isStyleLoaded(),zoom:map.getZoom?.(),center:map.getCenter?.()},timestamp:Date.now()})}).catch(()=>{});
-      } catch (_) { }
-    });
-    map.on('style.load', () => {
-      try {
-        try { navigator.sendBeacon?.('http://127.0.0.1:7263/ingest/053377fc-69ae-42c1-8e31-75a19d8aad14', JSON.stringify({sessionId:'1220c6',runId:'pre-fix',hypothesisId:'C',location:'src/components/map/MapLibreMap.jsx:~534',message:'map.style.load',data:{isStyleLoaded:!!map.isStyleLoaded()},timestamp:Date.now()})); } catch (_) { }
-        fetch('http://127.0.0.1:7263/ingest/053377fc-69ae-42c1-8e31-75a19d8aad14',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1220c6'},body:JSON.stringify({sessionId:'1220c6',runId:'pre-fix',hypothesisId:'C',location:'src/components/map/MapLibreMap.jsx:~534',message:'map.style.load',data:{isStyleLoaded:!!map.isStyleLoaded()},timestamp:Date.now()})}).catch(()=>{});
-      } catch (_) { }
-    });
-    map.on('error', (e) => {
-      try {
-        const err = e?.error;
-        try { navigator.sendBeacon?.('http://127.0.0.1:7263/ingest/053377fc-69ae-42c1-8e31-75a19d8aad14', JSON.stringify({sessionId:'1220c6',runId:'pre-fix',hypothesisId:'D',location:'src/components/map/MapLibreMap.jsx:~540',message:'map.error',data:{type:String(e?.type||''),sourceId:e?.sourceId||null,tile:e?.tile||null,message:err?.message?String(err.message):String(err??''),stack:err?.stack?String(err.stack).slice(0,2000):null},timestamp:Date.now()})); } catch (_) { }
-        fetch('http://127.0.0.1:7263/ingest/053377fc-69ae-42c1-8e31-75a19d8aad14',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1220c6'},body:JSON.stringify({sessionId:'1220c6',runId:'pre-fix',hypothesisId:'D',location:'src/components/map/MapLibreMap.jsx:~540',message:'map.error',data:{type:String(e?.type||''),sourceId:e?.sourceId||null,tile:e?.tile||null,message:err?.message?String(err.message):String(err??''),stack:err?.stack?String(err.stack).slice(0,2000):null},timestamp:Date.now()})}).catch(()=>{});
-      } catch (_) { }
-    });
+    // telemetry removed
     // #endregion
 
     mapRef.current = map;
@@ -583,9 +561,7 @@ export default function MapLibreMap({
     async function checkOffline() {
       if (isOnline) {
         if (offlineActive) {
-          // #region agent log
-          try { try { navigator.sendBeacon?.('http://127.0.0.1:7263/ingest/053377fc-69ae-42c1-8e31-75a19d8aad14', JSON.stringify({sessionId:'1220c6',runId:'pre-fix',hypothesisId:'E',location:'src/components/map/MapLibreMap.jsx:~562',message:'setStyle.backOnline',data:{offlineActive:!!offlineActive,isStyleLoaded:!!map.isStyleLoaded()},timestamp:Date.now()})); } catch (_) { } fetch('http://127.0.0.1:7263/ingest/053377fc-69ae-42c1-8e31-75a19d8aad14',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1220c6'},body:JSON.stringify({sessionId:'1220c6',runId:'pre-fix',hypothesisId:'E',location:'src/components/map/MapLibreMap.jsx:~562',message:'setStyle.backOnline',data:{offlineActive:!!offlineActive,isStyleLoaded:!!map.isStyleLoaded()},timestamp:Date.now()})}).catch(()=>{}); } catch (_) { }
-          // #endregion
+          // telemetry removed
           map.setStyle(getMapStyle(mapLayer, isDark));
           setOfflineActive(false);
           setOfflineCountry('');
@@ -619,9 +595,7 @@ export default function MapLibreMap({
             },
           },
         };
-        // #region agent log
-        try { try { navigator.sendBeacon?.('http://127.0.0.1:7263/ingest/053377fc-69ae-42c1-8e31-75a19d8aad14', JSON.stringify({sessionId:'1220c6',runId:'pre-fix',hypothesisId:'E',location:'src/components/map/MapLibreMap.jsx:~595',message:'setStyle.offline',data:{countryCode:found?.code||null,countryName:found?.name||null,isStyleLoaded:!!map.isStyleLoaded(),hasOfflineSources:!!offlineStyle?.sources,offlineSourceKeys:offlineStyle?.sources?Object.keys(offlineStyle.sources):null},timestamp:Date.now()})); } catch (_) { } fetch('http://127.0.0.1:7263/ingest/053377fc-69ae-42c1-8e31-75a19d8aad14',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1220c6'},body:JSON.stringify({sessionId:'1220c6',runId:'pre-fix',hypothesisId:'E',location:'src/components/map/MapLibreMap.jsx:~595',message:'setStyle.offline',data:{countryCode:found?.code||null,countryName:found?.name||null,isStyleLoaded:!!map.isStyleLoaded(),hasOfflineSources:!!offlineStyle?.sources,offlineSourceKeys:offlineStyle?.sources?Object.keys(offlineStyle.sources):null},timestamp:Date.now()})}).catch(()=>{}); } catch (_) { }
-        // #endregion
+        // telemetry removed
         map.setStyle(offlineStyle);
         setOfflineActive(true);
         setOfflineCountry(found.name);
@@ -637,9 +611,7 @@ export default function MapLibreMap({
     const map = mapRef.current;
     if (!map || offlineActive) return;
     const doSwitch = () => {
-      // #region agent log
-      try { try { navigator.sendBeacon?.('http://127.0.0.1:7263/ingest/053377fc-69ae-42c1-8e31-75a19d8aad14', JSON.stringify({sessionId:'1220c6',runId:'pre-fix',hypothesisId:'F',location:'src/components/map/MapLibreMap.jsx:~610',message:'setStyle.darkModeToggle',data:{isDark:!!isDark,mapLayer:String(mapLayer||''),offlineActive:!!offlineActive,isStyleLoaded:!!map.isStyleLoaded()},timestamp:Date.now()})); } catch (_) { } fetch('http://127.0.0.1:7263/ingest/053377fc-69ae-42c1-8e31-75a19d8aad14',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1220c6'},body:JSON.stringify({sessionId:'1220c6',runId:'pre-fix',hypothesisId:'F',location:'src/components/map/MapLibreMap.jsx:~610',message:'setStyle.darkModeToggle',data:{isDark:!!isDark,mapLayer:String(mapLayer||''),offlineActive:!!offlineActive,isStyleLoaded:!!map.isStyleLoaded()},timestamp:Date.now()})}).catch(()=>{}); } catch (_) { }
-      // #endregion
+      // telemetry removed
       map.setStyle(getMapStyle(mapLayer, isDark));
       map.once('idle', () => {
         map.triggerRepaint();
