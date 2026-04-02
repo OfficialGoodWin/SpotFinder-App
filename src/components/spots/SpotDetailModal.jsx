@@ -29,11 +29,26 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
   const overallRating = localSpot.rating || 0;
   const overallCount  = localSpot.rating_count || 0;
 
-  const catRows = [
-    { key: 'parking', label: t('spotDetail.parkingQuality'), val: localSpot.parking_rating || 0, count: localSpot.parking_rating_count || 0 },
-    { key: 'beauty',  label: t('spotDetail.beauty'),         val: localSpot.beauty_rating  || 0, count: localSpot.beauty_rating_count  || 0 },
-    { key: 'privacy', label: t('spotDetail.privacy'),        val: localSpot.privacy_rating || 0, count: localSpot.privacy_rating_count || 0 },
-  ];
+  const catRows = (() => {
+    const type = spot.spot_type || 'general';
+    if (type === 'photo') {
+      return [
+        { key: 'photoBeauty', label: t('spotDetail.photoBeauty'), val: localSpot.photo_beauty_rating || 0, count: localSpot.photo_beauty_rating_count || 0 },
+        { key: 'photoAccess', label: t('spotDetail.photoAccess'), val: localSpot.photo_access_rating || 0, count: localSpot.photo_access_rating_count || 0 },
+      ];
+    }
+    if (type === 'rest') {
+      return [
+        { key: 'restView', label: t('spotDetail.restView'), val: localSpot.rest_view_rating || 0, count: localSpot.rest_view_rating_count || 0 },
+        { key: 'restAccess', label: t('spotDetail.restAccess'), val: localSpot.rest_access_rating || 0, count: localSpot.rest_access_rating_count || 0 },
+      ];
+    }
+    return [
+      { key: 'parking', label: t('spotDetail.parkingQuality'), val: localSpot.parking_rating || 0, count: localSpot.parking_rating_count || 0 },
+      { key: 'beauty',  label: t('spotDetail.beauty'),         val: localSpot.beauty_rating  || 0, count: localSpot.beauty_rating_count  || 0 },
+      { key: 'privacy', label: t('spotDetail.privacy'),        val: localSpot.privacy_rating || 0, count: localSpot.privacy_rating_count || 0 },
+    ];
+  })();
 
   const hasCategoryRatings = catRows.some(r => r.val > 0);
 

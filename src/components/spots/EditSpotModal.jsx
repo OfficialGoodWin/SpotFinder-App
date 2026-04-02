@@ -46,6 +46,7 @@ export default function EditSpotModal({ spot, onClose, onSave }) {
       parking_rating: parkingRating,
       beauty_rating: beautyRating,
       privacy_rating: privacyRating,
+      spot_type: spot.spot_type || 'general',
       image_url,
     });
     setLoading(false);

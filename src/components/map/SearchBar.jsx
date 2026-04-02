@@ -69,11 +69,12 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
     }
     setPoiCategories(filterCategories(query, language));
 
-    // Search spots by title and description
+    // Search spots by title, description, and category
     const q = query.toLowerCase();
     const matched = (spots || []).filter(s => {
       if (s.title?.toLowerCase().includes(q)) return true;
       if (s.description?.toLowerCase().includes(q)) return true;
+      if (s.spot_type?.toLowerCase().includes(q)) return true;
       return false;
     }).slice(0, 5);
     setSpotResults(matched);
