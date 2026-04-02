@@ -320,34 +320,6 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
               </div>
             </>
           )}
-          {spotType === 'photo' && (
-            <>
-              <div>
-                <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpot.photoBeautyRating')}</label>
-                <p className="text-xs text-gray-500 dark:text-muted-foreground mb-2">{t('addSpot.photoBeautyHint')}</p>
-                <StarRating value={photoBeautyRating} onChange={setPhotoBeautyRating} size="lg" />
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpot.photoAccessRating')}</label>
-                <p className="text-xs text-gray-500 dark:text-muted-foreground mb-2">{t('addSpot.photoAccessHint')}</p>
-                <StarRating value={photoAccessRating} onChange={setPhotoAccessRating} size="lg" />
-              </div>
-            </>
-          )}
-          {spotType === 'rest' && (
-            <>
-              <div>
-                <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpot.restViewRating')}</label>
-                <p className="text-xs text-gray-500 dark:text-muted-foreground mb-2">{t('addSpot.restViewHint')}</p>
-                <StarRating value={restViewRating} onChange={setRestViewRating} size="lg" />
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpot.restAccessRating')}</label>
-                <p className="text-xs text-gray-500 dark:text-muted-foreground mb-2">{t('addSpot.restAccessHint')}</p>
-                <StarRating value={restAccessRating} onChange={setRestAccessRating} size="lg" />
-              </div>
-            </>
-          )}
 
           {/* Photo */}
           <div>

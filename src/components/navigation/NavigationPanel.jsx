@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Car, Bike, PersonStanding, Volume2, VolumeX, ArrowLeft, ArrowRight, ArrowUp, CircleArrowRight, ChevronUp, ChevronDown, Settings, Layers, MapPin, Zap, Crown, Gauge, Navigation } from 'lucide-react';
+import { X, Car, Bike, PersonStanding, Volume2, VolumeX, ArrowLeft, ArrowRight, ArrowUp, CircleArrowRight, ChevronUp, ChevronDown, Settings, Layers, MapPin, Zap, Crown, Gauge, Navigation, Truck } from 'lucide-react';
 import { getOSRMRoute, mapOSRMModifier } from '@/api/osrmServiceClient';
 import { useLanguage } from '@/lib/LanguageContext';
 
@@ -10,6 +10,7 @@ const LANG_BCP47 = {
 
 const ROUTE_TYPE_KEYS = [
   { id: 'car_fast',   labelKey: 'navPanel.drive', icon: Car,           profile: 'driving-car'     },
+  { id: 'truck',      labelKey: 'navPanel.truck', icon: Truck,         profile: 'external-tomtom' },
   { id: 'bike',       labelKey: 'navPanel.bike',  icon: Bike,          profile: 'cycling-regular' },
   { id: 'pedestrian', labelKey: 'navPanel.walk',  icon: PersonStanding,profile: 'foot-hiking'     },
 ];
@@ -477,6 +478,11 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
     // FIX: pass profile key directly — no more .replace('-', '/') which broke cycling/walking
     const profile = ROUTE_TYPE_KEYS.find(r => r.id === routeType)?.profile || 'driving-car';
     
+    if (profile === 'external-tomtom') {
+      setLoading(false);
+      return; // Do nothing here, UI handles it
+    }
+
     // Apply route options based on carSubMode
     const options = {};
     if (routeType === 'car_fast') {
@@ -645,11 +651,24 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
                       className={`flex-1 py-2 rounded-xl flex flex-col items-center gap-0.5 transition-colors text-xs font-semibold
                         ${routeType === rt.id ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'}`}>
                       <Icon className="w-4 h-4" />
-                      {t(rt.labelKey)}
+                      {t(rt.labelKey) || (rt.id === 'truck' ? 'Truck' : rt.id)}
                     </button>
                   );
                 })}
               </div>
+
+              {routeType === 'truck' && (
+                <div className="my-6">
+                  <p className="text-center text-sm text-muted-foreground mb-4">
+                    Open TomTom GO app for specialized truck routing.
+                  </p>
+                  <button onClick={() => window.location.href = `tomtomgo://x-callback-url/navigate?destination=${to.lat},${to.lng}`}
+                    className="w-full py-4 bg-orange-500 text-white rounded-xl font-bold text-lg flex items-center justify-center gap-2 shadow-lg hover:bg-orange-600 active:scale-[0.98] transition-all">
+                    <Truck className="w-6 h-6" />
+                    Open TomTom GO
+                  </button>
+                </div>
+              )}
 
               {/* Car sub-modes: Fastest / Shortest / Eco */}
               {routeType === 'car_fast' && !isNavigating && (
@@ -818,11 +837,21 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
                 </button>
 
                 {/* Find Nearby on Route */}
-<button
-                  disabled
-                  className="py-3 rounded-2xl bg-muted/50 text-muted-foreground/70 font-semibold text-sm flex items-center justify-center gap-2 cursor-not-allowed"
-                  title="Coming soon in SpotFinder Ultra">
-                  <MapPin className="w-4 h-4" /> Nearby on Route 🔒
+                <button
+                  disabled={!isSuperAdmin && userSubscription !== 'ultra'}
+                  className={`py-3 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 ${
+                    isSuperAdmin || userSubscription === 'ultra'
+                      ? 'bg-muted text-foreground hover:bg-accent active:scale-[0.98] transition-all'
+                      : 'bg-muted/50 text-muted-foreground/70 cursor-not-allowed'
+                  }`}
+                  title={isSuperAdmin || userSubscription === 'ultra' ? 'Find Nearby on Route' : 'SpotFinder Ultra required'}
+                  onClick={() => {
+                    if (isSuperAdmin || userSubscription === 'ultra') {
+                      alert(t('common.comingSoon') || 'Coming soon');
+                    }
+                  }}
+                >
+                  <MapPin className="w-4 h-4" /> Nearby on Route {!(isSuperAdmin || userSubscription === 'ultra') && '🔒'}
                 </button>
 
               </div>
