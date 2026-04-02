@@ -10,7 +10,7 @@ const LANG_BCP47 = {
 
 const ROUTE_TYPE_KEYS = [
   { id: 'car_fast',   labelKey: 'navPanel.drive', icon: Car,           profile: 'driving-car'     },
-  { id: 'truck',      labelKey: 'navPanel.truck', icon: Truck,         profile: 'external-tomtom' },
+  { id: 'truck',      labelKey: 'navPanel.truck', icon: Truck,         profile: 'truck'           },
   { id: 'bike',       labelKey: 'navPanel.bike',  icon: Bike,          profile: 'cycling-regular' },
   { id: 'pedestrian', labelKey: 'navPanel.walk',  icon: PersonStanding,profile: 'foot-hiking'     },
 ];
@@ -19,6 +19,10 @@ const ROUTE_TYPE_KEYS = [
 // Takes the raw OSRM step data and builds a human-readable instruction
 // in whatever language t() is currently set to.
 function localizeInstruction(step, t) {
+  if (step._isTomTom) {
+    return step.instruction; // TomTom provides pre-localized text
+  }
+
   // Special: closed road warning step
   if (step._closedRoadWarning) {
     return t ? t('traffic.roadClosedStep') : '⚠️ Warning: road ahead is closed';
@@ -322,7 +326,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
     const markers = [];
 
     osrmSteps.forEach((step) => {
-      const type = mapOSRMModifier(step.modifier);
+      const type = step._isTomTom ? (TURN_ICONS[step.type] ? step.type : mapOSRMModifier(step.modifier)) : mapOSRMModifier(step.modifier);
       // Build instruction in the current language using t()
       const instruction = localizeInstruction(step, t);
 
@@ -477,11 +481,6 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
 
     // FIX: pass profile key directly — no more .replace('-', '/') which broke cycling/walking
     const profile = ROUTE_TYPE_KEYS.find(r => r.id === routeType)?.profile || 'driving-car';
-    
-    if (profile === 'external-tomtom') {
-      setLoading(false);
-      return; // Do nothing here, UI handles it
-    }
 
     // Apply route options based on carSubMode
     const options = {};
@@ -656,19 +655,6 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
                   );
                 })}
               </div>
-
-              {routeType === 'truck' && (
-                <div className="my-6">
-                  <p className="text-center text-sm text-muted-foreground mb-4">
-                    Open TomTom GO app for specialized truck routing.
-                  </p>
-                  <button onClick={() => window.location.href = `tomtomgo://x-callback-url/navigate?destination=${to.lat},${to.lng}`}
-                    className="w-full py-4 bg-orange-500 text-white rounded-xl font-bold text-lg flex items-center justify-center gap-2 shadow-lg hover:bg-orange-600 active:scale-[0.98] transition-all">
-                    <Truck className="w-6 h-6" />
-                    Open TomTom GO
-                  </button>
-                </div>
-              )}
 
               {/* Car sub-modes: Fastest / Shortest / Eco */}
               {routeType === 'car_fast' && !isNavigating && (

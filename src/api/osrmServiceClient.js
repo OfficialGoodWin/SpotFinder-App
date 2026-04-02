@@ -37,9 +37,60 @@ function hasUltraSubscription() {
   return true;
 }
 
+const TOMTOM_KEY = import.meta.env.VITE_TOMTOM_KEY || import.meta.env.VITE_TOMTOM_API_KEY || '';
+
+// ─── TomTom Routing API for Trucks ──────────────────────────────────────────
+
+async function getTomTomRoute(from, to) {
+  if (!TOMTOM_KEY) throw new Error('Missing TomTom API Key for truck routing');
+  
+  const url = `https://api.tomtom.com/routing/1/calculateRoute/${from.lat},${from.lng}:${to.lat},${to.lng}/json?key=${TOMTOM_KEY}&travelMode=truck&vehicleCommercial=true&instructionsType=text&routeRepresentation=polyline`;
+  
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`TomTom API ${response.status}`);
+  const data = await response.json();
+  
+  const route = data.routes?.[0];
+  if (!route) throw new Error('No routes found from TomTom');
+
+  const geometry = route.legs.flatMap(leg => leg.points.map(p => [p.latitude, p.longitude]));
+  const distance = route.summary.lengthInMeters;
+  const duration = route.summary.travelTimeInSeconds;
+  
+  const steps = (route.guidance?.instructions || []).map(instr => {
+    return {
+      _isTomTom: true,
+      instruction: instr.message,
+      maneuverType: 'turn',
+      modifier: 'straight', // simplified
+      type: mapTomTomInstruction(instr.maneuver),
+      distance: instr.routeOffsetInMeters,
+      lat: instr.point.latitude,
+      lng: instr.point.longitude,
+    };
+  });
+
+  return { geometry, distance, duration, steps };
+}
+
+function mapTomTomInstruction(maneuver) {
+  if (!maneuver) return 'straight';
+  if (maneuver.includes('LEFT')) return 'turn-left';
+  if (maneuver.includes('RIGHT')) return 'turn-right';
+  if (maneuver.includes('ROUNDABOUT')) return 'enter-roundabout';
+  if (maneuver.includes('U_TURN')) return 'u-turn';
+  if (maneuver.includes('ARRIVE')) return 'arrive';
+  if (maneuver.includes('DEPART')) return 'depart';
+  return 'straight';
+}
+
 // ─── Main exported function ───────────────────────────────────────────────────
 
 export async function getOSRMRoute(from, to, profile = 'driving', options = {}) {
+  if (profile === 'truck') {
+    return await getTomTomRoute(from, to);
+  }
+
   const osrmProfile = PROFILE_MAP[profile] || 'driving';
   const coords = `${from.lng},${from.lat};${to.lng},${to.lat}`;
   const paramsBase = '?overview=full&steps=true&geometries=polyline&annotations=true';
