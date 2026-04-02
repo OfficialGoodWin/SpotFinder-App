@@ -89,18 +89,18 @@ async function deleteCountryFile(code) {
 // ── PMTiles streaming download ────────────────────────────────────────────────
 
 export async function downloadCountryPMTiles({ country, onProgress, abortRef }) {
-  const url  = `/offline/${country.code}.pmtiles`;
+  const url  = `https://github.com/OfficialGoodWin/SpotFinder-App/releases/latest/download/${country.code}.pmtiles`;
   const ctrl = new AbortController();
   const cancelWatch = setInterval(() => { if (abortRef?.current) ctrl.abort(); }, 200);
 
   try {
     const res = await fetch(url, { signal: ctrl.signal });
 
-    if (res.status === 404) {
+    if (res.status === 404 || !res.ok) {
       throw new Error(
         `PMTiles file not found for ${country.name}. ` +
         `Run: pmtiles extract https://build.protomaps.com/20260319.pmtiles ` +
-        `public/offline/${country.code}.pmtiles --bbox=${country.bbox.join(',')} --maxzoom=19`
+        `public/offline/${country.code}.pmtiles --bbox=${country.bbox.join(',')} --maxzoom=16`
       );
     }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
