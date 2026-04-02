@@ -432,10 +432,9 @@ function style(dark = false) {
           // With SDF icons we can tint per feature.
           // Goal: highways (motorway/trunk/primary/etc) → white; smaller/white roads → gray.
           'icon-color': [
-            'case',
-            ['in', ['get', 'class'], 'motorway', 'trunk', 'primary', 'secondary', 'tertiary'],
-            '#ffffff',
-            'rgba(136,136,136,0.85)',
+            'match', ['get', 'class'],
+            ['motorway', 'trunk', 'primary', 'secondary', 'tertiary'], '#ffffff',
+            'rgba(136,136,136,0.85)'
           ],
           'icon-opacity': 0.95,
         },

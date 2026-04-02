@@ -81,6 +81,13 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: 'priceId is required' });
   }
 
+  // Guard: Stripe Checkout needs a Price ID (price_...), not a Product ID (prod_...)
+  if (!priceId.startsWith('price_')) {
+    return res.status(400).json({
+      message: `Invalid priceId "${priceId}". Stripe requires a Price ID starting with "price_", not a Product ID ("prod_"). Go to Stripe Dashboard → Products → [your product] → Pricing → copy the Price ID.`
+    });
+  }
+
   try {
     const sessionParams = {
       mode: 'subscription',
