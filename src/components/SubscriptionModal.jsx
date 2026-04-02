@@ -1,24 +1,18 @@
 /**
  * SubscriptionModal.jsx
  * SpotFinder Elite (bruise purple) & Ultra (black/dark-green) subscription plans.
- * Uses Stripe Checkout (redirect mode) — no card details handled client-side.
+ * Uses Stripe Checkout (redirect mode) — no Stripe SDK loaded on the client.
+ * The server returns a checkout URL and we redirect directly to it.
  *
  * Setup:
  *  1. Create products + prices in your Stripe Dashboard (or CLI).
  *  2. Paste the price IDs into the PRICES object below.
- *  3. Set VITE_STRIPE_PUBLISHABLE_KEY in .env
- *  4. Deploy a small backend (Vercel Edge Function / Firebase Function)
- *     at POST /api/create-checkout-session  — see the comment block at the bottom.
+ *  3. Set STRIPE_SECRET_KEY in your server environment (Vercel dashboard).
  */
 
 import React, { useState } from 'react';
 import { useTheme } from '@/lib/ThemeContext';
 import { X, Zap, Crown, Check, Sparkles, Shield } from 'lucide-react';
-import { loadStripe } from '@stripe/stripe-js';
-
-// ── Stripe config ─────────────────────────────────────────────────────────────
-const STRIPE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '';
-const stripePromise = STRIPE_KEY ? loadStripe(STRIPE_KEY) : null;
 
 // ── Price IDs from your Stripe Dashboard ─────────────────────────────────────
 // Replace these with your real price IDs after creating products
@@ -86,12 +80,6 @@ const PLANS = [
 
 // ── Stripe checkout helper ────────────────────────────────────────────────────
 async function redirectToCheckout(priceId, userEmail) {
-  if (!stripePromise) {
-    alert('Stripe is not configured. Add VITE_STRIPE_PUBLISHABLE_KEY to your .env file.');
-    return;
-  }
-
-  // Call your backend to create a Checkout Session
   const res = await fetch('/api/create-checkout-session', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -109,10 +97,12 @@ async function redirectToCheckout(priceId, userEmail) {
     return;
   }
 
-  const { sessionId } = await res.json();
-  const stripe = await stripePromise;
-  const { error } = await stripe.redirectToCheckout({ sessionId });
-  if (error) alert(error.message);
+  const { url } = await res.json();
+  if (url) {
+    window.location.href = url;
+  } else {
+    alert('No checkout URL returned from server.');
+  }
 }
 
 // ── Plan card component ────────────────────────────────────────────────────────
