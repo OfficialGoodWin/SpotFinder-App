@@ -4,6 +4,15 @@
   "devCommand": "npm run dev",
   "headers": [
     {
+      "source": "/github-releases/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
+    },
+    {
       "source": "/(.*)",
       "headers": [
         { "key": "X-Content-Type-Options", "value": "nosniff" },
@@ -33,6 +42,10 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/github-releases/:path*",
+      "destination": "https://github.com/OfficialGoodWin/SpotFinder-App/releases/latest/download/:path*"
+    },
     {
       "source": "/gplaces/:path*",
       "destination": "https://maps.googleapis.com/maps/api/place/:path*"

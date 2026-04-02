@@ -23,6 +23,17 @@ export default defineConfig({
         target: 'https://api.openrouteservice.org/v2',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/ors-api/, ''),
+      },
+      '/github-releases': {
+        target: 'https://github.com/OfficialGoodWin/SpotFinder-App/releases/latest/download',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/github-releases/, ''),
+        followRedirects: true,
+        configure: (proxy, options) => {
+          proxy.on('proxyRes', (proxyRes, req, res) => {
+            res.setHeader('Access-Control-Allow-Origin', '*');
+          });
+        }
       }
     }
   }
