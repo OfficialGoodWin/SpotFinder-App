@@ -8,8 +8,8 @@ export default async function handler(req) {
       status: 204,
       headers: {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, Range',
       },
     });
   }
@@ -23,14 +23,27 @@ export default async function handler(req) {
 
   const targetUrl = `https://github.com/OfficialGoodWin/SpotFinder-App/releases/latest/download/${country}.pmtiles`;
 
+  if (req.method === 'HEAD') {
+    const response = await fetch(targetUrl, { method: 'HEAD', redirect: 'follow' });
+    const headers = new Headers(response.headers);
+    headers.set('Access-Control-Allow-Origin', '*');
+    return new Response(null, { status: response.status, headers });
+  }
+
   try {
+    const fetchHeaders = {};
+    // Forward Range header so chunked downloads work on Android
+    const range = req.headers.get('range') || req.headers.get('Range');
+    if (range) fetchHeaders['Range'] = range;
+
     // Fetch the asset, automatically following the 302 redirect from GitHub to Azure Blob
     const response = await fetch(targetUrl, {
       method: 'GET',
       redirect: 'follow',
+      headers: fetchHeaders,
     });
 
-    if (!response.ok) {
+    if (!response.ok && response.status !== 206) {
       return new Response(`Upstream error: ${response.status}`, { status: response.status });
     }
 
@@ -39,12 +52,12 @@ export default async function handler(req) {
     
     // Inject CORS headers so the browser allows the streaming response
     headers.set('Access-Control-Allow-Origin', '*');
-    headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    headers.set('Access-Control-Expose-Headers', 'Content-Length, Content-Range');
+    headers.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    headers.set('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
 
     // Stream the body back to the client
     return new Response(response.body, {
-      status: response.status,
+      status: response.status, // will be 206 for range requests
       headers: headers,
     });
   } catch (err) {

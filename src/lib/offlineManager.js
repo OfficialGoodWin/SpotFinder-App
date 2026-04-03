@@ -89,212 +89,174 @@ async function deleteCountryFile(code) {
 // ── PMTiles streaming download ────────────────────────────────────────────────
 
 export async function downloadCountryPMTiles({ country, onProgress, abortRef }) {
-  // On Capacitor (Android/iOS) we need an absolute URL to the proxy because it runs on localhost without a backend.
-  // However, during local Vite dev (import.meta.env.DEV), we can use the local Vite proxy we created.
+  const isNative = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.();
+
+  // On native Capacitor, fetch goes through WebView asset loader unless absolute URL
+  // On web dev, use local proxy; on web prod, use relative path
   let baseUrl = '';
-  if (typeof window !== 'undefined' && !import.meta.env.DEV) {
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:') {
-      baseUrl = 'https://spot-finder-app.vercel.app';
-    }
+  if (isNative) {
+    baseUrl = 'https://spot-finder-app.vercel.app';
+  } else if (typeof window !== 'undefined' && !import.meta.env.DEV && (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.protocol === 'file:'
+  )) {
+    baseUrl = 'https://spot-finder-app.vercel.app';
   }
-  const url  = `${baseUrl}/api/download?country=${country.code}`;
-  
-  // Detect Capacitor native environment
-  const isCapacitor = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.();
+  const url = `${baseUrl}/api/download?country=${country.code}`;
 
-  if (isCapacitor) {
-    // ── Android/iOS Native: use Native plugin to download large PMTiles directly ──
-    // Capacitor's WebView network stack crashes on 1.5GB files via XHR/fetch
-    // So we use a native OkHttp background download.
-    const { default: OsrmPlugin } = await import('../plugins/OsrmPlugin.js');
-    if (!OsrmPlugin.isAvailable) throw new Error('Native download plugin not available');
-
-    const totalMB = country.sizeMB;
-    let t0 = Date.now();
-    let lastReceivedMB = 0;
-
-    try {
-      const result = await OsrmPlugin.downloadFile({
-        url,
-        filename: `${country.code}.pmtiles`,
-        onProgress: (data) => {
-          if (abortRef?.current === true) return; // Native doesn't support abort yet, just ignore progress
-
-          const elapsed = Math.max((Date.now() - t0) / 1000, 0.1);
-          // calculate rough received MB from the percentage 
-          const receivedMB = (data.pct / 100) * totalMB;
-          
-          // Smoothed speed
-          const speedMBps = receivedMB > 0 ? receivedMB / elapsed : 0;
-          const etaSec = speedMBps > 0 ? (totalMB - receivedMB) / speedMBps : 0;
-          
-          onProgress?.({ 
-            receivedMB, 
-            totalMB, 
-            speedMBps, 
-            etaSec,
-            pct: data.pct
-          });
-          lastReceivedMB = receivedMB;
-        }
-      });
-
-      // The native plugin saved the file into the app's standard filesDir.
-      // Capacitor's OPFS is entirely separate. To allow MapLibre to read it,
-      // we need to copy it from the native path into OPFS.
-      
-      // ACTUALLY: Native filesystem paths cannot be read by OPFS handles easily.
-      // But MapLibre pmtiles uses OPFS, so we MUST copy the bytes. 
-      // Wait, reading 1.5GB into memory to write to OPFS will crash Android!
-      
-      // To fix this without memory crashes, we can stream read from the native file
-      // using Capacitor Filesystem plugin, and stream write to OPFS.
-      const { Filesystem, Directory } = await import('@capacitor/filesystem');
-      
-      // The file is located at downloadDir/filename, but the native plugin returned the absolute filePath.
-      // Instead of absolute path, let's just use the filename which we know is in getFilesDir()/downloads/
-      // Wait, Filesystem plugin uses "Directory.Data" for getFilesDir().
-      const nativePath = `downloads/${country.code}.pmtiles`;
-      
-      // Check file size
-      const stat = await Filesystem.stat({ path: nativePath, directory: Directory.Data });
-      const actualTotalMB = stat.size / 1024 / 1024;
-      
-      // Open OPFS writable
-      const dir = await getOfflineDir();
-      try { await dir.removeEntry(`${country.code}.pmtiles`); } catch(_) {}
-      const handle = await dir.getFileHandle(`${country.code}.pmtiles`, { create: true });
-      const writable = await handle.createWritable();
-      
-      // Read native file in small chunks and write to OPFS to avoid OOM
-      const CHUNK_SIZE = 1024 * 1024 * 2; // 2 MB chunks
-      let offset = 0;
-      
-      while (offset < stat.size) {
-        if (abortRef?.current === true) throw new Error('AbortError');
-        
-        const readLength = Math.min(CHUNK_SIZE, stat.size - offset);
-        
-        // Unfortunately Capacitor Filesystem reads into Base64 strings, which is inefficient.
-        // But for 2MB chunks it's okay.
-        // Actually, there is a better way: OPFS is available, but if MapLibre needs OPFS, we must move it.
-        // Wait, PMTiles library accepts *any* File-like object, or URL!
-        // We can just use capacitor://localhost/_capacitor_file_/data/user/0/com.spotfinder.app/files/downloads/CZ.pmtiles
-        // YES! We don't even need to copy it to OPFS. We can just let PMTiles read the native file via capacitor:// custom scheme!
-        
-        // Wait, `pmtiles` uses Range requests. Capacitor custom scheme DOES support Range requests in v5/v6!
-        // Let's copy it anyway because the rest of the app manages OPFS files (deletion, etc).
-        // Let's do the copy, 2MB at a time is slow but safe.
-        
-        const fileData = await Filesystem.readFile({
-            path: nativePath,
-            directory: Directory.Data,
-            position: offset,
-            length: readLength
-        });
-        
-        const binaryStr = atob(fileData.data);
-        const buf = new Uint8Array(binaryStr.length);
-        for (let i = 0; i < binaryStr.length; i++) buf[i] = binaryStr.charCodeAt(i);
-        
-        await writable.write(buf);
-        offset += readLength;
-        
-        // Optional: update progress for the copying phase
-        onProgress?.({ 
-          receivedMB: actualTotalMB, 
-          totalMB: actualTotalMB, 
-          speedMBps: 0, 
-          etaSec: 0,
-          pct: 100,
-          phase: 'copying' // UI can ignore or show "Saving..."
-        });
-      }
-      
-      await writable.close();
-      
-      // Delete the native file to save space
-      await Filesystem.deleteFile({ path: nativePath, directory: Directory.Data }).catch(()=>{});
-
-      await setMeta(country.code, {
-        downloadedAt: Date.now(),
-        sizeMB: Math.round(actualTotalMB),
-        source: 'pmtiles',
-      });
-      
-      onProgress?.({ receivedMB: actualTotalMB, totalMB: actualTotalMB, speedMBps: 0, etaSec: 0, pct: 100 });
-      
-    } catch(e) {
-      if (abortRef?.current !== true) throw e;
-    }
+  if (isNative) {
+    // Android WebView can't stream large files via fetch/XHR without OOM.
+    // Solution: chunked Range requests — download 50 MB at a time, write to OPFS, free memory.
+    await downloadChunked({ url, country, onProgress, abortRef });
   } else {
-    // Web: use fetch + ReadableStream
-    const ctrl = new AbortController();
-    const cancelWatch = setInterval(() => { if (abortRef?.current === true) ctrl.abort(); }, 200);
+    // Web browser: normal streaming fetch
+    await downloadStreaming({ url, country, onProgress, abortRef });
+  }
+}
 
-    try {
-      const res = await fetch(url, { signal: ctrl.signal });
+const CHUNK_SIZE = 50 * 1024 * 1024; // 50 MB per chunk
 
-      if (res.status === 404 || !res.ok) {
-        throw new Error(
-          `PMTiles file not found for ${country.name}. ` +
-          `Run: pmtiles extract https://build.protomaps.com/20260319.pmtiles ` +
-          `public/offline/${country.code}.pmtiles --bbox=${country.bbox.join(',')} --maxzoom=16`
-        );
-      }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+async function downloadChunked({ url, country, onProgress, abortRef }) {
+  // Step 1: HEAD request to get total file size
+  let totalBytes = country.sizeMB * 1024 * 1024; // fallback estimate
+  try {
+    const head = await fetch(url, { method: 'HEAD' });
+    const cl = head.headers.get('Content-Length');
+    if (cl) totalBytes = parseInt(cl, 10);
+  } catch (_) {}
 
-      const contentLength = parseInt(res.headers.get('Content-Length') || '0', 10);
-      const totalMB = contentLength > 0 ? contentLength / 1024 / 1024 : country.sizeMB;
+  const totalMB = totalBytes / 1048576;
+  const dir = await getOfflineDir();
 
-      const reader = res.body.getReader();
-      const chunks = [];
-      let received = 0;
-      const t0 = Date.now();
-      let lastReport = 0;
+  // Remove any partial file from previous attempt
+  try { await dir.removeEntry(`${country.code}.pmtiles`); } catch (_) {}
+  const handle = await dir.getFileHandle(`${country.code}.pmtiles`, { create: true });
+  const writable = await handle.createWritable();
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-        received += value.byteLength;
-        const now = Date.now();
-        if (now - lastReport > 250) {
-          lastReport = now;
-          const elapsed   = Math.max((now - t0) / 1000, 0.1);
-          const recvMB    = received / 1024 / 1024;
-          const speedMBps = recvMB / elapsed;
-          const etaSec    = speedMBps > 0 ? (totalMB - recvMB) / speedMBps : 0;
-          onProgress?.({ receivedMB: recvMB, totalMB, speedMBps, etaSec,
-                         pct: Math.min(99, Math.round(recvMB / totalMB * 100)) });
-        }
+  let received = 0;
+  const t0 = Date.now();
+
+  try {
+    for (let start = 0; start < totalBytes; start += CHUNK_SIZE) {
+      if (abortRef?.current) {
+        await writable.abort();
+        try { await dir.removeEntry(`${country.code}.pmtiles`); } catch (_) {}
+        throw new DOMException('Aborted', 'AbortError');
       }
 
-      // Assemble
-      const buf = new Uint8Array(received);
-      let off = 0;
-      for (const chunk of chunks) { buf.set(chunk, off); off += chunk.length; }
+      const end = Math.min(start + CHUNK_SIZE - 1, totalBytes - 1);
 
-      // Delete partial file before writing (fixes re-download stuck bug)
-      const dir      = await getOfflineDir();
-      try { await dir.removeEntry(`${country.code}.pmtiles`); } catch(_) {}
-      
-      const handle   = await dir.getFileHandle(`${country.code}.pmtiles`, { create: true });
-      const writable = await handle.createWritable();
-      await writable.write(buf.buffer);
-      await writable.close();
-
-      await setMeta(country.code, {
-        downloadedAt: Date.now(),
-        sizeMB: Math.round(received / 1024 / 1024),
-        source: 'pmtiles',
+      // Fetch this chunk with a Range header
+      // On Android WebView, fetch to an ABSOLUTE external URL works fine for Range requests
+      // because it's not matching any local asset path
+      const res = await fetch(url, {
+        headers: { 'Range': `bytes=${start}-${end}` },
       });
 
-      onProgress?.({ receivedMB: totalMB, totalMB, speedMBps: 0, etaSec: 0, pct: 100 });
+      // 206 = partial content (correct), 200 = server doesn't support range (fallback)
+      if (!res.ok && res.status !== 206) throw new Error(`HTTP ${res.status}`);
 
-    } finally {
-      clearInterval(cancelWatch);
+      const chunk = await res.arrayBuffer();
+      await writable.write(chunk);
+      received += chunk.byteLength;
+
+      const elapsed = Math.max((Date.now() - t0) / 1000, 0.1);
+      const receivedMB = received / 1048576;
+      const speedMBps = receivedMB / elapsed;
+      const etaSec = speedMBps > 0 ? (totalMB - receivedMB) / speedMBps : 0;
+      onProgress?.({
+        receivedMB,
+        totalMB,
+        speedMBps,
+        etaSec,
+        pct: Math.min(99, Math.round(received / totalBytes * 100)),
+      });
     }
+
+    await writable.close();
+
+    const receivedMB = Math.round(received / 1048576);
+    await setMeta(country.code, {
+      downloadedAt: Date.now(),
+      sizeMB: receivedMB,
+      source: 'pmtiles',
+    });
+    onProgress?.({ receivedMB, totalMB: receivedMB, speedMBps: 0, etaSec: 0, pct: 100 });
+
+  } catch (err) {
+    try { await writable.abort(); } catch (_) {}
+    try { await dir.removeEntry(`${country.code}.pmtiles`); } catch (_) {}
+    throw err;
+  }
+}
+
+async function downloadStreaming({ url, country, onProgress, abortRef }) {
+  const ctrl = new AbortController();
+  const cancelWatch = setInterval(() => { if (abortRef?.current === true) ctrl.abort(); }, 200);
+
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
+
+    if (res.status === 404 || !res.ok) {
+      throw new Error(
+        `PMTiles file not found for ${country.name}. ` +
+        `Run: pmtiles extract https://build.protomaps.com/20260319.pmtiles ` +
+        `public/offline/${country.code}.pmtiles --bbox=${country.bbox.join(',')} --maxzoom=16`
+      );
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const contentLength = parseInt(res.headers.get('Content-Length') || '0', 10);
+    const totalMB = contentLength > 0 ? contentLength / 1024 / 1024 : country.sizeMB;
+
+    const reader = res.body.getReader();
+    const chunks = [];
+    let received = 0;
+    const t0 = Date.now();
+    let lastReport = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.byteLength;
+      const now = Date.now();
+      if (now - lastReport > 250) {
+        lastReport = now;
+        const elapsed   = Math.max((now - t0) / 1000, 0.1);
+        const recvMB    = received / 1024 / 1024;
+        const speedMBps = recvMB / elapsed;
+        const etaSec    = speedMBps > 0 ? (totalMB - recvMB) / speedMBps : 0;
+        onProgress?.({ receivedMB: recvMB, totalMB, speedMBps, etaSec,
+                       pct: Math.min(99, Math.round(recvMB / totalMB * 100)) });
+      }
+    }
+
+    // Assemble
+    const buf = new Uint8Array(received);
+    let off = 0;
+    for (const chunk of chunks) { buf.set(chunk, off); off += chunk.length; }
+
+    // Delete partial file before writing (fixes re-download stuck bug)
+    const dir      = await getOfflineDir();
+    try { await dir.removeEntry(`${country.code}.pmtiles`); } catch(_) {}
+    
+    const handle   = await dir.getFileHandle(`${country.code}.pmtiles`, { create: true });
+    const writable = await handle.createWritable();
+    await writable.write(buf.buffer);
+    await writable.close();
+
+    await setMeta(country.code, {
+      downloadedAt: Date.now(),
+      sizeMB: Math.round(received / 1024 / 1024),
+      source: 'pmtiles',
+    });
+
+    onProgress?.({ receivedMB: totalMB, totalMB, speedMBps: 0, etaSec: 0, pct: 100 });
+
+  } finally {
+    clearInterval(cancelWatch);
   }
 }
 
