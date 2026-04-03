@@ -98,69 +98,143 @@ export async function downloadCountryPMTiles({ country, onProgress, abortRef }) 
     }
   }
   const url  = `${baseUrl}/api/download?country=${country.code}`;
-  const ctrl = new AbortController();
-  const cancelWatch = setInterval(() => { if (abortRef?.current === true) ctrl.abort(); }, 200);
+  
+  // Detect Capacitor native environment
+  const isCapacitor = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.();
 
-  try {
-    const res = await fetch(url, { signal: ctrl.signal });
-
-    if (res.status === 404 || !res.ok) {
-      throw new Error(
-        `PMTiles file not found for ${country.name}. ` +
-        `Run: pmtiles extract https://build.protomaps.com/20260319.pmtiles ` +
-        `public/offline/${country.code}.pmtiles --bbox=${country.bbox.join(',')} --maxzoom=16`
-      );
-    }
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-    const contentLength = parseInt(res.headers.get('Content-Length') || '0', 10);
-    const totalMB = contentLength > 0 ? contentLength / 1024 / 1024 : country.sizeMB;
-
-    const reader = res.body.getReader();
-    const chunks = [];
-    let received = 0;
-    const t0 = Date.now();
-    let lastReport = 0;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      received += value.byteLength;
-      const now = Date.now();
-      if (now - lastReport > 250) {
-        lastReport = now;
-        const elapsed   = Math.max((now - t0) / 1000, 0.1);
-        const recvMB    = received / 1024 / 1024;
-        const speedMBps = recvMB / elapsed;
-        const etaSec    = speedMBps > 0 ? (totalMB - recvMB) / speedMBps : 0;
-        onProgress?.({ receivedMB: recvMB, totalMB, speedMBps, etaSec,
-                       pct: Math.min(99, Math.round(recvMB / totalMB * 100)) });
-      }
-    }
-
-    // Assemble
-    const buf = new Uint8Array(received);
-    let off = 0;
-    for (const chunk of chunks) { buf.set(chunk, off); off += chunk.length; }
-
-    // Write to OPFS
-    const dir      = await getOfflineDir();
-    const handle   = await dir.getFileHandle(`${country.code}.pmtiles`, { create: true });
-    const writable = await handle.createWritable();
-    await writable.write(buf.buffer);
-    await writable.close();
-
-    await setMeta(country.code, {
-      downloadedAt: Date.now(),
-      sizeMB: Math.round(received / 1024 / 1024),
-      source: 'pmtiles',
+  if (isCapacitor) {
+    // Use XHR — Capacitor WebView supports arraybuffer responseType correctly
+    // unlike ReadableStream which gets intercepted by Capacitor's fetch override
+    await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', url);
+      xhr.responseType = 'arraybuffer';
+      
+      const t0 = Date.now();
+      let lastReport = 0;
+      
+      xhr.onprogress = (e) => {
+        const now = Date.now();
+        if (now - lastReport > 250) {
+          lastReport = now;
+          const elapsed   = Math.max((now - t0) / 1000, 0.1);
+          const receivedMB = e.loaded / 1024 / 1024;
+          const totalMB = e.total > 0 ? e.total / 1024 / 1024 : country.sizeMB;
+          const speedMBps = receivedMB / elapsed;
+          const etaSec = e.total > 0 ? (totalMB - receivedMB) / speedMBps : 0;
+          onProgress?.({ receivedMB, totalMB, speedMBps, etaSec,
+                         pct: e.total > 0 ? Math.min(99, Math.round(e.loaded / e.total * 100)) : 0 });
+        }
+      };
+      
+      xhr.onload = async () => {
+        if (xhr.status >= 400) { reject(new Error(`HTTP ${xhr.status}`)); return; }
+        try {
+          // Delete partial file before writing (fixes re-download stuck bug)
+          const dir = await getOfflineDir();
+          try { await dir.removeEntry(`${country.code}.pmtiles`); } catch(_) {}
+          
+          const handle = await dir.getFileHandle(`${country.code}.pmtiles`, { create: true });
+          const writable = await handle.createWritable();
+          await writable.write(xhr.response);
+          await writable.close();
+          
+          const totalMB = xhr.response.byteLength / 1024 / 1024;
+          await setMeta(country.code, {
+            downloadedAt: Date.now(),
+            sizeMB: Math.round(totalMB),
+            source: 'pmtiles',
+          });
+          
+          onProgress?.({ receivedMB: totalMB, totalMB, speedMBps: 0, etaSec: 0, pct: 100 });
+          resolve();
+        } catch(e) {
+          reject(e);
+        }
+      };
+      
+      xhr.onerror = () => reject(new Error('Network error'));
+      xhr.onabort = () => reject(new Error('AbortError'));
+      
+      // Wire up cancel
+      const watch = setInterval(() => { 
+        if (abortRef?.current === true) { 
+          xhr.abort(); 
+          clearInterval(watch); 
+        }
+      }, 200);
+      
+      xhr.onloadend = () => clearInterval(watch);
+      xhr.send();
     });
+  } else {
+    // Web: use fetch + ReadableStream
+    const ctrl = new AbortController();
+    const cancelWatch = setInterval(() => { if (abortRef?.current === true) ctrl.abort(); }, 200);
 
-    onProgress?.({ receivedMB: totalMB, totalMB, speedMBps: 0, etaSec: 0, pct: 100 });
+    try {
+      const res = await fetch(url, { signal: ctrl.signal });
 
-  } finally {
-    clearInterval(cancelWatch);
+      if (res.status === 404 || !res.ok) {
+        throw new Error(
+          `PMTiles file not found for ${country.name}. ` +
+          `Run: pmtiles extract https://build.protomaps.com/20260319.pmtiles ` +
+          `public/offline/${country.code}.pmtiles --bbox=${country.bbox.join(',')} --maxzoom=16`
+        );
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const contentLength = parseInt(res.headers.get('Content-Length') || '0', 10);
+      const totalMB = contentLength > 0 ? contentLength / 1024 / 1024 : country.sizeMB;
+
+      const reader = res.body.getReader();
+      const chunks = [];
+      let received = 0;
+      const t0 = Date.now();
+      let lastReport = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.byteLength;
+        const now = Date.now();
+        if (now - lastReport > 250) {
+          lastReport = now;
+          const elapsed   = Math.max((now - t0) / 1000, 0.1);
+          const recvMB    = received / 1024 / 1024;
+          const speedMBps = recvMB / elapsed;
+          const etaSec    = speedMBps > 0 ? (totalMB - recvMB) / speedMBps : 0;
+          onProgress?.({ receivedMB: recvMB, totalMB, speedMBps, etaSec,
+                         pct: Math.min(99, Math.round(recvMB / totalMB * 100)) });
+        }
+      }
+
+      // Assemble
+      const buf = new Uint8Array(received);
+      let off = 0;
+      for (const chunk of chunks) { buf.set(chunk, off); off += chunk.length; }
+
+      // Delete partial file before writing (fixes re-download stuck bug)
+      const dir      = await getOfflineDir();
+      try { await dir.removeEntry(`${country.code}.pmtiles`); } catch(_) {}
+      
+      const handle   = await dir.getFileHandle(`${country.code}.pmtiles`, { create: true });
+      const writable = await handle.createWritable();
+      await writable.write(buf.buffer);
+      await writable.close();
+
+      await setMeta(country.code, {
+        downloadedAt: Date.now(),
+        sizeMB: Math.round(received / 1024 / 1024),
+        source: 'pmtiles',
+      });
+
+      onProgress?.({ receivedMB: totalMB, totalMB, speedMBps: 0, etaSec: 0, pct: 100 });
+
+    } finally {
+      clearInterval(cancelWatch);
+    }
   }
 }
 

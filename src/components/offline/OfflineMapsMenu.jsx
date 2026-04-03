@@ -186,7 +186,7 @@ export default function OfflineMapsMenu({ onClose }) {
   const [storage, setStorage] = useState({ usedMB: 0, quotaMB: 0 });
   const [active,  setActive]  = useState(null);
   const [toast,   setToast]   = useState(null);
-  const abortRef = useRef({ current: false });
+  const abortRef = useRef(false);
 
   useEffect(() => {
     scrubInvalidMeta().then(() => getAllMeta().then(setMetaMap));
@@ -197,18 +197,18 @@ export default function OfflineMapsMenu({ onClose }) {
   const refresh   = async () => { const [m,s] = await Promise.all([getAllMeta(), estimateStorageUsage()]); setMetaMap(m); setStorage(s); };
 
   const handleDownload = useCallback(async (country, mode) => {
-    if (mode === 'cancel') { abortRef.current.current = true; setActive(null); return; }
+    if (mode === 'cancel') { abortRef.current = true; setActive(null); return; }
     if (active) return;
-    abortRef.current.current = false;
+    abortRef.current = false;
 
     if (mode === 'pois') {
       setActive({ code: country.code, progress: { poi:true, done:0, total:1, poiDone:0, poiTotal:1 } });
       await downloadCountryPOIs({
         country, geoapifyKey: GEOAPIFY_KEY,
         onProgress: (p) => setActive(a => a ? { ...a, progress: { poi:true, poiDone:p.done, poiTotal:p.total } } : null),
-        abortRef: abortRef.current,
+        abortRef,
       });
-      if (!abortRef.current.current) showToast(`POIs downloaded for ${country.name} ✓`, 'success');
+      if (!abortRef.current) showToast(`POIs downloaded for ${country.name} ✓`, 'success');
       setActive(null); await refresh(); return;
     }
 
@@ -217,12 +217,12 @@ export default function OfflineMapsMenu({ onClose }) {
       await downloadCountryPMTiles({
         country,
         onProgress: (p) => setActive(a => a ? { ...a, progress: p } : null),
-        abortRef: abortRef.current,
+        abortRef,
       });
-      if (!abortRef.current.current) showToast(`${country.name} ready for offline use ✓`, 'success');
+      if (!abortRef.current) showToast(`${country.name} ready for offline use ✓`, 'success');
       else showToast('Download cancelled', 'info');
     } catch(e) {
-      if (abortRef.current.current || e.name === 'AbortError') {
+      if (abortRef.current || e.name === 'AbortError') {
         showToast('Download cancelled', 'info');
       } else {
         showToast(e.message.split('\n')[0], 'error');
