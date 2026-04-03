@@ -28,10 +28,11 @@ export default defineConfig({
         target: 'https://github.com/OfficialGoodWin/SpotFinder-App/releases/latest/download',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/github-releases/, ''),
-        followRedirects: true,
         configure: (proxy, options) => {
           proxy.on('proxyRes', (proxyRes, req, res) => {
+            // Ensure CORS headers are injected on the 302 redirect response
             res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
           });
         }
       }

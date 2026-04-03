@@ -89,7 +89,7 @@ async function deleteCountryFile(code) {
 // ── PMTiles streaming download ────────────────────────────────────────────────
 
 export async function downloadCountryPMTiles({ country, onProgress, abortRef }) {
-  const url  = `/github-releases/${country.code}.pmtiles`;
+  const url  = `/api/download?country=${country.code}`;
   const ctrl = new AbortController();
   const cancelWatch = setInterval(() => { if (abortRef?.current) ctrl.abort(); }, 200);
 
