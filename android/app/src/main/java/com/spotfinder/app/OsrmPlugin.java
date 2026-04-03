@@ -137,4 +137,50 @@ public class OsrmPlugin extends Plugin {
             }
         }).start();
     }
+
+    /**
+     * Download a file using OkHttp and write it to the Android app's private files directory,
+     * bypassing the WebView so large files don't cause OOM errors.
+     *
+     * JS usage:
+     *   OsrmPlugin.downloadFile({
+     *     url: 'https://url/file.pmtiles',
+     *     filename: 'CZ.pmtiles'
+     *   })
+     */
+    @PluginMethod
+    public void downloadFile(PluginCall call) {
+        String url      = call.getString("url", "");
+        String filename = call.getString("filename", "");
+
+        if (url.isEmpty() || filename.isEmpty()) {
+            call.reject("url and filename are required");
+            return;
+        }
+
+        // We use the regular filesDir
+        File downloadDir = new File(getContext().getFilesDir(), "downloads");
+        if (!downloadDir.exists()) downloadDir.mkdirs();
+
+        // Run download in background thread
+        new Thread(() -> {
+            try {
+                OsrmDownloader.downloadDirect(url, downloadDir, filename, (progress) -> {
+                    // Emit progress event to JS
+                    JSObject data = new JSObject();
+                    data.put("filename", filename);
+                    data.put("pct", progress);
+                    notifyListeners("downloadProgress", data);
+                });
+
+                File downloadedFile = new File(downloadDir, filename);
+                JSObject result = new JSObject();
+                result.put("filePath", downloadedFile.getAbsolutePath());
+                result.put("filename", filename);
+                call.resolve(result);
+            } catch (Exception e) {
+                call.reject("Download failed: " + e.getMessage());
+            }
+        }).start();
+    }
 }

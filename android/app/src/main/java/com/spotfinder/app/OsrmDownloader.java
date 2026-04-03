@@ -50,6 +50,62 @@ public class OsrmDownloader {
      * @param countryCode  e.g. "CZ"
      * @param onProgress   Called with 0-100 as download progresses
      */
+    /**
+     * Download a raw file (like .pmtiles) without extraction.
+     */
+    public static void downloadDirect(String url, File destDir, String filename, ProgressCallback onProgress)
+            throws IOException {
+
+        if (!destDir.exists()) destDir.mkdirs();
+
+        HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+        conn.setConnectTimeout(15000);
+        conn.setReadTimeout(600000); // 10 min for large files like 2GB PMTiles
+        // Follow redirects explicitly if needed, but HttpURLConnection usually follows
+        conn.setInstanceFollowRedirects(true);
+        conn.connect();
+
+        if (conn.getResponseCode() != 200 && conn.getResponseCode() != 206) {
+            conn.disconnect();
+            throw new IOException("Server returned " + conn.getResponseCode() + " for " + url);
+        }
+
+        long contentLength = conn.getContentLengthLong();
+        Log.i(TAG, String.format("Downloading direct file %s: %.1f MB", filename, contentLength / 1048576.0));
+
+        File outFile = new File(destDir, filename);
+        File tempFile = new File(destDir, filename + ".tmp");
+
+        try (InputStream is = new BufferedInputStream(conn.getInputStream(), BUFFER_SIZE);
+             FileOutputStream fos = new FileOutputStream(tempFile)) {
+
+            byte[] buffer = new byte[BUFFER_SIZE];
+            long received = 0;
+            int read;
+            long lastReport = 0;
+
+            while ((read = is.read(buffer)) != -1) {
+                fos.write(buffer, 0, read);
+                received += read;
+                
+                long now = System.currentTimeMillis();
+                if (contentLength > 0 && onProgress != null && now - lastReport > 250) {
+                    onProgress.onProgress((int) (received * 100 / contentLength));
+                    lastReport = now;
+                }
+            }
+
+            fos.flush();
+            if (outFile.exists()) outFile.delete();
+            tempFile.renameTo(outFile);
+
+            Log.i(TAG, "File " + filename + " downloaded to " + outFile.getAbsolutePath());
+            if (onProgress != null) onProgress.onProgress(100);
+        } finally {
+            conn.disconnect();
+        }
+    }
+
     public static void download(String url, File osrmDir, String countryCode, ProgressCallback onProgress)
             throws IOException {
 

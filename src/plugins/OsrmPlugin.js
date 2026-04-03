@@ -84,6 +84,34 @@ class OsrmPluginWrapper {
       listenerHandle?.remove();
     }
   }
+
+  /**
+   * Download a file using OkHttp and write it to the Android app's private files directory.
+   * Progress is emitted as 'downloadProgress' events.
+   *
+   * @param {Object} options
+   * @param {string} options.url          - Download URL for the file
+   * @param {string} options.filename     - Output filename
+   * @param {Function} options.onProgress - Called with { filename, pct: 0-100 }
+   * @returns {Promise<{ filePath: string, filename: string }>}
+   */
+  async downloadFile({ url, filename, onProgress }) {
+    if (!this._available) throw new Error('OSRM native plugin not available on this platform');
+
+    let listenerHandle = null;
+    if (onProgress) {
+      listenerHandle = await NativePlugin.addListener('downloadProgress', (data) => {
+        if (data.filename === filename) onProgress(data);
+      });
+    }
+
+    try {
+      const result = await NativePlugin.downloadFile({ url, filename });
+      return result;
+    } finally {
+      listenerHandle?.remove();
+    }
+  }
 }
 
 const OsrmPlugin = new OsrmPluginWrapper();

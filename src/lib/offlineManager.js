@@ -103,70 +103,130 @@ export async function downloadCountryPMTiles({ country, onProgress, abortRef }) 
   const isCapacitor = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.();
 
   if (isCapacitor) {
-    // Use XHR — Capacitor WebView supports arraybuffer responseType correctly
-    // unlike ReadableStream which gets intercepted by Capacitor's fetch override
-    await new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('GET', url);
-      xhr.responseType = 'arraybuffer';
-      
-      const t0 = Date.now();
-      let lastReport = 0;
-      
-      xhr.onprogress = (e) => {
-        const now = Date.now();
-        if (now - lastReport > 250) {
-          lastReport = now;
-          const elapsed   = Math.max((now - t0) / 1000, 0.1);
-          const receivedMB = e.loaded / 1024 / 1024;
-          const totalMB = e.total > 0 ? e.total / 1024 / 1024 : country.sizeMB;
-          const speedMBps = receivedMB / elapsed;
-          const etaSec = e.total > 0 ? (totalMB - receivedMB) / speedMBps : 0;
-          onProgress?.({ receivedMB, totalMB, speedMBps, etaSec,
-                         pct: e.total > 0 ? Math.min(99, Math.round(e.loaded / e.total * 100)) : 0 });
-        }
-      };
-      
-      xhr.onload = async () => {
-        if (xhr.status >= 400) { reject(new Error(`HTTP ${xhr.status}`)); return; }
-        try {
-          // Delete partial file before writing (fixes re-download stuck bug)
-          const dir = await getOfflineDir();
-          try { await dir.removeEntry(`${country.code}.pmtiles`); } catch(_) {}
+    // ── Android/iOS Native: use Native plugin to download large PMTiles directly ──
+    // Capacitor's WebView network stack crashes on 1.5GB files via XHR/fetch
+    // So we use a native OkHttp background download.
+    const { default: OsrmPlugin } = await import('../plugins/OsrmPlugin.js');
+    if (!OsrmPlugin.isAvailable) throw new Error('Native download plugin not available');
+
+    const totalMB = country.sizeMB;
+    let t0 = Date.now();
+    let lastReceivedMB = 0;
+
+    try {
+      const result = await OsrmPlugin.downloadFile({
+        url,
+        filename: `${country.code}.pmtiles`,
+        onProgress: (data) => {
+          if (abortRef?.current === true) return; // Native doesn't support abort yet, just ignore progress
+
+          const elapsed = Math.max((Date.now() - t0) / 1000, 0.1);
+          // calculate rough received MB from the percentage 
+          const receivedMB = (data.pct / 100) * totalMB;
           
-          const handle = await dir.getFileHandle(`${country.code}.pmtiles`, { create: true });
-          const writable = await handle.createWritable();
-          await writable.write(xhr.response);
-          await writable.close();
+          // Smoothed speed
+          const speedMBps = receivedMB > 0 ? receivedMB / elapsed : 0;
+          const etaSec = speedMBps > 0 ? (totalMB - receivedMB) / speedMBps : 0;
           
-          const totalMB = xhr.response.byteLength / 1024 / 1024;
-          await setMeta(country.code, {
-            downloadedAt: Date.now(),
-            sizeMB: Math.round(totalMB),
-            source: 'pmtiles',
+          onProgress?.({ 
+            receivedMB, 
+            totalMB, 
+            speedMBps, 
+            etaSec,
+            pct: data.pct
           });
-          
-          onProgress?.({ receivedMB: totalMB, totalMB, speedMBps: 0, etaSec: 0, pct: 100 });
-          resolve();
-        } catch(e) {
-          reject(e);
+          lastReceivedMB = receivedMB;
         }
-      };
+      });
+
+      // The native plugin saved the file into the app's standard filesDir.
+      // Capacitor's OPFS is entirely separate. To allow MapLibre to read it,
+      // we need to copy it from the native path into OPFS.
       
-      xhr.onerror = () => reject(new Error('Network error'));
-      xhr.onabort = () => reject(new Error('AbortError'));
+      // ACTUALLY: Native filesystem paths cannot be read by OPFS handles easily.
+      // But MapLibre pmtiles uses OPFS, so we MUST copy the bytes. 
+      // Wait, reading 1.5GB into memory to write to OPFS will crash Android!
       
-      // Wire up cancel
-      const watch = setInterval(() => { 
-        if (abortRef?.current === true) { 
-          xhr.abort(); 
-          clearInterval(watch); 
-        }
-      }, 200);
+      // To fix this without memory crashes, we can stream read from the native file
+      // using Capacitor Filesystem plugin, and stream write to OPFS.
+      const { Filesystem, Directory } = await import('@capacitor/filesystem');
       
-      xhr.onloadend = () => clearInterval(watch);
-      xhr.send();
-    });
+      // The file is located at downloadDir/filename, but the native plugin returned the absolute filePath.
+      // Instead of absolute path, let's just use the filename which we know is in getFilesDir()/downloads/
+      // Wait, Filesystem plugin uses "Directory.Data" for getFilesDir().
+      const nativePath = `downloads/${country.code}.pmtiles`;
+      
+      // Check file size
+      const stat = await Filesystem.stat({ path: nativePath, directory: Directory.Data });
+      const actualTotalMB = stat.size / 1024 / 1024;
+      
+      // Open OPFS writable
+      const dir = await getOfflineDir();
+      try { await dir.removeEntry(`${country.code}.pmtiles`); } catch(_) {}
+      const handle = await dir.getFileHandle(`${country.code}.pmtiles`, { create: true });
+      const writable = await handle.createWritable();
+      
+      // Read native file in small chunks and write to OPFS to avoid OOM
+      const CHUNK_SIZE = 1024 * 1024 * 2; // 2 MB chunks
+      let offset = 0;
+      
+      while (offset < stat.size) {
+        if (abortRef?.current === true) throw new Error('AbortError');
+        
+        const readLength = Math.min(CHUNK_SIZE, stat.size - offset);
+        
+        // Unfortunately Capacitor Filesystem reads into Base64 strings, which is inefficient.
+        // But for 2MB chunks it's okay.
+        // Actually, there is a better way: OPFS is available, but if MapLibre needs OPFS, we must move it.
+        // Wait, PMTiles library accepts *any* File-like object, or URL!
+        // We can just use capacitor://localhost/_capacitor_file_/data/user/0/com.spotfinder.app/files/downloads/CZ.pmtiles
+        // YES! We don't even need to copy it to OPFS. We can just let PMTiles read the native file via capacitor:// custom scheme!
+        
+        // Wait, `pmtiles` uses Range requests. Capacitor custom scheme DOES support Range requests in v5/v6!
+        // Let's copy it anyway because the rest of the app manages OPFS files (deletion, etc).
+        // Let's do the copy, 2MB at a time is slow but safe.
+        
+        const fileData = await Filesystem.readFile({
+            path: nativePath,
+            directory: Directory.Data,
+            position: offset,
+            length: readLength
+        });
+        
+        const binaryStr = atob(fileData.data);
+        const buf = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) buf[i] = binaryStr.charCodeAt(i);
+        
+        await writable.write(buf);
+        offset += readLength;
+        
+        // Optional: update progress for the copying phase
+        onProgress?.({ 
+          receivedMB: actualTotalMB, 
+          totalMB: actualTotalMB, 
+          speedMBps: 0, 
+          etaSec: 0,
+          pct: 100,
+          phase: 'copying' // UI can ignore or show "Saving..."
+        });
+      }
+      
+      await writable.close();
+      
+      // Delete the native file to save space
+      await Filesystem.deleteFile({ path: nativePath, directory: Directory.Data }).catch(()=>{});
+
+      await setMeta(country.code, {
+        downloadedAt: Date.now(),
+        sizeMB: Math.round(actualTotalMB),
+        source: 'pmtiles',
+      });
+      
+      onProgress?.({ receivedMB: actualTotalMB, totalMB: actualTotalMB, speedMBps: 0, etaSec: 0, pct: 100 });
+      
+    } catch(e) {
+      if (abortRef?.current !== true) throw e;
+    }
   } else {
     // Web: use fetch + ReadableStream
     const ctrl = new AbortController();
