@@ -197,8 +197,9 @@ export default function OfflineMapsMenu({ onClose }) {
   const refresh   = async () => { const [m,s] = await Promise.all([getAllMeta(), estimateStorageUsage()]); setMetaMap(m); setStorage(s); };
 
   const handleDownload = useCallback(async (country, mode) => {
-    if (mode === 'cancel') { abortRef.current = { current: true }; setActive(null); return; }
-    abortRef.current = { current: false };
+    if (mode === 'cancel') { abortRef.current.current = true; setActive(null); return; }
+    if (active) return;
+    abortRef.current.current = false;
 
     if (mode === 'pois') {
       setActive({ code: country.code, progress: { poi:true, done:0, total:1, poiDone:0, poiTotal:1 } });
@@ -221,7 +222,11 @@ export default function OfflineMapsMenu({ onClose }) {
       if (!abortRef.current.current) showToast(`${country.name} ready for offline use ✓`, 'success');
       else showToast('Download cancelled', 'info');
     } catch(e) {
-      showToast(e.message.split('\n')[0], 'error');
+      if (abortRef.current.current || e.name === 'AbortError') {
+        showToast('Download cancelled', 'info');
+      } else {
+        showToast(e.message.split('\n')[0], 'error');
+      }
     }
     setActive(null); await refresh();
   }, []);

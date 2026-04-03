@@ -7,7 +7,7 @@ import { setMeta, deleteMeta, getMeta, setPOIs, deletePOIs } from './offlineStor
 
 export const COUNTRIES = [
   // Central Europe
-  { code:'CZ', name:'Czech Republic',  flag:'🇨🇿', bbox:[12.09,48.55,18.87,51.06], sizeMB:210 },
+  { code:'CZ', name:'Czech Republic',  flag:'🇨🇿', bbox:[12.09,48.55,18.87,51.06], sizeMB:1726 },
   { code:'SK', name:'Slovakia',         flag:'🇸🇰', bbox:[16.83,47.73,22.57,49.61], sizeMB:140 },
   { code:'AT', name:'Austria',          flag:'🇦🇹', bbox:[9.53,46.37,17.16,49.02],  sizeMB:190 },
   { code:'HU', name:'Hungary',          flag:'🇭🇺', bbox:[16.11,45.74,22.90,48.59], sizeMB:175 },
@@ -89,14 +89,17 @@ async function deleteCountryFile(code) {
 // ── PMTiles streaming download ────────────────────────────────────────────────
 
 export async function downloadCountryPMTiles({ country, onProgress, abortRef }) {
-  // On Capacitor (Android/iOS) and local Vite dev server, the Vercel Edge Function isn't running natively.
-  // We point directly to the production backend in that case so the Edge Function can stream the file.
-  const baseUrl = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
-    ? 'https://spot-finder-app.vercel.app'
-    : '';
+  // On Capacitor (Android/iOS) we need an absolute URL to the proxy because it runs on localhost without a backend.
+  // However, during local Vite dev (import.meta.env.DEV), we can use the local Vite proxy we created.
+  let baseUrl = '';
+  if (typeof window !== 'undefined' && !import.meta.env.DEV) {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:') {
+      baseUrl = 'https://spot-finder-app.vercel.app';
+    }
+  }
   const url  = `${baseUrl}/api/download?country=${country.code}`;
   const ctrl = new AbortController();
-  const cancelWatch = setInterval(() => { if (abortRef?.current) ctrl.abort(); }, 200);
+  const cancelWatch = setInterval(() => { if (abortRef?.current === true) ctrl.abort(); }, 200);
 
   try {
     const res = await fetch(url, { signal: ctrl.signal });
@@ -191,9 +194,9 @@ export async function downloadCountryPOIs({ country, geoapifyKey, onProgress, ab
   let doneReqs = 0;
 
   for (const cell of cells) {
-    if (abortRef?.current) return;
+    if (abortRef?.current === true) return;
     for (let i = 0; i < POI_CATS.length; i += BATCH) {
-      if (abortRef?.current) return;
+      if (abortRef?.current === true) return;
       const batch = POI_CATS.slice(i, i + BATCH).join(',');
       const url = `https://api.geoapify.com/v2/places?categories=${encodeURIComponent(batch)}&filter=rect:${cell.w},${cell.s},${cell.e},${cell.n}&limit=500&apiKey=${geoapifyKey}`;
       try {
@@ -217,7 +220,7 @@ export async function downloadCountryPOIs({ country, geoapifyKey, onProgress, ab
       await new Promise(r => setTimeout(r, 60));
     }
   }
-  if (!abortRef?.current) {
+  if (abortRef?.current !== true) {
     await setPOIs(country.code, allPOIs);
     const existing = await getMeta(country.code) || {};
     await setMeta(country.code, { ...existing, hasPOIs:true, poiCount:allPOIs.length });
