@@ -89,7 +89,12 @@ async function deleteCountryFile(code) {
 // ── PMTiles streaming download ────────────────────────────────────────────────
 
 export async function downloadCountryPMTiles({ country, onProgress, abortRef }) {
-  const url  = `/api/download?country=${country.code}`;
+  // On Capacitor (Android/iOS) and local Vite dev server, the Vercel Edge Function isn't running natively.
+  // We point directly to the production backend in that case so the Edge Function can stream the file.
+  const baseUrl = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
+    ? 'https://spot-finder-app.vercel.app'
+    : '';
+  const url  = `${baseUrl}/api/download?country=${country.code}`;
   const ctrl = new AbortController();
   const cancelWatch = setInterval(() => { if (abortRef?.current) ctrl.abort(); }, 200);
 
