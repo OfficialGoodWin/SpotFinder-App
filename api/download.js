@@ -2,65 +2,69 @@ export const config = {
   runtime: 'edge',
 };
 
+// CORS headers applied to every response — built fresh, never copied from upstream.
+// Azure CDN (where GitHub releases are hosted) may return its own CORS headers that
+// would override ours if we did new Headers(response.headers) first.
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, Range',
+  'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges',
+};
+
 export default async function handler(req) {
+  // Preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, Range',
-      },
-    });
+    return new Response(null, { status: 204, headers: CORS });
   }
 
   const url = new URL(req.url);
   const country = url.searchParams.get('country');
-  
-  if (!country) {
-    return new Response('Missing country parameter', { status: 400 });
+
+  if (!country || !/^[A-Z]{2}$/.test(country)) {
+    return new Response('Missing or invalid country parameter', { status: 400, headers: CORS });
   }
 
   const targetUrl = `https://github.com/OfficialGoodWin/SpotFinder-App/releases/latest/download/${country}.pmtiles`;
 
-  if (req.method === 'HEAD') {
-    const response = await fetch(targetUrl, { method: 'HEAD', redirect: 'follow' });
-    const headers = new Headers(response.headers);
-    headers.set('Access-Control-Allow-Origin', '*');
-    return new Response(null, { status: response.status, headers });
-  }
+  // Forward Range header from client — required for chunked Android downloads
+  const upstreamHeaders = {};
+  const range = req.headers.get('Range') || req.headers.get('range');
+  if (range) upstreamHeaders['Range'] = range;
 
   try {
-    const fetchHeaders = {};
-    // Forward Range header so chunked downloads work on Android
-    const range = req.headers.get('range') || req.headers.get('Range');
-    if (range) fetchHeaders['Range'] = range;
-
-    // Fetch the asset, automatically following the 302 redirect from GitHub to Azure Blob
     const response = await fetch(targetUrl, {
-      method: 'GET',
+      method: req.method === 'HEAD' ? 'HEAD' : 'GET',
       redirect: 'follow',
-      headers: fetchHeaders,
+      headers: upstreamHeaders,
     });
 
     if (!response.ok && response.status !== 206) {
-      return new Response(`Upstream error: ${response.status}`, { status: response.status });
+      return new Response(`Upstream error: ${response.status}`, { status: response.status, headers: CORS });
     }
 
-    // Create a new Headers object from the upstream response
-    const headers = new Headers(response.headers);
-    
-    // Inject CORS headers so the browser allows the streaming response
-    headers.set('Access-Control-Allow-Origin', '*');
-    headers.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-    headers.set('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
+    // Build clean headers from scratch — do NOT copy upstream headers first.
+    // Copying Azure's headers risks inheriting a mismatched Access-Control-Allow-Origin
+    // which the browser sees and blocks, even after we try to overwrite it.
+    const headers = {
+      ...CORS,
+      'Content-Type': response.headers.get('Content-Type') || 'application/octet-stream',
+    };
 
-    // Stream the body back to the client
-    return new Response(response.body, {
-      status: response.status, // will be 206 for range requests
-      headers: headers,
+    // Pass through size/range headers so the client knows total length and can show progress
+    const contentLength = response.headers.get('Content-Length');
+    const contentRange  = response.headers.get('Content-Range');
+    const acceptRanges  = response.headers.get('Accept-Ranges');
+    if (contentLength) headers['Content-Length']  = contentLength;
+    if (contentRange)  headers['Content-Range']   = contentRange;
+    if (acceptRanges)  headers['Accept-Ranges']   = acceptRanges;
+
+    return new Response(req.method === 'HEAD' ? null : response.body, {
+      status: response.status,
+      headers,
     });
+
   } catch (err) {
-    return new Response(`Proxy error: ${err.message}`, { status: 500 });
+    return new Response(`Proxy error: ${err.message}`, { status: 500, headers: CORS });
   }
 }

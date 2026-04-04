@@ -86,58 +86,54 @@ async function deleteCountryFile(code) {
   } catch (_) {}
 }
 
-// ── PMTiles streaming download ────────────────────────────────────────────────
+// ── PMTiles download ────────────────────────────────────────────────────────────────────────────────────
 
-export async function downloadCountryPMTiles({ country, onProgress, abortRef }) {
-  const isNative = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.();
+// 50 MB per Range chunk — fits comfortably in Android WebView memory.
+// Each chunk is written to OPFS and freed before the next fetch.
+const CHUNK_SIZE = 50 * 1024 * 1024;
 
-  // On native Capacitor, fetch goes through WebView asset loader unless absolute URL
-  // On web dev, use local proxy; on web prod, use relative path
-  let baseUrl = '';
-  if (isNative) {
-    baseUrl = 'https://spot-finder-app.vercel.app';
-  } else if (typeof window !== 'undefined' && !import.meta.env.DEV && (
+function getDownloadUrl(countryCode) {
+  // Capacitor Android serves the app from https://localhost (or capacitor://localhost).
+  // Any relative /api/... fetch goes through Capacitor's WebView asset loader which
+  // returns index.html for unknown paths. Must use the absolute Vercel URL instead.
+  const needsAbsolute = typeof window !== 'undefined' && !import.meta.env.DEV && (
     window.location.hostname === 'localhost' ||
     window.location.hostname === '127.0.0.1' ||
+    window.location.protocol === 'capacitor:' ||
     window.location.protocol === 'file:'
-  )) {
-    baseUrl = 'https://spot-finder-app.vercel.app';
-  }
-  const url = `${baseUrl}/api/download?country=${country.code}`;
-
-  if (isNative) {
-    // Android WebView can't stream large files via fetch/XHR without OOM.
-    // Solution: chunked Range requests — download 50 MB at a time, write to OPFS, free memory.
-    await downloadChunked({ url, country, onProgress, abortRef });
-  } else {
-    // Web browser: normal streaming fetch
-    await downloadStreaming({ url, country, onProgress, abortRef });
-  }
+  );
+  const base = needsAbsolute ? 'https://spot-finder-app.vercel.app' : '';
+  return `${base}/api/download?country=${countryCode}`;
 }
 
-const CHUNK_SIZE = 50 * 1024 * 1024; // 50 MB per chunk
+export async function downloadCountryPMTiles({ country, onProgress, abortRef }) {
+  const url = getDownloadUrl(country.code);
 
-async function downloadChunked({ url, country, onProgress, abortRef }) {
-  // Step 1: HEAD request to get total file size
+  // Step 1: HEAD to get total file size so we know how many chunks to fetch
   let totalBytes = country.sizeMB * 1024 * 1024; // fallback estimate
   try {
     const head = await fetch(url, { method: 'HEAD' });
     const cl = head.headers.get('Content-Length');
     if (cl) totalBytes = parseInt(cl, 10);
-  } catch (_) {}
-
+  } catch (_) { /* use estimate */ }
   const totalMB = totalBytes / 1048576;
-  const dir = await getOfflineDir();
 
-  // Remove any partial file from previous attempt
+  // Step 2: Open OPFS writable — delete any partial file from a previous attempt
+  const dir = await getOfflineDir();
   try { await dir.removeEntry(`${country.code}.pmtiles`); } catch (_) {}
-  const handle = await dir.getFileHandle(`${country.code}.pmtiles`, { create: true });
+  const handle   = await dir.getFileHandle(`${country.code}.pmtiles`, { create: true });
   const writable = await handle.createWritable();
 
   let received = 0;
   const t0 = Date.now();
 
   try {
+    // Step 3: Chunked Range requests
+    // Why chunked instead of one big fetch?
+    //   - Android WebView buffers the ENTIRE response body in RAM before resolving .arrayBuffer()
+    //   - A 1.7 GB file (Czech Republic) OOM-crashes the app immediately
+    //   - 50 MB chunks keep peak memory under ~60 MB regardless of country size
+    //   - The Vercel edge function now forwards the Range header to GitHub/Azure (which supports it)
     for (let start = 0; start < totalBytes; start += CHUNK_SIZE) {
       if (abortRef?.current) {
         await writable.abort();
@@ -146,27 +142,21 @@ async function downloadChunked({ url, country, onProgress, abortRef }) {
       }
 
       const end = Math.min(start + CHUNK_SIZE - 1, totalBytes - 1);
+      const res = await fetch(url, { headers: { Range: `bytes=${start}-${end}` } });
 
-      // Fetch this chunk with a Range header
-      // On Android WebView, fetch to an ABSOLUTE external URL works fine for Range requests
-      // because it's not matching any local asset path
-      const res = await fetch(url, {
-        headers: { 'Range': `bytes=${start}-${end}` },
-      });
-
-      // 206 = partial content (correct), 200 = server doesn't support range (fallback)
+      // 206 Partial Content = server honoured Range. 200 = server ignored Range (still ok, just less efficient).
       if (!res.ok && res.status !== 206) throw new Error(`HTTP ${res.status}`);
 
-      const chunk = await res.arrayBuffer();
+      const chunk = await res.arrayBuffer(); // max 50 MB — safe on Android
       await writable.write(chunk);
       received += chunk.byteLength;
 
-      const elapsed = Math.max((Date.now() - t0) / 1000, 0.1);
-      const receivedMB = received / 1048576;
-      const speedMBps = receivedMB / elapsed;
-      const etaSec = speedMBps > 0 ? (totalMB - receivedMB) / speedMBps : 0;
+      const elapsed   = Math.max((Date.now() - t0) / 1000, 0.1);
+      const recvMB    = received / 1048576;
+      const speedMBps = recvMB / elapsed;
+      const etaSec    = speedMBps > 0 ? (totalMB - recvMB) / speedMBps : 0;
       onProgress?.({
-        receivedMB,
+        receivedMB: recvMB,
         totalMB,
         speedMBps,
         etaSec,
@@ -176,13 +166,9 @@ async function downloadChunked({ url, country, onProgress, abortRef }) {
 
     await writable.close();
 
-    const receivedMB = Math.round(received / 1048576);
-    await setMeta(country.code, {
-      downloadedAt: Date.now(),
-      sizeMB: receivedMB,
-      source: 'pmtiles',
-    });
-    onProgress?.({ receivedMB, totalMB: receivedMB, speedMBps: 0, etaSec: 0, pct: 100 });
+    const sizeMB = Math.round(received / 1048576);
+    await setMeta(country.code, { downloadedAt: Date.now(), sizeMB, source: 'pmtiles' });
+    onProgress?.({ receivedMB: totalMB, totalMB, speedMBps: 0, etaSec: 0, pct: 100 });
 
   } catch (err) {
     try { await writable.abort(); } catch (_) {}
@@ -191,74 +177,6 @@ async function downloadChunked({ url, country, onProgress, abortRef }) {
   }
 }
 
-async function downloadStreaming({ url, country, onProgress, abortRef }) {
-  const ctrl = new AbortController();
-  const cancelWatch = setInterval(() => { if (abortRef?.current === true) ctrl.abort(); }, 200);
-
-  try {
-    const res = await fetch(url, { signal: ctrl.signal });
-
-    if (res.status === 404 || !res.ok) {
-      throw new Error(
-        `PMTiles file not found for ${country.name}. ` +
-        `Run: pmtiles extract https://build.protomaps.com/20260319.pmtiles ` +
-        `public/offline/${country.code}.pmtiles --bbox=${country.bbox.join(',')} --maxzoom=16`
-      );
-    }
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-    const contentLength = parseInt(res.headers.get('Content-Length') || '0', 10);
-    const totalMB = contentLength > 0 ? contentLength / 1024 / 1024 : country.sizeMB;
-
-    const reader = res.body.getReader();
-    const chunks = [];
-    let received = 0;
-    const t0 = Date.now();
-    let lastReport = 0;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      received += value.byteLength;
-      const now = Date.now();
-      if (now - lastReport > 250) {
-        lastReport = now;
-        const elapsed   = Math.max((now - t0) / 1000, 0.1);
-        const recvMB    = received / 1024 / 1024;
-        const speedMBps = recvMB / elapsed;
-        const etaSec    = speedMBps > 0 ? (totalMB - recvMB) / speedMBps : 0;
-        onProgress?.({ receivedMB: recvMB, totalMB, speedMBps, etaSec,
-                       pct: Math.min(99, Math.round(recvMB / totalMB * 100)) });
-      }
-    }
-
-    // Assemble
-    const buf = new Uint8Array(received);
-    let off = 0;
-    for (const chunk of chunks) { buf.set(chunk, off); off += chunk.length; }
-
-    // Delete partial file before writing (fixes re-download stuck bug)
-    const dir      = await getOfflineDir();
-    try { await dir.removeEntry(`${country.code}.pmtiles`); } catch(_) {}
-    
-    const handle   = await dir.getFileHandle(`${country.code}.pmtiles`, { create: true });
-    const writable = await handle.createWritable();
-    await writable.write(buf.buffer);
-    await writable.close();
-
-    await setMeta(country.code, {
-      downloadedAt: Date.now(),
-      sizeMB: Math.round(received / 1024 / 1024),
-      source: 'pmtiles',
-    });
-
-    onProgress?.({ receivedMB: totalMB, totalMB, speedMBps: 0, etaSec: 0, pct: 100 });
-
-  } finally {
-    clearInterval(cancelWatch);
-  }
-}
 
 // ── POI download ──────────────────────────────────────────────────────────────
 
