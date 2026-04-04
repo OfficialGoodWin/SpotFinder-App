@@ -35,9 +35,14 @@ export default async function handler(req) {
   try {
     const response = await fetch(targetUrl, {
       method: req.method === 'HEAD' ? 'HEAD' : 'GET',
-      redirect: 'follow',
+      redirect: 'manual',
       headers: upstreamHeaders,
     });
+    // GitHub returns 302 → Azure CDN. Fetch Azure server-side so browser never sees Azure's CORS headers.
+    const finalUrl = response.headers.get('Location') || targetUrl;
+    const azureRes = finalUrl !== targetUrl
+    ? await fetch(finalUrl, { method: req.method === 'HEAD' ? 'HEAD' : 'GET', headers: upstreamHeaders, redirect: 'follow' })
+    : response;
 
     if (!response.ok && response.status !== 206) {
       return new Response(`Upstream error: ${response.status}`, { status: response.status, headers: CORS });
