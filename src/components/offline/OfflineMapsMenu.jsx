@@ -8,14 +8,17 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Download, Trash2, MapPin, WifiOff, HardDrive, ChevronDown, ChevronUp } from 'lucide-react';
 import { COUNTRIES, downloadCountryPOIs, deleteCountry, scrubInvalidMeta } from '../../lib/vectorTileDownloader.js';
+import { COUNTRIES as OFFLINE_COUNTRIES } from '../../lib/offlineManager.js';
 import { downloadCountryPMTiles } from '../../lib/offlineManager.js';
 import { getAllMeta, estimateStorageUsage } from '../../lib/offlineStorage.js';
 
 const GEOAPIFY_KEY = import.meta.env.VITE_GEOAPIFY_KEY || '';
 
 // ── Region groupings ──────────────────────────────────────────────────────────
+const CZ_REGIONS = OFFLINE_COUNTRIES.filter(c => c.parent === 'CZ');
+
 const REGIONS = [
-  { name: 'Central Europe', codes: ['CZ','SK','AT','HU','PL','DE','CH'] },
+  { name: 'Central Europe', codes: ['SK','AT','HU','PL','DE','CH'] },
   { name: 'Western Europe', codes: ['FR','ES','PT','NL','BE','LU','GB','IE'] },
   { name: 'Southern Europe', codes: ['IT','HR','SI','GR','RS','BA','MK','AL','ME','MT'] },
   { name: 'Northern Europe', codes: ['SE','NO','DK','FI','EE','LV','LT','IS'] },
@@ -151,7 +154,41 @@ function CountryRow({ country, meta, onDownload, onDelete, activeDownload }) {
   );
 }
 
-function RegionSection({ region, countries, metaMap, onDownload, onDelete, activeDownload }) {
+
+function CzechGroupSection({ countries, metaMap, onDownload, onDelete, activeDownload }) {
+  const [open, setOpen] = useState(false);
+  const downloaded = countries.filter(c => metaMap[c.code]).length;
+  return (
+    <div className="space-y-1.5">
+      <button onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-gray-50 dark:bg-accent/20 border border-border hover:bg-gray-100 dark:hover:bg-accent/40 transition-all">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">🇨🇿</span>
+          <span className="font-medium text-sm">Czech Republic</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {downloaded > 0 && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">
+              {downloaded}/{countries.length} regions
+            </span>
+          )}
+          {open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </div>
+      </button>
+      {open && (
+        <div className="space-y-1.5 pl-3">
+          {countries.map(country => (
+            <CountryRow key={country.code} country={country} meta={metaMap[country.code] || null}
+              onDownload={onDownload} onDelete={onDelete}
+              activeDownload={activeDownload?.code === country.code ? activeDownload : null} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RegionSection({ region, countries, metaMap, onDownload, onDelete, activeDownload, extraHeader }) {
   const [open, setOpen] = useState(false);
   const downloaded = countries.filter(c => metaMap[c.code]).length;
   return (
@@ -170,6 +207,7 @@ function RegionSection({ region, countries, metaMap, onDownload, onDelete, activ
       </button>
       {open && (
         <div className="space-y-1.5 pl-1">
+          {extraHeader}
           {countries.map(country => (
             <CountryRow key={country.code} country={country} meta={metaMap[country.code] || null}
               onDownload={onDownload} onDelete={onDelete}
@@ -266,6 +304,9 @@ export default function OfflineMapsMenu({ onClose }) {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 pb-6">
+        {/* Czech Republic — shown first in Central Europe as a nested group */}
+        <CzechGroupSection countries={CZ_REGIONS} metaMap={metaMap}
+          onDownload={handleDownload} onDelete={handleDelete} activeDownload={active} />
         {REGIONS.map(region => {
           const countries = region.codes.map(code => COUNTRIES.find(c => c.code === code)).filter(Boolean);
           return (

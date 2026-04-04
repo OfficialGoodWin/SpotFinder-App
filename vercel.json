@@ -6,20 +6,47 @@
     {
       "source": "/github-releases/(.*)",
       "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET, HEAD, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Range" },
-        { "key": "Access-Control-Expose-Headers", "value": "Content-Length, Content-Range, Accept-Ranges" }
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Range"
+        },
+        {
+          "key": "Access-Control-Expose-Headers",
+          "value": "Content-Length, Content-Range, Accept-Ranges"
+        }
       ]
     },
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "X-XSS-Protection", "value": "1; mode=block" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "geolocation=(self), microphone=(self), camera=(self)" }
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "geolocation=(self), microphone=(self), camera=(self)"
+        }
       ]
     },
     {
@@ -60,8 +87,13 @@
     }
   ],
   "functions": {
-  "api/download.js": { "memory": 1024, "maxDuration": 300 },
-  "api/*.js": { "memory": 256, "maxDuration": 30 }
-
+    "api/download.js": {
+      "memory": 1024,
+      "maxDuration": 300
+    },
+    "api/*.js": {
+      "memory": 256,
+      "maxDuration": 30
+    }
   }
 }

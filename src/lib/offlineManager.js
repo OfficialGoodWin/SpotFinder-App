@@ -6,8 +6,21 @@
 import { setMeta, deleteMeta, getMeta, setPOIs, deletePOIs } from './offlineStorage.js';
 
 export const COUNTRIES = [
-  // Central Europe
-  { code:'CZ', name:'Czech Republic',  flag:'🇨🇿', bbox:[12.09,48.55,18.87,51.06], sizeMB:1726 },
+  // Central Europe — Czech Republic split into 14 regions (original single file was 1.7 GB, too large to proxy)
+  { code:'CZ-PHA', name:'Praha',              flag:'🇨🇿', bbox:[14.22,49.94,14.71,50.18], sizeMB:120,  parent:'CZ' },
+  { code:'CZ-STC', name:'Středočeský kraj',   flag:'🇨🇿', bbox:[13.55,49.61,15.28,50.75], sizeMB:160,  parent:'CZ' },
+  { code:'CZ-JHC', name:'Jihočeský kraj',     flag:'🇨🇿', bbox:[13.37,48.55,15.26,49.62], sizeMB:130,  parent:'CZ' },
+  { code:'CZ-PLK', name:'Plzeňský kraj',      flag:'🇨🇿', bbox:[12.09,49.17,13.90,50.02], sizeMB:110,  parent:'CZ' },
+  { code:'CZ-KVK', name:'Karlovarský kraj',   flag:'🇨🇿', bbox:[12.09,49.94,13.29,50.66], sizeMB:60,   parent:'CZ' },
+  { code:'CZ-ULK', name:'Ústecký kraj',       flag:'🇨🇿', bbox:[12.84,50.16,14.65,51.06], sizeMB:90,   parent:'CZ' },
+  { code:'CZ-LBK', name:'Liberecký kraj',     flag:'🇨🇿', bbox:[14.62,50.56,15.44,51.06], sizeMB:55,   parent:'CZ' },
+  { code:'CZ-HKK', name:'Královéhradecký kraj',flag:'🇨🇿', bbox:[15.28,50.18,16.50,50.78], sizeMB:80,  parent:'CZ' },
+  { code:'CZ-PAK', name:'Pardubický kraj',    flag:'🇨🇿', bbox:[15.50,49.61,16.90,50.33], sizeMB:75,   parent:'CZ' },
+  { code:'CZ-VYS', name:'Kraj Vysočina',      flag:'🇨🇿', bbox:[15.10,49.17,16.61,49.94], sizeMB:90,   parent:'CZ' },
+  { code:'CZ-JHM', name:'Jihomoravský kraj',  flag:'🇨🇿', bbox:[15.76,48.55,17.19,49.62], sizeMB:130,  parent:'CZ' },
+  { code:'CZ-OLK', name:'Olomoucký kraj',     flag:'🇨🇿', bbox:[16.61,49.44,17.87,50.22], sizeMB:80,   parent:'CZ' },
+  { code:'CZ-ZLK', name:'Zlínský kraj',       flag:'🇨🇿', bbox:[17.19,48.94,18.37,49.62], sizeMB:65,   parent:'CZ' },
+  { code:'CZ-MSK', name:'Moravskoslezský kraj',flag:'🇨🇿', bbox:[17.58,49.44,18.87,50.22], sizeMB:110,  parent:'CZ' },
   { code:'SK', name:'Slovakia',         flag:'🇸🇰', bbox:[16.83,47.73,22.57,49.61], sizeMB:140 },
   { code:'AT', name:'Austria',          flag:'🇦🇹', bbox:[9.53,46.37,17.16,49.02],  sizeMB:190 },
   { code:'HU', name:'Hungary',          flag:'🇭🇺', bbox:[16.11,45.74,22.90,48.59], sizeMB:175 },

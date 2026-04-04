@@ -2,18 +2,14 @@ export const config = {
   runtime: 'edge',
 };
 
-// CORS headers applied to every response — built fresh, never copied from upstream.
-// Azure CDN (where GitHub releases are hosted) may return its own CORS headers that
-// would override ours if we did new Headers(response.headers) first.
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, Range',
+  'Access-Control-Allow-Headers': 'Range',
   'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges',
 };
 
 export default async function handler(req) {
-  // Preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS });
   }
@@ -21,55 +17,48 @@ export default async function handler(req) {
   const url = new URL(req.url);
   const country = url.searchParams.get('country');
 
-  if (!country || !/^[A-Z]{2}$/.test(country)) {
-    return new Response('Missing or invalid country parameter', { status: 400, headers: CORS });
+  if (!country || !/^[A-Z]{2}(-[A-Z]+)?$/.test(country)) {
+    return new Response('Bad request', { status: 400, headers: CORS });
   }
 
-  const targetUrl = `https://github.com/OfficialGoodWin/SpotFinder-App/releases/latest/download/${country}.pmtiles`;
+  const githubUrl = `https://github.com/OfficialGoodWin/SpotFinder-App/releases/latest/download/${country}.pmtiles`;
 
-  // Forward Range header from client — required for chunked Android downloads
+  const range = req.headers.get('range') || req.headers.get('Range');
+
+  // Step 1: hit GitHub with redirect:manual to grab the Azure CDN Location URL
+  // If we use redirect:follow the browser ends up seeing Azure's CORS headers, not ours
+  const githubRes = await fetch(githubUrl, { method: 'GET', redirect: 'manual' });
+  const azureUrl = githubRes.headers.get('location');
+
+  if (!azureUrl) {
+    return new Response('File not found', { status: 404, headers: CORS });
+  }
+
+  // Step 2: fetch from Azure directly, forwarding Range header for chunked downloads
   const upstreamHeaders = {};
-  const range = req.headers.get('Range') || req.headers.get('range');
   if (range) upstreamHeaders['Range'] = range;
 
-  try {
-    const response = await fetch(targetUrl, {
-      method: req.method === 'HEAD' ? 'HEAD' : 'GET',
-      redirect: 'manual',
-      headers: upstreamHeaders,
-    });
-    // GitHub returns 302 → Azure CDN. Fetch Azure server-side so browser never sees Azure's CORS headers.
-    const finalUrl = response.headers.get('Location') || targetUrl;
-    const azureRes = finalUrl !== targetUrl
-    ? await fetch(finalUrl, { method: req.method === 'HEAD' ? 'HEAD' : 'GET', headers: upstreamHeaders, redirect: 'follow' })
-    : response;
+  const azureRes = await fetch(azureUrl, {
+    method: req.method === 'HEAD' ? 'HEAD' : 'GET',
+    headers: upstreamHeaders,
+    redirect: 'follow',
+  });
 
-    if (!response.ok && response.status !== 206) {
-      return new Response(`Upstream error: ${response.status}`, { status: response.status, headers: CORS });
-    }
-
-    // Build clean headers from scratch — do NOT copy upstream headers first.
-    // Copying Azure's headers risks inheriting a mismatched Access-Control-Allow-Origin
-    // which the browser sees and blocks, even after we try to overwrite it.
-    const headers = {
-      ...CORS,
-      'Content-Type': response.headers.get('Content-Type') || 'application/octet-stream',
-    };
-
-    // Pass through size/range headers so the client knows total length and can show progress
-    const contentLength = response.headers.get('Content-Length');
-    const contentRange  = response.headers.get('Content-Range');
-    const acceptRanges  = response.headers.get('Accept-Ranges');
-    if (contentLength) headers['Content-Length']  = contentLength;
-    if (contentRange)  headers['Content-Range']   = contentRange;
-    if (acceptRanges)  headers['Accept-Ranges']   = acceptRanges;
-
-    return new Response(req.method === 'HEAD' ? null : response.body, {
-      status: response.status,
-      headers,
-    });
-
-  } catch (err) {
-    return new Response(`Proxy error: ${err.message}`, { status: 500, headers: CORS });
+  if (!azureRes.ok && azureRes.status !== 206) {
+    return new Response(`Upstream error: ${azureRes.status}`, { status: azureRes.status, headers: CORS });
   }
+
+  // Step 3: return Azure body under our CORS headers — never copy Azure headers
+  const headers = { ...CORS, 'Content-Type': 'application/octet-stream' };
+  const cl = azureRes.headers.get('Content-Length');
+  const cr = azureRes.headers.get('Content-Range');
+  const ar = azureRes.headers.get('Accept-Ranges');
+  if (cl) headers['Content-Length'] = cl;
+  if (cr) headers['Content-Range'] = cr;
+  if (ar) headers['Accept-Ranges'] = ar;
+
+  return new Response(req.method === 'HEAD' ? null : azureRes.body, {
+    status: azureRes.status,
+    headers,
+  });
 }
