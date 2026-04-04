@@ -103,7 +103,8 @@ function getDownloadUrl(countryCode) {
     window.location.protocol === 'file:'
   );
   const base = needsAbsolute ? 'https://spot-finder-app.vercel.app' : '';
-  return `${base}/api/download?country=${countryCode}`;
+  // Use /github-releases/ rewrite — bypasses the edge function which has a 10s timeout
+  return `${base}/github-releases/${countryCode}.pmtiles`;
 }
 
 export async function downloadCountryPMTiles({ country, onProgress, abortRef }) {
