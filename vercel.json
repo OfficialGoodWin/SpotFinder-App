@@ -68,24 +68,6 @@
       ]
     }
   ],
-  "rewrites": [
-    {
-      "source": "/github-releases/:path*",
-      "destination": "https://github.com/OfficialGoodWin/SpotFinder-App/releases/latest/download/:path*"
-    },
-    {
-      "source": "/gplaces/:path*",
-      "destination": "https://maps.googleapis.com/maps/api/place/:path*"
-    },
-    {
-      "source": "/nominatim/:path*",
-      "destination": "https://nominatim.openstreetmap.org/:path*"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ],
   "functions": {
     "api/download.js": {
       "memory": 1024,
@@ -95,5 +77,27 @@
       "memory": 256,
       "maxDuration": 30
     }
-  }
+  },
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/github-releases/(.*)",
+      "dest": "https://github.com/OfficialGoodWin/SpotFinder-App/releases/latest/download/$1"
+    },
+    {
+      "src": "/gplaces/(.*)",
+      "dest": "https://maps.googleapis.com/maps/api/place/$1"
+    },
+    {
+      "src": "/nominatim/(.*)",
+      "dest": "https://nominatim.openstreetmap.org/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
 }
