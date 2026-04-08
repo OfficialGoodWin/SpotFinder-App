@@ -78,26 +78,22 @@
       "maxDuration": 30
     }
   },
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
+      "source": "/github-releases/:path*",
+      "destination": "https://github.com/OfficialGoodWin/SpotFinder-App/releases/latest/download/:path*"
     },
     {
-      "src": "/github-releases/(.*)",
-      "dest": "https://github.com/OfficialGoodWin/SpotFinder-App/releases/latest/download/$1"
+      "source": "/gplaces/:path*",
+      "destination": "https://maps.googleapis.com/maps/api/place/:path*"
     },
     {
-      "src": "/gplaces/(.*)",
-      "dest": "https://maps.googleapis.com/maps/api/place/$1"
+      "source": "/nominatim/:path*",
+      "destination": "https://nominatim.openstreetmap.org/:path*"
     },
     {
-      "src": "/nominatim/(.*)",
-      "dest": "https://nominatim.openstreetmap.org/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
     }
   ]
 }
