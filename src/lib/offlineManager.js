@@ -2,7 +2,8 @@
  * offlineManager.js — PMTiles + OPFS offline map system.
  * One file per country, streamed in, full zoom 0-19.
  */
-
+import { CapacitorHttp } from '@capacitor/core';
+import { Capacitor } from '@capacitor/core';
 import { setMeta, deleteMeta, getMeta, setPOIs, deletePOIs } from './offlineStorage.js';
 
 export const COUNTRIES = [
@@ -158,7 +159,30 @@ export async function downloadCountryPMTiles({ country, onProgress, abortRef }) 
       }
 
       const end = Math.min(start + CHUNK_SIZE - 1, totalBytes - 1);
-      const res = await fetch(url, { headers: { Range: `bytes=${start}-${end}` } });
+      let res;
+if (Capacitor.isNativePlatform()) {
+  const r = await CapacitorHttp.request({
+    method: 'GET',
+    url,
+    headers: { Range: `bytes=${start}-${end}` },
+    responseType: 'arraybuffer',
+  });
+  // CapacitorHttp returns base64 for arraybuffer — decode it
+  const binary = atob(r.data);
+  const chunk = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) chunk[i] = binary.charCodeAt(i);
+  await writable.write(chunk.buffer);
+  received += chunk.byteLength;
+  // report progress then continue (skip the res.arrayBuffer() below)
+  const elapsed = Math.max((Date.now() - t0) / 1000, 0.1);
+  const recvMB = received / 1048576;
+  const speedMBps = recvMB / elapsed;
+  const etaSec = speedMBps > 0 ? (totalMB - recvMB) / speedMBps : 0;
+  onProgress?.({ receivedMB: recvMB, totalMB, speedMBps, etaSec, pct: Math.min(99, Math.round(received / totalBytes * 100)) });
+  continue;
+} else {
+  res = await fetch(url, { headers: { Range: `bytes=${start}-${end}` } });
+}
 
       // 206 Partial Content = server honoured Range. 200 = server ignored Range (still ok, just less efficient).
       if (!res.ok && res.status !== 206) throw new Error(`HTTP ${res.status}`);
