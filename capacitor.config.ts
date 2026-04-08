@@ -5,8 +5,12 @@ const config: CapacitorConfig = {
   appName: 'spotfinder',
   webDir: 'dist',
   server: {
-    allowNavigation: ['spot-finder-app.vercel.app']
-  }
-};
+    androidScheme: 'https',
+    allowNavigation: [
+      'spot-finder-app.vercel.app',
+      'spot-finder-app-git-feature-officialgoodwins-projects.vercel.app',
+    ],
+  },
+}; 
 
 export default config;

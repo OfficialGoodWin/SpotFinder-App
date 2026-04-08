@@ -115,7 +115,9 @@ function getDownloadUrl(countryCode) {
     window.location.protocol === 'capacitor:' ||
     window.location.protocol === 'file:'
   );
-  const base = needsAbsolute ? 'https://spot-finder-app.vercel.app' : '';
+  const host = typeof window !== 'undefined' ? window.location.hostname : '';
+  const prodUrl = host.includes('feature') ? 'https://spot-finder-app-git-feature-officialgoodwins-projects.vercel.app' : 'https://spot-finder-app.vercel.app';
+  const base = needsAbsolute ? prodUrl : '';
   // Use /github-releases/ rewrite — bypasses the edge function which has a 10s timeout
   return `${base}/api/download?country=${countryCode}`;
 }
