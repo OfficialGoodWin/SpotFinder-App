@@ -104,7 +104,7 @@ async function deleteCountryFile(code) {
 
 // 50 MB per Range chunk — fits comfortably in Android WebView memory.
 // Each chunk is written to OPFS and freed before the next fetch.
-const CHUNK_SIZE = 50 * 1024 * 1024;
+const CHUNK_SIZE = 5 * 1024 * 1024;
 
 function getDownloadUrl(countryCode) {
   // Capacitor Android serves the app from https://localhost (or capacitor://localhost).
