@@ -13,11 +13,25 @@ android {
         aaptOptions {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
+
+        externalNativeBuild {
+            cmake {
+                cppFlags ""
+            }
+        }
     }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "src/main/cpp/CMakeLists.txt"
+            version "3.22.1"
         }
     }
 }
@@ -33,12 +47,22 @@ dependencies {
     implementation "androidx.appcompat:appcompat:1.7.0"
     implementation "androidx.coordinatorlayout:coordinatorlayout:1.2.0"
     implementation "androidx.core:core-splashscreen:1.0.1"
+    implementation "androidx.core:core-ktx:1.13.1"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:2.0.21"
+
+    // Keep Capacitor runtime for current shell compatibility
     implementation project(':capacitor-android')
+    implementation project(':capacitor-cordova-android-plugins')
+
+    // MapLibre native rendering
+    implementation "org.maplibre.gl:android-sdk:11.7.0"
+
+    // Apache commons
+    implementation 'org.apache.commons:commons-compress:1.26.0'
+
     testImplementation "junit:junit:4.13.2"
     androidTestImplementation "androidx.test.ext:junit:1.2.1"
     androidTestImplementation "androidx.test.espresso:espresso-core:3.6.1"
-    implementation project(':capacitor-cordova-android-plugins')
-    implementation 'org.apache.commons:commons-compress:1.26.0'
 }
 
 apply from: 'capacitor.build.gradle'

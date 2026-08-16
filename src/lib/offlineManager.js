@@ -1,12 +1,15 @@
 /**
- * offlineManager.js — PMTiles + OPFS offline map system.
- * One file per country/region, full zoom 0-16.
- * On Android: uses @capacitor/filesystem to bypass WebView CORS entirely.
- * On web: uses chunked Range requests.
+ * offlineManager.js — LEGACY PMTiles + OPFS offline map system.
+ *
+ * IMPORTANT:
+ * This file is deprecated for map rendering in the current architecture.
+ * The active offline rendering path is:
+ *   vectorTileDownloader.js (IndexedDB vt|z/x/y) + MapLibre offline-vt:// protocol.
+ *
+ * Keeping this module for backward compatibility/migration only.
+ * Do not use it for new offline map downloads.
  */
 
-import { Capacitor } from '@capacitor/core';
-import { Filesystem, Directory } from '@capacitor/filesystem';
 import { setMeta, deleteMeta, getMeta, setPOIs, deletePOIs } from './offlineStorage.js';
 
 export const COUNTRIES = [
@@ -130,69 +133,41 @@ export async function downloadCountryPMTiles({ country, onProgress, abortRef }) 
   // ── Native Android/iOS: Filesystem.downloadFile ───────────────────────────
   // Makes a native Java HTTP request — bypasses WebView CORS entirely.
   // No preflight, no CORS restrictions, no streaming memory issues.
-  if (Capacitor.isNativePlatform()) {
-    const tmpPath = `${country.code}.pmtiles`;
-    const totalMB = country.sizeMB;
+  import { isNative, nativeDownloadFile, nativeReadFileAsBase64, nativeDeleteFile } from './nativeBridge.js';
 
-    onProgress?.({ receivedMB: 0, totalMB, speedMBps: 0, etaSec: 0, pct: 0 });
+// In downloadCountryPMTiles, replace the Capacitor.isNativePlatform() block:
+if (isNative()) {
+  const tmpName = `${country.code}.pmtiles`;
+  
+  const result = await nativeDownloadFile(url, tmpName, (p) => {
+    onProgress?.({ receivedMB: p.receivedMB, totalMB: p.totalMB, 
+                   speedMBps: 0, etaSec: 0, pct: p.pct });
+  });
 
-    // Animate fake progress since Filesystem.downloadFile doesn't stream progress
-    let fakeProgress = 0;
-    const fakeInterval = setInterval(() => {
-      if (abortRef?.current) return;
-      fakeProgress = Math.min(fakeProgress + totalMB * 0.015, totalMB * 0.92);
-      onProgress?.({
-        receivedMB: fakeProgress,
-        totalMB,
-        speedMBps: 2,
-        etaSec: Math.round((totalMB - fakeProgress) / 2),
-        pct: Math.round(fakeProgress / totalMB * 100),
-      });
-    }, 600);
+  if (!result.ok) throw new Error(result.error);
 
-    try {
-      if (abortRef?.current) throw new DOMException('Aborted', 'AbortError');
+  // Read back and write to OPFS
+  const b64Result = await nativeReadFileAsBase64(result.path);
+  if (!b64Result.ok) throw new Error(b64Result.error);
 
-      await Filesystem.downloadFile({
-        url,
-        path: tmpPath,
-        directory: Directory.Cache,
-      });
+  const binary = atob(b64Result.data);
+  const buf = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) buf[i] = binary.charCodeAt(i);
 
-      if (abortRef?.current) {
-        await Filesystem.deleteFile({ path: tmpPath, directory: Directory.Cache }).catch(() => {});
-        throw new DOMException('Aborted', 'AbortError');
-      }
+  const dir = await getOfflineDir();
+  try { await dir.removeEntry(`${country.code}.pmtiles`); } catch (_) {}
+  const handle = await dir.getFileHandle(`${country.code}.pmtiles`, { create: true });
+  const writable = await handle.createWritable();
+  await writable.write(buf.buffer);
+  await writable.close();
 
-      // Read back as base64 and decode to ArrayBuffer
-      const result = await Filesystem.readFile({
-        path: tmpPath,
-        directory: Directory.Cache,
-      });
+  nativeDeleteFile(result.path);
 
-      const binary = atob(result.data);
-      const buf = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) buf[i] = binary.charCodeAt(i);
-
-      // Write to OPFS for map renderer access
-      const dir = await getOfflineDir();
-      try { await dir.removeEntry(`${country.code}.pmtiles`); } catch (_) {}
-      const handle = await dir.getFileHandle(`${country.code}.pmtiles`, { create: true });
-      const writable = await handle.createWritable();
-      await writable.write(buf.buffer);
-      await writable.close();
-
-      await Filesystem.deleteFile({ path: tmpPath, directory: Directory.Cache }).catch(() => {});
-
-      const sizeMB = Math.round(buf.byteLength / 1048576);
-      await setMeta(country.code, { downloadedAt: Date.now(), sizeMB, source: 'pmtiles' });
-      onProgress?.({ receivedMB: sizeMB, totalMB: sizeMB, speedMBps: 0, etaSec: 0, pct: 100 });
-
-    } finally {
-      clearInterval(fakeInterval);
-    }
-    return;
-  }
+  const sizeMB = Math.round(buf.byteLength / 1048576);
+  await setMeta(country.code, { downloadedAt: Date.now(), sizeMB, source: 'pmtiles' });
+  onProgress?.({ receivedMB: sizeMB, totalMB: sizeMB, pct: 100 });
+  return;
+}
 
   // ── Web browser: chunked Range requests ──────────────────────────────────
   let totalBytes = country.sizeMB * 1024 * 1024;

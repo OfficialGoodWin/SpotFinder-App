@@ -1507,13 +1507,16 @@ function FeedbackSection({ language }) {
     setStatus('sending');
 
     try {
-      const { db } = getFirebaseServices();
+      const services = getFirebaseServices();
+      if (!services || !services.db) throw new Error('Firebase not initialized');
       const { collection, addDoc } = await import('firebase/firestore');
-      await addDoc(collection(db, 'feedback'), {
+      const feedbackRef = collection(services.db, 'feedback');
+      await addDoc(feedbackRef, {
         email: email.trim() || null,
         message: msg.trim(),
         language,
         created_at: new Date().toISOString(),
+        userAgent: navigator.userAgent || null,
       });
       setStatus('sent');
       setEmail('');

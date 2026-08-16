@@ -18,8 +18,19 @@ import { PMTiles } from 'pmtiles';
 import { getTile, setTile, setMeta, deleteMeta, getMeta, setPOIs, deletePOIs, getAllMeta } from './offlineStorage.js';
 
 const PROTOMAPS_KEY  = import.meta.env.VITE_PROTOMAPS_KEY || '';
-// Use the Protomaps API tiles endpoint — supports range requests
-const PLANET_URL     = `https://api.protomaps.com/tiles/v4.pmtiles?key=${PROTOMAPS_KEY}`;
+// IMPORTANT: this MUST be a PMTiles file using the OpenMapTiles layer schema
+// (source-layers: landcover, landuse, water, waterway, transportation, building,
+// park, boundary, place, poi — see src/lib/mapStyle.js). The map style is shared
+// between online (OpenFreeMap, same schema) and offline mode.
+// Protomaps' own "v4 basemap" schema (api.protomaps.com/tiles/v4.pmtiles) uses
+// DIFFERENT layer names (roads/buildings/earth/physical_line/...), so tiles from
+// it decode fine but none of the style layers match anything -> blank offline map.
+// OpenFreeMap publishes a self-hostable planet PMTiles extract in the matching
+// OpenMapTiles schema (see https://openfreemap.org/ "self-host" / download page) —
+// verify the current file URL there before shipping, then set it via
+// VITE_OMT_PLANET_URL, or replace the fallback below directly.
+const PLANET_URL     = import.meta.env.VITE_OMT_PLANET_URL
+  || 'https://download.openfreemap.org/planet.pmtiles';
 const VT_KEY_PREFIX  = 'vt|';
 const CONCURRENCY    = 32;
 
@@ -47,31 +58,80 @@ export const COUNTRIES = [
 
 // ─── Tile math ────────────────────────────────────────────────────────────────
 
-function lngToX(lng, z) {
-  return Math.floor(((lng + 180) / 360) * Math.pow(2, z));
+export function lngToX(lng, z) {
+  let wrappedLng = ((lng + 180) % 360);
+  if (wrappedLng < 0) {
+    wrappedLng += 360;
+  }
+  wrappedLng -= 180;
+  
+  const x = Math.floor(((wrappedLng + 180) / 360) * Math.pow(2, z));
+  const maxTile = Math.pow(2, z) - 1;
+  return Math.max(0, Math.min(maxTile, x));
 }
-function latToY(lat, z) {
-  const r = lat * Math.PI / 180;
-  return Math.floor((1 - Math.log(Math.tan(r) + 1/Math.cos(r)) / Math.PI) / 2 * Math.pow(2, z));
+
+export function latToY(lat, z) {
+  const cappedLat = Math.max(-85.05112878, Math.min(85.05112878, lat));
+  const r = (cappedLat * Math.PI) / 180;
+  const y = Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * Math.pow(2, z));
+  const maxTile = Math.pow(2, z) - 1;
+  return Math.max(0, Math.min(maxTile, y));
 }
-function* tileGenerator(country, maxZoom) {
+
+function getXRange(x0, x1, maxTile) {
+  const xs = [];
+  if (x0 <= x1) {
+    for (let x = x0; x <= x1; x++) {
+      xs.push(x);
+    }
+  } else {
+    // Crosses antimeridian
+    for (let x = x0; x <= maxTile; x++) {
+      xs.push(x);
+    }
+    for (let x = 0; x <= x1; x++) {
+      xs.push(x);
+    }
+  }
+  return xs;
+}
+
+export function* tileGenerator(country, maxZoom) {
   const [west, south, east, north] = country.bbox;
   for (let z = 0; z <= maxZoom; z++) {
-    const x0 = lngToX(west,z),  x1 = lngToX(east,z);
-    const y0 = latToY(north,z), y1 = latToY(south,z);
-    for (let x = x0; x <= x1; x++)
-      for (let y = y0; y <= y1; y++)
+    const x0 = lngToX(west, z),  x1 = lngToX(east, z);
+    const y0 = latToY(north, z), y1 = latToY(south, z);
+    const minY = Math.min(y0, y1);
+    const maxY = Math.max(y0, y1);
+    const maxTile = Math.pow(2, z) - 1;
+    const xs = getXRange(x0, x1, maxTile);
+    for (const x of xs) {
+      for (let y = minY; y <= maxY; y++) {
         yield { z, x, y };
+      }
+    }
   }
 }
 
-export function countTilesForCountry(country, maxZoom = 14) {
+export function countTilesForCountry(country, maxZoom = 15) {
   const [west, south, east, north] = country.bbox;
   let total = 0;
   for (let z = 0; z <= maxZoom; z++) {
-    const x0 = lngToX(west,z),  x1 = lngToX(east,z);
-    const y0 = latToY(north,z), y1 = latToY(south,z);
-    total += (x1-x0+1) * (y1-y0+1);
+    const x0 = lngToX(west, z),  x1 = lngToX(east, z);
+    const y0 = latToY(north, z), y1 = latToY(south, z);
+    const minY = Math.min(y0, y1);
+    const maxY = Math.max(y0, y1);
+    const maxTile = Math.pow(2, z) - 1;
+    
+    let xCount = 0;
+    if (x0 <= x1) {
+      xCount = x1 - x0 + 1;
+    } else {
+      // Crosses antimeridian
+      xCount = (maxTile - x0 + 1) + (x1 + 1);
+    }
+    const yCount = maxY - minY + 1;
+    total += xCount * yCount;
   }
   return total;
 }
@@ -96,26 +156,42 @@ export async function setVectorTile(z, x, y, buf) {
  * Download all vector tiles for a country from the Protomaps planet file.
  * Uses HTTP Range Requests via the pmtiles JS library — no file hosting needed.
  *
- * maxZoom = 14 is recommended (covers navigation + street level, ~200MB for CZ)
- * maxZoom = 19 is possible but very large (~800MB for CZ, takes longer)
+ * maxZoom = 15 is the maximum supported by Protomaps (covers full street level detail)
+ * maxZoom = 14 is recommended for most use cases (~200MB for CZ)
+ * maxZoom = 15 is detailed but larger (~800MB for CZ, 4x more tiles than zoom 14)
  */
 export async function downloadCountryVectorTiles({
   country,
-  maxZoom = 14,
+  maxZoom = 15,
   onProgress,
   abortRef,
 }) {
+const cappedMaxZoom = Math.min(15, Math.max(0, Number(maxZoom) || 14));
   const pmtiles = new PMTiles(PLANET_URL);
-  const gen     = tileGenerator(country, maxZoom);
-  const total   = countTilesForCountry(country, maxZoom);
+  const total   = countTilesForCountry(country, cappedMaxZoom);
 
-  let done      = 0;
-  let idx       = 0;
-  let startTime = Date.now();
-  let lastReport = 0;
-  const allTiles = [...tileGenerator(country, maxZoom)]; // need array for indexed access
+  let done        = 0;
+  let fetched     = 0;
+  let cached      = 0;
+  let empty       = 0;
+  let failed      = 0;
+  let idx         = 0;
+  let startTime   = Date.now();
+  let lastReport  = 0;
+  const allTiles  = [...tileGenerator(country, cappedMaxZoom)]; // need array for indexed access
 
-  onProgress?.({ phase:'tiles', done:0, total, tilesPerSec:0, etaSec:0 });
+  onProgress?.({
+    phase:'tiles',
+    done:0,
+    total,
+    fetched,
+    cached,
+    empty,
+    failed,
+    tilesPerSec:0,
+    etaSec:0,
+    maxZoom:cappedMaxZoom,
+  });
 
   function report() {
     const now = Date.now();
@@ -124,7 +200,18 @@ export async function downloadCountryVectorTiles({
     const elapsed     = Math.max((now - startTime)/1000, 0.1);
     const tilesPerSec = Math.round(done / elapsed);
     const etaSec      = tilesPerSec > 0 ? Math.round((total-done)/tilesPerSec) : 0;
-    onProgress?.({ phase:'tiles', done, total, tilesPerSec, etaSec });
+    onProgress?.({
+      phase:'tiles',
+      done,
+      total,
+      fetched,
+      cached,
+      empty,
+      failed,
+      tilesPerSec,
+      etaSec,
+      maxZoom:cappedMaxZoom,
+    });
   }
 
   async function worker() {
@@ -138,7 +225,12 @@ export async function downloadCountryVectorTiles({
       // Skip if already cached
       try {
         const existing = await getTile(key);
-        if (existing) { done++; report(); continue; }
+        if (existing) {
+          cached++;
+          done++;
+          report();
+          continue;
+        }
       } catch (_) {}
 
       // Fetch from remote PMTiles via range request
@@ -146,8 +238,13 @@ export async function downloadCountryVectorTiles({
         const result = await pmtiles.getZxy(z, x, y);
         if (result?.data) {
           await setTile(key, result.data).catch(()=>{});
+          fetched++;
+        } else {
+          empty++;
         }
-      } catch (_) {}
+      } catch (_) {
+        failed++;
+      }
 
       done++;
       report();
@@ -161,10 +258,21 @@ export async function downloadCountryVectorTiles({
     await setMeta(country.code, {
       downloadedAt: Date.now(),
       tileCount:    done,
-      maxZoom,
+      fetchedCount: fetched,
+      cachedCount:  cached,
+      emptyCount:   empty,
+      failedCount:  failed,
+      maxZoom:      cappedMaxZoom,
       type:         'vector',
       sizeMB:       country.sizeMB,
     });
+
+    // Build the offline routing graph in the background so turn-by-turn
+    // navigation works offline without any server or native plugin. Best
+    // effort — failure here shouldn't fail the tile download itself.
+    import('./offlineRouter.js')
+      .then(({ buildRoutingGraph }) => buildRoutingGraph(country, 'driving', { force: true }))
+      .catch((e) => console.warn('[offline routing] graph build failed:', e?.message || e));
   }
 }
 

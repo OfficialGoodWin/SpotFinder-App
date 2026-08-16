@@ -1,9 +1,21 @@
-import React, { useState, useRef } from 'react';
-import { X, Camera, MapPin, Mic, MicOff, Loader2 } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { X, Camera, MapPin, Mic, MicOff, Loader2, AlertTriangle } from 'lucide-react';
 import StarRating from './StarRating';
 import AdBanner from '../AdBanner';
 import { useLanguage } from '@/lib/LanguageContext';
-import { uploadSpotImage } from '@/api/firebaseClient';
+import { uploadSpotImage, findNearbySpots } from '@/api/firebaseClient';
+
+// Category tags per spec — separate from the existing rating-group `spotType`.
+// A spot can carry several of these.
+const AVAILABLE_TAGS = [
+  'Viewpoint', 'SecretCafe', 'Sunset', 'Sunrise', 'PhotoSpot',
+  'Waterfall', 'Hike', 'SwimSpot', 'Ruin', 'UrbanExplore',
+];
+const COST_OPTIONS = ['free', 'paid', 'donation'];
+const ACCESS_OPTIONS = ['easy', 'moderate', 'hard'];
+const PARKING_OPTIONS = ['yes', 'no', 'street', 'paid'];
+const BEST_TIME_OPTIONS = ['sunrise', 'sunset', 'golden_hour', 'night', 'anytime'];
+const DUPLICATE_RADIUS_M = 50;
 
 // Language code → BCP-47 for Web Speech API
 const LANG_TO_BCP47 = {
@@ -30,6 +42,33 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   const [interimText, setInterimText] = useState('');
   const [micError, setMicError] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
+
+  // ── New fields per submission spec ──────────────────────────────────────────
+  const [tags, setTags] = useState([]);
+  const [cost, setCost] = useState('free');
+  const [accessDifficulty, setAccessDifficulty] = useState('easy');
+  const [parking, setParking] = useState('yes');
+  const [bestTime, setBestTime] = useState([]);
+  const [directions, setDirections] = useState('');
+
+  // ── Duplicate detection ──────────────────────────────────────────────────────
+  const [nearbySpots, setNearbySpots] = useState([]);
+  const [checkingDuplicates, setCheckingDuplicates] = useState(true);
+  const [duplicateConfirmed, setDuplicateConfirmed] = useState(false); // user said "not a duplicate"
+
+  useEffect(() => {
+    let cancelled = false;
+    setCheckingDuplicates(true);
+    findNearbySpots(latlng.lat, latlng.lng, DUPLICATE_RADIUS_M)
+      .then(results => { if (!cancelled) setNearbySpots(results); })
+      .catch(err => console.warn('Duplicate check failed:', err))
+      .finally(() => { if (!cancelled) setCheckingDuplicates(false); });
+    return () => { cancelled = true; };
+  }, [latlng.lat, latlng.lng]);
+
+  const toggleTag = (tag) => setTags(t => t.includes(tag) ? t.filter(x => x !== tag) : [...t, tag]);
+  const toggleBestTime = (val) => setBestTime(t => t.includes(val) ? t.filter(x => x !== val) : [...t, val]);
+
   const recognitionRef = useRef(null);
   const committedRef = useRef(''); // tracks already-committed final transcript
 
@@ -138,6 +177,9 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
       ? ratingsProvided.reduce((sum, r) => sum + r, 0) / ratingsProvided.length
       : 0;
 
+    // Block submission until the user has resolved the duplicate-spot prompt.
+    if (nearbySpots.length > 0 && !duplicateConfirmed) return;
+
     setLoading(true);
     let image_url = null;
 
@@ -165,6 +207,12 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
       is_public: true,
       created_by: user?.email || 'anonymous',
       created_by_name: user?.displayName || user?.email?.split('@')[0] || 'Anonymous',
+      tags,
+      cost,
+      access_difficulty: accessDifficulty,
+      parking,
+      best_time: bestTime,
+      directions,
     };
 
     if (spotType === 'general') {
@@ -210,6 +258,39 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
         </div>
 
         <div className="px-6 py-4 space-y-5">
+          {/* Duplicate-spot check */}
+          {nearbySpots.length > 0 && !duplicateConfirmed && (
+            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
+              <div className="flex gap-2 items-start">
+                <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                <div className="text-xs text-amber-800 dark:text-amber-300">
+                  <p className="font-semibold mb-1">Is this the same spot as one already here?</p>
+                  <ul className="mb-2 space-y-0.5">
+                    {nearbySpots.slice(0, 3).map(s => (
+                      <li key={s.id}>• {s.title || 'Untitled spot'}</li>
+                    ))}
+                  </ul>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="px-3 py-1 rounded-lg bg-amber-600 text-white font-semibold"
+                    >
+                      Yes, same spot — cancel mine
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDuplicateConfirmed(true)}
+                      className="px-3 py-1 rounded-lg border border-amber-400 text-amber-700 dark:text-amber-300 font-semibold"
+                    >
+                      No, different spot
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Category selector */}
           <div>
             <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-2 block">{t('addSpot.category')}</label>
@@ -321,6 +402,80 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
             </>
           )}
 
+          {/* Category tags */}
+          <div>
+            <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-2 block">Tags</label>
+            <div className="flex flex-wrap gap-2">
+              {AVAILABLE_TAGS.map(tag => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => toggleTag(tag)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-colors ${
+                    tags.includes(tag)
+                      ? 'bg-blue-500 text-white border-blue-500'
+                      : 'bg-white dark:bg-background text-gray-600 dark:text-foreground border-gray-200 dark:border-border hover:border-blue-300'
+                  }`}
+                >
+                  #{tag}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Practical details */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-600 dark:text-foreground mb-1 block">Cost</label>
+              <select value={cost} onChange={e => setCost(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-border bg-white dark:bg-background text-sm">
+                {COST_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600 dark:text-foreground mb-1 block">Access difficulty</label>
+              <select value={accessDifficulty} onChange={e => setAccessDifficulty(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-border bg-white dark:bg-background text-sm">
+                {ACCESS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600 dark:text-foreground mb-1 block">Parking</label>
+              <select value={parking} onChange={e => setParking(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-border bg-white dark:bg-background text-sm">
+                {PARKING_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600 dark:text-foreground mb-1 block">Best time</label>
+              <div className="flex flex-wrap gap-1">
+                {BEST_TIME_OPTIONS.map(o => (
+                  <button
+                    key={o}
+                    type="button"
+                    onClick={() => toggleBestTime(o)}
+                    className={`px-2 py-1 rounded-lg text-[11px] font-semibold border transition-colors ${
+                      bestTime.includes(o)
+                        ? 'bg-blue-500 text-white border-blue-500'
+                        : 'bg-white dark:bg-background text-gray-600 dark:text-foreground border-gray-200 dark:border-border'
+                    }`}
+                  >
+                    {o.replace('_', ' ')}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Directions */}
+          <div>
+            <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">Directions (optional)</label>
+            <textarea
+              value={directions}
+              onChange={e => setDirections(e.target.value)}
+              placeholder="e.g. park at the trailhead, walk 5 min north along the ridge"
+              rows={2}
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-border bg-white dark:bg-background text-gray-900 dark:text-foreground focus:outline-none focus:ring-2 focus:ring-blue-300 text-sm resize-none"
+            />
+          </div>
+
           {/* Photo */}
           <div>
             <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-2 block">{t('addSpot.photo')}</label>
@@ -360,7 +515,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
           </button>
           <button
             onClick={handleSave}
-            disabled={loading}
+            disabled={loading || checkingDuplicates || (nearbySpots.length > 0 && !duplicateConfirmed)}
             className="flex-2 px-8 py-3 rounded-2xl bg-blue-500 text-white font-semibold text-sm hover:bg-blue-600 disabled:opacity-50 transition-colors flex items-center gap-2"
           >
             {(loading || uploadingImage) && <Loader2 className="w-4 h-4 animate-spin" />}

@@ -9,7 +9,7 @@
  */
 
 const DB_NAME    = 'spotfinder-offline-v2';
-const DB_VERSION = 1;
+const DB_VERSION = 3;
 
 let _db = null;
 
@@ -23,6 +23,8 @@ async function getDB() {
       if (!db.objectStoreNames.contains('tiles')) db.createObjectStore('tiles');
       if (!db.objectStoreNames.contains('pois'))  db.createObjectStore('pois');
       if (!db.objectStoreNames.contains('meta'))  db.createObjectStore('meta');
+      if (!db.objectStoreNames.contains('bbox_meta')) db.createObjectStore('bbox_meta');
+      if (!db.objectStoreNames.contains('graphs')) db.createObjectStore('graphs');
     };
 
     req.onsuccess = (e) => { _db = e.target.result; resolve(_db); };
@@ -112,7 +114,7 @@ export async function deletePOIs(countryCode) {
   });
 }
 
-// ─── Meta ─────────────────────────────────────────────────────────────────────
+// ─── Meta (Countries) ────────────────────────────────────────────────────────
 
 export async function getMeta(countryCode) {
   const db  = await getDB();
@@ -158,6 +160,88 @@ export async function getAllMeta() {
       cursor.continue();
     };
     req.onerror = () => rej(req.error);
+  });
+}
+
+// ─── Bbox Metadata ───────────────────────────────────────────────────────────
+
+export async function getBboxMeta(bboxId) {
+  const db  = await getDB();
+  const tx  = db.transaction('bbox_meta', 'readonly');
+  const req = tx.objectStore('bbox_meta').get(bboxId);
+  return new Promise((res, rej) => {
+    req.onsuccess = () => res(req.result ?? null);
+    req.onerror   = () => rej(req.error);
+  });
+}
+
+export async function setBboxMeta(bboxId, meta) {
+  const db  = await getDB();
+  const tx  = db.transaction('bbox_meta', 'readwrite');
+  const req = tx.objectStore('bbox_meta').put(meta, bboxId);
+  return new Promise((res, rej) => {
+    req.onsuccess = () => res();
+    req.onerror   = () => rej(req.error);
+  });
+}
+
+export async function deleteBboxMeta(bboxId) {
+  const db  = await getDB();
+  const tx  = db.transaction('bbox_meta', 'readwrite');
+  const req = tx.objectStore('bbox_meta').delete(bboxId);
+  return new Promise((res, rej) => {
+    req.onsuccess = () => res();
+    req.onerror   = () => rej(req.error);
+  });
+}
+
+export async function getAllBboxMeta() {
+  const db    = await getDB();
+  const tx    = db.transaction('bbox_meta', 'readonly');
+  const store = tx.objectStore('bbox_meta');
+  const result = {};
+  return new Promise((res, rej) => {
+    const req = store.openCursor();
+    req.onsuccess = (e) => {
+      const cursor = e.target.result;
+      if (!cursor) { res(result); return; }
+      result[cursor.key] = cursor.value;
+      cursor.continue();
+    };
+    req.onerror = () => rej(req.error);
+  });
+}
+
+// ─── Routing graph (offline navigation) ──────────────────────────────────────
+
+/** Returns the stored routing graph for a region key, or null */
+export async function getGraph(regionKey) {
+  const db  = await getDB();
+  const tx  = db.transaction('graphs', 'readonly');
+  const req = tx.objectStore('graphs').get(regionKey);
+  return new Promise((res, rej) => {
+    req.onsuccess = () => res(req.result ?? null);
+    req.onerror   = () => rej(req.error);
+  });
+}
+
+export async function setGraph(regionKey, graph) {
+  const db  = await getDB();
+  const tx  = db.transaction('graphs', 'readwrite');
+  const req = tx.objectStore('graphs').put(graph, regionKey);
+  return new Promise((res, rej) => {
+    req.onsuccess = () => res();
+    req.onerror   = () => rej(req.error);
+  });
+}
+
+export async function deleteGraph(regionKey) {
+  const db  = await getDB();
+  const tx  = db.transaction('graphs', 'readwrite');
+  const req = tx.objectStore('graphs').delete(regionKey);
+  return new Promise((res, rej) => {
+    req.onsuccess = () => res();
+    req.onerror   = () => rej(req.error);
   });
 }
 

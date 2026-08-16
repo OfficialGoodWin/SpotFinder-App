@@ -8,14 +8,15 @@
  * Offline: local PMTiles file read from OPFS via pmtiles library
  * Dark:    full dark variant, switches instantly via setStyle()
  */
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import { Protocol } from 'pmtiles';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { lightStyle, darkStyle, outdoorStyle, winterStyle } from '../../lib/mapStyle.js';
 import { AMBIENT_CATEGORIES } from '../../lib/ambientCategories.js';
-import { COUNTRIES, isPointInCountry, getDownloadedCountryAt, vtKey } from '../../lib/vectorTileDownloader.js';
-import { getAllMeta, getPOIs, getTile } from '../../lib/offlineStorage.js';
+import { COUNTRIES, isPointInCountry, vtKey } from '../../lib/vectorTileDownloader.js';
+import { getAllMeta, getPOIs, getTile, getAllBboxMeta } from '../../lib/offlineStorage.js';
+import { getCachedTile, setCachedTile } from '../../lib/highZoomCache.js';
 
 
 // ── Road shield generator ─────────────────────────────────────────────────────
@@ -35,7 +36,7 @@ const SHIELD_COLORS = {
 
 // Road ref → E-route lookup (static mapping from official sources)
 // When drawing a road shield, if the ref has an E-route, draw it stacked below
-// This is mutable so admin overrides can be applied at runtime.
+// This is mutable so admin overrides can be applied at runtime.  
 let EURO_ROUTES = {
   // ── Czech motorways — source: OSM int_ref field, way-count weighted ─────────
   'D0': ['E50'],            // Prague ring (also E48,E55,E65 — E50 dominant)
@@ -305,15 +306,78 @@ function ensureProtocols() {
     try {
       const parts = params.url.replace('offline-vt://', '').split('/');
       const [z, x, y] = parts.map(Number);
-      const key = vtKey(z, x, y);
-      const buf = await getTile(key);
+      const buf = (await getTile(vtKey(z, x, y))) || (await getCachedTile(z, x, y));
       if (buf) return { data: buf };
     } catch (_) { }
     // Not cached — return empty tile
     return { data: new ArrayBuffer(0) };
   });
 
+  // ── Unified read-through base-map protocol ──────────────────────────────
+  // URL format: sf://planet/{z}/{x}/{y}
+  // Serving order:
+  //   1. Explicitly downloaded region tiles (offlineStorage `tiles` store)
+  //   2. Auto-cache from previous online browsing (highZoomCache, all zooms)
+  //   3. Network (OpenFreeMap) when online — result is cached for offline use
+  // This makes the base map available offline anywhere the user has already
+  // viewed it online, not just inside explicitly downloaded regions.
+  maplibregl.addProtocol('sf', async (params, abortController) => {
+    const m = /^sf:\/\/planet\/(\d+)\/(\d+)\/(\d+)/.exec(params.url);
+    if (!m) return { data: new ArrayBuffer(0) };
+    const z = Number(m[1]), x = Number(m[2]), y = Number(m[3]);
+
+    // 1) explicitly downloaded region
+    try {
+      const buf = await getTile(vtKey(z, x, y));
+      if (buf) return { data: buf };
+    } catch (_) { }
+
+    // 2) auto-cached from prior online browsing
+    try {
+      const buf = await getCachedTile(z, x, y);
+      if (buf) return { data: buf };
+    } catch (_) { }
+
+    // 3) network — fetch and cache for later offline use
+    if (typeof navigator === 'undefined' || navigator.onLine) {
+      try {
+        const tpl = await getOpenFreeMapTemplate();
+        if (tpl) {
+          const url = tpl.replace('{z}', z).replace('{x}', x).replace('{y}', y);
+          const resp = await fetch(url, { signal: abortController.signal });
+          if (resp.ok) {
+            const ab = await resp.arrayBuffer();
+            if (ab && ab.byteLength > 0) {
+              setCachedTile(z, x, y, ab).catch(() => {});
+              return { data: ab };
+            }
+          }
+        }
+      } catch (_) { }
+    }
+
+    return { data: new ArrayBuffer(0) };
+  });
+
   protocolsRegistered = true;
+}
+
+// Lazily resolve (and memoize) the OpenFreeMap planet vector-tile URL template
+// from its TileJSON so we can fetch individual tiles for the read-through cache.
+let _ofmTemplate = null;
+let _ofmTemplatePromise = null;
+function getOpenFreeMapTemplate() {
+  if (_ofmTemplate) return Promise.resolve(_ofmTemplate);
+  if (!_ofmTemplatePromise) {
+    _ofmTemplatePromise = fetch('https://tiles.openfreemap.org/planet')
+      .then((r) => r.json())
+      .then((j) => {
+        _ofmTemplate = (j && Array.isArray(j.tiles) && j.tiles[0]) || null;
+        return _ofmTemplate;
+      })
+      .catch(() => null);
+  }
+  return _ofmTemplatePromise;
 }
 
 // ── Ambient POI categories ────────────────────────────────────────────────────
@@ -473,6 +537,13 @@ export default function MapLibreMap({
   const [offlineActive, setOfflineActive] = useState(false);
   const [offlineCountry, setOfflineCountry] = useState('');
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const offlineActiveRef = useRef(false);
+  const offlineCountryRef = useRef('');
+  const [pitch, setPitch] = useState(0);
+  const terrainReadyRef = useRef(false);
+
+  useEffect(() => { offlineActiveRef.current = offlineActive; }, [offlineActive]);
+  useEffect(() => { offlineCountryRef.current = offlineCountry; }, [offlineCountry]);
 
   // ── Apply admin E-route shield removals ───────────────────────────────────
   useEffect(() => {
@@ -509,7 +580,8 @@ export default function MapLibreMap({
       minZoom: 3,
       maxZoom: 22,
       attributionControl: false,
-      pitchWithRotate: false,
+      pitchWithRotate: true,
+      gl: { antialias: true, failIfMajorPerformanceCaveat: false },
     });
 
     // #region agent log
@@ -535,6 +607,128 @@ export default function MapLibreMap({
     // telemetry removed
     // #endregion
 
+    const setBuildingsVisibility = (visible) => {
+      try {
+        if (map.getLayer('3d-buildings')) {
+          map.setLayoutProperty('3d-buildings', 'visibility', visible ? 'visible' : 'none');
+        }
+      } catch (_) {}
+    };
+
+    const add3DBuildings = () => {
+      try {
+        if (map.getLayer('3d-buildings')) return;
+
+        const sourceId = 'v';
+        const source = map.getSource(sourceId);
+        if (!source) return;
+
+        // Most OSM vector schemas use 'building' source-layer.
+        // If unavailable in a specific style, this safely no-ops.
+        map.addLayer({
+          id: '3d-buildings',
+          type: 'fill-extrusion',
+          source: sourceId,
+          'source-layer': 'building',
+          filter: ['==', ['geometry-type'], 'Polygon'],
+          minzoom: 14,
+          layout: {
+            visibility: 'none',
+          },
+          paint: {
+            'fill-extrusion-color': [
+              'case',
+              ['has', 'colour'], ['get', 'colour'],
+              '#c9ced6'
+            ],
+            'fill-extrusion-height': [
+              'coalesce',
+              ['to-number', ['get', 'height']],
+              ['*', ['coalesce', ['to-number', ['get', 'building:levels']], 2], 3],
+              10
+            ],
+            'fill-extrusion-base': [
+              'coalesce',
+              ['to-number', ['get', 'min_height']],
+              0
+            ],
+            'fill-extrusion-opacity': 0.88,
+          },
+        });
+      } catch (_) {}
+    };
+
+    const setupTerrain = () => {
+      try {
+        if (!map.getSource('terrain-dem')) {
+          // AWS Open Data "elevation-tiles-prod" (Terrarium encoding) — global coverage,
+          // free, no key required. The old demotiles.maplibre.org source only had real
+          // elevation data for its small demo region (Innsbruck), which is why terrain
+          // only worked there.
+          map.addSource('terrain-dem', {
+            type: 'raster-dem',
+            tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+            tileSize: 256,
+            maxzoom: 15,
+            encoding: 'terrarium',
+          });
+        }
+        map.setTerrain({ source: 'terrain-dem', exaggeration: 1.35 });
+        terrainReadyRef.current = true;
+
+        if (!map.getLayer('hillshade')) {
+          const beforeId = map.getLayer('water') ? 'water' : undefined;
+          map.addLayer({
+            id: 'hillshade',
+            type: 'hillshade',
+            source: 'terrain-dem',
+            paint: {
+              'hillshade-exaggeration': 0.45,
+              'hillshade-shadow-color': '#000000',
+              'hillshade-highlight-color': '#ffffff',
+            },
+          }, beforeId);
+        }
+      } catch (_) {
+        terrainReadyRef.current = false;
+      }
+    };
+
+    const update3DByPitch = () => {
+      const p = map.getPitch();
+      setPitch(p);
+
+      const tilted = p > 10;
+      setBuildingsVisibility(tilted);
+
+      // Terrain should be active only while tilted
+      try {
+        if (tilted) {
+          if (!terrainReadyRef.current) setupTerrain();
+          if (terrainReadyRef.current) {
+            map.setTerrain({ source: 'terrain-dem', exaggeration: 1.35 });
+          }
+        } else {
+          map.setTerrain(null);
+        }
+      } catch (_) {}
+    };
+
+    map.on('pitch', update3DByPitch);
+    setPitch(map.getPitch());
+
+    const onStyleReady = () => {
+      terrainReadyRef.current = false;
+      add3DBuildings();
+      update3DByPitch();
+    };
+
+    if (map.isStyleLoaded()) onStyleReady();
+    else map.once('idle', onStyleReady);
+
+    // Re-apply on style switches
+    map.on('style.load', onStyleReady);
+
     mapRef.current = map;
     setMapRef?.(map);
 
@@ -546,6 +740,8 @@ export default function MapLibreMap({
     return () => {
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
+      map.off('pitch', update3DByPitch);
+      map.off('style.load', onStyleReady);
       map.remove();
       mapRef.current = null;
     };
@@ -553,57 +749,138 @@ export default function MapLibreMap({
   }, []);
 
   // ── Offline vector tile switcher ─────────────────────────────────────────
-  // When offline and the country has downloaded tiles, switch to offline-vt:// source
+  // When offline and the map center has downloaded tiles, switch to offline-vt:// source.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
+    let cancelled = false;
+    let checking = false;
+
+    const setOnlineStyle = () => {
+      map.setStyle(getMapStyle(mapLayer, isDark));
+      setOfflineActive(false);
+      setOfflineCountry('');
+    };
+
     async function checkOffline() {
+      if (checking) return;
+      checking = true;
+
       if (isOnline) {
-        if (offlineActive) {
-          // telemetry removed
-          map.setStyle(getMapStyle(mapLayer, isDark));
-          setOfflineActive(false);
-          setOfflineCountry('');
+        if (offlineActiveRef.current) {
+          setOnlineStyle();
         }
+        checking = false;
         return;
       }
 
-      // Check if this location has downloaded vector tiles
-      const c = map.getCenter();
-      const meta = await getAllMeta();
-      let found = null;
-      for (const code of Object.keys(meta)) {
-        const country = COUNTRIES.find(x => x.code === code);
-        if (country && meta[code]?.type === 'vector' && isPointInCountry(c.lat, c.lng, country)) {
-          found = country; break;
-        }
-      }
+      try {
+        const c = map.getCenter();
+        const meta = await getAllMeta();
+        const bboxes = await getAllBboxMeta();
+        let found = null;
+        let maxZoomFound = 15;
 
-      if (found) {
-        // Switch to offline-vt:// source — served from IndexedDB
+        // 1. Check predefined countries
+        for (const code of Object.keys(meta || {})) {
+          const country = COUNTRIES.find(x => x.code === code);
+          if (country && meta[code]?.type === 'vector' && isPointInCountry(c.lat, c.lng, country)) {
+            found = {
+              code: country.code,
+              name: country.name,
+              bbox: country.bbox,
+            };
+            if (meta[code]?.maxZoom) {
+              maxZoomFound = Number(meta[code].maxZoom);
+            }
+            break;
+          }
+        }
+
+        // 2. Check custom bounding boxes
+        if (!found) {
+          for (const bboxId of Object.keys(bboxes || {})) {
+            const bboxMeta = bboxes[bboxId];
+            if (bboxMeta && bboxMeta.bbox) {
+              const [w, s, e, n] = bboxMeta.bbox;
+              const lat = c.lat;
+              const lng = c.lng;
+              const latOk = lat >= s && lat <= n;
+              let lngOk = false;
+              if (w <= e) {
+                lngOk = lng >= w && lng <= e;
+              } else {
+                // Antimeridian crossing
+                lngOk = lng >= w || lng <= e;
+              }
+              if (latOk && lngOk) {
+                found = {
+                  code: bboxId,
+                  name: bboxMeta.name || 'Offline Area',
+                  bbox: bboxMeta.bbox,
+                };
+                if (bboxMeta.zoomMax) {
+                  maxZoomFound = Number(bboxMeta.zoomMax);
+                }
+                break;
+              }
+            }
+          }
+        }
+
+        if (cancelled) return;
+
+        if (!found) {
+          if (offlineActiveRef.current) {
+            setOnlineStyle();
+          }
+          return;
+        }
+
+        if (offlineActiveRef.current && offlineCountryRef.current === found.name) {
+          return;
+        }
+
         const offlineStyle = {
           ...getMapStyle(mapLayer, isDark),
           sources: {
             v: {
               type: 'vector',
-              // Custom TileJSON pointing at our IndexedDB protocol
-              tiles: ['offline-vt://{z}/{x}/{y}'],
+              tiles: ['sf://planet/{z}/{x}/{y}'],
               minzoom: 0,
-              maxzoom: 14,
+              maxzoom: maxZoomFound,
               attribution: '© OpenStreetMap contributors',
             },
           },
         };
-        // telemetry removed
+
         map.setStyle(offlineStyle);
         setOfflineActive(true);
         setOfflineCountry(found.name);
+
+        // Ensure map is properly resized and rendered in offline mode
+        const ensureOfflineRendering = () => {
+          try {
+            map.resize();
+            map.triggerRepaint();
+          } catch (_) {}
+        };
+
+        if (map.isStyleLoaded()) ensureOfflineRendering();
+        else map.once('idle', ensureOfflineRendering);
+      } finally {
+        checking = false;
       }
     }
 
     checkOffline();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    map.on('moveend', checkOffline);
+
+    return () => {
+      cancelled = true;
+      map.off('moveend', checkOffline);
+    };
   }, [isOnline, isDark, mapLayer]);
 
   // ── Dark mode ──────────────────────────────────────────────────────────────
@@ -1163,6 +1440,37 @@ const addAdminMarkers = () => {
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+
+      {/* Tilt toggle */}
+      <button
+        onClick={() => {
+          const map = mapRef.current;
+          if (!map) return;
+          const currentPitch = map.getPitch();
+          map.easeTo({ pitch: currentPitch > 10 ? 0 : 60, duration: 400 });
+        }}
+        style={{
+          position: 'absolute',
+          top: 52,
+          right: 8,
+          zIndex: 20,
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          border: '1px solid rgba(0,0,0,0.2)',
+          background: pitch > 10 ? '#2563eb' : '#ffffff',
+          color: pitch > 10 ? '#ffffff' : '#111827',
+          fontSize: 18,
+          lineHeight: '36px',
+          textAlign: 'center',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+          cursor: 'pointer',
+        }}
+        title={pitch > 10 ? 'Disable tilt' : 'Enable tilt'}
+      >
+        ⛰
+      </button>
+
       {!isOnline && (
         <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 10, pointerEvents: 'none' }}>
           <span style={{

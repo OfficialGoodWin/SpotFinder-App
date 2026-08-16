@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { X, Navigation, MapPin, Edit2, Trash2, Share2, Check } from 'lucide-react';
+import { X, Navigation, MapPin, Edit2, Trash2, Share2, Check, Camera, Coffee, Car } from 'lucide-react';
 import StarRating from './StarRating';
 import { submitCategoryRatings } from '@/api/firebaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 
 const RATED_KEY = (spotId, userId) => `sf_rated_${spotId}_${userId || 'guest'}`;
+
+const CATEGORY_CONFIG = {
+  general: { icon: Car,    bgClass: 'bg-blue-100 dark:bg-blue-900/30',   textClass: 'text-blue-700 dark:text-blue-300',   borderClass: 'border-blue-200 dark:border-blue-800' },
+  photo:   { icon: Camera, bgClass: 'bg-purple-100 dark:bg-purple-900/30', textClass: 'text-purple-700 dark:text-purple-300', borderClass: 'border-purple-200 dark:border-purple-800' },
+  rest:    { icon: Coffee, bgClass: 'bg-green-100 dark:bg-green-900/30',  textClass: 'text-green-700 dark:text-green-300',  borderClass: 'border-green-200 dark:border-green-800' },
+};
 
 export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdit, onDelete, onSpotUpdate }) {
   const { t } = useLanguage();
@@ -29,15 +35,21 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
   const overallRating = localSpot.rating || 0;
   const overallCount  = localSpot.rating_count || 0;
 
+  const spotType = spot.spot_type || 'general';
+  const categoryLabel = spotType === 'photo' ? t('addSpot.categoryPhoto')
+    : spotType === 'rest' ? t('addSpot.categoryRest')
+    : t('addSpot.categoryGeneral');
+  const catConfig = CATEGORY_CONFIG[spotType] || CATEGORY_CONFIG.general;
+  const CatIcon = catConfig.icon;
+
   const catRows = (() => {
-    const type = spot.spot_type || 'general';
-    if (type === 'photo') {
+    if (spotType === 'photo') {
       return [
         { key: 'photoBeauty', label: t('spotDetail.photoBeauty'), val: localSpot.photo_beauty_rating || 0, count: localSpot.photo_beauty_rating_count || 0 },
         { key: 'photoAccess', label: t('spotDetail.photoAccess'), val: localSpot.photo_access_rating || 0, count: localSpot.photo_access_rating_count || 0 },
       ];
     }
-    if (type === 'rest') {
+    if (spotType === 'rest') {
       return [
         { key: 'restView', label: t('spotDetail.restView'), val: localSpot.rest_view_rating || 0, count: localSpot.rest_view_rating_count || 0 },
         { key: 'restAccess', label: t('spotDetail.restAccess'), val: localSpot.rest_access_rating || 0, count: localSpot.rest_access_rating_count || 0 },
@@ -117,7 +129,13 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
                 <MapPin className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-foreground">{localSpot.title || 'Spot'}</h2>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-foreground">{localSpot.title || 'Spot'}</h2>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${catConfig.bgClass} ${catConfig.textClass} ${catConfig.borderClass}`}>
+                    <CatIcon className="w-3 h-3" />
+                    {categoryLabel}
+                  </span>
+                </div>
                 <p className="text-xs text-gray-500 dark:text-muted-foreground">
                   {t('spotDetail.addedBy')} {localSpot.created_by_name || localSpot.created_by || 'Anonymous'}
                   {localSpot.created_date && ` ${t('spotDetail.addedOn')} ${formatDate(localSpot.created_date)}`}
@@ -156,7 +174,7 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
               </div>
               {overallCount > 0 && (
                 <p className="text-xs text-gray-400 dark:text-muted-foreground mt-0.5 italic">
-                  {t('spotDetail.calculatedFromCategories') || 'Calculated from category ratings'}
+                  {t('spotDetail.overallAuto')}
                 </p>
               )}
             </div>
@@ -203,7 +221,7 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
                 {t('spotDetail.rateCategories')}
               </p>
               <p className="text-xs text-gray-500 dark:text-muted-foreground">
-                {t('spotDetail.loginToRate') || 'Sign in to leave a rating'}
+                {t('spotDetail.signInToRate')}
               </p>
             </div>
           )}
@@ -214,7 +232,7 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
                   {t('spotDetail.rateCategories')}
                 </p>
                 <p className="text-xs text-purple-500 dark:text-purple-400 mt-0.5">
-                  {t('spotDetail.overallAutoCalc') || 'Overall score is automatically calculated from your ratings'}
+                  {t('spotDetail.overallAuto')}
                 </p>
               </div>
 
@@ -241,7 +259,7 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
                 return (
                   <div className="flex items-center justify-between pt-2 border-t border-purple-200 dark:border-purple-700 mt-1">
                     <span className="text-xs font-semibold text-purple-600 dark:text-purple-400">
-                      {t('spotDetail.yourOverall') || 'Your overall'}
+                      {t('spotDetail.overallRating')}
                     </span>
                     <div className="flex items-center gap-1.5">
                       {[1,2,3,4,5].map(star => {

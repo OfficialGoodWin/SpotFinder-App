@@ -13,9 +13,20 @@ service cloud.firestore {
     match /spots/{spotId} {
       allow read: if true;
       allow create: if true;
+
+      // Owner (or superadmin) can edit their own spot's full content.
+      // Any signed-in user may ALSO update only the moderation/voting counters
+      // (flag_count, status→'flagged', upvote_count, downvote_count, quality_score) —
+      // this is what flagSpot()/voteSpot() in firebaseClient.js write as a
+      // non-owner. In production, move this to a Cloud Function trigger instead
+      // of trusting the client for counter math; kept client-side here to match
+      // the current no-backend architecture.
       allow update: if request.auth != null && (
         resource.data.created_by == request.auth.token.email ||
-        resource.data.created_by == 'anonymous'
+        resource.data.created_by == 'anonymous' ||
+        isSuperAdmin() ||
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['flag_count', 'status', 'upvote_count', 'downvote_count', 'quality_score'])
       );
       allow delete: if request.auth != null && (
         resource.data.created_by == request.auth.token.email || isSuperAdmin()
@@ -26,6 +37,34 @@ service cloud.firestore {
     match /ratings/{ratingId} {
       allow read: if isAuth();
       allow create: if isAuth();
+    }
+
+    // ── Flags (community moderation) ────────────────────────────────────────
+    // Doc id is `${spotId}_${reporterEmail}` — one flag per user per spot.
+    match /flags/{flagId} {
+      allow read: if isSuperAdmin();
+      allow create: if isAuth() && flagId == request.resource.data.spot_id + '_' + request.auth.token.email
+        && request.resource.data.reporter_email == request.auth.token.email;
+      allow update: if isSuperAdmin(); // resolving a flag
+      allow delete: if isSuperAdmin();
+    }
+
+    // ── Votes (upvote/downvote) ─────────────────────────────────────────────
+    // Doc id is `${userEmail}_${spotId}` — one vote per user per spot.
+    match /votes/{voteId} {
+      allow read: if isAuth();
+      allow create, update: if isAuth() && voteId == request.auth.token.email + '_' + request.resource.data.spot_id
+        && request.resource.data.user_email == request.auth.token.email;
+      allow delete: if isAuth() && voteId == request.auth.token.email + '_' + resource.data.spot_id;
+    }
+
+    // ── Bookmarks ────────────────────────────────────────────────────────────
+    // Doc id is `${userEmail}_${spotId}` — private to the bookmarking user.
+    match /bookmarks/{bookmarkId} {
+      allow read: if isAuth() && resource.data.user_email == request.auth.token.email;
+      allow create: if isAuth() && bookmarkId == request.auth.token.email + '_' + request.resource.data.spot_id
+        && request.resource.data.user_email == request.auth.token.email;
+      allow delete: if isAuth() && bookmarkId == request.auth.token.email + '_' + resource.data.spot_id;
     }
 
     // ── POI community data (public read) ────────────

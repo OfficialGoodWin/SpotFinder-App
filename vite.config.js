@@ -1,6 +1,10 @@
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import { fileURLToPath } from 'url'
 import { defineConfig } from 'vite'
+
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // Vite plugin to emulate the Vercel Edge Function locally for downloading PMTiles
 function localDownloadProxyPlugin() {
@@ -66,6 +70,7 @@ function localDownloadProxyPlugin() {
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: './',
   logLevel: 'error',
   resolve: {
     alias: {

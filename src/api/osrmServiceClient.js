@@ -11,6 +11,7 @@
  */
 
 import { saveRoute, getCachedRoute } from '@/lib/routeCache';
+import SpotfinderNavPlugin from '@/plugins/SpotfinderNavPlugin';
 
 const LOCAL_OSRM_URL  = 'http://localhost:5000/route/v1';
 // Profile-specific public OSRM servers.
@@ -91,6 +92,27 @@ export async function getOSRMRoute(from, to, profile = 'driving', options = {}) 
     return await getTomTomRoute(from, to);
   }
 
+  // 0. Native Spotfinder routing engine path (Option A)
+  // Use native plugin first when available; fallback chain remains unchanged.
+  if (SpotfinderNavPlugin?.isAvailable) {
+    try {
+      const nativeResp = await SpotfinderNavPlugin.calculateRoute({
+        points: [
+          { lat: from.lat, lng: from.lng },
+          { lat: to.lat, lng: to.lng },
+        ],
+      });
+
+      const route = normalizeNativeRoute(nativeResp);
+      if (route) {
+        saveRoute(from, to, profile, route).catch(() => {});
+        return route;
+      }
+    } catch (e) {
+      console.warn('[OSRM] Native Spotfinder route failed:', e?.message || e);
+    }
+  }
+
   const osrmProfile = PROFILE_MAP[profile] || 'driving';
   const coords = `${from.lng},${from.lat};${to.lng},${to.lat}`;
   const paramsBase = '?overview=full&steps=true&geometries=polyline&annotations=true';
@@ -141,7 +163,22 @@ export async function getOSRMRoute(from, to, profile = 'driving', options = {}) 
     }
   }
 
-  // 3. Serve from route cache (offline / all servers down)
+  // 3. Compute offline, in the browser, from downloaded map tiles.
+  // No server, no Capacitor/native plugin required — works for any
+  // origin/destination pair inside a downloaded offline region.
+  try {
+    const { computeOfflineRoute } = await import('@/lib/offlineRouter');
+    const offlineRoute = await computeOfflineRoute(from, to, osrmProfile);
+    if (offlineRoute) {
+      console.info('[OSRM] Serving offline-computed route');
+      saveRoute(from, to, profile, offlineRoute).catch(() => {});
+      return offlineRoute;
+    }
+  } catch (e) {
+    console.warn('[OSRM] Offline routing engine failed:', e?.message || e);
+  }
+
+  // 4. Serve from route cache (exact/fuzzy match from a previous online route)
   const cached = await getCachedRoute(from, to, profile);
   if (cached) {
     console.info('[OSRM] Serving cached route');
@@ -150,7 +187,7 @@ export async function getOSRMRoute(from, to, profile = 'driving', options = {}) 
 
   // Give a specific, actionable error
   if (!navigator.onLine) {
-    throw new Error('No internet connection and no cached route for this destination. Calculate the route while online first.');
+    throw new Error('No internet connection, no offline map data covering this route, and no cached route for this destination. Download the region in Offline Maps first.');
   }
   throw new Error('Routing servers unavailable. Check your connection or try again in a moment.');
 }
@@ -200,6 +237,64 @@ const PROFILE_MAP = {
 };
 
 // ─── Response normalizer ──────────────────────────────────────────────────────
+
+function normalizeNativeRoute(nativeResp) {
+  if (!nativeResp) return null;
+  const geojson = nativeResp.geojson;
+  const maneuvers = nativeResp.maneuvers || [];
+  const summary = nativeResp.summary || {};
+
+  const coords = geojson?.type === 'FeatureCollection'
+    ? geojson.features?.[0]?.geometry?.coordinates
+    : geojson?.type === 'Feature'
+      ? geojson.geometry?.coordinates
+      : geojson?.coordinates;
+
+  if (!Array.isArray(coords) || coords.length < 2) return null;
+
+  // Native likely returns [lng,lat]; convert to [lat,lng] to match app convention
+  const geometry = coords.map(([lng, lat]) => [lat, lng]);
+
+  const steps = maneuvers.map((m) => {
+    const lat = m.lat ?? m.location?.[1] ?? m.coordinate?.[1];
+    const lng = m.lng ?? m.location?.[0] ?? m.coordinate?.[0];
+    const modifier = m.modifier || 'straight';
+    const maneuverType = m.maneuverType || m.type || 'turn';
+    const normalizedStep = {
+      maneuverType,
+      modifier,
+      distance: m.distance ?? 0,
+      lat,
+      lng,
+      name: m.name || '',
+      ref: m.ref || '',
+      destinations: m.destinations || '',
+      exits: m.exits || '',
+      exit: m.exit || null,
+      intersections: m.intersections,
+      instruction: m.instruction || buildInstruction({
+        maneuverType,
+        modifier,
+        distance: m.distance ?? 0,
+        lat,
+        lng,
+        name: m.name || '',
+        ref: m.ref || '',
+        destinations: m.destinations || '',
+        exits: m.exits || '',
+        exit: m.exit || null,
+      }),
+    };
+    return normalizedStep;
+  });
+
+  return {
+    geometry,
+    distance: summary.distance ?? summary.totalDistance ?? 0,
+    duration: summary.duration ?? summary.totalDuration ?? 0,
+    steps,
+  };
+}
 
 function normalizeOSRMResponse(data) {
   const route = data.routes?.[0];
@@ -259,14 +354,14 @@ function extractStepsFromRoute(route) {
 
 // ─── Bearing helpers ──────────────────────────────────────────────────────────
 
-function bearingDiff(before, after) {
+export function bearingDiff(before, after) {
   let diff = after - before;
   while (diff >  180) diff -= 360;
   while (diff < -180) diff += 360;
   return diff;
 }
 
-function modifierFromAngle(diff) {
+export function modifierFromAngle(diff) {
   const abs = Math.abs(diff);
   const dir = diff < 0 ? 'left' : 'right';
   if (abs < 15)  return 'straight';
@@ -294,7 +389,7 @@ export function mapOSRMModifier(modifier) {
 
 // ─── Instruction builder ──────────────────────────────────────────────────────
 
-function buildInstruction(step) {
+export function buildInstruction(step) {
   const { maneuverType, modifier, exit, name, ref, destinations, exits } = step;
   const roadLabel = buildRoadLabel(name, ref);
   const destLabel = buildDestLabel(destinations);

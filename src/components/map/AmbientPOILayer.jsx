@@ -190,7 +190,7 @@ export default function AmbientPOILayer({ onSelectPOI, selectedCategory }) {
           const meta = await getAllMeta();
           const country = getDownloadedCountryAt(centerLat, centerLon, meta);
           if (country && meta[country.code]?.hasPOIs) {
-            const offlinePOIs = await getPOIs(country.code);
+const offlinePOIs = await getPOIs(country.code) || [];
             if (offlinePOIs?.length) {
               usedOfflinePOIs = true;
               for (const poi of offlinePOIs) {

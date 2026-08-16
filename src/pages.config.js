@@ -50,12 +50,16 @@ import FAQ from './pages/FAQ';
  */
 import Home from './pages/Home';
 import FAQ from './pages/FAQ';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
 import __Layout from './Layout.jsx';
  
  
 export const PAGES = {
     "Home": Home,
-    "FAQ": FAQ,
+    "faq": FAQ,
+    "privacy": PrivacyPolicy,
+    "terms": TermsOfService,
 }
  
 export const pagesConfig = {

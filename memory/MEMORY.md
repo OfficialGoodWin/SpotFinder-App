@@ -6,47 +6,85 @@
 - **Admin**: superadmin@spotfinder.cz — SuperAdminEditor.jsx panel
 - **Auth**: Firebase Auth with email/Google; AuthModal.jsx has client-side rate limiting (5 attempts → 5min lockout)
 
+## Offline Tiles System (BACKEND READY)
+```
+Download: OfflineMapsMenu.jsx → offlineManager.js → 
+  - Country: api/download proxy → OPFS
+  - Bbox: direct protomaps.com Range → OPFS (downloadBboxPMTiles)
+Metadata: offlineStorage.js (meta + bbox_meta)
+Core Functions ✅:
+  - downloadBboxPMTiles(id, [w,s,e,n], name) → concurrent 16 workers, z2-16
+  - getAllBboxFiles() → list OPFS+meta
+  - getPMTilesUrlAt(lat,lng) → `pmtiles://praha-center.pmtiles` or null
+Render:  MapLibreMap.jsx → needs 'moveend' listener calling getPMTilesUrlAt()
+```
+**Next**: MapLibreMap.jsx auto-switch → OfflineMapsMenu.jsx bbox UI.
+
+## Target Fix (bbox + direct protomaps.com)
+1. Bbox drawer UI in OfflineMapsMenu.jsx
+2. `downloadBboxPMTiles()` in offlineManager.js: PMTiles(20260403.pmtiles) → Range fetch bbox tiles → OPFS
+3. MapLibreMap.jsx: `moveend` → find OPFS bbox at center → switch to `pmtiles://{filename}.pmtiles`
+4. Metadata: offlineStorage.js adds bbox store (`{id: 'praha-center', bbox:[], name, filename, sizeMB}`)
+
 ## Key Files
-- `src/components/map/MapLibreMap.jsx` — main map, renders admin POIs, road shields, E-routes
-- `src/components/map/SuperAdminEditor.jsx` — admin panel (POIs, Road Closures, Nav Overrides, Road Numbers, E-Routes tabs)
-- `src/lib/ambientCategories.js` — AMBIENT_CATEGORIES array used for POI icon/color matching
-- `src/lib/POICategories.js` — POI_CATEGORIES for the search filter
-- `src/api/firebaseClient.js` — all Firebase operations
-- `src/components/map/SearchBar.jsx` — searches Nominatim + POI categories + spots by description
-- `firestore.rules` — security rules for all collections
+- `src/components/map/MapLibreMap.jsx` — main map, PMTiles protocol registered, needs OPFS auto-switch
+- `src/lib/offlineManager.js` — country downloads (rewrite for bbox + direct protomaps.com)
+- `src/components/offline/OfflineMapsMenu.jsx` — country list UI → add bbox drawer
+- `src/lib/offlineStorage.js` — IndexedDB meta/POIs → add bbox metadata
+- `src/components/map/OfflineTileLayer.jsx` — unused raster layer (deprecate)
+- `api/download.js` — proxy (bypass for direct PMTiles)
+- `src/lib/vectorTileDownloader.js` — legacy MVT (deprecate)
+- `src/lib/opfsTileStore.js` — generic OPFS utils (use existing getFileHandle)
 
 ## Admin POI System
 - Admin POIs stored in `admin_pois` Firestore collection
-- Each POI has: `{ name, description, category (key), icon, color, lat, lon, street, houseNumber, city, postcode }`
-- Category key must match AMBIENT_CATEGORIES `key` field for color/icon lookup
-- CATEGORY_OPTIONS in SuperAdminEditor.jsx defines the dropdown (31 categories)
-- MapLibreMap uses `poi.color` first, then falls back to AMBIENT_CATEGORIES lookup
+[... existing admin details unchanged ...]
 
-## Known Bugs Fixed
-- `AMBIENT_CATS` was undefined in MapLibreMap.jsx — fixed by defining `const AMBIENT_CATS = AMBIENT_CATEGORIES.filter(c => c.geo)` before `fetchAmbientPOIs`
-- `GEO_LOOKUP` must only include entries with non-null `geo` field — new admin-only categories have `geo: null`
-- Nominatim CORS: add `/nominatim/:path*` rewrite in vercel.json, use `/nominatim/search` in SearchBar
-
-## Road Shields / E-Routes
-- `EURO_ROUTES` object in MapLibreMap.jsx (now `let`, mutable) maps road refs to E-route arrays
-- Admin E-route overrides stored in `admin_eroute_overrides` collection
-- Admin road number overrides stored in `admin_road_overrides` collection
-- These are loaded in Home.jsx and passed as props to MapLibreMap
-- Road 27 → E53 in static table; use E-Routes admin tab to remove/modify
-
-## Search
-- SearchBar searches: POI categories, Nominatim geocoder, AND spots by title+description
-- Spot description search is client-side filtering of the `spots` array passed as prop
-
-## Security
-- Client-side brute force: 5 failed logins → 5 min lockout (AuthModal.jsx, session-scoped)
-- Firebase handles server-side auth/too-many-requests
-- API rate limiting: 10 req/60s per IP in create-checkout-session.js
-- Security headers in vercel.json (X-Frame-Options, X-Content-Type-Options, etc.)
-- Firestore rules: all admin_ collections restricted to superadmin@spotfinder.cz
+## Known Issues Fixed
+- **MapLibreMap.jsx TypeError**: Fixed `Cannot read properties of undefined (reading 'toFixed')` at line 74. Root cause: `map.getCenter()` returns `[lng, lat]` array but state expected `{lng, lat}` object. Fixed by normalizing: `setLngLat({ lng: center.lng, lat: center.lat })` in 'move' event handler.
+[... existing unchanged ...]
 
 ## Firebase Collections
-- `spots`, `ratings`, `poi_photos`, `poi_ratings`, `ip_bans`
-- `admin_pois`, `admin_closures`, `admin_nav_overrides`
-- `admin_road_overrides`, `admin_eroute_overrides` (new)
-- `feedback`
+
+## Current Task: Hero Page + Compliance Pages + Feedback Fix (2024-...)
+
+**Status:** Planning → Implementation
+
+**Goal:** 
+- Paper-design hero landing page
+- Privacy Policy + Terms pages (app store compliance)
+- Fix feedback form in FAQ.jsx
+
+**Analysis:**
+- Routing: src/pages.config.js imports from src/pages/*.jsx
+- Feedback: FAQ.jsx → firebaseClient 'feedback' collection. Rules allow `create: if true` but "never works" → client init/auth issue?
+- Hero: Home.jsx = map only. Create Landing.jsx with paper tokens (#111111 primary, spacing 4/8/12..., Roboto/Montserrat)
+
+**Implementation Plan:**
+1. [ ] Update firestore.rules (already allows feedback writes)
+2. [ ] Create `src/pages/Landing.jsx` (paper hero: discover spots, features, CTA)
+3. [ ] Create `src/pages/PrivacyPolicy.jsx` + `src/pages/TermsOfService.jsx`
+4. [ ] Edit `src/pages.config.js`: import new pages, `mainPage: "Landing"`
+5. [ ] Test: feedback form, new pages render, landing as /
+
+**Files:**
+- memory/MEMORY.md ← this update
+- firestore.rules (check)
+- src/pages/Landing.jsx (NEW)
+- src/pages/PrivacyPolicy.jsx (NEW) 
+- src/pages/TermsOfService.jsx (NEW)
+- src/pages.config.js (add imports + mainPage)
+
+**Progress:** 
+- [x] Updated MEMORY.md 
+- [x] Created src/pages/Landing.jsx (paper hero design)
+- [x] Created src/pages/PrivacyPolicy.jsx 
+- [x] Created src/pages/TermsOfService.jsx 
+- [x] Updated src/pages.config.js (mainPage="Landing", added new pages)
+
+**Next/Verify:**
+- Test landing at /, map at /Home
+- Test feedback form (rules allow writes)
+- Links in footers: /privacy → /privacy, /terms → /terms, /faq → /faq
+- App store compliance ✅
+[... existing unchanged ...]

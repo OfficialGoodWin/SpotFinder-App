@@ -1,0 +1,12 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="30dp"
+    android:height="30dp"
+    android:viewportWidth="30"
+    android:viewportHeight="30">
+    <!-- Custom user Spot: orange star badge, visually distinct from POI pins. -->
+    <path
+        android:fillColor="#FB8C00"
+        android:strokeColor="#E65100"
+        android:strokeWidth="1"
+        android:pathData="M15,1 L19,11 L29,11 L21,17 L24,28 L15,22 L6,28 L9,17 L1,11 L11,11 Z" />
+</vector>

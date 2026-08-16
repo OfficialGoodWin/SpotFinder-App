@@ -1,15 +1,15 @@
 /**
  * highZoomCache.js
  *
- * LRU IndexedDB cache for zoom 15-19 map tiles.
+ * LRU IndexedDB cache for zoom 16-19 map tiles.
  * When the user is online and browses at street level, tiles are saved here.
  * When offline, they're served from here instead of the network.
  *
  * Strategy:
  *   - Max cache size: 600 MB (configurable)
  *   - Eviction: delete oldest-accessed tiles when limit approaches
- *   - Only caches z >= HIGH_ZOOM_MIN (default 15)
- *   - Used as a read-through cache in the MapLibre offline-vt:// protocol
+ *   - Caches every base-map tile the user views online (all zoom levels)
+ *   - Used as a read-through cache in the MapLibre sf:// / offline-vt:// protocols
  */
 
 const DB_NAME    = 'spotfinder-hztiles-v1';
@@ -17,7 +17,8 @@ const DB_VERSION = 1;
 const STORE      = 'tiles';
 const META_STORE = 'meta';
 const MAX_BYTES  = 600 * 1024 * 1024; // 600 MB
-export const HIGH_ZOOM_MIN = 15;
+// Cache all zoom levels so the whole base map is available offline once viewed.
+export const HIGH_ZOOM_MIN = 0;
 
 let _db = null;
 

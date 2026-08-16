@@ -125,7 +125,9 @@ function style(dark = false) {
     sources: {
       v: {
         type: 'vector',
-        url:  'https://tiles.openfreemap.org/planet',
+        tiles: ['sf://planet/{z}/{x}/{y}'],
+        minzoom: 0,
+        maxzoom: 14,
         attribution: '© <a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>',
       },
     },
@@ -440,10 +442,14 @@ function style(dark = false) {
         },
       },
 
-      // ── Buildings (after roads so they render on top of tunnels) ─────────
-      { id: 'bldg-fill', type: 'fill', source: 'v', 'source-layer': 'building', minzoom: 13,
-        paint: { 'fill-color': c.building,
-          'fill-opacity': ['interpolate',['linear'],['zoom'], 13,0, 14,0.8, 16,1] } },
+      // ── Buildings (3D extrusion + subtle outline) ────────────────────────
+      { id: 'bldg-3d', type: 'fill-extrusion', source: 'v', 'source-layer': 'building', minzoom: 14,
+        paint: {
+          'fill-extrusion-color': c.building,
+          'fill-extrusion-height': ['coalesce', ['get', 'render_height'], ['get', 'height'], 10],
+          'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0],
+          'fill-extrusion-opacity': 0.85,
+        } },
       { id: 'bldg-line', type: 'line', source: 'v', 'source-layer': 'building', minzoom: 14,
         paint: { 'line-color': c.buildingLine, 'line-width': 0.5 } },
 
@@ -634,7 +640,9 @@ export function outdoorStyle(dark = false) {
     sources: {
       v: {
         type: 'vector',
-        url: 'https://tiles.openfreemap.org/planet',
+        tiles: ['sf://planet/{z}/{x}/{y}'],
+        minzoom: 0,
+        maxzoom: 14,
         attribution: '© <a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>',
       },
     },
@@ -791,7 +799,9 @@ export function winterStyle(dark = false) {
     sources: {
       v: {
         type: 'vector',
-        url: 'https://tiles.openfreemap.org/planet',
+        tiles: ['sf://planet/{z}/{x}/{y}'],
+        minzoom: 0,
+        maxzoom: 14,
         attribution: '© <a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>',
       },
     },
