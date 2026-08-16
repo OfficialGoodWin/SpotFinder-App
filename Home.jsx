@@ -104,7 +104,9 @@ export default function Home() {
  
   // Load spots
   useEffect(() => {
-    getPublicSpots(200).then(setSpots).catch(console.error);
+    getPublicSpots(200)
+      .then(data => { console.log('[DEBUG] spots loaded:', data.length, data); setSpots(data); })
+      .catch(err => console.error('[DEBUG] spots fetch failed:', err));
   }, []);
  
   // Track if we've centered to user location once
