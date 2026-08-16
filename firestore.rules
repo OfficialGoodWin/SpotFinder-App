@@ -8,11 +8,28 @@ service cloud.firestore {
     function isSuperAdmin() {
       return isAuth() && request.auth.token.email == 'superadmin@spotfinder.cz';
     }
+    // Kill-switch check: reads the single config/maintenance doc. Costs one
+    // extra `get` per gated write, which is the standard tradeoff for a
+    // rules-enforced (not just client-hidden) maintenance mode.
+    function isSiteUp() {
+      return !exists(/databases/$(database)/documents/config/maintenance) ||
+        get(/databases/$(database)/documents/config/maintenance).data.status != 'down';
+    }
+
+    // ── Site status / kill switch ───────────────────────────────────────────
+    // Single doc: config/maintenance { status: 'ok'|'warning'|'down', message, showBanner }
+    // Publicly readable so the banner/lockout screen can show without auth.
+    // Only the superadmin account can change it — this is the entire security
+    // boundary for the kill switch, so treat that account/password as critical.
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
 
     // ── Public spots ─────────────────────────────────────────────────────────
     match /spots/{spotId} {
       allow read: if true;
-      allow create: if true;
+      allow create: if isSiteUp() || isSuperAdmin();
 
       // Owner (or superadmin) can edit their own spot's full content.
       // Any signed-in user may ALSO update only the moderation/voting counters
@@ -36,14 +53,15 @@ service cloud.firestore {
     // ── Ratings ──────────────────────────────────────────────────────────────
     match /ratings/{ratingId} {
       allow read: if isAuth();
-      allow create: if isAuth();
+      allow create: if isAuth() && (isSiteUp() || isSuperAdmin());
     }
 
     // ── Flags (community moderation) ────────────────────────────────────────
     // Doc id is `${spotId}_${reporterEmail}` — one flag per user per spot.
     match /flags/{flagId} {
       allow read: if isSuperAdmin();
-      allow create: if isAuth() && flagId == request.resource.data.spot_id + '_' + request.auth.token.email
+      allow create: if (isSiteUp() || isSuperAdmin()) && isAuth()
+        && flagId == request.resource.data.spot_id + '_' + request.auth.token.email
         && request.resource.data.reporter_email == request.auth.token.email;
       allow update: if isSuperAdmin(); // resolving a flag
       allow delete: if isSuperAdmin();
@@ -53,7 +71,8 @@ service cloud.firestore {
     // Doc id is `${userEmail}_${spotId}` — one vote per user per spot.
     match /votes/{voteId} {
       allow read: if isAuth();
-      allow create, update: if isAuth() && voteId == request.auth.token.email + '_' + request.resource.data.spot_id
+      allow create, update: if (isSiteUp() || isSuperAdmin()) && isAuth()
+        && voteId == request.auth.token.email + '_' + request.resource.data.spot_id
         && request.resource.data.user_email == request.auth.token.email;
       allow delete: if isAuth() && voteId == request.auth.token.email + '_' + resource.data.spot_id;
     }
@@ -62,7 +81,8 @@ service cloud.firestore {
     // Doc id is `${userEmail}_${spotId}` — private to the bookmarking user.
     match /bookmarks/{bookmarkId} {
       allow read: if isAuth() && resource.data.user_email == request.auth.token.email;
-      allow create: if isAuth() && bookmarkId == request.auth.token.email + '_' + request.resource.data.spot_id
+      allow create: if (isSiteUp() || isSuperAdmin()) && isAuth()
+        && bookmarkId == request.auth.token.email + '_' + request.resource.data.spot_id
         && request.resource.data.user_email == request.auth.token.email;
       allow delete: if isAuth() && bookmarkId == request.auth.token.email + '_' + resource.data.spot_id;
     }

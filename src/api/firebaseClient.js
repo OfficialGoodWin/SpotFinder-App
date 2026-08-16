@@ -431,6 +431,32 @@ export const getUserBookmarks = async (userEmail) => {
   return (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
 };
 
+// ─── Site status / kill switch ─────────────────────────────────────────────────
+// Single doc: config/maintenance. Read is public (no auth needed) so the
+// banner/lockout screen works for signed-out visitors too. Writes are
+// restricted to the superadmin account by firestore.rules — this function
+// enforces nothing client-side; the security lives entirely in the rules.
+const MAINTENANCE_DOC_PATH = ['config', 'maintenance'];
+
+export const getMaintenanceStatus = async () => {
+  const { db } = getFirebaseServices();
+  const snap = await getDoc(doc(db, ...MAINTENANCE_DOC_PATH));
+  if (!snap.exists()) return { status: 'ok', message: '', showBanner: false };
+  return snap.data();
+};
+
+// status: 'ok' | 'warning' | 'down'. Will throw/reject if the signed-in user
+// isn't the superadmin — that's firestore.rules doing its job, not a bug.
+export const setMaintenanceStatus = async ({ status, message = '', showBanner = false }) => {
+  const { db } = getFirebaseServices();
+  await setDoc(doc(db, ...MAINTENANCE_DOC_PATH), {
+    status,
+    message,
+    showBanner,
+    updated_date: new Date().toISOString(),
+  });
+};
+
 // ─── POI Community Data ───────────────────────────────────────────────────────
 // Stable ID for any OSM POI: "lat4_lon4_slug"
 export const makePOIId = (lat, lon, name) =>
