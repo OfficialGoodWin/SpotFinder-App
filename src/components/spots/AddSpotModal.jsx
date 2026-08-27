@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Camera, MapPin, Mic, MicOff, Loader2, AlertTriangle } from 'lucide-react';
+import { X, Camera, MapPin, Mic, MicOff, Loader2 } from 'lucide-react';
 import StarRating from './StarRating';
 import AdBanner from '../AdBanner';
 import { useLanguage } from '@/lib/LanguageContext';
-import { uploadSpotImage, findNearbySpots } from '@/api/firebaseClient';
+import { uploadSpotImage } from '@/api/firebaseClient';
 
 // Category tags per spec — separate from the existing rating-group `spotType`.
 // A spot can carry several of these.
@@ -51,20 +51,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   const [bestTime, setBestTime] = useState([]);
   const [directions, setDirections] = useState('');
 
-  // ── Duplicate detection ──────────────────────────────────────────────────────
-  const [nearbySpots, setNearbySpots] = useState([]);
-  const [checkingDuplicates, setCheckingDuplicates] = useState(true);
-  const [duplicateConfirmed, setDuplicateConfirmed] = useState(false); // user said "not a duplicate"
-
-  useEffect(() => {
-    let cancelled = false;
-    setCheckingDuplicates(true);
-    findNearbySpots(latlng.lat, latlng.lng, DUPLICATE_RADIUS_M)
-      .then(results => { if (!cancelled) setNearbySpots(results); })
-      .catch(err => console.warn('Duplicate check failed:', err))
-      .finally(() => { if (!cancelled) setCheckingDuplicates(false); });
-    return () => { cancelled = true; };
-  }, [latlng.lat, latlng.lng]);
+  // Duplicate detection disabled for now (requires findNearbySpots in firebaseClient.js)
 
   const toggleTag = (tag) => setTags(t => t.includes(tag) ? t.filter(x => x !== tag) : [...t, tag]);
   const toggleBestTime = (val) => setBestTime(t => t.includes(val) ? t.filter(x => x !== val) : [...t, val]);
@@ -177,9 +164,6 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
       ? ratingsProvided.reduce((sum, r) => sum + r, 0) / ratingsProvided.length
       : 0;
 
-    // Block submission until the user has resolved the duplicate-spot prompt.
-    if (nearbySpots.length > 0 && !duplicateConfirmed) return;
-
     setLoading(true);
     let image_url = null;
 
@@ -263,39 +247,6 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
         </div>
 
         <div className="px-6 py-4 space-y-5">
-          {/* Duplicate-spot check */}
-          {nearbySpots.length > 0 && !duplicateConfirmed && (
-            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
-              <div className="flex gap-2 items-start">
-                <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
-                <div className="text-xs text-amber-800 dark:text-amber-300">
-                  <p className="font-semibold mb-1">Is this the same spot as one already here?</p>
-                  <ul className="mb-2 space-y-0.5">
-                    {nearbySpots.slice(0, 3).map(s => (
-                      <li key={s.id}>• {s.title || 'Untitled spot'}</li>
-                    ))}
-                  </ul>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={onClose}
-                      className="px-3 py-1 rounded-lg bg-amber-600 text-white font-semibold"
-                    >
-                      Yes, same spot — cancel mine
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDuplicateConfirmed(true)}
-                      className="px-3 py-1 rounded-lg border border-amber-400 text-amber-700 dark:text-amber-300 font-semibold"
-                    >
-                      No, different spot
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Category selector */}
           <div>
             <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-2 block">{t('addSpot.category')}</label>
@@ -520,7 +471,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
           </button>
           <button
             onClick={handleSave}
-            disabled={loading || checkingDuplicates || (nearbySpots.length > 0 && !duplicateConfirmed)}
+            disabled={loading}
             className="flex-2 px-8 py-3 rounded-2xl bg-blue-500 text-white font-semibold text-sm hover:bg-blue-600 disabled:opacity-50 transition-colors flex items-center gap-2"
           >
             {(loading || uploadingImage) && <Loader2 className="w-4 h-4 animate-spin" />}
