@@ -26,8 +26,9 @@ import {
   getDoc
 } from 'firebase/firestore';
 import { firebaseConfig } from './firebaseConfig';
+import { encodeGeohash, boundingBox, geohashPrecisionForRadius, haversineDistanceM } from '../utils/geohash';
  
-let app, auth, db, storage;
+let app, auth, db;
 try {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
@@ -99,6 +100,13 @@ export const onAuthChange = (callback) => {
   const { auth } = getFirebaseServices();
   return onAuthStateChanged(auth, callback);
 };
+
+// ── POI Error Handler ─────────────────────────────────────────────────────────
+export const handlePOIError = (error, poiData) => {
+  console.warn('[Firebase POI] Access blocked or service unavailable:', error.message);
+  console.warn('Falling back to:', poiData?.length || 0, 'cached/local POIs');
+  return { blocked: true, fallback: poiData || [] };
+};
  
 // Compress image with canvas and return base64 data URL (stored in Firestore)
 // Max output size ~600KB — well within Firestore 1MB document limit
@@ -133,6 +141,7 @@ export const uploadSpotImage = async (file) => {
     reader.readAsDataURL(file);
   });
 };
+
  
 const IP_BANS_COLLECTION = 'ip_bans';
 export const banIP = async (ipAddress, reason = 'Violation of terms') => {
@@ -155,9 +164,17 @@ export const isIPBanned = async (ipAddress) => {
 const SPOTS_COLLECTION = 'spots';
 const RATINGS_COLLECTION = 'ratings';
  
+// Visible statuses: published spots + pending_trust spots (shown immediately with
+// a "new" badge in the UI per spec — flagged/hidden/rejected are excluded).
 export const getPublicSpots = async (maxCount = 200) => {
   const { db } = getFirebaseServices();
-  const q = query(collection(db, SPOTS_COLLECTION), where('is_public', '==', true), orderBy('created_date', 'desc'), limit(maxCount));
+  const q = query(
+    collection(db, SPOTS_COLLECTION),
+    where('is_public', '==', true),
+    where('status', 'in', ['published', 'pending_trust']),
+    orderBy('created_date', 'desc'),
+    limit(maxCount)
+  );
   return (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
 };
  
@@ -167,11 +184,73 @@ export const getUserSpots = async (userEmail, maxCount = 50) => {
   return (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
 };
  
+// A submitter needs this many previously-published spots before new submissions
+// skip the pending_trust review tier (see spec: moderation & quality control).
+const TRUSTED_SUBMITTER_THRESHOLD = 3;
+
+export const getApprovedSpotCount = async (userEmail) => {
+  if (!userEmail || userEmail === 'anonymous') return 0;
+  const { db } = getFirebaseServices();
+  const q = query(
+    collection(db, SPOTS_COLLECTION),
+    where('created_by', '==', userEmail),
+    where('status', '==', 'published')
+  );
+  return (await getDocs(q)).size;
+};
+
 export const createSpot = async (spotData) => {
   const { db } = getFirebaseServices();
-  const data = { ...spotData, created_date: new Date().toISOString() };
+  const approvedCount = await getApprovedSpotCount(spotData.created_by);
+  const status = approvedCount >= TRUSTED_SUBMITTER_THRESHOLD ? 'published' : 'pending_trust';
+
+  const data = {
+    ...spotData,
+    status,                       // 'pending_trust' | 'published' | 'flagged' | 'hidden' | 'rejected'
+    geohash: encodeGeohash(spotData.lat, spotData.lng, 9),
+    quality_score: 0,
+    upvote_count: 0,
+    downvote_count: 0,
+    flag_count: 0,
+    created_date: new Date().toISOString(),
+  };
   const docRef = await addDoc(collection(db, SPOTS_COLLECTION), data);
   return { id: docRef.id, ...data };
+};
+
+// ── Duplicate detection ───────────────────────────────────────────────────────
+// Finds published/pending spots within `radiusM` of (lat, lng) using a geohash
+// prefix-range query (cheap, index-friendly), then filters precisely with
+// haversine distance. Used by the submission form to prompt "is this the same spot?"
+export const findNearbySpots = async (lat, lng, radiusM = 50) => {
+  const { db } = getFirebaseServices();
+  const precision = geohashPrecisionForRadius(radiusM);
+  const centerHash = encodeGeohash(lat, lng, precision);
+  const { south, north, west, east } = boundingBox(lat, lng, radiusM);
+
+  const q = query(
+    collection(db, SPOTS_COLLECTION),
+    where('geohash', '>=', centerHash),
+    where('geohash', '<=', centerHash + '~'),
+    limit(50)
+  );
+  const candidates = (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
+  return candidates.filter(s =>
+    typeof s.lat === 'number' && typeof s.lng === 'number' &&
+    s.lat >= south && s.lat <= north && s.lng >= west && s.lng <= east &&
+    haversineDistanceM(lat, lng, s.lat, s.lng) <= radiusM &&
+    s.status !== 'rejected' && s.status !== 'hidden'
+  );
+};
+
+// Merge a newly-flagged duplicate submission into an existing spot instead of
+// keeping two pins for the same place.
+export const markSpotAsDuplicate = async (newSpotId, canonicalSpotId) => {
+  const { db } = getFirebaseServices();
+  await updateDoc(doc(db, SPOTS_COLLECTION, newSpotId), {
+    status: 'rejected',
+    duplicate_of_spot_id: canonicalSpotId,
+  });
 };
  
 export const updateSpot = async (spotId, data) => {
@@ -256,7 +335,128 @@ export const submitCategoryRatings = async (spotId, currentSpot, ratings) => {
 
   return { ...currentSpot, ...updates };
 };
- 
+
+// ─── Flags (community moderation) ─────────────────────────────────────────────
+const FLAGS_COLLECTION = 'flags';
+const FLAG_AUTO_HIDE_THRESHOLD = 3; // distinct users flagging → auto-hide pending admin review
+
+// reason: 'private_property' | 'dangerous' | 'duplicate' | 'spam' | 'inaccurate_location'
+export const flagSpot = async (spotId, reporterEmail, reason, note = '') => {
+  const { db } = getFirebaseServices();
+  if (!reporterEmail || reporterEmail === 'anonymous') throw new Error('Must be signed in to flag a spot');
+
+  // One flag per user per spot — composite doc id prevents duplicate flags.
+  const flagId = `${spotId}_${reporterEmail}`;
+  const flagRef = doc(db, FLAGS_COLLECTION, flagId);
+  const existing = await getDoc(flagRef);
+  if (existing.exists()) return { alreadyFlagged: true };
+
+  await setDoc(flagRef, {
+    spot_id: spotId,
+    reporter_email: reporterEmail,
+    reason,
+    note,
+    status: 'open',
+    created_date: new Date().toISOString(),
+  });
+
+  const q = query(collection(db, FLAGS_COLLECTION), where('spot_id', '==', spotId), where('status', '==', 'open'));
+  const flagCount = (await getDocs(q)).size;
+  await updateDoc(doc(db, SPOTS_COLLECTION, spotId), { flag_count: flagCount });
+
+  if (flagCount >= FLAG_AUTO_HIDE_THRESHOLD) {
+    await updateDoc(doc(db, SPOTS_COLLECTION, spotId), { status: 'flagged' });
+  }
+  return { alreadyFlagged: false, flagCount };
+};
+
+export const getOpenFlagsForAdmin = async (maxCount = 100) => {
+  const { db } = getFirebaseServices();
+  const q = query(collection(db, FLAGS_COLLECTION), where('status', '==', 'open'), orderBy('created_date', 'desc'), limit(maxCount));
+  return (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
+};
+
+export const resolveFlag = async (flagId, resolution /* 'upheld' | 'dismissed' */) => {
+  const { db } = getFirebaseServices();
+  await updateDoc(doc(db, FLAGS_COLLECTION, flagId), { status: 'resolved', resolution, resolved_date: new Date().toISOString() });
+};
+
+// ─── Votes (up/down, feeds quality_score/ranking — not visibility) ───────────
+const VOTES_COLLECTION = 'votes';
+
+export const voteSpot = async (spotId, userEmail, type /* 'up' | 'down' */) => {
+  const { db } = getFirebaseServices();
+  if (!userEmail || userEmail === 'anonymous') throw new Error('Must be signed in to vote');
+
+  const voteId = `${userEmail}_${spotId}`;
+  const voteRef = doc(db, VOTES_COLLECTION, voteId);
+  const existing = await getDoc(voteRef);
+  const prevType = existing.exists() ? existing.data().type : null;
+  if (prevType === type) return; // no-op, already voted this way
+
+  await setDoc(voteRef, { user_email: userEmail, spot_id: spotId, type, created_date: new Date().toISOString() });
+
+  const upDelta = (type === 'up' ? 1 : 0) - (prevType === 'up' ? 1 : 0);
+  const downDelta = (type === 'down' ? 1 : 0) - (prevType === 'down' ? 1 : 0);
+  const spotSnap = await getDoc(doc(db, SPOTS_COLLECTION, spotId));
+  const spot = spotSnap.data() || {};
+  const upvote_count = Math.max(0, (spot.upvote_count || 0) + upDelta);
+  const downvote_count = Math.max(0, (spot.downvote_count || 0) + downDelta);
+  await updateDoc(doc(db, SPOTS_COLLECTION, spotId), {
+    upvote_count,
+    downvote_count,
+    quality_score: upvote_count - downvote_count,
+  });
+};
+
+// ─── Bookmarks ─────────────────────────────────────────────────────────────────
+const BOOKMARKS_COLLECTION = 'bookmarks';
+
+export const bookmarkSpot = async (spotId, userEmail) => {
+  const { db } = getFirebaseServices();
+  if (!userEmail || userEmail === 'anonymous') throw new Error('Must be signed in to bookmark');
+  await setDoc(doc(db, BOOKMARKS_COLLECTION, `${userEmail}_${spotId}`), {
+    user_email: userEmail, spot_id: spotId, created_date: new Date().toISOString(),
+  });
+};
+
+export const removeBookmark = async (spotId, userEmail) => {
+  const { db } = getFirebaseServices();
+  await deleteDoc(doc(db, BOOKMARKS_COLLECTION, `${userEmail}_${spotId}`));
+};
+
+export const getUserBookmarks = async (userEmail) => {
+  const { db } = getFirebaseServices();
+  const q = query(collection(db, BOOKMARKS_COLLECTION), where('user_email', '==', userEmail));
+  return (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
+};
+
+// ─── Site status / kill switch ─────────────────────────────────────────────────
+// Single doc: config/maintenance. Read is public (no auth needed) so the
+// banner/lockout screen works for signed-out visitors too. Writes are
+// restricted to the superadmin account by firestore.rules — this function
+// enforces nothing client-side; the security lives entirely in the rules.
+const MAINTENANCE_DOC_PATH = ['config', 'maintenance'];
+
+export const getMaintenanceStatus = async () => {
+  const { db } = getFirebaseServices();
+  const snap = await getDoc(doc(db, ...MAINTENANCE_DOC_PATH));
+  if (!snap.exists()) return { status: 'ok', message: '', showBanner: false };
+  return snap.data();
+};
+
+// status: 'ok' | 'warning' | 'down'. Will throw/reject if the signed-in user
+// isn't the superadmin — that's firestore.rules doing its job, not a bug.
+export const setMaintenanceStatus = async ({ status, message = '', showBanner = false }) => {
+  const { db } = getFirebaseServices();
+  await setDoc(doc(db, ...MAINTENANCE_DOC_PATH), {
+    status,
+    message,
+    showBanner,
+    updated_date: new Date().toISOString(),
+  });
+};
+
 // ─── POI Community Data ───────────────────────────────────────────────────────
 // Stable ID for any OSM POI: "lat4_lon4_slug"
 export const makePOIId = (lat, lon, name) =>
@@ -429,6 +629,29 @@ export const deleteAdminERouteOverride = async (user, id) => {
   await deleteDoc(doc(db, 'admin_eroute_overrides', id));
 };
 
+// ── Deleted Ambient POIs (superadmin blocklist) ───────────────────────────────
+// Stores a blocklist of ambient POI IDs (lat+lon+name hash) that should never
+// be shown again. Loaded once on app start and cached client-side.
+export const getDeletedAmbientPOIs = async () => {
+  const { db } = getFirebaseServices();
+  try {
+    const q = query(collection(db, 'admin_deleted_pois'), orderBy('created_at', 'desc'), limit(1000));
+    return (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch { return []; }
+};
+export const addDeletedAmbientPOI = async (user, data) => {
+  requireSuperAdmin(user);
+  const { db } = getFirebaseServices();
+  const payload = { ...data, created_at: new Date().toISOString(), created_by: user.email };
+  const ref = await addDoc(collection(db, 'admin_deleted_pois'), payload);
+  return { id: ref.id, ...payload };
+};
+export const removeDeletedAmbientPOI = async (user, id) => {
+  requireSuperAdmin(user);
+  const { db } = getFirebaseServices();
+  await deleteDoc(doc(db, 'admin_deleted_pois', id));
+};
+
 export const base44 = {
   auth: {
     me: async () => {
@@ -460,4 +683,7 @@ export const base44 = {
   appLogs: { logUserInApp: async (p) => console.log('User in app:', p) }
 };
  
+export const getDeletedAmbientPOIs = async () => [];
+export const addDeletedAmbientPOI = async () => {};
+
 export default base44;
