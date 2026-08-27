@@ -683,7 +683,4 @@ export const base44 = {
   appLogs: { logUserInApp: async (p) => console.log('User in app:', p) }
 };
  
-export const getDeletedAmbientPOIs = async () => [];
-export const addDeletedAmbientPOI = async () => {};
-
 export default base44;
