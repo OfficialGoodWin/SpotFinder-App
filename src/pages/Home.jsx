@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-import { Plus, Settings, Crosshair, HelpCircle, Trash2, WifiOff, Sparkles } from 'lucide-react';
+import { Plus, Settings, Crosshair, HelpCircle, Trash2, WifiOff } from 'lucide-react';
 import SubscriptionModal from '../components/SubscriptionModal';
-import { getPublicSpots, createSpot, deleteSpot, updateSpot, getAdminPOIs, getAdminClosures, getAdminERouteOverrides, getAdminRoadOverrides } from '@/api/firebaseClient';
+import { getPublicSpots, createSpot, deleteSpot, updateSpot, getAdminPOIs, getAdminClosures, getAdminERouteOverrides, getAdminRoadOverrides, getDeletedAmbientPOIs, addDeletedAmbientPOI } from '@/api/firebaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/lib/LanguageContext';
  
 import MapLayerSwitcher from '../components/map/MapLayerSwitcher';
+import ZoomSlider from '../components/map/ZoomSlider';
 import SearchBar from '../components/map/SearchBar';
 import MapLibreMap from '../components/map/MapLibreMap';
 import SuperAdminEditor from '../components/map/SuperAdminEditor';
@@ -25,7 +26,6 @@ import POIDetailPanel from '../components/spots/POIDetailPanel';
 import SettingsModal from '../components/SettingsModal';
 import ProfileMenu from '../components/ProfileMenu';
 import OfflineMapsMenu from '../components/offline/OfflineMapsMenu';
-import { getAllMeta } from '../lib/offlineStorage.js';
  
 // Note: Leaflet marker icons are fixed via src/lib/leaflet-fix.js
  
@@ -43,6 +43,7 @@ export default function Home() {
   const [selectedSpot, setSelectedSpot] = useState(null);
   const [editingSpot, setEditingSpot] = useState(null);
   const [navTarget, setNavTarget] = useState(null);
+  const [isActivelyNavigating, setIsActivelyNavigating] = useState(false);
   const [navFrom, setNavFrom] = useState(null); // snapshot of start position, never changes mid-nav
   const [flyTo, setFlyTo] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
@@ -52,13 +53,8 @@ export default function Home() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
-  const [showOffline, setShowOffline] = useState(false);
-  const [offlineMeta, setOfflineMeta] = useState({});
+  const [showOfflineMaps, setShowOfflineMaps] = useState(false);
 
-  // Load offline metadata once on mount
-  useEffect(() => {
-    getAllMeta().then(setOfflineMeta);
-  }, []);
   const [navRouteData, setNavRouteData] = useState({ coordinates: [], turns: [], currentStep: 0 });
   const [showSpots, setShowSpots] = useState(false);
   const [fitBoundsData, setFitBoundsData] = useState(null);
@@ -70,6 +66,21 @@ export default function Home() {
   const [selectedPOI, setSelectedPOI] = useState(null);
   const [selectedPOIDirectCat, setSelectedPOIDirectCat] = useState(null);
   const [poiLoading, setPoiLoading] = useState(false);
+
+  // ── Deleted ambient POIs (superadmin blocklist) ────────────────────────────
+  const [deletedAmbientPOIIds, setDeletedAmbientPOIIds] = useState([]);
+  useEffect(() => {
+    getDeletedAmbientPOIs().then(docs => setDeletedAmbientPOIIds(docs.map(d => d.poiId)));
+  }, []);
+
+  const handleBlockAmbientPOI = async (poi) => {
+    if (!user) return;
+    const poiId = `${poi.lat?.toFixed(5)}_${poi.lon?.toFixed(5)}_${(poi.name || '').replace(/\s+/g, '_')}`;
+    try {
+      await addDeletedAmbientPOI(user, { poiId, name: poi.name || '', lat: poi.lat, lon: poi.lon });
+      setDeletedAmbientPOIIds(prev => [...prev, poiId]);
+    } catch (e) { console.error('Block POI failed:', e); }
+  };
 
   // ── Superadmin editor state ────────────────────────────────────────────────
   const isSuperAdmin = user?.email === 'superadmin@spotfinder.cz';
@@ -158,9 +169,15 @@ export default function Home() {
   }, []);
  
   const handleSaveSpot = async (data) => {
-    const spot = await createSpot(data);
-    setSpots(prev => [spot, ...prev]);
-    setPendingLatlng(null);
+    try {
+      const spot = await createSpot(data);
+      setSpots(prev => [spot, ...prev]);
+      setPendingLatlng(null);
+    } catch (err) {
+      console.error('Failed to create spot:', err);
+      alert('Failed to save spot: ' + (err.message || 'unknown error'));
+      throw err; // re-throw so AddSpotModal's finally/loading state also resolves correctly
+    }
   };
 
   // Deep-link: ?spot=<id> opens that spot detail
@@ -302,6 +319,7 @@ export default function Home() {
         adminERouteOverrides={adminERouteOverrides}
         adminRoadOverrides={adminRoadOverrides}
         onAdminMapClick={(coords) => { adminMapClickRef.current?.(coords); }}
+        deletedAmbientPOIIds={deletedAmbientPOIIds}
       />
  
       {/* Search bar */}
@@ -341,6 +359,8 @@ export default function Home() {
         onSignOut={handleSignOut}
         onShowDeleteConfirm={() => setShowDeleteConfirm(true)}
         onShowAuth={() => setShowAuth(true)}
+        onShowSubscription={() => setShowSubscription(true)}
+        isSuperAdmin={isSuperAdmin}
       />
 
       {/* Spots toggle — sits between search bar and layer switcher */}
@@ -367,8 +387,11 @@ export default function Home() {
  
  
  
-      {/* Bottom bar */}
-      <div className="absolute bottom-0 inset-x-0 z-[1000]">
+      {/* Zoom half-circle slider — right edge */}
+      <ZoomSlider mapRef={mapRef} />
+
+      {/* Bottom bar — hidden during active navigation (drawer replaces it) */}
+      <div className={`absolute bottom-0 inset-x-0 z-[1000] transition-transform duration-300 ${isActivelyNavigating ? 'translate-y-full pointer-events-none' : ''}`}>
         {/* FAB — green + floating above bar */}
         <div className="absolute left-1/2 -translate-x-1/2 z-10 pointer-events-none" style={{ bottom: '100%', marginBottom: '-36px' }}>
           <button
@@ -407,6 +430,13 @@ export default function Home() {
               <HelpCircle className="w-5 h-5" />
             </button>
             <button
+              onClick={() => setShowOfflineMaps(true)}
+              className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-accent/60 flex items-center justify-center text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent active:scale-95 transition-all"
+              title="Offline maps"
+            >
+              <WifiOff className="w-5 h-5" />
+            </button>
+            <button
               onClick={() => setShowSettings(true)}
               className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-accent/60 flex items-center justify-center text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent active:scale-95 transition-all"
               title="Settings"
@@ -422,19 +452,6 @@ export default function Home() {
                 🛠️
               </button>
             )}
-            <button
-              onClick={() => setShowOffline(true)}
-              className={`w-10 h-10 rounded-xl flex items-center justify-center active:scale-95 transition-all relative
-                ${Object.keys(offlineMeta).length > 0
-                  ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/60'
-                  : 'bg-gray-100 dark:bg-accent/60 text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent'}`}
-              title="Offline Maps"
-            >
-              <WifiOff className="w-5 h-5" />
-              {Object.keys(offlineMeta).length > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-background" />
-              )}
-            </button>
           </div>
         </div>
       </div>
@@ -477,8 +494,13 @@ export default function Home() {
           from={navFrom}
           to={{ lat: navTarget.lat, lng: navTarget.lng }}
           toLabel={navTarget.label}
-          onClose={() => { setNavTarget(null); setNavFrom(null); }}
+          onClose={(clearRoute) => { setNavTarget(null); setNavFrom(null); if (clearRoute) setNavRouteData({ coordinates: [], turns: [], currentStep: 0 }); setIsActivelyNavigating(false); }}
           onRouteReady={() => {}}
+          onNavigatingChange={setIsActivelyNavigating}
+          isSuperAdmin={isSuperAdmin}
+          userSubscription={null}
+          onOpenSettings={() => setShowSettings(true)}
+          onChangeMapLayer={() => {/* MapLayerSwitcher is in toolbar — just open it */}}
           onRouteData={(data) => {
             setNavRouteData(data);
             // Fit map to show full route
@@ -492,12 +514,6 @@ export default function Home() {
       )}
  
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
-
-      {showOffline && (
-        <OfflineMapsMenu
-          onClose={() => { setShowOffline(false); getAllMeta().then(setOfflineMeta); }}
-        />
-      )}
  
       {showMySpots && isAuthenticated && user && (
         <MySpotsPanel
@@ -528,16 +544,21 @@ export default function Home() {
           poi={selectedPOI}
           category={selectedPOIDirectCat || selectedPOICategory}
           user={user}
+          isSuperAdmin={isSuperAdmin}
           onClose={() => { setSelectedPOI(null); setSelectedPOIDirectCat(null); if (!showPOIPanel) setSelectedPOICategory(null); }}
           onNavigate={(destination) => {
             if (!userPos) return alert(t('home.locationUnavailable'));
             startNavTo(destination);
           }}
+          onBlockPOI={handleBlockAmbientPOI}
         />
       )}
  
       {showSettings && (
         <SettingsModal onClose={() => setShowSettings(false)} />
+      )}
+      {showOfflineMaps && (
+        <OfflineMapsMenu onClose={() => setShowOfflineMaps(false)} />
       )}
 
       {isSuperAdmin && showAdminEditor && (
