@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-import { Plus, Settings, Crosshair, HelpCircle, Trash2, WifiOff, Navigation } from 'lucide-react';
+import { Plus, Settings, Crosshair, HelpCircle, Trash2, WifiOff, Radar } from 'lucide-react';
 import SubscriptionModal from '../components/SubscriptionModal';
 import { getPublicSpots, createSpot, deleteSpot, updateSpot, getAdminPOIs, getAdminClosures, getAdminERouteOverrides, getAdminRoadOverrides, getDeletedAmbientPOIs, addDeletedAmbientPOI } from '@/api/firebaseClient';
 import { useAuth } from '@/lib/AuthContext';
@@ -49,6 +49,10 @@ export default function Home() {
   const [showAuth, setShowAuth] = useState(false);
   const [showMySpots, setShowMySpots] = useState(false);
   const [showNearbySpots, setShowNearbySpots] = useState(false);
+  const [showNearbyFilter, setShowNearbyFilter] = useState(false);
+  const [nearbyFilters, setNearbyFilters] = useState({ maxDistance: 50, minRating: 0 });
+  const [nearbyDraft, setNearbyDraft] = useState({ maxDistance: 50, minRating: 0 });
+  const [terrainEnabled, setTerrainEnabled] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -56,7 +60,7 @@ export default function Home() {
   const [showOfflineMaps, setShowOfflineMaps] = useState(false);
 
   const [navRouteData, setNavRouteData] = useState({ coordinates: [], turns: [], currentStep: 0 });
-  const [showSpots, setShowSpots] = useState(true);
+  const [showSpots, setShowSpots] = useState(false);
   const [fitBoundsData, setFitBoundsData] = useState(null);
   const [zoomToArea, setZoomToArea] = useState(null);
   const [deleteInput, setDeleteInput] = useState('');
@@ -203,7 +207,7 @@ export default function Home() {
       });
     };
     setTimeout(() => tryOpen(), 800);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);  
  
   const handleDeleteSpot = async (spot) => {
     await deleteSpot(spot.id);
@@ -313,6 +317,7 @@ export default function Home() {
         navRouteData={navRouteData}
         isDark={isDark}
         mapLayer={mapLayer}
+        terrainEnabled={terrainEnabled}
         adminPOIs={adminPOIs}
         adminClosures={adminClosures}
         adminNavMode={adminNavMode}
@@ -387,6 +392,7 @@ export default function Home() {
         <NearbySpotsPanel
           spots={spots}
           userPos={userPos}
+          initialFilters={nearbyFilters}
           onSelectSpot={(spot) => {
             setSelectedSpot(spot);
             setFlyTo([spot.lat, spot.lng]);
@@ -429,19 +435,93 @@ export default function Home() {
             >
               <Crosshair className="w-5 h-5" />
             </button>
+            {/* Nearby spots — opens a quick filter popover on click */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  if (!userPos) return alert(t('home.enableLocation'));
+                  setNearbyDraft(nearbyFilters);
+                  setShowNearbyFilter(v => !v);
+                }}
+                className={`w-10 h-10 rounded-xl flex items-center justify-center active:scale-95 transition-all ${
+                  showNearbySpots || showNearbyFilter
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-gray-100 dark:bg-accent/60 text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent'
+                }`}
+                title="Nearby spots"
+              >
+                <Radar className="w-5 h-5" />
+              </button>
+              {showNearbyFilter && (
+                <>
+                  <div className="fixed inset-0 z-[1500]" onClick={() => setShowNearbyFilter(false)} />
+                  <div className="absolute bottom-full left-0 mb-3 z-[1600] w-64 rounded-2xl shadow-xl border border-gray-200 dark:border-border bg-white dark:bg-card p-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-sm font-bold text-gray-900 dark:text-foreground">Filter Nearby</span>
+                      <button onClick={() => setShowNearbyFilter(false)} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-accent">
+                        <X className="w-3.5 h-3.5 text-gray-400 dark:text-muted-foreground" />
+                      </button>
+                    </div>
+                    <div className="mb-3">
+                      <div className="flex justify-between text-xs font-semibold text-gray-600 dark:text-muted-foreground mb-1">
+                        <span>Max Distance</span>
+                        <span className="text-purple-600 dark:text-purple-400">{nearbyDraft.maxDistance} km</span>
+                      </div>
+                      <input
+                        type="range" min="1" max="50" value={nearbyDraft.maxDistance}
+                        onChange={(e) => setNearbyDraft(d => ({ ...d, maxDistance: Number(e.target.value) }))}
+                        className="w-full accent-purple-600 cursor-pointer"
+                      />
+                    </div>
+                    <div className="mb-4">
+                      <label className="block text-xs font-semibold text-gray-600 dark:text-muted-foreground mb-1.5">Minimum Rating</label>
+                      <div className="flex items-center gap-1.5">
+                        {[0, 3, 3.5, 4, 4.5].map((rating) => (
+                          <button
+                            key={rating}
+                            type="button"
+                            onClick={() => setNearbyDraft(d => ({ ...d, minRating: rating }))}
+                            className={`flex-1 py-1.5 rounded-xl text-xs font-medium border transition ${
+                              nearbyDraft.minRating === rating
+                                ? 'bg-purple-600 text-white border-purple-600'
+                                : 'bg-white dark:bg-background text-gray-700 dark:text-foreground border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent'
+                            }`}
+                          >
+                            {rating === 0 ? 'Any' : `${rating}★`}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { setShowNearbyFilter(false); }}
+                        className="flex-1 py-2 rounded-xl text-xs font-medium text-gray-500 dark:text-muted-foreground hover:bg-gray-100 dark:hover:bg-accent border border-gray-200 dark:border-border"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => { setNearbyFilters(nearbyDraft); setShowNearbySpots(true); setShowNearbyFilter(false); }}
+                        className="flex-1 py-2 rounded-xl text-xs font-medium bg-purple-600 text-white hover:bg-purple-700"
+                      >
+                        Show Nearby
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* 3D Terrain toggle */}
             <button
-              onClick={() => {
-                if (!userPos) return alert(t('home.enableLocation'));
-                setShowNearbySpots(true);
-              }}
+              onClick={() => setTerrainEnabled(v => !v)}
               className={`w-10 h-10 rounded-xl flex items-center justify-center active:scale-95 transition-all ${
-                showNearbySpots
-                  ? 'bg-purple-600 text-white'
+                terrainEnabled
+                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30'
                   : 'bg-gray-100 dark:bg-accent/60 text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent'
               }`}
-              title="Nearby spots"
+              title="3D terrain"
             >
-              <Navigation className="w-5 h-5" />
+              <span className="text-base font-extrabold italic tracking-tight">3D</span>
             </button>
           </div>
 

@@ -69,11 +69,12 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
     }
     setPoiCategories(filterCategories(query, language));
 
-    // Search spots by title and description
-    const q = query.toLowerCase();
+    // Search spots by title, description, and hashtag tags (e.g. "#viewpoint")
+    const q = query.toLowerCase().replace(/^#/, '');
     const matched = (spots || []).filter(s => {
       if (s.title?.toLowerCase().includes(q)) return true;
       if (s.description?.toLowerCase().includes(q)) return true;
+      if ((s.tags || []).some(tag => String(tag).toLowerCase().includes(q))) return true;
       return false;
     }).slice(0, 5);
     setSpotResults(matched);
@@ -198,7 +199,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
 
   return (
     <div ref={containerRef} className="absolute top-4 left-4 z-[1002]" style={{ right: '3.75rem' }}>
-      <div className={`bg-white dark:bg-card rounded-2xl shadow-lg border transition-all ${focused ? 'border-blue-400 dark:border-blue-500' : 'border-gray-200 dark:border-border'}`}>
+      <div className={`bg-white dark:bg-card rounded-full shadow-lg border transition-all ${focused ? 'border-blue-400 dark:border-blue-500' : 'border-gray-200 dark:border-border'}`}>
         <div className="flex items-center px-3 gap-1.5">
           <Search className="w-4 h-4 text-gray-400 dark:text-muted-foreground flex-shrink-0" />
           <input

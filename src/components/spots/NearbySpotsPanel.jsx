@@ -12,6 +12,7 @@ function haversineKm([lat1, lng1], [lat2, lng2]) {
 }
 
 const TYPE_EMOJI = { parking: '🅿️', food: '🍽️', toilet: '🚽' };
+const TYPE_LABEL = { parking: 'Parking', food: 'Food', toilet: 'Toilet', general: 'Spot' };
 
 function StarRow({ rating }) {
   if (!rating) return <span className="text-xs text-muted-foreground">–</span>;
@@ -36,8 +37,20 @@ function SpotRow({ spot, onSelectSpot, onNavigate, onClose }) {
     >
       <span className="text-xl flex-shrink-0 w-7 text-center">{TYPE_EMOJI[spot.spot_type] || '📍'}</span>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-foreground truncate">{spot.title || 'Spot'}</p>
-        <StarRow rating={spot.rating} />
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-semibold text-foreground truncate">{spot.title || TYPE_LABEL[spot.spot_type] || 'Spot'}</p>
+          {spot.spot_type && (
+            <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-accent text-gray-500 dark:text-muted-foreground flex-shrink-0">
+              {TYPE_LABEL[spot.spot_type] || spot.spot_type}
+            </span>
+          )}
+        </div>
+        {spot.description && (
+          <p className="text-xs text-muted-foreground truncate mt-0.5">{spot.description}</p>
+        )}
+        <div className="mt-0.5">
+          <StarRow rating={spot.rating} />
+        </div>
       </div>
       {spot._km != null && (
         <div className="flex-shrink-0 flex flex-col items-end gap-0.5 min-w-[44px]">
@@ -63,9 +76,9 @@ function SpotRow({ spot, onSelectSpot, onNavigate, onClose }) {
   );
 }
 
-export default function NearbySpotsPanel({ spots, userPos, onSelectSpot, onNavigate, onClose }) {
+export default function NearbySpotsPanel({ spots, userPos, onSelectSpot, onNavigate, onClose, initialFilters }) {
   const { t } = useLanguage();
-  const [filters, setFilters] = useState({ maxDistance: 50, minRating: 0 });
+  const [filters, setFilters] = useState(initialFilters || { maxDistance: 50, minRating: 0 });
   const [showFilterModal, setShowFilterModal] = useState(false);
 
   const nearby = useMemo(() => {

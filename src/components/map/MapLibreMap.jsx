@@ -8,13 +8,13 @@
  * Offline: local PMTiles file read from OPFS via pmtiles library
  * Dark:    full dark variant, switches instantly via setStyle()
  */
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import { Protocol } from 'pmtiles';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { lightStyle, darkStyle, outdoorStyle, winterStyle } from '../../lib/mapStyle.js';
 import { AMBIENT_CATEGORIES } from '../../lib/ambientCategories.js';
-import { COUNTRIES, isPointInCountry, getDownloadedCountryAt, vtKey } from '../../lib/vectorTileDownloader.js';
+import { COUNTRIES, isPointInCountry, vtKey } from '../../lib/vectorTileDownloader.js';
 import { getAllMeta, getPOIs, getTile } from '../../lib/offlineStorage.js';
 
 
@@ -325,6 +325,30 @@ function getMapStyle(isDark, mapLayer) {
   return isDark ? darkStyle : lightStyle;
 }
 
+// ── 3D terrain (free Terrarium DEM tiles, no API key required) ────────────────
+function applyTerrain(map, enabled) {
+  try {
+    if (enabled) {
+      if (!map.getSource('terrain-dem')) {
+        map.addSource('terrain-dem', {
+          type: 'raster-dem',
+          tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+          encoding: 'terrarium',
+          tileSize: 256,
+          maxzoom: 14,
+        });
+      }
+      map.setTerrain({ source: 'terrain-dem', exaggeration: 1.4 });
+      if (map.getPitch() < 30) map.easeTo({ pitch: 50, duration: 500 });
+    } else {
+      map.setTerrain(null);
+      if (map.getPitch() > 0) map.easeTo({ pitch: 0, duration: 500 });
+    }
+  } catch (e) {
+    console.warn('Terrain toggle failed:', e);
+  }
+}
+
 // ── Ambient POI categories ────────────────────────────────────────────────────
 // Only include entries that have a Geoapify geo string (null = admin-only categories)
 const AMBIENT_CATS = AMBIENT_CATEGORIES.filter(c => c.geo);
@@ -439,11 +463,14 @@ function reRegisterShieldListener(map) {
   // styleimagemissing survives setStyle in MapLibre — no need to re-add
   // BUT we need to clear the image cache so shields get redrawn after style reload
   // (setStyle wipes all images including our shields)
-  map.on('style.load', () => {
-    // Shields are gone after style reload — they'll be re-requested via styleimagemissing
-    // No action needed, the listener persists
-  });
-}
+    map.on('style.load', () => {
+      // Shields are gone after style reload — they'll be re-requested via styleimagemissing
+      // No action needed, the listener persists
+      // Re-apply 3D terrain after a style reload wipes it
+      applyTerrain(map, terrainRef.current);
+    });
+  }
+
 
 export default function MapLibreMap({
   center, flyTo, fitBoundsData, zoomToArea, setMapRef,
@@ -453,6 +480,7 @@ export default function MapLibreMap({
   selectedPOICategory, onSelectPOI, onPOIsLoaded, onLoadingChange,
   navTarget, navRouteData,
   isDark, mapLayer,
+  terrainEnabled,
   adminPOIs, adminClosures, adminNavMode, onAdminMapClick,
   adminERouteOverrides, adminRoadOverrides,
 }) {
@@ -462,6 +490,15 @@ export default function MapLibreMap({
   // the current addMode value instead of the stale value from init time.
   const addModeRef = useRef(addMode);
   useEffect(() => { addModeRef.current = addMode; }, [addMode]);
+  // Ref so the map's style.load handler (registered once) reads the live terrain value
+  const terrainRef = useRef(terrainEnabled);
+  useEffect(() => {
+    terrainRef.current = terrainEnabled;
+    const map = mapRef.current;
+    if (!map) return;
+    if (map.isStyleLoaded()) applyTerrain(map, terrainEnabled);
+    else map.once('idle', () => applyTerrain(map, terrainEnabled));
+  }, [terrainEnabled]);
   const markers = useRef({ spots: new Map(), ambient: new Map(), pois: new Map(), user: null });
   const routeAdded = useRef(false);
   const poiAbort = useRef(null);
@@ -540,7 +577,7 @@ export default function MapLibreMap({
       map.remove();
       mapRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []);
 
   // ── Offline vector tile switcher ─────────────────────────────────────────
@@ -593,7 +630,7 @@ export default function MapLibreMap({
     }
 
     checkOffline();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [isOnline, isDark, mapLayer]);
 
   // ── Dark mode ──────────────────────────────────────────────────────────────
@@ -755,7 +792,7 @@ export default function MapLibreMap({
     const onMove = () => { clearTimeout(poiTimer.current); poiTimer.current = setTimeout(load, 1200); };
     map.on('moveend', onMove); map.on('zoomend', onMove);
     return () => { map.off('moveend', onMove); map.off('zoomend', onMove); clearTimeout(poiTimer.current); poiAbort.current?.abort(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [selectedPOICategory]);
 
   // ── Category POIs ──────────────────────────────────────────────────────────
@@ -1016,7 +1053,7 @@ const addAdminMarkers = () => {
       map.off('zoomend', onZoom);
       adminMarkers.forEach(m => m.remove());
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [adminPOIs, adminClosures]);
 
   // ── E-route markers + custom road shield markers ─────────────────────────────

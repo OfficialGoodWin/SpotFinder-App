@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { X, Camera, MapPin, Mic, MicOff, Loader2 } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { X, Camera, MapPin, Mic, Loader2 } from 'lucide-react';
 import StarRating from './StarRating';
 import AdBanner from '../AdBanner';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -38,15 +38,11 @@ const LANG_TO_BCP47 = {
 
 export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   const { t, language } = useLanguage();
-  const [spotType, setSpotType] = useState('general');
+  const spotType = 'general';
   const [description, setDescription] = useState('');
   const [parkingRating, setParkingRating] = useState(0);
   const [beautyRating, setBeautyRating] = useState(0);
   const [privacyRating, setPrivacyRating] = useState(0);
-  const [photoBeautyRating, setPhotoBeautyRating] = useState(0);
-  const [photoAccessRating, setPhotoAccessRating] = useState(0);
-  const [restViewRating, setRestViewRating] = useState(0);
-  const [restAccessRating, setRestAccessRating] = useState(0);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -161,17 +157,9 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
 
   const handleSave = async () => {
     const ratingsProvided = [];
-    if (spotType === 'general') {
-      if (parkingRating > 0) ratingsProvided.push(parkingRating);
-      if (beautyRating > 0) ratingsProvided.push(beautyRating);
-      if (privacyRating > 0) ratingsProvided.push(privacyRating);
-    } else if (spotType === 'photo') {
-      if (photoBeautyRating > 0) ratingsProvided.push(photoBeautyRating);
-      if (photoAccessRating > 0) ratingsProvided.push(photoAccessRating);
-    } else if (spotType === 'rest') {
-      if (restViewRating > 0) ratingsProvided.push(restViewRating);
-      if (restAccessRating > 0) ratingsProvided.push(restAccessRating);
-    }
+    if (parkingRating > 0) ratingsProvided.push(parkingRating);
+    if (beautyRating > 0) ratingsProvided.push(beautyRating);
+    if (privacyRating > 0) ratingsProvided.push(privacyRating);
     const overallRating = ratingsProvided.length > 0
       ? ratingsProvided.reduce((sum, r) => sum + r, 0) / ratingsProvided.length
       : 0;
@@ -211,30 +199,14 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
       directions,
     };
 
-    if (spotType === 'general') {
-      Object.assign(baseData, {
-        parking_rating: parkingRating,
-        parking_rating_count: parkingRating > 0 ? 1 : 0,
-        beauty_rating: beautyRating,
-        beauty_rating_count: beautyRating > 0 ? 1 : 0,
-        privacy_rating: privacyRating,
-        privacy_rating_count: privacyRating > 0 ? 1 : 0,
-      });
-    } else if (spotType === 'photo') {
-      Object.assign(baseData, {
-        photo_beauty_rating: photoBeautyRating,
-        photo_beauty_rating_count: photoBeautyRating > 0 ? 1 : 0,
-        photo_access_rating: photoAccessRating,
-        photo_access_rating_count: photoAccessRating > 0 ? 1 : 0,
-      });
-    } else if (spotType === 'rest') {
-      Object.assign(baseData, {
-        rest_view_rating: restViewRating,
-        rest_view_rating_count: restViewRating > 0 ? 1 : 0,
-        rest_access_rating: restAccessRating,
-        rest_access_rating_count: restAccessRating > 0 ? 1 : 0,
-      });
-    }
+    Object.assign(baseData, {
+      parking_rating: parkingRating,
+      parking_rating_count: parkingRating > 0 ? 1 : 0,
+      beauty_rating: beautyRating,
+      beauty_rating_count: beautyRating > 0 ? 1 : 0,
+      privacy_rating: privacyRating,
+      privacy_rating_count: privacyRating > 0 ? 1 : 0,
+    });
 
     try {
       await onSave(baseData);
@@ -259,31 +231,6 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
         </div>
 
         <div className="px-6 py-4 space-y-5">
-          {/* Category selector */}
-          <div>
-            <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-2 block">{t('addSpot.category')}</label>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { key: 'general', label: t('addSpot.categoryGeneral') },
-                { key: 'photo', label: t('addSpot.categoryPhoto') },
-                { key: 'rest', label: t('addSpot.categoryRest') },
-              ].map(cat => (
-                <button
-                  key={cat.key}
-                  type="button"
-                  onClick={() => setSpotType(cat.key)}
-                  className={`py-2 px-3 rounded-xl text-xs font-semibold border-2 transition-colors ${
-                    spotType === cat.key
-                      ? 'bg-blue-500 text-white border-blue-500'
-                      : 'bg-white dark:bg-background text-gray-600 dark:text-foreground border-gray-200 dark:border-border hover:border-blue-300'
-                  }`}
-                >
-                  {cat.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* Description + voice */}
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -322,53 +269,21 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
           </div>
 
           {/* Ratings */}
-          {spotType === 'general' && (
-            <>
-              <div>
-                <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpot.parkingRating')}</label>
-                <p className="text-xs text-gray-500 dark:text-muted-foreground mb-2">{t('addSpot.parkingHint')}</p>
-                <StarRating value={parkingRating} onChange={setParkingRating} size="lg" />
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpot.beautyRating')}</label>
-                <p className="text-xs text-gray-500 dark:text-muted-foreground mb-2">{t('addSpot.beautyHint')}</p>
-                <StarRating value={beautyRating} onChange={setBeautyRating} size="lg" />
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpot.privacyRating')}</label>
-                <p className="text-xs text-gray-500 dark:text-muted-foreground mb-2">{t('addSpot.privacyHint')}</p>
-                <StarRating value={privacyRating} onChange={setPrivacyRating} size="lg" />
-              </div>
-            </>
-          )}
-          {spotType === 'photo' && (
-            <>
-              <div>
-                <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpot.photoBeautyRating')}</label>
-                <p className="text-xs text-gray-500 dark:text-muted-foreground mb-2">{t('addSpot.photoBeautyHint')}</p>
-                <StarRating value={photoBeautyRating} onChange={setPhotoBeautyRating} size="lg" />
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpot.photoAccessRating')}</label>
-                <p className="text-xs text-gray-500 dark:text-muted-foreground mb-2">{t('addSpot.photoAccessHint')}</p>
-                <StarRating value={photoAccessRating} onChange={setPhotoAccessRating} size="lg" />
-              </div>
-            </>
-          )}
-          {spotType === 'rest' && (
-            <>
-              <div>
-                <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpot.restViewRating')}</label>
-                <p className="text-xs text-gray-500 dark:text-muted-foreground mb-2">{t('addSpot.restViewHint')}</p>
-                <StarRating value={restViewRating} onChange={setRestViewRating} size="lg" />
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpot.restAccessRating')}</label>
-                <p className="text-xs text-gray-500 dark:text-muted-foreground mb-2">{t('addSpot.restAccessHint')}</p>
-                <StarRating value={restAccessRating} onChange={setRestAccessRating} size="lg" />
-              </div>
-            </>
-          )}
+          <div>
+            <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpot.parkingRating')}</label>
+            <p className="text-xs text-gray-500 dark:text-muted-foreground mb-2">{t('addSpot.parkingHint')}</p>
+            <StarRating value={parkingRating} onChange={setParkingRating} size="lg" />
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpot.beautyRating')}</label>
+            <p className="text-xs text-gray-500 dark:text-muted-foreground mb-2">{t('addSpot.beautyHint')}</p>
+            <StarRating value={beautyRating} onChange={setBeautyRating} size="lg" />
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpot.privacyRating')}</label>
+            <p className="text-xs text-gray-500 dark:text-muted-foreground mb-2">{t('addSpot.privacyHint')}</p>
+            <StarRating value={privacyRating} onChange={setPrivacyRating} size="lg" />
+          </div>
 
           {/* Category tags */}
           <div>
