@@ -458,6 +458,10 @@ export default function MapLibreMap({
 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
+  // Ref so the map's click handler (registered once on mount) always reads
+  // the current addMode value instead of the stale value from init time.
+  const addModeRef = useRef(addMode);
+  useEffect(() => { addModeRef.current = addMode; }, [addMode]);
   const markers = useRef({ spots: new Map(), ambient: new Map(), pois: new Map(), user: null });
   const routeAdded = useRef(false);
   const poiAbort = useRef(null);
@@ -509,7 +513,7 @@ export default function MapLibreMap({
     });
 
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
-    map.on('click', e => { if (addMode) onMapClick?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }); });
+    map.on('click', e => { if (addModeRef.current) onMapClick?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }); });
 
     // Register shield image listener — generates signs on demand via styleimagemissing
     registerShieldListener(map);
