@@ -126,6 +126,50 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
             <p className="text-gray-600 dark:text-muted-foreground text-sm leading-relaxed">{localSpot.description}</p>
           )}
 
+          {/* Tags */}
+          {localSpot.tags?.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {localSpot.tags.map(tag => (
+                <span key={tag} className="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Practical details */}
+          {(localSpot.cost || localSpot.access_difficulty || localSpot.parking || localSpot.best_time?.length > 0) && (
+            <div className="flex flex-wrap gap-2 text-xs">
+              {localSpot.cost && (
+                <span className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 font-medium">
+                  {t(`addSpot.cost${localSpot.cost[0].toUpperCase()}${localSpot.cost.slice(1)}`)}
+                </span>
+              )}
+              {localSpot.access_difficulty && (
+                <span className="px-2.5 py-1 rounded-lg bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 font-medium">
+                  {t(`addSpot.access${localSpot.access_difficulty[0].toUpperCase()}${localSpot.access_difficulty.slice(1)}`)}
+                </span>
+              )}
+              {localSpot.parking && (
+                <span className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium">
+                  {t(`addSpot.parking${localSpot.parking[0].toUpperCase()}${localSpot.parking.slice(1)}`)}
+                </span>
+              )}
+              {localSpot.best_time?.map(bt => (
+                <span key={bt} className="px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 font-medium">
+                  {t(`addSpot.bestTime${bt.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join('')}`)}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Directions */}
+          {localSpot.directions && (
+            <p className="text-xs text-gray-500 dark:text-muted-foreground bg-gray-50 dark:bg-accent/40 rounded-xl px-3 py-2">
+              🧭 {localSpot.directions}
+            </p>
+          )}
+
           {/* Overall Rating — read-only, derived from category reviews */}
           <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-accent rounded-2xl">
             <div className="flex-1">
@@ -199,7 +243,7 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
                   {t('spotDetail.rateCategories')}
                 </p>
                 <p className="text-xs text-purple-500 dark:text-purple-400 mt-0.5">
-                  {t('spotDetail.overallAutoCalc') || 'Overall score is automatically calculated from your ratings'}
+                  {t('spotDetail.overallAuto')}
                 </p>
               </div>
 

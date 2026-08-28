@@ -19,7 +19,6 @@ import NavigationPanel from '../components/navigation/NavigationPanel';
 import AuthModal from '../components/auth/AuthModal';
 import MySpotsPanel from '../components/spots/MySpotsPanel';
 
-import SpotsPanel from '../components/spots/SpotsPanel';
 import NearbySpotsPanel from '../components/spots/NearbySpotsPanel';
 import POIPanel from '../components/spots/POIPanel';
 import POIDetailPanel from '../components/spots/POIDetailPanel';
@@ -58,7 +57,7 @@ export default function Home() {
   const [showOfflineMaps, setShowOfflineMaps] = useState(false);
 
   const [navRouteData, setNavRouteData] = useState({ coordinates: [], turns: [], currentStep: 0 });
-  const [showSpots, setShowSpots] = useState(false);
+  const [showSpots, setShowSpots] = useState(true);
   const [fitBoundsData, setFitBoundsData] = useState(null);
   const [zoomToArea, setZoomToArea] = useState(null);
   const [deleteInput, setDeleteInput] = useState('');
@@ -329,8 +328,6 @@ export default function Home() {
       <SearchBar
         onSelect={handleSearchSelect}
         mapCenter={mapCenter}
-        showSpots={showSpots}
-        onToggleSpots={() => setShowSpots(v => !v)}
         spots={spots}
         userPos={userPos}
         onNearby={(filters) => { setNearbyFilters(filters); setShowNearbySpots(true); }}
@@ -366,25 +363,6 @@ export default function Home() {
         onShowAuth={() => setShowAuth(true)}
         onShowSubscription={() => setShowSubscription(true)}
         isSuperAdmin={isSuperAdmin}
-      />
-
-      {/* Spots toggle — sits between search bar and layer switcher */}
-      <SpotsPanel
-        spots={spots}
-        userPos={userPos}
-        showSpots={showSpots}
-        onToggleSpots={() => setShowSpots(v => !v)}
-        onZoomToArea={() => {
-          const center = userPos ? { lat: userPos[0], lng: userPos[1] } : null;
-          setZoomToArea({ center, ts: Date.now() });
-          setTimeout(() => setZoomToArea(null), 200);
-        }}
-        onFlyTo={(pos) => { setFlyTo(pos); setTimeout(() => setFlyTo(null), 1000); }}
-        onNavigate={(spot) => {
-          if (!userPos) return alert(t('home.locationUnavailable'));
-          startNavTo({ lat: spot.lat, lng: spot.lng, label: spot.title || 'Spot' });
-        }}
-        onSelectSpot={setSelectedSpot}
       />
 
       {/* Nearby Spots panel (distance + rating filtered) */}

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Search, X, Navigation, Mic, Radar, MapPin, Camera } from 'lucide-react';
+import { Search, X, Navigation, Mic, Compass } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { filterCategories, getCategoryName } from '@/lib/POICategories';
 
@@ -10,19 +10,7 @@ const LANG_TO_BCP47 = {
   ro: 'ro-RO', es: 'es-ES', bg: 'bg-BG',
 };
 
-const SpotsBtnIcon = () => (
-  <svg viewBox="0 0 44 20" width="38" height="17" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <line x1="4" y1="18" x2="4" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-    <polygon points="4,3 0,13 8,13" fill="currentColor" opacity="0.9"/>
-    <rect x="12" y="12" width="14" height="7" rx="1.5" fill="currentColor"/>
-    <rect x="14" y="9" width="9" height="5" rx="1" fill="currentColor" opacity="0.8"/>
-    <circle cx="15" cy="19.5" r="1.8" fill="currentColor" opacity="0.6"/>
-    <circle cx="23" cy="19.5" r="1.8" fill="currentColor" opacity="0.6"/>
-    <path d="M30 14 L38 14 M36 11 L39 14 L36 17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-);
-
-export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, onToggleSpots, onSelectCategory, spots = [], onSelectSpot, userPos, onNearby }) {
+export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCategory, spots = [], onSelectSpot, userPos, onNearby }) {
   const { t, language } = useLanguage();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
@@ -198,10 +186,11 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
   };
 
   const showDropdown = focused && (poiCategories.length > 0 || results.length > 0 || spotResults.length > 0 || (loading && !!query));
+  const isExpanded = showDropdown || listening || (micError && !listening);
 
   return (
     <div ref={containerRef} className="absolute top-4 left-4 z-[1002]" style={{ right: '3.75rem' }}>
-      <div className={`bg-white dark:bg-card rounded-full shadow-lg border transition-all ${focused ? 'border-blue-400 dark:border-blue-500' : 'border-gray-200 dark:border-border'}`}>
+      <div className={`bg-white dark:bg-card shadow-lg border transition-all ${isExpanded ? 'rounded-t-2xl' : 'rounded-full'} ${focused ? 'border-blue-400 dark:border-blue-500' : 'border-gray-200 dark:border-border'}`}>
         <div className="flex items-center px-3 gap-1.5">
           <Search className="w-4 h-4 text-gray-400 dark:text-muted-foreground flex-shrink-0" />
           <input
@@ -224,12 +213,6 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
             <Mic className="w-4 h-4" />
           </button>
           <div className="w-px h-5 bg-gray-200 dark:bg-border flex-shrink-0" />
-          <button
-            onClick={onToggleSpots}
-            className={`px-2 py-1.5 rounded-lg flex-shrink-0 transition-all active:scale-95 ${showSpots ? 'text-primary bg-primary/10' : 'text-gray-500 dark:text-muted-foreground hover:text-gray-700'}`}
-          >
-            <SpotsBtnIcon />
-          </button>
 
           {/* Nearby spots — opens a quick filter popover on click */}
           <div className="relative">
@@ -245,16 +228,12 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
               }`}
               title="Nearby spots"
             >
-              <span className="relative inline-flex">
-                <Radar className="w-5 h-5" />
-                <MapPin className="w-2.5 h-2.5 absolute -top-1.5 -right-1.5 text-pink-500" />
-                <Camera className="w-2.5 h-2.5 absolute -bottom-1.5 -left-1.5 text-sky-500" />
-              </span>
+              <Compass className="w-5 h-5" />
             </button>
             {showNearbyFilter && (
               <>
                 <div className="fixed inset-0 z-[1500]" onClick={() => setShowNearbyFilter(false)} />
-                <div className="absolute bottom-full right-0 mb-3 z-[1600] w-64 rounded-2xl shadow-xl border border-gray-200 dark:border-border bg-white dark:bg-card p-4">
+                <div className="absolute top-full right-0 mt-3 z-[1600] w-64 rounded-2xl shadow-xl border border-gray-200 dark:border-border bg-white dark:bg-card p-4">
                   <div className="flex justify-between items-center mb-3">
                     <span className="text-sm font-bold text-gray-900 dark:text-foreground">Filter Nearby</span>
                     <button onClick={() => setShowNearbyFilter(false)} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-accent">

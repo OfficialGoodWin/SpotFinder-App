@@ -349,6 +349,41 @@ function applyTerrain(map, enabled) {
   }
 }
 
+// ── 3D buildings (extruded from the existing flat 'building' vector layer) ────
+// Uses OpenMapTiles' standard render_height/render_min_height fields, which
+// the vector source already provides — no extra tile source needed. Inserted
+// just above the flat 'bldg-fill' layer so it doesn't fight with labels on top.
+function apply3DBuildings(map, enabled) {
+  try {
+    if (enabled) {
+      if (!map.getLayer('bldg-3d')) {
+        const beforeId = map.getLayer('bldg-fill') ? 'bldg-fill' : undefined;
+        map.addLayer({
+          id: 'bldg-3d',
+          type: 'fill-extrusion',
+          source: 'v',
+          'source-layer': 'building',
+          minzoom: 14,
+          paint: {
+            'fill-extrusion-color': '#c9bda3',
+            'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 6],
+            'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
+            'fill-extrusion-opacity': 0.85,
+          },
+        }, beforeId);
+      }
+      map.setLayoutProperty('bldg-3d', 'visibility', 'visible');
+      // Flat fill becomes redundant (and visually double-draws) once extruded — hide it.
+      if (map.getLayer('bldg-fill')) map.setLayoutProperty('bldg-fill', 'visibility', 'none');
+    } else {
+      if (map.getLayer('bldg-3d')) map.setLayoutProperty('bldg-3d', 'visibility', 'none');
+      if (map.getLayer('bldg-fill')) map.setLayoutProperty('bldg-fill', 'visibility', 'visible');
+    }
+  } catch (e) {
+    console.warn('3D buildings toggle failed:', e);
+  }
+}
+
 // ── Ambient POI categories ────────────────────────────────────────────────────
 // Only include entries that have a Geoapify geo string (null = admin-only categories)
 const AMBIENT_CATS = AMBIENT_CATEGORIES.filter(c => c.geo);
@@ -459,15 +494,16 @@ function registerShieldListener(map) {
   });
 }
 
-function reRegisterShieldListener(map) {
+function reRegisterShieldListener(map, getTerrainEnabled) {
   // styleimagemissing survives setStyle in MapLibre — no need to re-add
   // BUT we need to clear the image cache so shields get redrawn after style reload
   // (setStyle wipes all images including our shields)
     map.on('style.load', () => {
       // Shields are gone after style reload — they'll be re-requested via styleimagemissing
       // No action needed, the listener persists
-      // Re-apply 3D terrain after a style reload wipes it
-      applyTerrain(map, terrainRef.current);
+      // Re-apply 3D terrain + buildings after a style reload wipes them
+      applyTerrain(map, getTerrainEnabled());
+      apply3DBuildings(map, getTerrainEnabled());
     });
   }
 
@@ -496,8 +532,8 @@ export default function MapLibreMap({
     terrainRef.current = terrainEnabled;
     const map = mapRef.current;
     if (!map) return;
-    if (map.isStyleLoaded()) applyTerrain(map, terrainEnabled);
-    else map.once('idle', () => applyTerrain(map, terrainEnabled));
+    if (map.isStyleLoaded()) { applyTerrain(map, terrainEnabled); apply3DBuildings(map, terrainEnabled); }
+    else map.once('idle', () => { applyTerrain(map, terrainEnabled); apply3DBuildings(map, terrainEnabled); });
   }, [terrainEnabled]);
   const markers = useRef({ spots: new Map(), ambient: new Map(), pois: new Map(), user: null });
   const routeAdded = useRef(false);
@@ -554,6 +590,12 @@ export default function MapLibreMap({
 
     // Register shield image listener — generates signs on demand via styleimagemissing
     registerShieldListener(map);
+    // Re-apply 3D terrain + buildings after any style reload (dark mode toggle,
+    // map layer switch, offline mode switch all call map.setStyle(), which wipes
+    // both). Previously this listener was defined but never registered, so 3D
+    // silently broke — visually stuck tilted with no terrain/buildings — the
+    // moment the user switched map layer or dark/light mode while 3D was on.
+    reRegisterShieldListener(map, () => terrainRef.current);
     // Add the one-way arrow image on first style load, and re-add after style reloads
     const addImages = () => {
       addOnewayArrow(map);
