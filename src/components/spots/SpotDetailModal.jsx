@@ -141,7 +141,7 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
               </div>
               {overallCount > 0 && (
                 <p className="text-xs text-gray-400 dark:text-muted-foreground mt-0.5 italic">
-                  {t('spotDetail.calculatedFromCategories') || 'Calculated from category ratings'}
+                  {t('spotDetail.overallAuto')}
                 </p>
               )}
             </div>

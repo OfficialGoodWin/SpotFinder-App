@@ -6,16 +6,28 @@ import { useLanguage } from '@/lib/LanguageContext';
 import { uploadSpotImage } from '@/api/firebaseClient';
 
 // Category tags per spec — separate from the existing rating-group `spotType`.
-// A spot can carry several of these.
+// A spot can carry several of these. Display uses an emoji + translated label
+// where one exists (addSpot.tag<Name>); falls back to the raw tag name.
 const AVAILABLE_TAGS = [
-  'Viewpoint', 'SecretCafe', 'Sunset', 'Sunrise', 'PhotoSpot',
-  'Waterfall', 'Hike', 'SwimSpot', 'Ruin', 'UrbanExplore',
+  { id: 'Viewpoint', emoji: '🏞️' },
+  { id: 'SecretCafe', emoji: '☕' },
+  { id: 'Sunset', emoji: '🌇' },
+  { id: 'Sunrise', emoji: '🌅' },
+  { id: 'PhotoSpot', emoji: '📸' },
+  { id: 'Waterfall', emoji: '💦' },
+  { id: 'Hike', emoji: '🥾' },
+  { id: 'SwimSpot', emoji: '🏊' },
+  { id: 'Ruin', emoji: '🏛️' },
+  { id: 'UrbanExplore', emoji: '🏙️' },
 ];
+// Each option maps to an addSpot.<prefix><CapitalizedOption> translation key.
 const COST_OPTIONS = ['free', 'paid', 'donation'];
 const ACCESS_OPTIONS = ['easy', 'moderate', 'hard'];
 const PARKING_OPTIONS = ['yes', 'no', 'street', 'paid'];
 const BEST_TIME_OPTIONS = ['sunrise', 'sunset', 'golden_hour', 'night', 'anytime'];
-const DUPLICATE_RADIUS_M = 50;
+
+// snake_case option -> CamelCase suffix for translation key lookup, e.g. 'golden_hour' -> 'GoldenHour'
+const toKeySuffix = (opt) => opt.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join('');
 
 // Language code → BCP-47 for Web Speech API
 const LANG_TO_BCP47 = {
@@ -360,60 +372,102 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
 
           {/* Category tags */}
           <div>
-            <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-2 block">Tags</label>
+            <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-2 block">{t('addSpot.tags')}</label>
             <div className="flex flex-wrap gap-2">
-              {AVAILABLE_TAGS.map(tag => (
+              {AVAILABLE_TAGS.map(({ id, emoji }) => (
                 <button
-                  key={tag}
+                  key={id}
                   type="button"
-                  onClick={() => toggleTag(tag)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-colors ${
-                    tags.includes(tag)
-                      ? 'bg-blue-500 text-white border-blue-500'
+                  onClick={() => toggleTag(id)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all ${
+                    tags.includes(id)
+                      ? 'bg-blue-500 text-white border-blue-500 scale-105 shadow-sm'
                       : 'bg-white dark:bg-background text-gray-600 dark:text-foreground border-gray-200 dark:border-border hover:border-blue-300'
                   }`}
                 >
-                  #{tag}
+                  {emoji} #{id}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Practical details */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Practical details — pill selectors instead of plain dropdowns */}
+          <div className="space-y-3">
             <div>
-              <label className="text-xs font-semibold text-gray-600 dark:text-foreground mb-1 block">Cost</label>
-              <select value={cost} onChange={e => setCost(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-border bg-white dark:bg-background text-sm">
-                {COST_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-              </select>
+              <label className="text-xs font-semibold text-gray-600 dark:text-foreground mb-1.5 block">{t('addSpot.cost')}</label>
+              <div className="flex flex-wrap gap-1.5">
+                {COST_OPTIONS.map(o => (
+                  <button
+                    key={o}
+                    type="button"
+                    onClick={() => setCost(o)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all ${
+                      cost === o
+                        ? 'bg-emerald-500 text-white border-emerald-500 scale-105 shadow-sm'
+                        : 'bg-white dark:bg-background text-gray-600 dark:text-foreground border-gray-200 dark:border-border hover:border-emerald-300'
+                    }`}
+                  >
+                    {t(`addSpot.cost${toKeySuffix(o)}`)}
+                  </button>
+                ))}
+              </div>
             </div>
+
             <div>
-              <label className="text-xs font-semibold text-gray-600 dark:text-foreground mb-1 block">Access difficulty</label>
-              <select value={accessDifficulty} onChange={e => setAccessDifficulty(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-border bg-white dark:bg-background text-sm">
-                {ACCESS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-              </select>
+              <label className="text-xs font-semibold text-gray-600 dark:text-foreground mb-1.5 block">{t('addSpot.accessDifficulty')}</label>
+              <div className="flex flex-wrap gap-1.5">
+                {ACCESS_OPTIONS.map(o => (
+                  <button
+                    key={o}
+                    type="button"
+                    onClick={() => setAccessDifficulty(o)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all ${
+                      accessDifficulty === o
+                        ? 'bg-orange-500 text-white border-orange-500 scale-105 shadow-sm'
+                        : 'bg-white dark:bg-background text-gray-600 dark:text-foreground border-gray-200 dark:border-border hover:border-orange-300'
+                    }`}
+                  >
+                    {t(`addSpot.access${toKeySuffix(o)}`)}
+                  </button>
+                ))}
+              </div>
             </div>
+
             <div>
-              <label className="text-xs font-semibold text-gray-600 dark:text-foreground mb-1 block">Parking</label>
-              <select value={parking} onChange={e => setParking(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-border bg-white dark:bg-background text-sm">
-                {PARKING_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-              </select>
+              <label className="text-xs font-semibold text-gray-600 dark:text-foreground mb-1.5 block">{t('addSpot.parkingAvailability')}</label>
+              <div className="flex flex-wrap gap-1.5">
+                {PARKING_OPTIONS.map(o => (
+                  <button
+                    key={o}
+                    type="button"
+                    onClick={() => setParking(o)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all ${
+                      parking === o
+                        ? 'bg-blue-500 text-white border-blue-500 scale-105 shadow-sm'
+                        : 'bg-white dark:bg-background text-gray-600 dark:text-foreground border-gray-200 dark:border-border hover:border-blue-300'
+                    }`}
+                  >
+                    {t(`addSpot.parking${toKeySuffix(o)}`)}
+                  </button>
+                ))}
+              </div>
             </div>
+
             <div>
-              <label className="text-xs font-semibold text-gray-600 dark:text-foreground mb-1 block">Best time</label>
-              <div className="flex flex-wrap gap-1">
+              <label className="text-xs font-semibold text-gray-600 dark:text-foreground mb-1.5 block">{t('addSpot.bestTime')}</label>
+              <div className="flex flex-wrap gap-1.5">
                 {BEST_TIME_OPTIONS.map(o => (
                   <button
                     key={o}
                     type="button"
                     onClick={() => toggleBestTime(o)}
-                    className={`px-2 py-1 rounded-lg text-[11px] font-semibold border transition-colors ${
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all ${
                       bestTime.includes(o)
-                        ? 'bg-blue-500 text-white border-blue-500'
-                        : 'bg-white dark:bg-background text-gray-600 dark:text-foreground border-gray-200 dark:border-border'
+                        ? 'bg-purple-500 text-white border-purple-500 scale-105 shadow-sm'
+                        : 'bg-white dark:bg-background text-gray-600 dark:text-foreground border-gray-200 dark:border-border hover:border-purple-300'
                     }`}
                   >
-                    {o.replace('_', ' ')}
+                    {t(`addSpot.bestTime${toKeySuffix(o)}`)}
                   </button>
                 ))}
               </div>
@@ -422,11 +476,11 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
 
           {/* Directions */}
           <div>
-            <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">Directions (optional)</label>
+            <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpot.directions')}</label>
             <textarea
               value={directions}
               onChange={e => setDirections(e.target.value)}
-              placeholder="e.g. park at the trailhead, walk 5 min north along the ridge"
+              placeholder={t('addSpot.directionsPlaceholder')}
               rows={2}
               className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-border bg-white dark:bg-background text-gray-900 dark:text-foreground focus:outline-none focus:ring-2 focus:ring-blue-300 text-sm resize-none"
             />

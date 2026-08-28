@@ -3,6 +3,24 @@ import { X, Camera, MapPin } from 'lucide-react';
 import StarRating from './StarRating';
 import { useLanguage } from '@/lib/LanguageContext';
 
+const AVAILABLE_TAGS = [
+  { id: 'Viewpoint', emoji: '🏞️' },
+  { id: 'SecretCafe', emoji: '☕' },
+  { id: 'Sunset', emoji: '🌇' },
+  { id: 'Sunrise', emoji: '🌅' },
+  { id: 'PhotoSpot', emoji: '📸' },
+  { id: 'Waterfall', emoji: '💦' },
+  { id: 'Hike', emoji: '🥾' },
+  { id: 'SwimSpot', emoji: '🏊' },
+  { id: 'Ruin', emoji: '🏛️' },
+  { id: 'UrbanExplore', emoji: '🏙️' },
+];
+const COST_OPTIONS = ['free', 'paid', 'donation'];
+const ACCESS_OPTIONS = ['easy', 'moderate', 'hard'];
+const PARKING_OPTIONS = ['yes', 'no', 'street', 'paid'];
+const BEST_TIME_OPTIONS = ['sunrise', 'sunset', 'golden_hour', 'night', 'anytime'];
+const toKeySuffix = (opt) => opt.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join('');
+
 export default function EditSpotModal({ spot, onClose, onSave }) {
   const { t } = useLanguage();
   const [description, setDescription] = useState(spot.description || '');
@@ -12,6 +30,16 @@ export default function EditSpotModal({ spot, onClose, onSave }) {
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(spot.image_url || null);
   const [loading, setLoading] = useState(false);
+
+  const [tags, setTags] = useState(spot.tags || []);
+  const [cost, setCost] = useState(spot.cost || 'free');
+  const [accessDifficulty, setAccessDifficulty] = useState(spot.access_difficulty || 'easy');
+  const [parking, setParking] = useState(spot.parking || 'yes');
+  const [bestTime, setBestTime] = useState(spot.best_time || []);
+  const [directions, setDirections] = useState(spot.directions || '');
+
+  const toggleTag = (tag) => setTags(t => t.includes(tag) ? t.filter(x => x !== tag) : [...t, tag]);
+  const toggleBestTime = (val) => setBestTime(t => t.includes(val) ? t.filter(x => x !== val) : [...t, val]);
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -47,6 +75,12 @@ export default function EditSpotModal({ spot, onClose, onSave }) {
       beauty_rating: beautyRating,
       privacy_rating: privacyRating,
       image_url,
+      tags,
+      cost,
+      access_difficulty: accessDifficulty,
+      parking,
+      best_time: bestTime,
+      directions,
     });
     setLoading(false);
   };
@@ -96,6 +130,122 @@ export default function EditSpotModal({ spot, onClose, onSave }) {
             <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpot.privacyRating')}</label>
             <p className="text-xs text-gray-500 dark:text-muted-foreground mb-2">{t('addSpot.privacyHint')}</p>
             <StarRating value={privacyRating} onChange={setPrivacyRating} size="lg" />
+          </div>
+
+          {/* Category tags */}
+          <div>
+            <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-2 block">{t('addSpot.tags')}</label>
+            <div className="flex flex-wrap gap-2">
+              {AVAILABLE_TAGS.map(({ id, emoji }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => toggleTag(id)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all ${
+                    tags.includes(id)
+                      ? 'bg-blue-500 text-white border-blue-500 scale-105 shadow-sm'
+                      : 'bg-white dark:bg-background text-gray-600 dark:text-foreground border-gray-200 dark:border-border hover:border-blue-300'
+                  }`}
+                >
+                  {emoji} #{id}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Practical details */}
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-600 dark:text-foreground mb-1.5 block">{t('addSpot.cost')}</label>
+              <div className="flex flex-wrap gap-1.5">
+                {COST_OPTIONS.map(o => (
+                  <button
+                    key={o}
+                    type="button"
+                    onClick={() => setCost(o)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all ${
+                      cost === o
+                        ? 'bg-emerald-500 text-white border-emerald-500 scale-105 shadow-sm'
+                        : 'bg-white dark:bg-background text-gray-600 dark:text-foreground border-gray-200 dark:border-border hover:border-emerald-300'
+                    }`}
+                  >
+                    {t(`addSpot.cost${toKeySuffix(o)}`)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-600 dark:text-foreground mb-1.5 block">{t('addSpot.accessDifficulty')}</label>
+              <div className="flex flex-wrap gap-1.5">
+                {ACCESS_OPTIONS.map(o => (
+                  <button
+                    key={o}
+                    type="button"
+                    onClick={() => setAccessDifficulty(o)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all ${
+                      accessDifficulty === o
+                        ? 'bg-orange-500 text-white border-orange-500 scale-105 shadow-sm'
+                        : 'bg-white dark:bg-background text-gray-600 dark:text-foreground border-gray-200 dark:border-border hover:border-orange-300'
+                    }`}
+                  >
+                    {t(`addSpot.access${toKeySuffix(o)}`)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-600 dark:text-foreground mb-1.5 block">{t('addSpot.parkingAvailability')}</label>
+              <div className="flex flex-wrap gap-1.5">
+                {PARKING_OPTIONS.map(o => (
+                  <button
+                    key={o}
+                    type="button"
+                    onClick={() => setParking(o)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all ${
+                      parking === o
+                        ? 'bg-blue-500 text-white border-blue-500 scale-105 shadow-sm'
+                        : 'bg-white dark:bg-background text-gray-600 dark:text-foreground border-gray-200 dark:border-border hover:border-blue-300'
+                    }`}
+                  >
+                    {t(`addSpot.parking${toKeySuffix(o)}`)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-600 dark:text-foreground mb-1.5 block">{t('addSpot.bestTime')}</label>
+              <div className="flex flex-wrap gap-1.5">
+                {BEST_TIME_OPTIONS.map(o => (
+                  <button
+                    key={o}
+                    type="button"
+                    onClick={() => toggleBestTime(o)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all ${
+                      bestTime.includes(o)
+                        ? 'bg-purple-500 text-white border-purple-500 scale-105 shadow-sm'
+                        : 'bg-white dark:bg-background text-gray-600 dark:text-foreground border-gray-200 dark:border-border hover:border-purple-300'
+                    }`}
+                  >
+                    {t(`addSpot.bestTime${toKeySuffix(o)}`)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Directions */}
+          <div>
+            <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpot.directions')}</label>
+            <textarea
+              value={directions}
+              onChange={e => setDirections(e.target.value)}
+              placeholder={t('addSpot.directionsPlaceholder')}
+              rows={2}
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-border bg-white dark:bg-background text-gray-900 dark:text-foreground focus:outline-none focus:ring-2 focus:ring-blue-300 text-sm resize-none"
+            />
           </div>
 
           {/* Image */}
