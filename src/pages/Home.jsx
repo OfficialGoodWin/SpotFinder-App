@@ -55,7 +55,7 @@ export default function Home() {
   const [showOfflineMaps, setShowOfflineMaps] = useState(false);
 
   const [navRouteData, setNavRouteData] = useState({ coordinates: [], turns: [], currentStep: 0 });
-  const [showSpots, setShowSpots] = useState(false);
+  const [showSpots, setShowSpots] = useState(true);
   const [fitBoundsData, setFitBoundsData] = useState(null);
   const [zoomToArea, setZoomToArea] = useState(null);
   const [deleteInput, setDeleteInput] = useState('');
