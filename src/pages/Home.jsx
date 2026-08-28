@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-import { Plus, Settings, Crosshair, HelpCircle, Trash2, WifiOff } from 'lucide-react';
+import { Plus, Settings, Crosshair, HelpCircle, Trash2, WifiOff, Navigation } from 'lucide-react';
 import SubscriptionModal from '../components/SubscriptionModal';
 import { getPublicSpots, createSpot, deleteSpot, updateSpot, getAdminPOIs, getAdminClosures, getAdminERouteOverrides, getAdminRoadOverrides, getDeletedAmbientPOIs, addDeletedAmbientPOI } from '@/api/firebaseClient';
 import { useAuth } from '@/lib/AuthContext';
@@ -20,6 +20,7 @@ import AuthModal from '../components/auth/AuthModal';
 import MySpotsPanel from '../components/spots/MySpotsPanel';
 
 import SpotsPanel from '../components/spots/SpotsPanel';
+import NearbySpotsPanel from '../components/spots/NearbySpotsPanel';
 import POIPanel from '../components/spots/POIPanel';
 import POIDetailPanel from '../components/spots/POIDetailPanel';
 import SettingsModal from '../components/SettingsModal';
@@ -380,6 +381,21 @@ export default function Home() {
         }}
         onSelectSpot={setSelectedSpot}
       />
+
+      {/* Nearby Spots panel (distance + rating filtered) */}
+      {showNearbySpots && (
+        <NearbySpotsPanel
+          spots={spots}
+          userPos={userPos}
+          onSelectSpot={(spot) => {
+            setSelectedSpot(spot);
+            setFlyTo([spot.lat, spot.lng]);
+            setTimeout(() => setFlyTo(null), 1000);
+          }}
+          onNavigate={(spot) => handleNavigate(spot)}
+          onClose={() => setShowNearbySpots(false)}
+        />
+      )}
  
  
 
@@ -412,6 +428,20 @@ export default function Home() {
               title="Center location"
             >
               <Crosshair className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => {
+                if (!userPos) return alert(t('home.enableLocation'));
+                setShowNearbySpots(true);
+              }}
+              className={`w-10 h-10 rounded-xl flex items-center justify-center active:scale-95 transition-all ${
+                showNearbySpots
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-gray-100 dark:bg-accent/60 text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent'
+              }`}
+              title="Nearby spots"
+            >
+              <Navigation className="w-5 h-5" />
             </button>
           </div>
 

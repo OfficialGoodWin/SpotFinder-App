@@ -77,3 +77,4 @@
 | POI photos | Not available offline |
 | Traffic layer | Not available offline (requires TomTom API) |
 | Aerial/satellite layer | Not available offline (requires Esri CDN) |
+fg
