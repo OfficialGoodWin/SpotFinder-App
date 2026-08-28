@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Search, X, Navigation, Mic } from 'lucide-react';
+import { Search, X, Navigation, Mic, Radar, MapPin, Camera } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { filterCategories, getCategoryName } from '@/lib/POICategories';
 
@@ -22,7 +22,7 @@ const SpotsBtnIcon = () => (
   </svg>
 );
 
-export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, onToggleSpots, onSelectCategory, spots = [], onSelectSpot }) {
+export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, onToggleSpots, onSelectCategory, spots = [], onSelectSpot, userPos, onNearby }) {
   const { t, language } = useLanguage();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
@@ -32,6 +32,8 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
   const [focused, setFocused] = useState(false);
   const [listening, setListening] = useState(false);
   const [micError, setMicError] = useState('');
+  const [showNearbyFilter, setShowNearbyFilter] = useState(false);
+  const [nearbyDraft, setNearbyDraft] = useState({ maxDistance: 50, minRating: 0 });
   const debounce = useRef(null);
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -228,6 +230,85 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, showSpots, 
           >
             <SpotsBtnIcon />
           </button>
+
+          {/* Nearby spots — opens a quick filter popover on click */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                if (!userPos) { alert(t('search.enableLocation') || 'Enable location to find nearby spots'); return; }
+                setShowNearbyFilter(v => !v);
+              }}
+              className={`px-2 py-1.5 rounded-lg flex-shrink-0 transition-all active:scale-95 ${
+                showNearbyFilter
+                  ? 'text-purple-600 bg-purple-600/10'
+                  : 'text-gray-500 dark:text-muted-foreground hover:text-gray-700'
+              }`}
+              title="Nearby spots"
+            >
+              <span className="relative inline-flex">
+                <Radar className="w-5 h-5" />
+                <MapPin className="w-2.5 h-2.5 absolute -top-1.5 -right-1.5 text-pink-500" />
+                <Camera className="w-2.5 h-2.5 absolute -bottom-1.5 -left-1.5 text-sky-500" />
+              </span>
+            </button>
+            {showNearbyFilter && (
+              <>
+                <div className="fixed inset-0 z-[1500]" onClick={() => setShowNearbyFilter(false)} />
+                <div className="absolute bottom-full right-0 mb-3 z-[1600] w-64 rounded-2xl shadow-xl border border-gray-200 dark:border-border bg-white dark:bg-card p-4">
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-sm font-bold text-gray-900 dark:text-foreground">Filter Nearby</span>
+                    <button onClick={() => setShowNearbyFilter(false)} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-accent">
+                      <X className="w-3.5 h-3.5 text-gray-400 dark:text-muted-foreground" />
+                    </button>
+                  </div>
+                  <div className="mb-3">
+                    <div className="flex justify-between text-xs font-semibold text-gray-600 dark:text-muted-foreground mb-1">
+                      <span>Max Distance</span>
+                      <span className="text-purple-600 dark:text-purple-400">{nearbyDraft.maxDistance} km</span>
+                    </div>
+                    <input
+                      type="range" min="1" max="50" value={nearbyDraft.maxDistance}
+                      onChange={(e) => setNearbyDraft(d => ({ ...d, maxDistance: Number(e.target.value) }))}
+                      className="w-full accent-purple-600 cursor-pointer"
+                    />
+                  </div>
+                  <div className="mb-4">
+                    <label className="block text-xs font-semibold text-gray-600 dark:text-muted-foreground mb-1.5">Minimum Rating</label>
+                    <div className="flex items-center gap-1.5">
+                      {[0, 3, 3.5, 4, 4.5].map((rating) => (
+                        <button
+                          key={rating}
+                          type="button"
+                          onClick={() => setNearbyDraft(d => ({ ...d, minRating: rating }))}
+                          className={`flex-1 py-1.5 rounded-xl text-xs font-medium border transition ${
+                            nearbyDraft.minRating === rating
+                              ? 'bg-purple-600 text-white border-purple-600'
+                              : 'bg-white dark:bg-background text-gray-700 dark:text-foreground border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent'
+                          }`}
+                        >
+                          {rating === 0 ? 'Any' : `${rating}★`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowNearbyFilter(false)}
+                      className="flex-1 py-2 rounded-xl text-xs font-medium text-gray-500 dark:text-muted-foreground hover:bg-gray-100 dark:hover:bg-accent border border-gray-200 dark:border-border"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => { onNearby?.(nearbyDraft); setShowNearbyFilter(false); }}
+                      className="flex-1 py-2 rounded-xl text-xs font-medium bg-purple-600 text-white hover:bg-purple-700"
+                    >
+                      Show Nearby
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {listening && (
