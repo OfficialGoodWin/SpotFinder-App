@@ -26,7 +26,6 @@ import {
   getDoc
 } from 'firebase/firestore';
 import { firebaseConfig } from './firebaseConfig';
-import { encodeGeohash, boundingBox, geohashPrecisionForRadius, haversineDistanceM } from '../utils/geohash';
  
 let app, auth, db;
 try {
@@ -207,7 +206,6 @@ export const createSpot = async (spotData) => {
   const data = {
     ...spotData,
     status,                       // 'pending_trust' | 'published' | 'flagged' | 'hidden' | 'rejected'
-    geohash: encodeGeohash(spotData.lat, spotData.lng, 9),
     quality_score: 0,
     upvote_count: 0,
     downvote_count: 0,
@@ -218,40 +216,8 @@ export const createSpot = async (spotData) => {
   return { id: docRef.id, ...data };
 };
 
-// ── Duplicate detection ───────────────────────────────────────────────────────
-// Finds published/pending spots within `radiusM` of (lat, lng) using a geohash
-// prefix-range query (cheap, index-friendly), then filters precisely with
-// haversine distance. Used by the submission form to prompt "is this the same spot?"
-export const findNearbySpots = async (lat, lng, radiusM = 50) => {
-  const { db } = getFirebaseServices();
-  const precision = geohashPrecisionForRadius(radiusM);
-  const centerHash = encodeGeohash(lat, lng, precision);
-  const { south, north, west, east } = boundingBox(lat, lng, radiusM);
+// Duplicate detection disabled for now (requires geohash utils)
 
-  const q = query(
-    collection(db, SPOTS_COLLECTION),
-    where('geohash', '>=', centerHash),
-    where('geohash', '<=', centerHash + '~'),
-    limit(50)
-  );
-  const candidates = (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
-  return candidates.filter(s =>
-    typeof s.lat === 'number' && typeof s.lng === 'number' &&
-    s.lat >= south && s.lat <= north && s.lng >= west && s.lng <= east &&
-    haversineDistanceM(lat, lng, s.lat, s.lng) <= radiusM &&
-    s.status !== 'rejected' && s.status !== 'hidden'
-  );
-};
-
-// Merge a newly-flagged duplicate submission into an existing spot instead of
-// keeping two pins for the same place.
-export const markSpotAsDuplicate = async (newSpotId, canonicalSpotId) => {
-  const { db } = getFirebaseServices();
-  await updateDoc(doc(db, SPOTS_COLLECTION, newSpotId), {
-    status: 'rejected',
-    duplicate_of_spot_id: canonicalSpotId,
-  });
-};
  
 export const updateSpot = async (spotId, data) => {
   const { db } = getFirebaseServices();
