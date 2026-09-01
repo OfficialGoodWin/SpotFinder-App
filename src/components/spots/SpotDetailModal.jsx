@@ -6,7 +6,7 @@ import { useLanguage } from '@/lib/LanguageContext';
 
 const RATED_KEY = (spotId, userId) => `sf_rated_${spotId}_${userId || 'guest'}`;
 
-export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdit, onDelete, onSpotUpdate }) {
+export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdit, onDelete, onSpotUpdate, onShowAuth }) {
   const { t } = useLanguage();
   const [localSpot, setLocalSpot] = useState(spot);
   const [shareTooltip, setShareTooltip] = useState(false);
@@ -109,7 +109,7 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
                 </p>
               </div>
             </div>
-            <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-accent">
+            <button onClick={onClose} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-accent">
               <X className="w-5 h-5 text-gray-500 dark:text-muted-foreground" />
             </button>
           </div>
@@ -227,13 +227,16 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
 
           {/* Rate by categories — account required */}
           {!user && !ratingSubmitted && (
-            <div className="p-4 bg-gray-50 dark:bg-accent/40 rounded-2xl border border-gray-200 dark:border-border text-center space-y-1">
+            <div className="p-4 bg-gray-50 dark:bg-accent/40 rounded-2xl border border-gray-200 dark:border-border text-center space-y-2">
               <p className="text-sm font-semibold text-gray-700 dark:text-foreground">
                 {t('spotDetail.rateCategories')}
               </p>
-              <p className="text-xs text-gray-500 dark:text-muted-foreground">
-                {t('spotDetail.loginToRate') || 'Sign in to leave a rating'}
-              </p>
+              <button
+                onClick={onShowAuth}
+                className="min-h-[44px] px-5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold transition-colors"
+              >
+                {t('spotDetail.loginToRate')}
+              </button>
             </div>
           )}
           {user && !isOwner && !ratingSubmitted && (

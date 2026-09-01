@@ -485,6 +485,7 @@ export default function Home() {
           onNavigate={handleNavigate}
           onEdit={() => { setEditingSpot(selectedSpot); setSelectedSpot(null); }}
           onDelete={() => handleDeleteSpot(selectedSpot)}
+          onShowAuth={() => setShowAuth(true)}
           onSpotUpdate={(updated) => {
             setSpots(prev => prev.map(s => s.id === updated.id ? updated : s));
             setSelectedSpot(updated);

@@ -10,8 +10,8 @@ export default function StarRating({ value = 0, onChange, readOnly = false, size
           type="button"
           onClick={() => !readOnly && onChange && onChange(star)}
           disabled={readOnly}
-          className={`${sizes[size]} transition-transform ${!readOnly ? 'hover:scale-110 active:scale-95 cursor-pointer' : 'cursor-default'} ${star <= value ? 'text-yellow-400' : 'text-gray-300'}`}
-          style={{ background: 'none', border: 'none', padding: '2px' }}
+          className={`${sizes[size]} ${!readOnly ? 'min-w-[44px] min-h-[44px] flex items-center justify-center' : ''} transition-transform ${!readOnly ? 'hover:scale-110 active:scale-95 cursor-pointer' : 'cursor-default'} ${star <= value ? 'text-yellow-400' : 'text-gray-300'}`}
+          style={{ background: 'none', border: 'none', padding: readOnly ? '2px' : 0 }}
         >
           ★
         </button>

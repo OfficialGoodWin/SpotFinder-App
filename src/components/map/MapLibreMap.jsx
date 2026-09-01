@@ -407,15 +407,38 @@ function makeDot(emoji, color, size = 28) {
   return el;
 }
 
-function makeSpotDom(type) {
-  const cfg = { parking: { c: '#3B82F6', i: '🅿️' }, food: { c: '#22C55E', i: '🍽️' }, toilet: { c: '#F97316', i: '🚽' } };
-  const { c, i } = cfg[type] || cfg.parking;
+// ── Hybrid spot marker: photo thumbnail + cost-color ring + category badge + difficulty dot ──
+const CATEGORY_ICONS = {
+  Viewpoint: '⛰️', SecretCafe: '☕', Sunset: '🌇', Sunrise: '🌅', PhotoSpot: '📸',
+  Waterfall: '💧', Hike: '🥾', SwimSpot: '🏊', Ruin: '🏛️', UrbanExplore: '🏙️',
+};
+const COST_RING_COLOR = { free: '#22c55e', paid: '#f59e0b', donation: '#f59e0b' };
+const DIFFICULTY_DOT_COLOR = { easy: '#22c55e', moderate: '#f97316', hard: '#ef4444' };
+
+function makeSpotDom(spot) {
+  const primaryTag = spot.tags?.[0];
+  const icon = CATEGORY_ICONS[primaryTag] || '📍';
+  const ringColor = COST_RING_COLOR[spot.cost] || '#22c55e';
+  const diffColor = DIFFICULTY_DOT_COLOR[spot.access_difficulty];
+
   const el = document.createElement('div');
-  el.style.cssText = 'width:36px;height:36px;cursor:pointer;';
-  el.innerHTML = `<div style="width:36px;height:36px;background:${c};border-radius:50% 50% 50% 0;
-    transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;
-    box-shadow:0 2px 6px rgba(0,0,0,0.35);border:2px solid white;">
-    <span style="transform:rotate(45deg);font-size:16px;line-height:1">${i}</span></div>`;
+  el.style.cssText = 'width:52px;height:52px;cursor:pointer;position:relative;';
+
+  const photoOrFallback = spot.image_url
+    ? `<div style="width:100%;height:100%;border-radius:50%;background-image:url('${spot.image_url}');background-size:cover;background-position:center;"></div>`
+    : `<div style="width:100%;height:100%;border-radius:50%;background:linear-gradient(135deg,#60a5fa,#a78bfa);display:flex;align-items:center;justify-content:center;">
+         <span style="font-size:20px;filter:brightness(0) invert(1);">${icon}</span>
+       </div>`;
+
+  el.innerHTML = `
+    <div style="width:48px;height:48px;border-radius:50%;border:3px solid ${ringColor};box-shadow:0 2px 8px rgba(0,0,0,0.35);overflow:hidden;background:#fff;">
+      ${photoOrFallback}
+    </div>
+    <div style="position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);width:22px;height:22px;border-radius:50%;background:#fff;border:2px solid ${ringColor};display:flex;align-items:center;justify-content:center;font-size:11px;box-shadow:0 1px 3px rgba(0,0,0,0.3);">
+      ${icon}
+    </div>
+    ${diffColor ? `<div style="position:absolute;top:-2px;right:-2px;width:12px;height:12px;border-radius:50%;background:${diffColor};border:2px solid white;box-shadow:0 1px 2px rgba(0,0,0,0.3);"></div>` : ''}
+  `;
   return el;
 }
 
@@ -729,8 +752,8 @@ export default function MapLibreMap({
     m.forEach((x, id) => { if (!ids.has(id)) { x.remove(); m.delete(id); } });
     for (const spot of spots) {
       if (m.has(spot.id)) continue;
-      const el = makeSpotDom(spot.spot_type);
-      const mk = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([spot.lng, spot.lat]).addTo(map);
+      const el = makeSpotDom(spot);
+      const mk = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat([spot.lng, spot.lat]).addTo(map);
       el.addEventListener('click', e => { e.stopPropagation(); onSelectSpot?.(spot); });
       m.set(spot.id, mk);
     }
