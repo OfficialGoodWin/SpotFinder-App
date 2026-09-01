@@ -412,8 +412,8 @@ const CATEGORY_ICONS = {
   Viewpoint: '⛰️', SecretCafe: '☕', Sunset: '🌇', Sunrise: '🌅', PhotoSpot: '📸',
   Waterfall: '💧', Hike: '🥾', SwimSpot: '🏊', Ruin: '🏛️', UrbanExplore: '🏙️',
 };
-const COST_RING_COLOR = { free: '#22c55e', paid: '#f59e0b', donation: '#f59e0b' };
-const DIFFICULTY_DOT_COLOR = { easy: '#22c55e', moderate: '#f97316', hard: '#ef4444' };
+const COST_RING_COLOR = { free: '#22c55e', paid: '#f59e0b', donation: '#0bb3f5' };
+const DIFFICULTY_DOT_COLOR = { easy: '#22c55e', moderate: '#ffbb00', hard: '#ef4444' };
 
 function makeSpotDom(spot) {
   const primaryTag = spot.tags?.[0];
