@@ -4,6 +4,8 @@ import StarRating from './StarRating';
 import AdBanner from '../AdBanner';
 import { useLanguage } from '@/lib/LanguageContext';
 import { uploadSpotImage } from '@/api/firebaseClient';
+import { moderateSubmission } from '@/lib/moderation';
+import { toast } from 'sonner';
 
 // Category tags per spec — separate from the existing rating-group `spotType`.
 // A spot can carry several of these. Display uses an emoji + translated label
@@ -156,6 +158,24 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   };
 
   const handleSave = async () => {
+    // Anti-spam / moderation pre-check (client-side UX only — the
+    // authoritative check runs server-side in the Cloud Functions trigger
+    // on `spots` creation; see functions/index.js).
+    const modCheck = moderateSubmission({
+      text: description,
+      rateLimitKey: `rate:add_spot:${user?.email || 'anon'}`,
+      maxPerWindow: 5,
+      windowMs: 10 * 60 * 1000, // 5 new spots / 10 minutes / device
+    });
+    if (!modCheck.allowed) {
+      toast.error(
+        modCheck.reasonKey === 'moderation.tooManySubmissions'
+          ? t('moderation.tooManySubmissions') || 'You are adding spots too quickly. Please wait a few minutes and try again.'
+          : t('moderation.contentBlocked') || 'This description looks like spam. Please rewrite it and try again.'
+      );
+      return;
+    }
+
     const ratingsProvided = [];
     if (parkingRating > 0) ratingsProvided.push(parkingRating);
     if (beautyRating > 0) ratingsProvided.push(beautyRating);

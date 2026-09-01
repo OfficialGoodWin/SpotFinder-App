@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Navigation, Share2, Camera, Star, Phone, Mail, Globe, MapPin, ChevronUp, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getPOIPhotos, getPOIRatings, addPOIPhoto, addPOIRating, uploadSpotImage, makePOIId } from '@/api/firebaseClient';
+import { moderateSubmission } from '@/lib/moderation';
+import { toast } from 'sonner';
 import { useLanguage } from '@/lib/LanguageContext';
 
 
@@ -576,6 +578,24 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
   };
 
   const handleSubmitRating = async (rating, comment) => {
+    // Anti-spam / moderation pre-check (client-side UX only — the
+    // authoritative check runs server-side in the Cloud Functions trigger
+    // on `poi_ratings` creation; see functions/index.js).
+    const modCheck = moderateSubmission({
+      text: comment,
+      rateLimitKey: `rate:poi_rating:${user?.email || 'anon'}`,
+      maxPerWindow: 10,
+      windowMs: 10 * 60 * 1000,
+    });
+    if (!modCheck.allowed) {
+      toast.error(
+        modCheck.reasonKey === 'moderation.tooManySubmissions'
+          ? 'You are submitting reviews too quickly. Please wait a few minutes.'
+          : 'This review looks like spam. Please rewrite it and try again.'
+      );
+      return;
+    }
+
     const poiId = makePOIId(poi.lat, poi.lon, poi.name);
     await addPOIRating(poiId, rating, comment, user?.email);
     getPOIRatings(poiId).then(r => setSfRating(

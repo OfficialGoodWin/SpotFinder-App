@@ -5,37 +5,130 @@ service cloud.firestore {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
     function isAuth() { return request.auth != null; }
+    function authEmail() { return request.auth.token.email; }
     function isSuperAdmin() {
-      return isAuth() && request.auth.token.email == 'superadmin@spotfinder.cz';
+      return isAuth() && authEmail() == 'superadmin@spotfinder.cz';
+    }
+    // True if none of `fields` changed between the existing doc and the
+    // incoming write. Use this to lock aggregate/moderation fields so a
+    // normal client write can never move them — only trusted server code
+    // (Cloud Functions, running with the Admin SDK) bypasses rules entirely
+    // and can update them.
+    function unchanged(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(fields) == false;
+    }
+    function isNewOwner() {
+      return request.resource.data.created_by == authEmail();
+    }
+    function strLen(v, max) {
+      return v is string && v.size() <= max;
     }
 
     // ── Public spots ─────────────────────────────────────────────────────────
     match /spots/{spotId} {
       allow read: if true;
-      allow create: if isAuth();
-      allow update: if isAuth() && resource.data.created_by == request.auth.token.email;
+
+      allow create: if isAuth()
+        && isNewOwner()
+        && strLen(request.resource.data.title, 100)
+        && strLen(request.resource.data.description, 2000)
+        // Never trust a client-supplied moderation state on create.
+        && request.resource.data.status in ['pending_trust', 'published']
+        && (!('flag_count' in request.resource.data) || request.resource.data.flag_count == 0);
+
+      // Owners may edit their own listing content, but can never touch the
+      // rating aggregates, flag/moderation state, or re-assign ownership —
+      // those are only ever written by Cloud Functions with the Admin SDK.
+      allow update: if isAuth() && (
+        (resource.data.created_by == authEmail()
+          && unchanged(['rating', 'rating_count', 'parking_rating', 'parking_rating_count',
+                        'beauty_rating', 'beauty_rating_count', 'privacy_rating',
+                        'privacy_rating_count', 'flag_count', 'status', 'created_by']))
+        || isSuperAdmin()
+      );
+
       allow delete: if isAuth() && (
-        resource.data.created_by == request.auth.token.email || isSuperAdmin()
+        resource.data.created_by == authEmail() || isSuperAdmin()
       );
     }
 
-    // ── Ratings ──────────────────────────────────────────────────────────────
+    // ── Per-user spot ratings (one doc per user per spot; aggregates are  ──────
+    // recomputed server-side by a Cloud Function trigger — never trust a
+    // client-submitted average).
+    match /spot_ratings/{ratingId} {
+      allow read: if true;
+      // ratingId MUST be `${spotId}_${uid}` so a user can only ever create
+      // or overwrite *their own* rating for a given spot (built-in de-dupe).
+      allow create, update: if isAuth()
+        && ratingId == request.resource.data.spot_id + '_' + request.auth.uid
+        && request.resource.data.user_id == request.auth.uid
+        && request.resource.data.parking is number && request.resource.data.parking >= 0 && request.resource.data.parking <= 5
+        && request.resource.data.beauty  is number && request.resource.data.beauty  >= 0 && request.resource.data.beauty  <= 5
+        && request.resource.data.privacy is number && request.resource.data.privacy >= 0 && request.resource.data.privacy <= 5;
+      allow delete: if isSuperAdmin();
+    }
+
+    // Legacy single-value ratings collection — kept read-only for existing
+    // data; new writes should go through /spot_ratings above.
     match /ratings/{ratingId} {
       allow read: if isAuth();
-      allow create: if isAuth();
+      allow create: if false;
     }
 
     // ── POI community photos and ratings (public read, auth write) ────────────
     match /poi_photos/{docId} {
       allow read: if true;
-      allow create: if isAuth();
-      allow delete: if isSuperAdmin();
+      allow create: if isAuth() && request.resource.data.created_by == authEmail();
+      allow delete: if isSuperAdmin() || (isAuth() && resource.data.created_by == authEmail());
     }
 
     match /poi_ratings/{docId} {
       allow read: if true;
-      allow create: if isAuth();
-      allow delete: if isSuperAdmin();
+      allow create: if isAuth()
+        && request.resource.data.user_email == authEmail()
+        && request.resource.data.rating is number
+        && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
+        && strLen(request.resource.data.get('comment', ''), 1000);
+      allow delete: if isSuperAdmin() || (isAuth() && resource.data.user_email == authEmail());
+    }
+
+    // ── Community moderation: flags (report a spot) ────────────────────────────
+    // One flag per user per spot: docId MUST be `${spotId}_${reporterEmail}`.
+    // flag_count / status on the target spot are recomputed server-side only.
+    match /flags/{flagId} {
+      allow read: if isSuperAdmin();
+      allow create: if isAuth()
+        && flagId == request.resource.data.spot_id + '_' + authEmail()
+        && request.resource.data.reporter_email == authEmail()
+        && request.resource.data.status == 'open'
+        && request.resource.data.reason in
+             ['private_property', 'dangerous', 'duplicate', 'spam', 'inaccurate_location'];
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // ── Votes (up/down) — one vote per user per spot ───────────────────────────
+    match /votes/{voteId} {
+      allow read: if isAuth();
+      allow create, update: if isAuth()
+        && voteId == authEmail() + '_' + request.resource.data.spot_id
+        && request.resource.data.user_email == authEmail()
+        && request.resource.data.type in ['up', 'down'];
+      allow delete: if isAuth() && resource.data.user_email == authEmail();
+    }
+
+    // ── Bookmarks — private to each user ───────────────────────────────────────
+    match /bookmarks/{bookmarkId} {
+      allow read, delete: if isAuth() && resource.data.user_email == authEmail();
+      allow create: if isAuth() && request.resource.data.user_email == authEmail();
+    }
+
+    // ── User profile / subscription state ──────────────────────────────────────
+    // Subscription fields are set only by the Stripe webhook via the Admin
+    // SDK (which bypasses these rules entirely) — clients get read-only
+    // access to their own document and can never grant themselves a plan.
+    match /users/{userId} {
+      allow read: if isAuth() && request.auth.uid == userId;
+      allow write: if false;
     }
 
     // ── IP bans (superadmin only) ─────────────────────────────────────────────
@@ -71,8 +164,10 @@ service cloud.firestore {
     }
 
     // ── Feedback (public submit, admin read) ─────────────────────────────────
+    // Publicly writable collections are the easiest spam target — cap size
+    // and require the shape the app actually sends.
     match /feedback/{docId} {
-      allow create: if true;
+      allow create: if strLen(request.resource.data.get('message', ''), 3000);
       allow read, delete: if isSuperAdmin();
     }
   }
