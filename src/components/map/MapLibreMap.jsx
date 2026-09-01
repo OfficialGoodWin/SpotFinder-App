@@ -412,8 +412,8 @@ const CATEGORY_ICONS = {
   Viewpoint: '⛰️', SecretCafe: '☕', Sunset: '🌇', Sunrise: '🌅', PhotoSpot: '📸',
   Waterfall: '💧', Hike: '🥾', SwimSpot: '🏊', Ruin: '🏛️', UrbanExplore: '🏙️',
 };
-const COST_RING_COLOR = { free: '#22c55e', paid: '#f59e0b', donation: '#0bb3f5' };
-const DIFFICULTY_DOT_COLOR = { easy: '#22c55e', moderate: '#ffbb00', hard: '#ef4444' };
+const COST_RING_COLOR = { free: '#22c55e', paid: '#f59e0b', donation: '#f59e0b' };
+const DIFFICULTY_DOT_COLOR = { easy: '#22c55e', moderate: '#eab308', hard: '#ef4444' };
 
 function makeSpotDom(spot) {
   const primaryTag = spot.tags?.[0];
@@ -422,7 +422,13 @@ function makeSpotDom(spot) {
   const diffColor = DIFFICULTY_DOT_COLOR[spot.access_difficulty];
 
   const el = document.createElement('div');
-  el.style.cssText = 'width:52px;height:52px;cursor:pointer;position:relative;';
+  // IMPORTANT: don't set `position` here — MapLibre's own CSS class
+  // (.maplibregl-marker { position: absolute }) must control the outer
+  // element's positioning for zoom/pan to track correctly. An inline
+  // `position:relative` here previously overrode that (inline styles beat
+  // a stylesheet class rule), which is what caused markers to drift or
+  // freeze during zoom instead of tracking their real lng/lat.
+  el.style.cssText = 'width:52px;height:52px;cursor:pointer;';
 
   const photoOrFallback = spot.image_url
     ? `<div style="width:100%;height:100%;border-radius:50%;background-image:url('${spot.image_url}');background-size:cover;background-position:center;"></div>`
@@ -430,14 +436,19 @@ function makeSpotDom(spot) {
          <span style="font-size:20px;filter:brightness(0) invert(1);">${icon}</span>
        </div>`;
 
+  // Inner wrapper carries `position:relative` instead, so the badge/dot
+  // overlays below still anchor correctly without touching the outer
+  // element MapLibre positions.
   el.innerHTML = `
-    <div style="width:48px;height:48px;border-radius:50%;border:3px solid ${ringColor};box-shadow:0 2px 8px rgba(0,0,0,0.35);overflow:hidden;background:#fff;">
-      ${photoOrFallback}
+    <div style="position:relative;width:52px;height:52px;">
+      <div style="width:48px;height:48px;border-radius:50%;border:3px solid ${ringColor};box-shadow:0 2px 8px rgba(0,0,0,0.35);overflow:hidden;background:#fff;">
+        ${photoOrFallback}
+      </div>
+      <div style="position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);width:22px;height:22px;border-radius:50%;background:#fff;border:2px solid ${ringColor};display:flex;align-items:center;justify-content:center;font-size:11px;box-shadow:0 1px 3px rgba(0,0,0,0.3);">
+        ${icon}
+      </div>
+      ${diffColor ? `<div style="position:absolute;top:-2px;right:-2px;width:12px;height:12px;border-radius:50%;background:${diffColor};border:2px solid white;box-shadow:0 1px 2px rgba(0,0,0,0.3);"></div>` : ''}
     </div>
-    <div style="position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);width:22px;height:22px;border-radius:50%;background:#fff;border:2px solid ${ringColor};display:flex;align-items:center;justify-content:center;font-size:11px;box-shadow:0 1px 3px rgba(0,0,0,0.3);">
-      ${icon}
-    </div>
-    ${diffColor ? `<div style="position:absolute;top:-2px;right:-2px;width:12px;height:12px;border-radius:50%;background:${diffColor};border:2px solid white;box-shadow:0 1px 2px rgba(0,0,0,0.3);"></div>` : ''}
   `;
   return el;
 }
