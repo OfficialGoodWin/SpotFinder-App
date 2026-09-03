@@ -168,10 +168,15 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
       windowMs: 10 * 60 * 1000, // 5 new spots / 10 minutes / device
     });
     if (!modCheck.allowed) {
+      // Note: 'moderation.*' keys don't exist in locales/translations.js —
+      // t() falls back to returning the raw key string (not null/undefined)
+      // for missing keys, so using `t(key) || fallback` here would silently
+      // show the ugly key text to users instead of the fallback. Using
+      // plain English directly until these are added to every language file.
       toast.error(
         modCheck.reasonKey === 'moderation.tooManySubmissions'
-          ? t('moderation.tooManySubmissions') || 'You are adding spots too quickly. Please wait a few minutes and try again.'
-          : t('moderation.contentBlocked') || 'This description looks like spam. Please rewrite it and try again.'
+          ? 'You are adding spots too quickly. Please wait a few minutes and try again.'
+          : 'This description looks like spam. Please rewrite it and try again.'
       );
       return;
     }

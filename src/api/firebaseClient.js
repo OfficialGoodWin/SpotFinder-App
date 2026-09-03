@@ -8,46 +8,60 @@ import {
   getRedirectResult,
   GoogleAuthProvider,
   signOut as firebaseSignOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  sendEmailVerification
 } from 'firebase/auth';
-import { 
-  getFirestore, 
-  collection, 
-  addDoc, 
-  getDocs, 
-  doc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  orderBy, 
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  doc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
   limit,
   setDoc,
   getDoc
 } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { firebaseConfig } from './firebaseConfig';
- 
-let app, auth, db;
+
+let app, auth, db, functionsInstance;
 try {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
+  functionsInstance = getFunctions(app);
 } catch (error) {
   console.error("Firebase initialization error:", error);
 }
- 
+
 export const getFirebaseServices = () => {
   if (!app || !auth || !db) {
     try {
       app = initializeApp(firebaseConfig);
       auth = getAuth(app);
       db = getFirestore(app);
+      functionsInstance = getFunctions(app);
         } catch (error) {
       console.error("Firebase re-initialization error:", error);
       return null;
     }
   }
-  return { app, auth, db };
+  return { app, auth, db, functions: functionsInstance };
+};
+
+// Thin wrapper so admin actions always go through the audited Cloud
+// Function callables in functions/index.js instead of writing Firestore
+// directly from the client (which would skip the admin_audit_log entry).
+const callAdminFn = (name) => async (payload) => {
+  const { functions } = getFirebaseServices();
+  const fn = httpsCallable(functions, name);
+  const { data } = await fn(payload);
+  return data;
 };
  
 // Detect WebView / in-app browsers that block Google OAuth popup
@@ -64,7 +78,19 @@ export const loginWithEmail = async (email, password) => {
  
 export const registerWithEmail = async (email, password) => {
   const { auth } = getFirebaseServices();
-  return (await createUserWithEmailAndPassword(auth, email, password)).user;
+  const user = (await createUserWithEmailAndPassword(auth, email, password)).user;
+  // Required now that firestore.rules gates all content creation on
+  // `request.auth.token.email_verified == true` — without this, every new
+  // account would be silently unable to add a spot or leave a review the
+  // moment those rules take effect, with no indication why.
+  await sendEmailVerification(user).catch((err) => console.error('Failed to send verification email:', err));
+  return user;
+};
+
+export const resendVerificationEmail = async () => {
+  const { auth } = getFirebaseServices();
+  if (!auth.currentUser) throw new Error('Not signed in');
+  await sendEmailVerification(auth.currentUser);
 };
  
 export const loginWithGoogle = async () => {
@@ -143,18 +169,13 @@ export const uploadSpotImage = async (file) => {
 
  
 const IP_BANS_COLLECTION = 'ip_bans';
-export const banIP = async (ipAddress, reason = 'Violation of terms') => {
-  const { db, auth } = getFirebaseServices();
-  const user = auth.currentUser;
-  if (!user || user.email !== 'superadmin@spotfinder.cz') throw new Error('Unauthorized');
-  await setDoc(doc(db, IP_BANS_COLLECTION, ipAddress), { ip: ipAddress, reason, banned_by: user.email, banned_at: new Date().toISOString() });
-};
-export const unbanIP = async (ipAddress) => {
-  const { db, auth } = getFirebaseServices();
-  const user = auth.currentUser;
-  if (!user || user.email !== 'superadmin@spotfinder.cz') throw new Error('Unauthorized');
-  await deleteDoc(doc(db, IP_BANS_COLLECTION, ipAddress));
-};
+// These now call the audited Cloud Function callables (functions/index.js)
+// instead of writing Firestore directly — every ban/unban/delete/resolve is
+// guaranteed to leave an admin_audit_log entry, since the logging happens
+// server-side as part of the same call rather than as a separate write the
+// client could skip or fail to make.
+export const banIP = callAdminFn('adminBanIP');
+export const unbanIP = (ipAddress) => callAdminFn('adminUnbanIP')({ ip: ipAddress });
 export const isIPBanned = async (ipAddress) => {
   const { db } = getFirebaseServices();
   return (await getDoc(doc(db, IP_BANS_COLLECTION, ipAddress))).exists();
@@ -229,12 +250,9 @@ export const deleteSpot = async (spotId) => {
   await deleteDoc(doc(db, SPOTS_COLLECTION, spotId));
 };
  
-export const deleteSpotAsSuperAdmin = async (spotId) => {
-  const { db, auth } = getFirebaseServices();
-  const user = auth.currentUser;
-  if (!user || user.email !== 'superadmin@spotfinder.cz') throw new Error('Unauthorized');
-  await deleteDoc(doc(db, SPOTS_COLLECTION, spotId));
-};
+// Routed through the audited Cloud Function callable (functions/index.js)
+// so deletion always leaves an admin_audit_log entry.
+export const deleteSpotAsSuperAdmin = (spotId) => callAdminFn('adminDeleteSpot')({ spotId });
  
 export const rateSpot = async (spotId, rating) => {
   const { db } = getFirebaseServices();
@@ -253,53 +271,38 @@ export const updateSpotDetailRating = async (spotId, field, newVal, count) => {
 };
  
 /**
- * Submit all three category ratings at once and recalculate overall rating.
- * This is the ONLY rating entry point from SpotDetailModal.
- * @param {string} spotId
- * @param {object} currentSpot - existing spot data (for running averages)
+ * Submit a user's category ratings for a spot.
+ *
+ * Rewritten to write one document per user per spot to `spot_ratings`
+ * (doc id `${spotId}_${uid}`) instead of averaging client-side and pushing
+ * the result into `spots/{id}`. That old approach let any authenticated
+ * user rate the same spot unlimited times (no server-side de-dupe) and,
+ * combined with the ownership-only update rule on `spots`, would actually
+ * have been rejected by Firestore for anyone rating someone else's spot --
+ * see SECURITY_REVIEW.md section 0. The new firestore.rules validate this
+ * shape directly, and a Cloud Function (onSpotRatingWritten) recomputes the
+ * trusted averages on spots/{id} server-side after every write.
+ *
  * @param {{parking:number, beauty:number, privacy:number}} ratings - 0 = not rated
  */
-export const submitCategoryRatings = async (spotId, currentSpot, ratings) => {
+export const submitCategoryRatings = async (spotId, currentSpot, ratings, userId) => {
   const { db } = getFirebaseServices();
-  const updates = {};
+  if (!userId) throw new Error('Must be signed in to rate a spot');
 
-  const recalc = (field, countField, newVal) => {
-    if (!newVal) return null;
-    const oldCount = currentSpot[countField] || 0;
-    const oldVal   = currentSpot[field]     || 0;
-    const newCount = oldCount + 1;
-    const newAvg   = Math.round(((oldVal * oldCount) + newVal) / newCount * 10) / 10;
-    updates[field]      = newAvg;
-    updates[countField] = newCount;
-    return newAvg;
-  };
+  const ratingId = `${spotId}_${userId}`;
+  await setDoc(doc(db, 'spot_ratings', ratingId), {
+    spot_id: spotId,
+    user_id: userId,
+    parking: ratings.parking || 0,
+    beauty: ratings.beauty || 0,
+    privacy: ratings.privacy || 0,
+    updated_date: new Date().toISOString(),
+  });
 
-  recalc('parking_rating', 'parking_rating_count', ratings.parking);
-  recalc('beauty_rating',  'beauty_rating_count',  ratings.beauty);
-  recalc('privacy_rating', 'privacy_rating_count', ratings.privacy);
-
-  // This review's overall = average of the categories rated in THIS submission only
-  const submittedValues = [
-    ratings.parking > 0 ? ratings.parking : null,
-    ratings.beauty  > 0 ? ratings.beauty  : null,
-    ratings.privacy > 0 ? ratings.privacy : null,
-  ].filter(x => x !== null);
-
-  if (submittedValues.length > 0) {
-    const reviewOverall   = submittedValues.reduce((s, x) => s + x, 0) / submittedValues.length;
-    const oldOverallCount = currentSpot.rating_count || 0;
-    const oldOverall      = currentSpot.rating       || 0;
-    const newOverallCount = oldOverallCount + 1;
-    const newOverall      = Math.round(((oldOverall * oldOverallCount) + reviewOverall) / newOverallCount * 10) / 10;
-    updates.rating        = newOverall;
-    updates.rating_count  = newOverallCount;
-  }
-
-  if (Object.keys(updates).length > 0) {
-    await updateDoc(doc(db, SPOTS_COLLECTION, spotId), updates);
-  }
-
-  return { ...currentSpot, ...updates };
+  // The Cloud Function trigger updates spots/{id} asynchronously (usually
+  // within a second or two); return the current spot so the UI can proceed
+  // without claiming these are the final server-computed numbers.
+  return currentSpot;
 };
 
 // ─── Flags (community moderation) ─────────────────────────────────────────────
@@ -311,7 +314,8 @@ export const flagSpot = async (spotId, reporterEmail, reason, note = '') => {
   const { db } = getFirebaseServices();
   if (!reporterEmail || reporterEmail === 'anonymous') throw new Error('Must be signed in to flag a spot');
 
-  // One flag per user per spot — composite doc id prevents duplicate flags.
+  // One flag per user per spot — composite doc id prevents duplicate flags,
+  // and is now also enforced server-side by firestore.rules.
   const flagId = `${spotId}_${reporterEmail}`;
   const flagRef = doc(db, FLAGS_COLLECTION, flagId);
   const existing = await getDoc(flagRef);
@@ -326,14 +330,13 @@ export const flagSpot = async (spotId, reporterEmail, reason, note = '') => {
     created_date: new Date().toISOString(),
   });
 
-  const q = query(collection(db, FLAGS_COLLECTION), where('spot_id', '==', spotId), where('status', '==', 'open'));
-  const flagCount = (await getDocs(q)).size;
-  await updateDoc(doc(db, SPOTS_COLLECTION, spotId), { flag_count: flagCount });
-
-  if (flagCount >= FLAG_AUTO_HIDE_THRESHOLD) {
-    await updateDoc(doc(db, SPOTS_COLLECTION, spotId), { status: 'flagged' });
-  }
-  return { alreadyFlagged: false, flagCount };
+  // flag_count / auto-hide (status: 'flagged') on the spot are now computed
+  // by the onFlagCreated Cloud Function (functions/index.js) using the
+  // Admin SDK — a normal client is no longer allowed to write those fields
+  // directly (see firestore.rules `unchanged([...])` lock on /spots update),
+  // so we don't attempt it here anymore. The UI can optimistically show
+  // "reported" without waiting on the recount.
+  return { alreadyFlagged: false };
 };
 
 export const getOpenFlagsForAdmin = async (maxCount = 100) => {
@@ -342,10 +345,10 @@ export const getOpenFlagsForAdmin = async (maxCount = 100) => {
   return (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
 };
 
-export const resolveFlag = async (flagId, resolution /* 'upheld' | 'dismissed' */) => {
-  const { db } = getFirebaseServices();
-  await updateDoc(doc(db, FLAGS_COLLECTION, flagId), { status: 'resolved', resolution, resolved_date: new Date().toISOString() });
-};
+// Routed through the audited Cloud Function callable (functions/index.js)
+// so every flag resolution leaves an admin_audit_log entry.
+export const resolveFlag = (flagId, resolution /* 'upheld' | 'dismissed' */) =>
+  callAdminFn('adminResolveFlag')({ flagId, resolution });
 
 // ─── Votes (up/down, feeds quality_score/ranking — not visibility) ───────────
 const VOTES_COLLECTION = 'votes';

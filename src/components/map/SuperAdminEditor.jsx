@@ -11,6 +11,8 @@ import {
   getAdminNavOverrides, addAdminNavOverride, deleteAdminNavOverride,
   getAdminRoadOverrides, addAdminRoadOverride, deleteAdminRoadOverride,
   getAdminERouteOverrides, addAdminERouteOverride, deleteAdminERouteOverride,
+  getOpenFlagsForAdmin, resolveFlag, deleteSpotAsSuperAdmin,
+  getMaintenanceStatus, setMaintenanceStatus,
 } from '@/api/firebaseClient';
 // Category options for the POI dropdown — keys match AMBIENT_CATEGORIES keys in ambientCategories.js
 const CATEGORY_OPTIONS = [
@@ -56,6 +58,7 @@ const TABS = [
   { id: 'nav',      label: 'Nav Overrides', Icon: Navigation },
   { id: 'roads',    label: 'Road Numbers',  Icon: AlertTriangle },
   { id: 'eroutes',  label: 'E-Routes',      Icon: Navigation },
+  { id: 'moderation', label: 'Moderation',  Icon: AlertTriangle },
 ];
 
 const CLOSURE_ICONS = ['⛔','🚧','⚠️','🚦','🔒','🛑','🚨','🏗️','🔴'];
@@ -844,6 +847,143 @@ function ERoutesTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
   );
 }
 
+// ─── Moderation tab: flag review queue + status banner control ────────────
+// Previously: getOpenFlagsForAdmin/resolveFlag existed in firebaseClient.js
+// and getMaintenanceStatus/setMaintenanceStatus existed too, but nothing in
+// the UI ever called any of them — there was no report button to generate
+// flags in the first place, and no admin screen to review them. Both are
+// wired up now (see SpotDetailModal.jsx for the report button).
+function ModerationTab({ user }) {
+  const [flags, setFlags] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [statusForm, setStatusForm] = useState({ status: 'ok', message: '', showBanner: true });
+  const [savingStatus, setSavingStatus] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const [openFlags, currentStatus] = await Promise.all([
+        getOpenFlagsForAdmin(100),
+        getMaintenanceStatus(),
+      ]);
+      setFlags(openFlags || []);
+      if (currentStatus) setStatusForm((f) => ({ ...f, ...currentStatus }));
+    } catch (err) {
+      console.error('Failed to load moderation data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleResolve = async (flagId, resolution) => {
+    try {
+      await resolveFlag(flagId, resolution);
+      setFlags((prev) => prev.filter((f) => f.id !== flagId));
+    } catch (err) {
+      console.error('Failed to resolve flag:', err);
+      alert('Could not resolve flag: ' + (err?.message || 'unknown error'));
+    }
+  };
+
+  const handleDeleteSpot = async (spotId, flagId) => {
+    if (!confirm('Delete this spot permanently?')) return;
+    try {
+      await deleteSpotAsSuperAdmin(spotId);
+      await resolveFlag(flagId, 'upheld');
+      setFlags((prev) => prev.filter((f) => f.id !== flagId));
+    } catch (err) {
+      console.error('Failed to delete spot:', err);
+      alert('Could not delete spot: ' + (err?.message || 'unknown error'));
+    }
+  };
+
+  const saveStatus = async () => {
+    setSavingStatus(true);
+    try {
+      await setMaintenanceStatus(statusForm);
+      alert('Site status updated.');
+    } catch (err) {
+      console.error('Failed to save status:', err);
+      alert('Could not save status: ' + (err?.message || 'unknown error'));
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
+  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
+
+  return (
+    <div className="space-y-5">
+      {/* Site status banner control */}
+      <div className="bg-gray-50 dark:bg-accent/30 rounded-xl p-3 border border-gray-100 dark:border-border">
+        <p className="text-xs font-semibold mb-2">Site status banner</p>
+        <select
+          value={statusForm.status}
+          onChange={(e) => setStatusForm((f) => ({ ...f, status: e.target.value }))}
+          className="w-full mb-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-border bg-white dark:bg-background text-sm"
+        >
+          <option value="ok">OK — hide banner</option>
+          <option value="warning">Warning — show dismissible banner</option>
+          <option value="down">Down — block the app with a full-screen notice</option>
+        </select>
+        <textarea
+          value={statusForm.message}
+          onChange={(e) => setStatusForm((f) => ({ ...f, message: e.target.value }))}
+          placeholder="Message shown to users"
+          className="w-full mb-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-border bg-white dark:bg-background text-sm"
+          rows={2}
+        />
+        <button
+          onClick={saveStatus}
+          disabled={savingStatus}
+          className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg disabled:opacity-50"
+        >
+          {savingStatus ? 'Saving…' : 'Save status'}
+        </button>
+      </div>
+
+      {/* Flag review queue */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-semibold">Open reports ({flags.length})</p>
+          <button onClick={load} className="text-xs text-blue-600 hover:underline">Refresh</button>
+        </div>
+        {flags.length === 0 && <p className="text-sm text-muted-foreground">No open reports.</p>}
+        <div className="space-y-2">
+          {flags.map((flag) => (
+            <div key={flag.id} className="border border-gray-200 dark:border-border rounded-xl p-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-2 py-0.5 rounded-full">
+                  {flag.reason}
+                </span>
+                <span className="text-[10px] text-muted-foreground">{flag.reporter_email}</span>
+              </div>
+              {flag.note && <p className="text-xs text-muted-foreground mb-2">"{flag.note}"</p>}
+              <p className="text-[10px] text-muted-foreground mb-2">Spot: {flag.spot_id}</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleResolve(flag.id, 'dismissed')}
+                  className="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 dark:bg-accent hover:bg-gray-200"
+                >
+                  Dismiss
+                </button>
+                <button
+                  onClick={() => handleDeleteSpot(flag.spot_id, flag.id)}
+                  className="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-red-500 hover:bg-red-600 text-white"
+                >
+                  Delete spot
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main editor ──────────────────────────────────────────────────────────────
 export default function SuperAdminEditor({ user, onClose, onAdminDataChange }) {
   const [tab, setTab] = useState('pois');
@@ -929,6 +1069,7 @@ export default function SuperAdminEditor({ user, onClose, onAdminDataChange }) {
                 <ERoutesTab user={user} pendingLatLon={pendingLatLon}
                   onRequestMapClick={requestMapClick} onClear={clearPending} />
               )}
+              {tab === 'moderation' && <ModerationTab user={user} />}
             </div>
           </>
         )}

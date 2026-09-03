@@ -84,9 +84,13 @@ const PLANS = [
 ];
 
 // ── Stripe checkout helper ────────────────────────────────────────────────────
-async function redirectToCheckout(priceId, userEmail) {
+async function redirectToCheckout(priceId, userEmail, userId, planId) {
   if (!stripePromise) {
     alert('Stripe is not configured. Add VITE_STRIPE_PUBLISHABLE_KEY to your .env file.');
+    return;
+  }
+  if (!userId) {
+    alert('Please sign in before subscribing.');
     return;
   }
 
@@ -97,6 +101,12 @@ async function redirectToCheckout(priceId, userEmail) {
     body: JSON.stringify({
       priceId,
       customerEmail: userEmail || undefined,
+      // userId/plan travel as Checkout Session metadata so the Stripe
+      // webhook can attribute the paid subscription to the right Firestore
+      // user doc — previously missing, so successful payments never
+      // actually unlocked anything.
+      userId,
+      plan: planId,
       successUrl: `${window.location.origin}/?subscribed=success`,
       cancelUrl:  `${window.location.origin}/?subscribed=cancel`,
     }),
@@ -124,7 +134,7 @@ function PlanCard({ plan, user, onClose }) {
   const handleSubscribe = async () => {
     setLoading(true);
     try {
-      await redirectToCheckout(price.priceId, user?.email);
+      await redirectToCheckout(price.priceId, user?.email, user?.uid, plan.id || plan.name);
     } finally {
       setLoading(false);
     }

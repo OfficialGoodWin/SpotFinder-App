@@ -28,13 +28,17 @@ export const PLANS = {
   }
 };
 
-export async function createCheckoutSession(planId, returnUrl = window.location.origin) {
+export async function createCheckoutSession(planId, userId, customerEmail, returnUrl = window.location.origin) {
   if (!STRIPE_PUBLISHABLE_KEY) throw new Error('Stripe key missing');
+  if (!userId) throw new Error('Must be signed in to subscribe');
 
   const response = await fetch('/api/create-checkout-session', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ priceId: planId, returnUrl })
+    // userId travels as Stripe Checkout `metadata` (set server-side in
+    // create-checkout-session.js) so the webhook can attribute the paid
+    // subscription back to the right Firestore user document.
+    body: JSON.stringify({ priceId: planId, userId, customerEmail, returnUrl })
   });
 
   if (!response.ok) {
@@ -47,9 +51,18 @@ export async function createCheckoutSession(planId, returnUrl = window.location.
   return stripe.redirectToCheckout({ sessionId });
 }
 
-// Client-side subscription status check
+// Client-side subscription status check — sends the caller's Firebase ID
+// token so the server can verify they're actually asking about themselves
+// (see api/subscription-status/route.js).
 export async function getSubscriptionStatus(userId) {
-  const response = await fetch(`/api/subscription-status?userId=${userId}`);
+  const { getFirebaseServices } = await import('./firebaseClient');
+  const { auth } = getFirebaseServices();
+  const idToken = await auth.currentUser?.getIdToken();
+  if (!idToken) return null;
+
+  const response = await fetch(`/api/subscription-status?userId=${userId}`, {
+    headers: { Authorization: `Bearer ${idToken}` },
+  });
   if (!response.ok) return null;
   return await response.json();
 }

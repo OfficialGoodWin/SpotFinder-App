@@ -2,6 +2,28 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!--
+      Content-Security-Policy: defense-in-depth against XSS. This app
+      renders user-submitted text (spot descriptions, POI reviews,
+      feedback) into the DOM — no injection vector was found in this
+      review (react-markdown doesn't render raw HTML by default, and the
+      one dangerouslySetInnerHTML usage is unrelated fixed CSS), but a CSP
+      means a future regression fails closed instead of becoming an XSS.
+      Update this list if you add new API/CDN origins.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self' 'unsafe-inline';
+      style-src 'self' 'unsafe-inline';
+      img-src 'self' data: blob: https:;
+      connect-src 'self' https://*.googleapis.com https://*.firebaseio.com
+        https://*.firebase.com https://api.mapy.com https://api.mapy.cz
+        https://api.openrouteservice.org https://tile.openstreetmap.org
+        https://api.stripe.com;
+      frame-src https://js.stripe.com https://checkout.stripe.com;
+      object-src 'none';
+      base-uri 'self';
+    ">
     <meta name="google-site-verification" content="TTox7d-pz1BRmoxCsn4hsdiweAdkQ9w6zWZCqeKrus0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />

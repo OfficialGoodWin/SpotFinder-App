@@ -7,7 +7,12 @@ service cloud.firestore {
     function isAuth() { return request.auth != null; }
     function authEmail() { return request.auth.token.email; }
     function isSuperAdmin() {
-      return isAuth() && authEmail() == 'superadmin@spotfinder.cz';
+      // Prefer a Firebase custom claim (set via functions/setAdminClaim.js,
+      // callable once by the existing hardcoded admin) — it's revocable and
+      // auditable, unlike a string baked into rules and client code.
+      // The hardcoded email is kept ONLY as a bootstrap fallback until the
+      // claim has been set once; remove the `||` branch after migrating.
+      return isAuth() && (request.auth.token.admin == true || authEmail() == 'superadmin@spotfinder.cz');
     }
     // True if none of `fields` changed between the existing doc and the
     // incoming write. Use this to lock aggregate/moderation fields so a
@@ -34,7 +39,10 @@ service cloud.firestore {
         && strLen(request.resource.data.description, 2000)
         // Never trust a client-supplied moderation state on create.
         && request.resource.data.status in ['pending_trust', 'published']
-        && (!('flag_count' in request.resource.data) || request.resource.data.flag_count == 0);
+        && (!('flag_count' in request.resource.data) || request.resource.data.flag_count == 0)
+        // Community-abuse mitigation: throwaway/unverified accounts can
+        // browse and rate, but can't post new public content.
+        && request.auth.token.email_verified == true;
 
       // Owners may edit their own listing content, but can never touch the
       // rating aggregates, flag/moderation state, or re-assign ownership —
@@ -43,7 +51,8 @@ service cloud.firestore {
         (resource.data.created_by == authEmail()
           && unchanged(['rating', 'rating_count', 'parking_rating', 'parking_rating_count',
                         'beauty_rating', 'beauty_rating_count', 'privacy_rating',
-                        'privacy_rating_count', 'flag_count', 'status', 'created_by']))
+                        'privacy_rating_count', 'flag_count', 'status', 'created_by',
+                        'upvote_count', 'downvote_count', 'quality_score']))
         || isSuperAdmin()
       );
 
@@ -60,6 +69,7 @@ service cloud.firestore {
       // ratingId MUST be `${spotId}_${uid}` so a user can only ever create
       // or overwrite *their own* rating for a given spot (built-in de-dupe).
       allow create, update: if isAuth()
+        && request.auth.token.email_verified == true
         && ratingId == request.resource.data.spot_id + '_' + request.auth.uid
         && request.resource.data.user_id == request.auth.uid
         && request.resource.data.parking is number && request.resource.data.parking >= 0 && request.resource.data.parking <= 5
@@ -78,13 +88,14 @@ service cloud.firestore {
     // ── POI community photos and ratings (public read, auth write) ────────────
     match /poi_photos/{docId} {
       allow read: if true;
-      allow create: if isAuth() && request.resource.data.created_by == authEmail();
+      allow create: if isAuth() && request.auth.token.email_verified == true
+        && request.resource.data.created_by == authEmail();
       allow delete: if isSuperAdmin() || (isAuth() && resource.data.created_by == authEmail());
     }
 
     match /poi_ratings/{docId} {
       allow read: if true;
-      allow create: if isAuth()
+      allow create: if isAuth() && request.auth.token.email_verified == true
         && request.resource.data.user_email == authEmail()
         && request.resource.data.rating is number
         && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
@@ -97,7 +108,7 @@ service cloud.firestore {
     // flag_count / status on the target spot are recomputed server-side only.
     match /flags/{flagId} {
       allow read: if isSuperAdmin();
-      allow create: if isAuth()
+      allow create: if isAuth() && request.auth.token.email_verified == true
         && flagId == request.resource.data.spot_id + '_' + authEmail()
         && request.resource.data.reporter_email == authEmail()
         && request.resource.data.status == 'open'
@@ -109,7 +120,7 @@ service cloud.firestore {
     // ── Votes (up/down) — one vote per user per spot ───────────────────────────
     match /votes/{voteId} {
       allow read: if isAuth();
-      allow create, update: if isAuth()
+      allow create, update: if isAuth() && request.auth.token.email_verified == true
         && voteId == authEmail() + '_' + request.resource.data.spot_id
         && request.resource.data.user_email == authEmail()
         && request.resource.data.type in ['up', 'down'];
@@ -128,6 +139,19 @@ service cloud.firestore {
     // access to their own document and can never grant themselves a plan.
     match /users/{userId} {
       allow read: if isAuth() && request.auth.uid == userId;
+      allow write: if false;
+    }
+
+    // ── Site status / maintenance banner (public read, superadmin write) ──────
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    // ── Admin audit log (write-only from Cloud Functions via Admin SDK,
+    //     which bypasses these rules; clients may only read their own trail) ──
+    match /admin_audit_log/{docId} {
+      allow read: if isSuperAdmin();
       allow write: if false;
     }
 

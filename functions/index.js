@@ -16,8 +16,53 @@
 
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const nodemailer = require('nodemailer');
 admin.initializeApp();
 const db = admin.firestore();
+
+// ─── Feedback email notifications ──────────────────────────────────────────
+// The feedback form in FAQ.jsx was only ever writing to Firestore — nothing
+// ever sent a notification anywhere, so submissions silently piled up with
+// no alert to the team. This uses SMTP via nodemailer; set these as Cloud
+// Functions config/env vars before deploying:
+//   firebase functions:config:set smtp.host="smtp.example.com" smtp.port="587" \
+//     smtp.user="you@example.com" smtp.pass="app-password" \
+//     feedback.to="redm1234@outlook.cz"
+// (Any SMTP provider works — Gmail with an App Password, SendGrid, Postmark,
+// your email host's SMTP, etc. Swap in a provider-specific SDK instead of
+// nodemailer if you prefer.)
+function getMailTransport() {
+  const cfg = functions.config();
+  if (!cfg.smtp?.host || !cfg.smtp?.user || !cfg.smtp?.pass) {
+    throw new Error(
+      'SMTP is not configured. Run `firebase functions:config:set smtp.host=... smtp.user=... smtp.pass=...`.'
+    );
+  }
+  return nodemailer.createTransport({
+    host: cfg.smtp.host,
+    port: Number(cfg.smtp.port || 587),
+    secure: Number(cfg.smtp.port) === 465,
+    auth: { user: cfg.smtp.user, pass: cfg.smtp.pass },
+  });
+}
+
+async function sendFeedbackEmail(feedback) {
+  const cfg = functions.config();
+  const to = cfg.feedback?.to || 'redm1234@outlook.cz';
+  const transport = getMailTransport();
+  await transport.sendMail({
+    from: cfg.smtp.user,
+    to,
+    replyTo: feedback.email || undefined,
+    subject: 'New SpotFinder feedback',
+    text: [
+      `From: ${feedback.email || '(no email given)'}`,
+      `Language: ${feedback.language || 'unknown'}`,
+      '',
+      feedback.message || '',
+    ].join('\n'),
+  });
+}
 
 // ─── Shared spam heuristics (server-side source of truth) ─────────────────
 const BLOCKED_SUBSTRINGS = [
@@ -190,5 +235,101 @@ exports.onFeedbackCreated = functions.firestore
     const { score, reasons } = spamScore(feedback.message);
     if (score >= 5) {
       await snap.ref.update({ hidden: true, moderation_note: `auto_hidden:${reasons.join(',')}` });
+      return; // don't email obvious spam
     }
+
+    await sendFeedbackEmail(feedback).catch((err) => {
+      // Never let a broken mail provider block feedback from being saved —
+      // it's already in Firestore either way, this is just the notification.
+      console.error('Failed to send feedback notification email:', err);
+    });
   });
+
+// ─── Votes: recompute trusted up/down aggregates server-side ───────────────
+// Mirrors onSpotRatingWritten — clients write only their own vote doc
+// (validated by Security Rules), this function is the only thing allowed to
+// touch upvote_count/downvote_count/quality_score on the spot.
+exports.onVoteWritten = functions.firestore
+  .document('votes/{voteId}')
+  .onWrite(async (change) => {
+    const data = change.after.exists ? change.after.data() : change.before.data();
+    const spotId = data?.spot_id;
+    if (!spotId) return;
+
+    const votesSnap = await db.collection('votes').where('spot_id', '==', spotId).get();
+    let up = 0, down = 0;
+    votesSnap.forEach((d) => {
+      const type = d.data().type;
+      if (type === 'up') up += 1;
+      else if (type === 'down') down += 1;
+    });
+
+    await db.collection('spots').doc(spotId).update({
+      upvote_count: up,
+      downvote_count: down,
+      quality_score: up - down,
+    });
+  });
+
+// ─── Admin audit log helper, called from the admin-only functions below ────
+async function logAdminAction(action, performedBy, details = {}) {
+  await db.collection('admin_audit_log').add({
+    action,
+    performed_by: performedBy,
+    performed_at: new Date().toISOString(),
+    ...details,
+  });
+}
+
+function assertIsAdmin(context) {
+  const isAdmin = context.auth?.token?.admin === true || context.auth?.token?.email === 'superadmin@spotfinder.cz';
+  if (!context.auth || !isAdmin) {
+    throw new functions.https.HttpsError('permission-denied', 'Admin only.');
+  }
+}
+
+// ─── Admin actions as callables (so every admin action is logged server-side,
+// instead of trusting the client to also write an audit entry) ─────────────
+exports.adminBanIP = functions.https.onCall(async (data, context) => {
+  assertIsAdmin(context);
+  const { ip, reason } = data || {};
+  if (!ip) throw new functions.https.HttpsError('invalid-argument', 'ip is required.');
+  await db.collection('ip_bans').doc(ip).set({
+    ip, reason: reason || 'Violation of terms', banned_by: context.auth.token.email, banned_at: new Date().toISOString(),
+  });
+  await logAdminAction('ban_ip', context.auth.token.email, { ip, reason });
+  return { success: true };
+});
+
+exports.adminUnbanIP = functions.https.onCall(async (data, context) => {
+  assertIsAdmin(context);
+  const { ip } = data || {};
+  if (!ip) throw new functions.https.HttpsError('invalid-argument', 'ip is required.');
+  await db.collection('ip_bans').doc(ip).delete();
+  await logAdminAction('unban_ip', context.auth.token.email, { ip });
+  return { success: true };
+});
+
+exports.adminResolveFlag = functions.https.onCall(async (data, context) => {
+  assertIsAdmin(context);
+  const { flagId, resolution } = data || {};
+  if (!flagId || !['upheld', 'dismissed'].includes(resolution)) {
+    throw new functions.https.HttpsError('invalid-argument', 'flagId and a valid resolution are required.');
+  }
+  await db.collection('flags').doc(flagId).update({
+    status: 'resolved', resolution, resolved_date: new Date().toISOString(),
+  });
+  await logAdminAction('resolve_flag', context.auth.token.email, { flagId, resolution });
+  return { success: true };
+});
+
+exports.adminDeleteSpot = functions.https.onCall(async (data, context) => {
+  assertIsAdmin(context);
+  const { spotId } = data || {};
+  if (!spotId) throw new functions.https.HttpsError('invalid-argument', 'spotId is required.');
+  await db.collection('spots').doc(spotId).delete();
+  await logAdminAction('delete_spot', context.auth.token.email, { spotId });
+  return { success: true };
+});
+
+exports.setAdminClaim = require('./setAdminClaim').setAdminClaim;

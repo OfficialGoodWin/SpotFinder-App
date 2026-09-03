@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Navigation, MapPin, Edit2, Trash2, Share2, Check } from 'lucide-react';
+import { X, Navigation, MapPin, Edit2, Trash2, Share2, Check, Flag } from 'lucide-react';
 import StarRating from './StarRating';
 import { submitCategoryRatings } from '@/api/firebaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -53,13 +53,14 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
 
   const handleSubmitRatings = async () => {
     if (!canSubmit) return;
+    if (!user) { onShowAuth?.(); return; }
     setSubmitting(true);
     try {
       const updated = await submitCategoryRatings(spot.id, localSpot, {
         parking: pendingParking,
         beauty:  pendingBeauty,
         privacy: pendingPrivacy,
-      });
+      }, user.uid);
       setLocalSpot(updated);
       onSpotUpdate?.(updated);
       try { localStorage.setItem(RATED_KEY(spot.id, user?.uid || user?.email), '1'); } catch (_) {}
@@ -68,6 +69,37 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
       console.error('Rating submit failed:', err);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const [showReportMenu, setShowReportMenu] = useState(false);
+  const [reportSent, setReportSent] = useState(false);
+  const [reporting, setReporting] = useState(false);
+
+  const REPORT_REASONS = [
+    { value: 'private_property',    label: t('spotDetail.reportPrivateProperty') },
+    { value: 'dangerous',           label: t('spotDetail.reportDangerous') },
+    { value: 'duplicate',           label: t('spotDetail.reportDuplicate') },
+    { value: 'spam',                label: t('spotDetail.reportSpam') },
+    { value: 'inaccurate_location', label: t('spotDetail.reportInaccurate') },
+  ];
+
+  const handleReport = async (reason) => {
+    if (!user) { onShowAuth?.(); return; }
+    setReporting(true);
+    try {
+      const { flagSpot } = await import('@/api/firebaseClient');
+      const result = await flagSpot(spot.id, user.email, reason);
+      setReportSent(true);
+      setShowReportMenu(false);
+      if (result?.alreadyFlagged) {
+        // Already reported by this account — still show confirmation, no
+        // need to alarm the user with an error for a no-op.
+      }
+    } catch (err) {
+      console.error('Report failed:', err);
+    } finally {
+      setReporting(false);
     }
   };
 
@@ -332,6 +364,38 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
                 <Trash2 className="w-5 h-5 text-red-500" />
               </button>
             </>
+          )}
+
+          {!isOwner && (
+            <div className="relative">
+              <button
+                onClick={() => { if (!user) { onShowAuth?.(); return; } setShowReportMenu(v => !v); }}
+                disabled={reportSent}
+                className="p-3 rounded-2xl border-2 border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent transition-colors disabled:opacity-50"
+                title={t('spotDetail.report')}
+              >
+                {reportSent ? <Check className="w-5 h-5 text-green-500" /> : <Flag className="w-5 h-5 text-gray-500" />}
+              </button>
+              {showReportMenu && (
+                <div className="absolute bottom-full left-0 mb-2 w-56 bg-white dark:bg-gray-900 border border-gray-200 dark:border-border rounded-xl shadow-lg overflow-hidden z-10">
+                  {REPORT_REASONS.map(r => (
+                    <button
+                      key={r.value}
+                      onClick={() => handleReport(r.value)}
+                      disabled={reporting}
+                      className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-accent disabled:opacity-50"
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {reportSent && (
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-lg whitespace-nowrap">
+                  {t('spotDetail.reportSent')}
+                </div>
+              )}
+            </div>
           )}
 
           <div className="relative">

@@ -62,10 +62,16 @@ export default async function handler(req, res) {
     return res.status(500).json({ message: 'STRIPE_SECRET_KEY is not configured on the server.' });
   }
 
-  const { priceId, customerEmail, successUrl, cancelUrl } = req.body || {};
+  const { priceId, customerEmail, userId, plan, successUrl, cancelUrl } = req.body || {};
 
   if (!priceId) {
     return res.status(400).json({ message: 'priceId is required' });
+  }
+  if (!userId) {
+    // Without this, the webhook has no way to know whose account to
+    // upgrade after a successful payment — a paid subscription would
+    // silently never take effect. See api/webhooks/route.js.
+    return res.status(400).json({ message: 'userId is required' });
   }
 
   try {
@@ -79,6 +85,9 @@ export default async function handler(req, res) {
       billing_address_collection: 'auto',
       // Allow promotional codes
       allow_promotion_codes: true,
+      // Read by the webhook to attribute payment -> Firestore user doc.
+      metadata: { userId, plan: plan || '' },
+      subscription_data: { metadata: { userId, plan: plan || '' } },
     };
 
     // Attach email if provided (pre-fills the checkout form)

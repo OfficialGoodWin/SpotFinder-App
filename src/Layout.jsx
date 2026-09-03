@@ -1,5 +1,6 @@
 import React from "react";
 import 'leaflet/dist/leaflet.css';
+import StatusBanner from '@/components/StatusBanner';
 
 export default function Layout({ children, currentPageName }) {
   // The map page needs overflow:hidden + position:fixed to prevent rubber-band
@@ -10,6 +11,7 @@ export default function Layout({ children, currentPageName }) {
   if (isMapPage) {
     return (
       <div style={{ height: '100dvh', width: '100vw', overflow: 'hidden', position: 'fixed', top: 0, left: 0 }}>
+        <StatusBanner />
         {children}
       </div>
     );
@@ -18,6 +20,7 @@ export default function Layout({ children, currentPageName }) {
   // Non-map pages: let the browser handle scrolling normally
   return (
     <div style={{ minHeight: '100dvh', width: '100%', overflowX: 'hidden' }}>
+      <StatusBanner />
       {children}
     </div>
   );

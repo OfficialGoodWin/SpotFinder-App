@@ -81,7 +81,14 @@ export const translations = {
         "submitRatings": "Submit Ratings",
         "thanksCategoryRating": "Thanks for rating!",
         "share": "Share",
-        "linkCopied": "Link copied!"
+        "linkCopied": "Link copied!",
+        "report": "Report",
+        "reportSent": "Reported — thank you",
+        "reportPrivateProperty": "Private property",
+        "reportDangerous": "Dangerous location",
+        "reportDuplicate": "Duplicate spot",
+        "reportSpam": "Spam / fake",
+        "reportInaccurate": "Wrong location"
     },
     "poiDetail": {
         "navigate": "Navigate",
@@ -385,7 +392,14 @@ export const translations = {
         "submitRatings": "Odeslat hodnocení",
         "thanksCategoryRating": "Děkujeme za hodnocení!",
         "share": "Sdílet",
-        "linkCopied": "Odkaz zkopírován!"
+        "linkCopied": "Odkaz zkopírován!",
+        "report": "Nahlásit",
+        "reportSent": "Nahlášeno — děkujeme",
+        "reportPrivateProperty": "Soukromý pozemek",
+        "reportDangerous": "Nebezpečné místo",
+        "reportDuplicate": "Duplicitní místo",
+        "reportSpam": "Spam / podvod",
+        "reportInaccurate": "Nesprávná poloha"
     },
     "poiDetail": {
         "navigate": "Navigovat",
@@ -689,7 +703,14 @@ export const translations = {
         "submitRatings": "Prześlij oceny",
         "thanksCategoryRating": "Dziękujemy za ocenę!",
         "share": "Udostępnij",
-        "linkCopied": "Link skopiowany!"
+        "linkCopied": "Link skopiowany!",
+        "report": "Zgłoś",
+        "reportSent": "Zgłoszono — dziękujemy",
+        "reportPrivateProperty": "Prywatna posiadłość",
+        "reportDangerous": "Niebezpieczne miejsce",
+        "reportDuplicate": "Zduplikowane miejsce",
+        "reportSpam": "Spam / fałszywe",
+        "reportInaccurate": "Błędna lokalizacja"
     },
     "poiDetail": {
         "navigate": "Nawiguj",
@@ -993,7 +1014,14 @@ export const translations = {
         "submitRatings": "Bewertungen abschicken",
         "thanksCategoryRating": "Danke für Ihre Bewertung!",
         "share": "Teilen",
-        "linkCopied": "Link kopiert!"
+        "linkCopied": "Link kopiert!",
+        "report": "Melden",
+        "reportSent": "Gemeldet — danke",
+        "reportPrivateProperty": "Privatgrundstück",
+        "reportDangerous": "Gefährlicher Ort",
+        "reportDuplicate": "Doppelter Eintrag",
+        "reportSpam": "Spam / Fälschung",
+        "reportInaccurate": "Falscher Standort"
     },
     "poiDetail": {
         "navigate": "Navigieren",
@@ -1297,7 +1325,14 @@ export const translations = {
         "submitRatings": "Odoslať hodnotenia",
         "thanksCategoryRating": "Ďakujeme za hodnotenie!",
         "share": "Zdieľať",
-        "linkCopied": "Odkaz skopírovaný!"
+        "linkCopied": "Odkaz skopírovaný!",
+        "report": "Nahlásiť",
+        "reportSent": "Nahlásené — ďakujeme",
+        "reportPrivateProperty": "Súkromný pozemok",
+        "reportDangerous": "Nebezpečné miesto",
+        "reportDuplicate": "Duplicitné miesto",
+        "reportSpam": "Spam / podvod",
+        "reportInaccurate": "Nesprávna poloha"
     },
     "poiDetail": {
         "navigate": "Navigovať",
@@ -1601,7 +1636,14 @@ export const translations = {
         "submitRatings": "Invia valutazioni",
         "thanksCategoryRating": "Grazie per la valutazione!",
         "share": "Condividi",
-        "linkCopied": "Link copiato!"
+        "linkCopied": "Link copiato!",
+        "report": "Segnala",
+        "reportSent": "Segnalato — grazie",
+        "reportPrivateProperty": "Proprietà privata",
+        "reportDangerous": "Luogo pericoloso",
+        "reportDuplicate": "Punto duplicato",
+        "reportSpam": "Spam / falso",
+        "reportInaccurate": "Posizione errata"
     },
     "poiDetail": {
         "navigate": "Naviga",
@@ -1905,7 +1947,14 @@ export const translations = {
         "submitRatings": "Soumettre les notes",
         "thanksCategoryRating": "Merci pour votre note !",
         "share": "Partager",
-        "linkCopied": "Lien copié !"
+        "linkCopied": "Lien copié !",
+        "report": "Signaler",
+        "reportSent": "Signalé — merci",
+        "reportPrivateProperty": "Propriété privée",
+        "reportDangerous": "Lieu dangereux",
+        "reportDuplicate": "Doublon",
+        "reportSpam": "Spam / faux",
+        "reportInaccurate": "Emplacement incorrect"
     },
     "poiDetail": {
         "navigate": "Naviguer",
@@ -2209,7 +2258,14 @@ export const translations = {
         "submitRatings": "Отправить оценки",
         "thanksCategoryRating": "Спасибо за оценку!",
         "share": "Поделиться",
-        "linkCopied": "Ссылка скопирована!"
+        "linkCopied": "Ссылка скопирована!",
+        "report": "Пожаловаться",
+        "reportSent": "Жалоба отправлена — спасибо",
+        "reportPrivateProperty": "Частная территория",
+        "reportDangerous": "Опасное место",
+        "reportDuplicate": "Дублирующая метка",
+        "reportSpam": "Спам / фейк",
+        "reportInaccurate": "Неверное местоположение"
     },
     "poiDetail": {
         "navigate": "Маршрут",
@@ -2513,7 +2569,14 @@ export const translations = {
         "submitRatings": "Надіслати оцінки",
         "thanksCategoryRating": "Дякуємо за оцінку!",
         "share": "Поділитися",
-        "linkCopied": "Посилання скопійовано!"
+        "linkCopied": "Посилання скопійовано!",
+        "report": "Поскаржитись",
+        "reportSent": "Скаргу надіслано — дякуємо",
+        "reportPrivateProperty": "Приватна територія",
+        "reportDangerous": "Небезпечне місце",
+        "reportDuplicate": "Дублікат місця",
+        "reportSpam": "Спам / фейк",
+        "reportInaccurate": "Невірне розташування"
     },
     "poiDetail": {
         "navigate": "Маршрут",
@@ -2817,7 +2880,14 @@ export const translations = {
         "submitRatings": "Értékelések beküldése",
         "thanksCategoryRating": "Köszönjük az értékelést!",
         "share": "Megosztás",
-        "linkCopied": "Link másolva!"
+        "linkCopied": "Link másolva!",
+        "report": "Jelentés",
+        "reportSent": "Jelentve — köszönjük",
+        "reportPrivateProperty": "Magánterület",
+        "reportDangerous": "Veszélyes hely",
+        "reportDuplicate": "Duplikált hely",
+        "reportSpam": "Spam / hamis",
+        "reportInaccurate": "Hibás helyszín"
     },
     "poiDetail": {
         "navigate": "Navigálás",
@@ -3121,7 +3191,14 @@ export const translations = {
         "submitRatings": "Trimite evaluările",
         "thanksCategoryRating": "Mulțumim pentru evaluare!",
         "share": "Distribuie",
-        "linkCopied": "Link copiat!"
+        "linkCopied": "Link copiat!",
+        "report": "Raportează",
+        "reportSent": "Raportat — mulțumim",
+        "reportPrivateProperty": "Proprietate privată",
+        "reportDangerous": "Loc periculos",
+        "reportDuplicate": "Loc duplicat",
+        "reportSpam": "Spam / fals",
+        "reportInaccurate": "Locație incorectă"
     },
     "poiDetail": {
         "navigate": "Navighează",
@@ -3425,7 +3502,14 @@ export const translations = {
         "submitRatings": "Enviar calificaciones",
         "thanksCategoryRating": "¡Gracias por calificar!",
         "share": "Compartir",
-        "linkCopied": "¡Enlace copiado!"
+        "linkCopied": "¡Enlace copiado!",
+        "report": "Reportar",
+        "reportSent": "Reportado — gracias",
+        "reportPrivateProperty": "Propiedad privada",
+        "reportDangerous": "Lugar peligroso",
+        "reportDuplicate": "Lugar duplicado",
+        "reportSpam": "Spam / falso",
+        "reportInaccurate": "Ubicación incorrecta"
     },
     "poiDetail": {
         "navigate": "Navegar",
@@ -3729,7 +3813,14 @@ export const translations = {
         "submitRatings": "Изпрати оценки",
         "thanksCategoryRating": "Благодарим за оценката!",
         "share": "Сподели",
-        "linkCopied": "Връзката е копирана!"
+        "linkCopied": "Връзката е копирана!",
+        "report": "Докладвай",
+        "reportSent": "Докладвано — благодарим",
+        "reportPrivateProperty": "Частна собственост",
+        "reportDangerous": "Опасно място",
+        "reportDuplicate": "Дублирано място",
+        "reportSpam": "Спам / фалшиво",
+        "reportInaccurate": "Грешно местоположение"
     },
     "poiDetail": {
         "navigate": "Навигация",
