@@ -24,7 +24,7 @@ import { useAuth } from '@/lib/AuthContext';
 export default function StatusBanner() {
   const [status, setStatus] = useState(null);
   const [dismissed, setDismissed] = useState(false);
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [verifyDismissed, setVerifyDismissed] = useState(false);
   const [resent, setResent] = useState(false);
 
@@ -87,6 +87,12 @@ export default function StatusBanner() {
               Resend email
             </button>
           )}
+          <button
+            onClick={() => refreshUser()}
+            className="underline font-semibold whitespace-nowrap"
+          >
+            I've verified
+          </button>
           <button onClick={() => setVerifyDismissed(true)} aria-label="Dismiss">
             <X className="w-4 h-4" />
           </button>

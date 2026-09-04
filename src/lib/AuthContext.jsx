@@ -31,7 +31,8 @@ export const AuthProvider = ({ children }) => {
               email: firebaseUser.email,
               id: firebaseUser.uid,
               displayName: displayName,
-              photoURL: firebaseUser.photoURL
+              photoURL: firebaseUser.photoURL,
+              emailVerified: firebaseUser.emailVerified
             });
             setIsAuthenticated(true);
           } else {
@@ -93,6 +94,38 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Force-reloads the Firebase user (picks up emailVerified changes made in
+  // another tab) and force-refreshes the ID token, since Firestore rules
+  // read `email_verified` from the cached token, not live from the server.
+  const refreshUser = async () => {
+    try {
+      const { auth } = getFirebaseServices();
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) return;
+      await firebaseUser.reload();
+      await firebaseUser.getIdToken(true);
+      setUser({
+        email: firebaseUser.email,
+        id: firebaseUser.uid,
+        displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0],
+        photoURL: firebaseUser.photoURL,
+        emailVerified: firebaseUser.emailVerified
+      });
+    } catch (error) {
+      console.error('User refresh failed:', error);
+    }
+  };
+
+  useEffect(() => {
+    const onFocus = () => { refreshUser(); };
+    window.addEventListener('visibilitychange', onFocus);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.removeEventListener('visibilitychange', onFocus);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, []);
+
   const logout = async (shouldRedirect = true) => {
     try {
       const { logout } = await import('@/api/firebaseClient');
@@ -128,7 +161,8 @@ export const AuthProvider = ({ children }) => {
       logout,
       navigateToLogin,
       checkAppState,
-      checkUserAuth
+      checkUserAuth,
+      refreshUser
     }}>
       {children}
     </AuthContext.Provider>
