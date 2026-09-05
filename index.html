@@ -13,7 +13,7 @@
     -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
-      script-src 'self' 'unsafe-inline'
+      script-src 'self' 'unsafe-inline' https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/
         https://apis.google.com https://maps.googleapis.com https://www.google.com https://www.gstatic.com
         https://www.googletagmanager.com
         https://pagead2.googlesyndication.com
@@ -21,7 +21,7 @@
         https://js.stripe.com;
       style-src 'self' 'unsafe-inline';
       img-src 'self' data: blob: https:;
-      connect-src 'self' data: https://*.googleapis.com https://*.firebaseio.com
+      connect-src 'self' data: https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net https://*.run.app https://www.google.com https://www.gstatic.com: https://*.googleapis.com https://*.firebaseio.com
         https://*.firebase.com https://api.mapy.com https://api.mapy.cz
         https://api.openrouteservice.org https://tile.openstreetmap.org
         https://api.stripe.com https://api.geoapify.com
