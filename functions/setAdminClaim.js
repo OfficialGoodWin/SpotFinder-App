@@ -21,8 +21,9 @@
  * admin (by the existing hardcoded-email check) grant the claim — it can't
  * be used by an arbitrary user to promote themselves.
  */
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
+const functions = require('firebase-functions/v1');
+const { getAuth } = require('firebase-admin/auth');
+const { getFirestore } = require('firebase-admin/firestore');
 
 const HARDCODED_BOOTSTRAP_ADMIN = 'superadmin@spotfinder.cz';
 
@@ -40,10 +41,10 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('invalid-argument', 'targetEmail is required.');
   }
 
-  const user = await admin.auth().getUserByEmail(targetEmail);
-  await admin.auth().setCustomUserClaims(user.uid, { admin: true });
+  const user = await getAuth().getUserByEmail(targetEmail);
+  await getAuth().setCustomUserClaims(user.uid, { admin: true });
 
-  await admin.firestore().collection('admin_audit_log').add({
+  await getFirestore().collection('admin_audit_log').add({
     action: 'grant_admin_claim',
     target_email: targetEmail,
     performed_by: callerEmail,

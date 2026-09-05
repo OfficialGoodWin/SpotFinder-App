@@ -3,6 +3,7 @@ import { X, Camera, MapPin, Mic, Loader2 } from 'lucide-react';
 import StarRating from './StarRating';
 import AdBanner from '../AdBanner';
 import { useLanguage } from '@/lib/LanguageContext';
+import { useAuth } from '@/lib/AuthContext';
 import { uploadSpotImage } from '@/api/firebaseClient';
 import { moderateSubmission } from '@/lib/moderation';
 import { toast } from 'sonner';
@@ -39,6 +40,7 @@ const LANG_TO_BCP47 = {
 };
 
 export default function AddSpotModal({ latlng, onClose, onSave, user }) {
+  const { authUid } = useAuth();
   const { t, language } = useLanguage();
   const spotType = 'general';
   const [description, setDescription] = useState('');
@@ -216,6 +218,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
       is_public: true,
       created_by: user?.email || 'anonymous',
       created_by_name: user?.displayName || user?.email?.split('@')[0] || 'Anonymous',
+      created_by_uid: authUid || null,
       tags,
       cost,
       access_difficulty: accessDifficulty,

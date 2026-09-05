@@ -5,6 +5,10 @@ const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  // uid is populated for BOTH real and anonymous Firebase sessions (unlike
+  // `user`, which is null for anonymous). Used to stamp ownership on
+  // content anonymous guests are allowed to create (e.g. spots).
+  const [authUid, setAuthUid] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
@@ -26,6 +30,7 @@ export const AuthProvider = ({ children }) => {
       const { auth } = getFirebaseServices();
       const unsubscribe = onAuthChange((firebaseUser) => {
         try {
+          setAuthUid(firebaseUser ? firebaseUser.uid : null);
           if (firebaseUser) {
             const anonymous = firebaseUser.isAnonymous === true;
             setIsAnonymous(anonymous);
@@ -182,6 +187,7 @@ export const AuthProvider = ({ children }) => {
   return (
     <AuthContext.Provider value={{ 
       user, 
+      authUid,
       isAuthenticated, 
       isLoadingAuth,
       isLoadingPublicSettings,
