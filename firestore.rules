@@ -191,7 +191,9 @@ service cloud.firestore {
     // Publicly writable collections are the easiest spam target — cap size
     // and require the shape the app actually sends.
     match /feedback/{docId} {
-      allow create: if strLen(request.resource.data.get('message', ''), 3000);
+      // Public feedback is created only by the submitFeedback callable after
+      // reCAPTCHA + IP/session rate limiting. Direct SDK writes are blocked.
+      allow create: if false;
       allow read, delete: if isSuperAdmin();
     }
   }

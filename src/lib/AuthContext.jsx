@@ -1,11 +1,12 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { getFirebaseServices, onAuthChange, handleGoogleRedirectResult } from '@/api/firebaseClient';
+import { getFirebaseServices, onAuthChange, handleGoogleRedirectResult, ensureAnonymousSession } from '@/api/firebaseClient';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAnonymous, setIsAnonymous] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(true);
   const [authError, setAuthError] = useState(null);
@@ -15,6 +16,11 @@ export const AuthProvider = ({ children }) => {
     // Set up Firebase auth state listener
     checkAppState();
     
+    // Keep a lightweight anonymous Firebase identity for guests. The
+    // anonymous UID gives server-side rate limiting a stable session key
+    // without requiring signup or exposing it as an authenticated app user.
+    ensureAnonymousSession().catch((e) => console.warn('Anonymous guest session:', e));
+
     // Handle redirect result from Google OAuth (TikTok/WebView flow)
     handleGoogleRedirectResult().then(redirectUser => {
       if (redirectUser) console.log('Google redirect sign-in succeeded:', redirectUser.email);
@@ -26,18 +32,26 @@ export const AuthProvider = ({ children }) => {
       const unsubscribe = onAuthChange((firebaseUser) => {
         try {
           if (firebaseUser) {
-            const displayName = firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'User');
-            setUser({
-              email: firebaseUser.email,
-              id: firebaseUser.uid,
-              displayName: displayName,
-              photoURL: firebaseUser.photoURL,
-              emailVerified: firebaseUser.emailVerified
-            });
-            setIsAuthenticated(true);
+            const anonymous = firebaseUser.isAnonymous === true;
+            setIsAnonymous(anonymous);
+            if (anonymous) {
+              setUser(null);
+              setIsAuthenticated(false);
+            } else {
+              const displayName = firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'User');
+              setUser({
+                email: firebaseUser.email,
+                id: firebaseUser.uid,
+                displayName: displayName,
+                photoURL: firebaseUser.photoURL,
+                emailVerified: firebaseUser.emailVerified
+              });
+              setIsAuthenticated(true);
+            }
           } else {
             setUser(null);
             setIsAuthenticated(false);
+            setIsAnonymous(false);
           }
         } catch (err) {
           console.error('Error in auth state callback:', err);
@@ -74,17 +88,24 @@ export const AuthProvider = ({ children }) => {
     try {
       const { auth } = getFirebaseServices();
       const firebaseUser = auth.currentUser;
-      if (firebaseUser) {
+      if (firebaseUser && !firebaseUser.isAnonymous) {
+        setIsAnonymous(false);
         setUser({
           email: firebaseUser.email,
           id: firebaseUser.uid,
           displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0],
-          photoURL: firebaseUser.photoURL
+          photoURL: firebaseUser.photoURL,
+          emailVerified: firebaseUser.emailVerified
         });
         setIsAuthenticated(true);
+      } else if (firebaseUser?.isAnonymous) {
+        setUser(null);
+        setIsAuthenticated(false);
+        setIsAnonymous(true);
       } else {
         setUser(null);
         setIsAuthenticated(false);
+        setIsAnonymous(false);
       }
     } catch (error) {
       console.error('User auth check failed:', error);
@@ -104,6 +125,13 @@ export const AuthProvider = ({ children }) => {
       if (!firebaseUser) return;
       await firebaseUser.reload();
       await firebaseUser.getIdToken(true);
+      if (firebaseUser.isAnonymous) {
+        setUser(null);
+        setIsAuthenticated(false);
+        setIsAnonymous(true);
+        return;
+      }
+      setIsAnonymous(false);
       setUser({
         email: firebaseUser.email,
         id: firebaseUser.uid,

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ChevronDown, ArrowLeft, MapPin, Star, Navigation, Layers, Share2, Mic, Car, Wifi, Lock, Trash2, Send, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/lib/LanguageContext';
-import { getFirebaseServices } from '@/api/firebaseClient';
+import { submitFeedback } from '@/api/firebaseClient';
 
 // ─── SVG Illustrations ────────────────────────────────────────────────────────
 
@@ -1507,13 +1507,10 @@ function FeedbackSection({ language }) {
     setStatus('sending');
 
     try {
-      const { db } = getFirebaseServices();
-      const { collection, addDoc } = await import('firebase/firestore');
-      await addDoc(collection(db, 'feedback'), {
-        email: email.trim() || null,
+      await submitFeedback({
+        email: email.trim(),
         message: msg.trim(),
         language,
-        created_at: new Date().toISOString(),
       });
       setStatus('sent');
       setEmail('');

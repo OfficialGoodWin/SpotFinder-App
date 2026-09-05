@@ -17,6 +17,7 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 admin.initializeApp();
 const db = admin.firestore();
 
@@ -32,27 +33,28 @@ const db = admin.firestore();
 // your email host's SMTP, etc. Swap in a provider-specific SDK instead of
 // nodemailer if you prefer.)
 function getMailTransport() {
-  const cfg = functions.config();
-  if (!cfg.smtp?.host || !cfg.smtp?.user || !cfg.smtp?.pass) {
-    throw new Error(
-      'SMTP is not configured. Run `firebase functions:config:set smtp.host=... smtp.user=... smtp.pass=...`.'
-    );
+  const host = process.env.SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT || 587);
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+
+  if (!host || !user || !pass) {
+    throw new Error('SMTP environment variables are not configured.');
   }
+
   return nodemailer.createTransport({
-    host: cfg.smtp.host,
-    port: Number(cfg.smtp.port || 587),
-    secure: Number(cfg.smtp.port) === 465,
-    auth: { user: cfg.smtp.user, pass: cfg.smtp.pass },
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
   });
 }
 
 async function sendFeedbackEmail(feedback) {
-  const cfg = functions.config();
-  const to = cfg.feedback?.to || 'redm1234@outlook.cz';
   const transport = getMailTransport();
   await transport.sendMail({
-    from: cfg.smtp.user,
-    to,
+    from: process.env.SMTP_USER,
+    to: process.env.FEEDBACK_TO || 'redm1234@outlook.cz',
     replyTo: feedback.email || undefined,
     subject: 'New SpotFinder feedback',
     text: [
@@ -63,7 +65,6 @@ async function sendFeedbackEmail(feedback) {
     ].join('\n'),
   });
 }
-
 // ─── Shared spam heuristics (server-side source of truth) ─────────────────
 const BLOCKED_SUBSTRINGS = [
   'viagra', 'porn', 'xxx', 'nudes', 'onlyfans',
@@ -73,6 +74,54 @@ const BLOCKED_SUBSTRINGS = [
 const URL_REGEX = /(https?:\/\/|www\.)[^\s]+/gi;
 const REPEATED_CHAR_REGEX = /(.)\1{6,}/;
 const REPEATED_WORD_REGEX = /\b(\w+)\b(?:\s+\1\b){3,}/i;
+
+function getRequestIp(context) {
+  const req = context?.rawRequest;
+  const forwarded = req?.headers?.['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) {
+    return forwarded.split(',')[0].trim();
+  }
+  return req?.socket?.remoteAddress || req?.ip || 'unknown';
+}
+
+function hashIp(ip) {
+  const salt = process.env.ANTI_SPAM_IP_SALT || process.env.RECAPTCHA_SECRET_KEY || 'spotfinder-anti-spam';
+  return crypto.createHash('sha256').update(`${salt}:${ip}`).digest('hex');
+}
+
+function isAllowedRecaptchaHostname(hostname) {
+  const configured = (process.env.RECAPTCHA_ALLOWED_HOSTNAMES || 'spotfinder.cz,www.spotfinder.cz,localhost,127.0.0.1')
+    .split(',').map((v) => v.trim().toLowerCase()).filter(Boolean);
+  return configured.includes(String(hostname || '').toLowerCase());
+}
+
+async function verifyRecaptcha(token, action) {
+  const secret = process.env.RECAPTCHA_SECRET_KEY;
+  if (!secret) throw new Error('RECAPTCHA_SECRET_KEY is not configured');
+  if (!token || typeof token !== 'string') return { ok: false, reason: 'missing_token' };
+
+  const body = new URLSearchParams({ secret, response: token });
+  const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body,
+  });
+  if (!response.ok) throw new Error(`reCAPTCHA verification HTTP ${response.status}`);
+  const result = await response.json();
+  return {
+    ok: result.success === true
+      && Number(result.score || 0) >= Number(process.env.RECAPTCHA_MIN_SCORE || 0.5)
+      && result.action === action
+      && isAllowedRecaptchaHostname(result.hostname),
+    score: Number(result.score || 0),
+    hostname: result.hostname || '',
+    reason: result['error-codes']?.join(',') || '',
+  };
+}
+
+async function checkIpRateLimit(ipHash, action, max, windowMs) {
+  return checkServerRateLimit(`ip_${ipHash}`, action, max, windowMs);
+}
 
 function spamScore(text = '') {
   const raw = String(text || '').trim();
@@ -227,7 +276,59 @@ exports.onPoiRatingCreated = functions.firestore
     }
   });
 
-// ─── Feedback: spam scan (public, unauthenticated write surface) ──────────
+// ─── Feedback: protected public submit endpoint ─────────────────────────────
+// Guest-friendly: Firebase anonymous auth supplies a stable session key while
+// reCAPTCHA + IP limits stop an attacker from creating unlimited sessions.
+exports.submitFeedback = functions.https.onCall(async (data, context) => {
+  const payload = data || {};
+  const message = String(payload.message || '').trim();
+  const email = String(payload.email || '').trim().slice(0, 320);
+  const language = String(payload.language || 'en').trim().slice(0, 16);
+  const recaptchaToken = payload.recaptchaToken;
+
+  if (!message) {
+    throw new functions.https.HttpsError('invalid-argument', 'Message is required.');
+  }
+  if (message.length > 3000) {
+    throw new functions.https.HttpsError('invalid-argument', 'Message is too long.');
+  }
+
+  const captcha = await verifyRecaptcha(recaptchaToken, 'feedback');
+  if (!captcha.ok) {
+    console.warn('Feedback rejected by reCAPTCHA', { score: captcha.score, hostname: captcha.hostname, reason: captcha.reason });
+    throw new functions.https.HttpsError('permission-denied', 'reCAPTCHA verification failed.');
+  }
+
+  const ipHash = hashIp(getRequestIp(context));
+  const uid = context.auth?.uid || 'no-auth';
+  const sessionAllowed = await checkServerRateLimit(uid, 'feedback', 5, 60 * 60 * 1000);
+  const ipAllowed = await checkIpRateLimit(ipHash, 'feedback', 10, 60 * 60 * 1000);
+
+  if (!sessionAllowed || !ipAllowed) {
+    throw new functions.https.HttpsError('resource-exhausted', 'Too many feedback submissions. Try again later.');
+  }
+
+  const spam = spamScore(message);
+  const ref = db.collection('feedback').doc();
+  await ref.set({
+    email: email || null,
+    message,
+    language,
+    created_at: new Date().toISOString(),
+    recaptcha_score: captcha.score,
+    recaptcha_action: 'feedback',
+    anonymous_session: context.auth?.token?.firebase?.sign_in_provider === 'anonymous',
+    ip_hash: ipHash,
+    hidden: spam.score >= 5,
+    moderation_note: spam.score >= 5 ? `auto_hidden:${spam.reasons.join(',')}` : (spam.score > 0 ? `low_confidence:${spam.reasons.join(',')}` : null),
+  });
+
+  // `onFeedbackCreated` remains the single notification path, so a successful
+  // callable submission produces exactly one email.
+  return { success: true, id: ref.id };
+});
+
+// ─── Feedback: legacy trigger / defense-in-depth ──────────────────────────
 exports.onFeedbackCreated = functions.firestore
   .document('feedback/{docId}')
   .onCreate(async (snap) => {

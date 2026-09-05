@@ -9,7 +9,8 @@ import {
   GoogleAuthProvider,
   signOut as firebaseSignOut,
   onAuthStateChanged,
-  sendEmailVerification
+  sendEmailVerification,
+  signInAnonymously
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -28,6 +29,7 @@ import {
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { firebaseConfig } from './firebaseConfig';
+import { getRecaptchaToken } from '@/lib/recaptcha';
 
 let app, auth, db, functionsInstance;
 try {
@@ -54,10 +56,9 @@ export const getFirebaseServices = () => {
   return { app, auth, db, functions: functionsInstance };
 };
 
-// Thin wrapper so admin actions always go through the audited Cloud
-// Function callables in functions/index.js instead of writing Firestore
-// directly from the client (which would skip the admin_audit_log entry).
-const callAdminFn = (name) => async (payload) => {
+// Shared callable wrapper. Admin helpers below use the same path so every
+// privileged action stays behind the Cloud Function authorization checks.
+const callFn = (name) => async (payload) => {
   const { functions } = getFirebaseServices();
   const fn = httpsCallable(functions, name);
   const { data } = await fn(payload);
@@ -71,6 +72,12 @@ export const isRestrictedBrowser = () => {
          (/Android/.test(ua) && /\bwv\b/.test(ua));
 };
  
+export const ensureAnonymousSession = async () => {
+  const { auth } = getFirebaseServices();
+  if (auth.currentUser) return auth.currentUser;
+  return (await signInAnonymously(auth)).user;
+};
+
 export const loginWithEmail = async (email, password) => {
   const { auth } = getFirebaseServices();
   return (await signInWithEmailAndPassword(auth, email, password)).user;
@@ -174,8 +181,8 @@ const IP_BANS_COLLECTION = 'ip_bans';
 // guaranteed to leave an admin_audit_log entry, since the logging happens
 // server-side as part of the same call rather than as a separate write the
 // client could skip or fail to make.
-export const banIP = callAdminFn('adminBanIP');
-export const unbanIP = (ipAddress) => callAdminFn('adminUnbanIP')({ ip: ipAddress });
+export const banIP = callFn('adminBanIP');
+export const unbanIP = (ipAddress) => callFn('adminUnbanIP')({ ip: ipAddress });
 export const isIPBanned = async (ipAddress) => {
   const { db } = getFirebaseServices();
   return (await getDoc(doc(db, IP_BANS_COLLECTION, ipAddress))).exists();
@@ -183,6 +190,20 @@ export const isIPBanned = async (ipAddress) => {
  
 const SPOTS_COLLECTION = 'spots';
 const RATINGS_COLLECTION = 'ratings';
+
+// Public feedback is deliberately routed through a callable function. This
+// lets the server verify reCAPTCHA and apply IP + anonymous-session limits
+// before a Firestore document is created.
+export const submitFeedback = async ({ email = '', message, language = 'en' }) => {
+  if (!message?.trim()) throw new Error('Message is required');
+  const recaptchaToken = await getRecaptchaToken('feedback');
+  return callFn('submitFeedback')({
+    email: String(email || '').trim().slice(0, 320),
+    message: String(message).trim().slice(0, 3000),
+    language: String(language || 'en').slice(0, 16),
+    recaptchaToken,
+  });
+};
  
 // Visible statuses: published spots + pending_trust spots (shown immediately with
 // a "new" badge in the UI per spec — flagged/hidden/rejected are excluded).
@@ -252,7 +273,7 @@ export const deleteSpot = async (spotId) => {
  
 // Routed through the audited Cloud Function callable (functions/index.js)
 // so deletion always leaves an admin_audit_log entry.
-export const deleteSpotAsSuperAdmin = (spotId) => callAdminFn('adminDeleteSpot')({ spotId });
+export const deleteSpotAsSuperAdmin = (spotId) => callFn('adminDeleteSpot')({ spotId });
  
 export const rateSpot = async (spotId, rating) => {
   const { db } = getFirebaseServices();
@@ -348,7 +369,7 @@ export const getOpenFlagsForAdmin = async (maxCount = 100) => {
 // Routed through the audited Cloud Function callable (functions/index.js)
 // so every flag resolution leaves an admin_audit_log entry.
 export const resolveFlag = (flagId, resolution /* 'upheld' | 'dismissed' */) =>
-  callAdminFn('adminResolveFlag')({ flagId, resolution });
+  callFn('adminResolveFlag')({ flagId, resolution });
 
 // ─── Votes (up/down, feeds quality_score/ranking — not visibility) ───────────
 const VOTES_COLLECTION = 'votes';
