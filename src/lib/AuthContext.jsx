@@ -16,11 +16,6 @@ export const AuthProvider = ({ children }) => {
     // Set up Firebase auth state listener
     checkAppState();
     
-    // Keep a lightweight anonymous Firebase identity for guests. The
-    // anonymous UID gives server-side rate limiting a stable session key
-    // without requiring signup or exposing it as an authenticated app user.
-    ensureAnonymousSession().catch((e) => console.warn('Anonymous guest session:', e));
-
     // Handle redirect result from Google OAuth (TikTok/WebView flow)
     handleGoogleRedirectResult().then(redirectUser => {
       if (redirectUser) console.log('Google redirect sign-in succeeded:', redirectUser.email);
@@ -52,6 +47,12 @@ export const AuthProvider = ({ children }) => {
             setUser(null);
             setIsAuthenticated(false);
             setIsAnonymous(false);
+            // Only start an anonymous guest session once we know for sure
+            // there's no real signed-in user — checking this here (instead
+            // of at mount) avoids a race where a persisted real login is
+            // still being restored and gets silently overwritten by an
+            // anonymous session.
+            ensureAnonymousSession().catch((e) => console.warn('Anonymous guest session:', e));
           }
         } catch (err) {
           console.error('Error in auth state callback:', err);
