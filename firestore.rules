@@ -40,24 +40,28 @@ service cloud.firestore {
         // Never trust a client-supplied moderation state on create.
         && request.resource.data.status in ['pending_trust', 'published']
         && (!('flag_count' in request.resource.data) || request.resource.data.flag_count == 0)
-        // Community-abuse mitigation: throwaway/unverified accounts can
-        // browse and rate, but can't post new public content.
-        && request.auth.token.email_verified == true;
+        // Ownership is by uid so anonymous guests can post too.
+        && request.resource.data.created_by_uid == request.auth.uid
+        // Community-abuse mitigation: throwaway/unverified/anonymous
+        // accounts can post, but only into the pending_trust review
+        // queue — never straight to published.
+        && (request.auth.token.email_verified == true
+            || request.resource.data.status == 'pending_trust');
 
       // Owners may edit their own listing content, but can never touch the
       // rating aggregates, flag/moderation state, or re-assign ownership —
       // those are only ever written by Cloud Functions with the Admin SDK.
       allow update: if isAuth() && (
-        (resource.data.created_by == authEmail()
+        ((resource.data.created_by == authEmail() || resource.data.created_by_uid == request.auth.uid)
           && unchanged(['rating', 'rating_count', 'parking_rating', 'parking_rating_count',
                         'beauty_rating', 'beauty_rating_count', 'privacy_rating',
                         'privacy_rating_count', 'flag_count', 'status', 'created_by',
-                        'upvote_count', 'downvote_count', 'quality_score']))
+                        'created_by_uid', 'upvote_count', 'downvote_count', 'quality_score']))
         || isSuperAdmin()
       );
 
       allow delete: if isAuth() && (
-        resource.data.created_by == authEmail() || isSuperAdmin()
+        resource.data.created_by == authEmail() || resource.data.created_by_uid == request.auth.uid || isSuperAdmin()
       );
     }
 
