@@ -14,12 +14,13 @@
  * Deploy with: firebase deploy --only functions
  */
 
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
+const functions = require('firebase-functions/v1');
+const { initializeApp } = require('firebase-admin/app');
+const { getFirestore } = require('firebase-admin/firestore');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
-admin.initializeApp();
-const db = admin.firestore();
+initializeApp();
+const db = getFirestore();
 
 // ─── Feedback email notifications ──────────────────────────────────────────
 // The feedback form in FAQ.jsx was only ever writing to Firestore — nothing
@@ -65,6 +66,7 @@ async function sendFeedbackEmail(feedback) {
     ].join('\n'),
   });
 }
+
 // ─── Shared spam heuristics (server-side source of truth) ─────────────────
 const BLOCKED_SUBSTRINGS = [
   'viagra', 'porn', 'xxx', 'nudes', 'onlyfans',
