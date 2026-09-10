@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-import { Plus, Settings, Crosshair, HelpCircle, Trash2, WifiOff } from 'lucide-react';
+import { Plus, Settings, Crosshair, HelpCircle, Trash2 } from 'lucide-react';
 import SubscriptionModal from '../components/SubscriptionModal';
 import { getPublicSpots, createSpot, deleteSpot, updateSpot, getAdminPOIs, getAdminClosures, getAdminERouteOverrides, getAdminRoadOverrides, getDeletedAmbientPOIs, addDeletedAmbientPOI } from '@/api/firebaseClient';
 import { useAuth } from '@/lib/AuthContext';
@@ -24,7 +24,6 @@ import POIPanel from '../components/spots/POIPanel';
 import POIDetailPanel from '../components/spots/POIDetailPanel';
 import SettingsModal from '../components/SettingsModal';
 import ProfileMenu from '../components/ProfileMenu';
-import OfflineMapsMenu from '../components/offline/OfflineMapsMenu';
  
 // Note: Leaflet marker icons are fixed via src/lib/leaflet-fix.js
  
@@ -54,7 +53,6 @@ export default function Home() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
-  const [showOfflineMaps, setShowOfflineMaps] = useState(false);
 
   const [navRouteData, setNavRouteData] = useState({ coordinates: [], turns: [], currentStep: 0 });
   const [showSpots, setShowSpots] = useState(true);
@@ -283,7 +281,7 @@ export default function Home() {
         </div>
       )}
  
-      {/* Map — MapLibre GL: online=vector tiles from R2, offline=local PMTiles */}
+      {/* Map — MapLibre GL, vector tiles streamed from R2 */}
       <MapLibreMap
         center={mapCenter}
         flyTo={flyTo}
@@ -441,13 +439,6 @@ export default function Home() {
               <HelpCircle className="w-5 h-5" />
             </button>
             <button
-              onClick={() => setShowOfflineMaps(true)}
-              className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-accent/60 flex items-center justify-center text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent active:scale-95 transition-all"
-              title="Offline maps"
-            >
-              <WifiOff className="w-5 h-5" />
-            </button>
-            <button
               onClick={() => setShowSettings(true)}
               className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-accent/60 flex items-center justify-center text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent active:scale-95 transition-all"
               title="Settings"
@@ -568,9 +559,6 @@ export default function Home() {
  
       {showSettings && (
         <SettingsModal onClose={() => setShowSettings(false)} />
-      )}
-      {showOfflineMaps && (
-        <OfflineMapsMenu onClose={() => setShowOfflineMaps(false)} />
       )}
 
       {isSuperAdmin && showAdminEditor && (

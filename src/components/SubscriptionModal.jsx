@@ -47,7 +47,6 @@ const PLANS = [
     features: [
       'Unlimited spot saves',
       'Advanced route planning',
-      'Offline maps for 3 regions',
       'Priority spot ratings',
       'Elite badge on profile',
       'No ads',
@@ -70,7 +69,6 @@ const PLANS = [
     yearly:  { price: '$49.99', priceId: PRICES.ultra_yearly,  period: '/year', saving: 'Save $69.89' },
     features: [
       'Everything in Elite',
-      'Unlimited offline maps',
       'Real-time traffic alerts',
       'Custom map themes',
       'Trip history & export',

@@ -151,6 +151,16 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
 
+    // ── Public status page (public read, superadmin write) ────────────────────
+    match /status_services/{docId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+    match /status_incidents/{docId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
     // ── Admin audit log (write-only from Cloud Functions via Admin SDK,
     //     which bypasses these rules; clients may only read their own trail) ──
     match /admin_audit_log/{docId} {

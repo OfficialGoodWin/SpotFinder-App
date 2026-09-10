@@ -1,6 +1,4 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { getPOIs } from '../../lib/offlineStorage.js';
-import { getDownloadedCountryAt, COUNTRIES } from '../../lib/offlineManager.js';
 import { Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 
@@ -176,40 +174,8 @@ export default function AmbientPOILayer({ onSelectPOI, selectedCategory }) {
         const seen = new Set();
         const isOffline = !navigator.onLine;
 
-        // ── Offline POI data path ─────────────────────────────────────────────
-        // If we have pre-downloaded POIs for a country that covers this viewport,
-        // use them directly (and skip the Geoapify request entirely).
-        const centerLat = (south + north) / 2;
-        const centerLon = (west + east)   / 2;
-
-        // We need the meta map to check which countries are downloaded.
-        // Try to read it from a module-level cache (refreshed on mount).
-        let usedOfflinePOIs = false;
-        if (isOffline || true) {  // Always prefer offline POIs if available
-          const { getAllMeta } = await import('../../lib/offlineStorage.js');
-          const meta = await getAllMeta();
-          const country = getDownloadedCountryAt(centerLat, centerLon, meta);
-          if (country && meta[country.code]?.hasPOIs) {
-            const offlinePOIs = await getPOIs(country.code);
-            if (offlinePOIs?.length) {
-              usedOfflinePOIs = true;
-              for (const poi of offlinePOIs) {
-                // Filter to viewport
-                if (poi.lat < south || poi.lat > north || poi.lon < west || poi.lon > east) continue;
-                if (seen.has(poi.id)) continue;
-                seen.add(poi.id);
-                // Match to a category hint
-                const fakeFeature = { properties: { categories: poi.categories || [], name: poi.name } };
-                const cat = detectCategory(fakeFeature);
-                if (!cat || z < cat.minZoom) continue;
-                result.push({ ...poi, _cat: cat, tags: { phone: poi.phone, website: poi.website } });
-              }
-            }
-          }
-        }
-
         // ── Online Geoapify path ──────────────────────────────────────────────
-        if (!usedOfflinePOIs && !isOffline) {
+        if (!isOffline) {
           const features = await fetchGeoapifyPlaces(south, west, north, east, z, signal);
 
           for (const feat of features) {

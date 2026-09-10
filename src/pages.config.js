@@ -50,12 +50,14 @@ import FAQ from './pages/FAQ';
  */
 import Home from './pages/Home';
 import FAQ from './pages/FAQ';
+import Status from './pages/Status';
 import __Layout from './Layout.jsx';
  
  
 export const PAGES = {
     "Home": Home,
     "FAQ": FAQ,
+    "Status": Status,
 }
  
 export const pagesConfig = {

@@ -14,7 +14,7 @@ export const PLANS = {
     priceYearly: '$27.99/yr',
     colors: { bg: '#7C3AED', accent: '#A78BFA' },
     icon: '👑',
-    features: ['Lane markings', 'Advanced POI filters', 'Offline premium']
+    features: ['Lane markings', 'Advanced POI filters']
   },
   ultra: {
     monthly: 'price_ultra_monthly',

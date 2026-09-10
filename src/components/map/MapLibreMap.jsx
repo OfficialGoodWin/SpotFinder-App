@@ -1,12 +1,11 @@
 /**
  * MapLibreMap.jsx
- * Replaces: MapContainer, TileLayer, OfflineTileLayer, SpotMarker,
+ * Replaces: MapContainer, TileLayer, SpotMarker,
  *           UserLocationMarker, AmbientPOILayer, POILayer,
  *           RoadClosureLayer, RouteOverlay, MapController, MapClickHandler
  *
- * Online:  OpenFreeMap vector tiles — styled to match Mapy.cz
- * Offline: local PMTiles file read from OPFS via pmtiles library
- * Dark:    full dark variant, switches instantly via setStyle()
+ * OpenFreeMap vector tiles — styled to match Mapy.cz
+ * Dark: full dark variant, switches instantly via setStyle()
  */
 import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
@@ -14,8 +13,6 @@ import { Protocol } from 'pmtiles';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { lightStyle, darkStyle, outdoorStyle, winterStyle } from '../../lib/mapStyle.js';
 import { AMBIENT_CATEGORIES } from '../../lib/ambientCategories.js';
-import { COUNTRIES, isPointInCountry, vtKey } from '../../lib/vectorTileDownloader.js';
-import { getAllMeta, getPOIs, getTile } from '../../lib/offlineStorage.js';
 
 
 // ── Road shield generator ─────────────────────────────────────────────────────
@@ -299,20 +296,6 @@ function ensureProtocols() {
   const protocol = new Protocol();
   maplibregl.addProtocol('pmtiles', protocol.tile.bind(protocol));
 
-  // Offline vector tile protocol — serves from IndexedDB
-  // URL format: offline-vt://z/x/y
-  maplibregl.addProtocol('offline-vt', async (params, abortController) => {
-    try {
-      const parts = params.url.replace('offline-vt://', '').split('/');
-      const [z, x, y] = parts.map(Number);
-      const key = vtKey(z, x, y);
-      const buf = await getTile(key);
-      if (buf) return { data: buf };
-    } catch (_) { }
-    // Not cached — return empty tile
-    return { data: new ArrayBuffer(0) };
-  });
-
   protocolsRegistered = true;
 }
 
@@ -573,8 +556,6 @@ export default function MapLibreMap({
   const routeAdded = useRef(false);
   const poiAbort = useRef(null);
   const poiTimer = useRef(null);
-  const [offlineActive, setOfflineActive] = useState(false);
-  const [offlineCountry, setOfflineCountry] = useState('');
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   // ── Apply admin E-route shield removals ───────────────────────────────────
@@ -656,63 +637,10 @@ export default function MapLibreMap({
      
   }, []);
 
-  // ── Offline vector tile switcher ─────────────────────────────────────────
-  // When offline and the country has downloaded tiles, switch to offline-vt:// source
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    async function checkOffline() {
-      if (isOnline) {
-        if (offlineActive) {
-          map.setStyle(getMapStyle(isDark, mapLayer));
-          setOfflineActive(false);
-          setOfflineCountry('');
-        }
-        return;
-      }
-
-      // Check if this location has downloaded vector tiles
-      const c = map.getCenter();
-      const meta = await getAllMeta();
-      let found = null;
-      for (const code of Object.keys(meta)) {
-        const country = COUNTRIES.find(x => x.code === code);
-        if (country && meta[code]?.type === 'vector' && isPointInCountry(c.lat, c.lng, country)) {
-          found = country; break;
-        }
-      }
-
-      if (found) {
-        // Switch to offline-vt:// source — served from IndexedDB
-        const baseStyle = getMapStyle(isDark, mapLayer);
-        const offlineStyle = {
-          ...baseStyle,
-          sources: {
-            v: {
-              type: 'vector',
-              // Custom TileJSON pointing at our IndexedDB protocol
-              tiles: ['offline-vt://{z}/{x}/{y}'],
-              minzoom: 0,
-              maxzoom: 14,
-              attribution: '© OpenStreetMap contributors',
-            },
-          },
-        };
-        map.setStyle(offlineStyle);
-        setOfflineActive(true);
-        setOfflineCountry(found.name);
-      }
-    }
-
-    checkOffline();
-     
-  }, [isOnline, isDark, mapLayer]);
-
   // ── Dark mode ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || offlineActive) return;
+    if (!map) return;
     const doSwitch = () => {
       map.setStyle(getMapStyle(isDark, mapLayer));
       map.once('idle', () => {
@@ -722,7 +650,7 @@ export default function MapLibreMap({
     };
     if (!map.isStyleLoaded()) map.once('idle', doSwitch);
     else doSwitch();
-  }, [isDark, mapLayer, offlineActive]);
+  }, [isDark, mapLayer]);
 
   // ── Cursor ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -813,24 +741,6 @@ export default function MapLibreMap({
       poiAbort.current = new AbortController();
 
       let pois = [];
-
-      // Try offline POIs first
-      const metaMap = await getAllMeta();
-      const country = COUNTRIES.find(c => {
-        const [cw, cs, ce, cn] = c.bbox;
-        return cLat >= cs && cLat <= cn && cLon >= cw && cLon <= ce && metaMap[c.code]?.hasPOIs;
-      });
-      if (country) {
-        const offline = await getPOIs(country.code);
-        if (offline?.length) {
-          pois = offline.filter(p => p.lat >= s && p.lat <= n && p.lon >= w && p.lon <= e)
-            .map(p => {
-              const cat = detectCat({ properties: { categories: p.categories || [], name: p.name } });
-              if (!cat || zoom < cat.minZoom) return null;
-              return { ...p, _cat: cat };
-            }).filter(Boolean);
-        }
-      }
 
       // Online Geoapify fallback
       if (!pois.length && navigator.onLine) {
@@ -1358,7 +1268,7 @@ const addAdminMarkers = () => {
             fontSize: 11, padding: '3px 8px', borderRadius: 12, background: '#2563eb',
             color: '#fff', fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.3)', opacity: 0.9
           }}>
-            📴 {offlineActive ? `Offline · ${offlineCountry}` : 'Offline'}
+            📴 Offline
           </span>
         </div>
       )}
