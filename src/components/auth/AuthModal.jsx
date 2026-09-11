@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Mail, Lock, User, ArrowRight, ExternalLink } from 'lucide-react';
-import { loginWithEmail, registerWithEmail, loginWithGoogle, isRestrictedBrowser } from '@/api/firebaseClient';
+import { X, Mail, Lock, User, ArrowRight, ExternalLink, Smartphone } from 'lucide-react';
+import { loginWithEmail, registerWithEmail, loginWithGoogle, isRestrictedBrowser, getMfaResolverFromError, getMfaRecaptchaVerifier, clearMfaRecaptchaVerifier, startMfaSignIn, completeMfaSignIn } from '@/api/firebaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useLanguage } from '@/lib/LanguageContext';
 
@@ -20,6 +20,12 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
   const [restricted, setRestricted] = useState(false);
   const [lockoutRemaining, setLockoutRemaining] = useState(0);
   const { checkUserAuth } = useAuth();
+
+  // ── MFA challenge state (only used when the account has a second factor) ──
+  const [mfaResolver, setMfaResolver] = useState(null);
+  const [mfaVerificationId, setMfaVerificationId] = useState(null);
+  const [mfaCode, setMfaCode] = useState('');
+  const [mfaSending, setMfaSending] = useState(false);
 
   useEffect(() => { setRestricted(isRestrictedBrowser()); }, []);
 
@@ -53,6 +59,13 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
       loginAttempts.lockedUntil = 0;
       await checkUserAuth(); onSuccess(); onClose();
     } catch (err) {
+      // Account has a second factor enrolled — this isn't a failed login,
+      // switch to the SMS-code challenge screen instead of showing an error.
+      if (err.code === 'auth/multi-factor-auth-required') {
+        setMfaResolver(getMfaResolverFromError(err));
+        setLoading(false);
+        return;
+      }
       // Track failed login attempts (only for login tab, not registration)
       if (tab === 'login') {
         loginAttempts.count += 1;
@@ -83,6 +96,32 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
         };
         setError(codes[err.code] || err.message || t('auth.somethingWrong'));
       }
+    } finally { setLoading(false); }
+  };
+
+  const handleSendMfaCode = async () => {
+    if (!mfaResolver) return;
+    setMfaSending(true); setError('');
+    try {
+      const verifier = getMfaRecaptchaVerifier('mfa-recaptcha-container');
+      const id = await startMfaSignIn(mfaResolver, 0, verifier);
+      setMfaVerificationId(id);
+    } catch (err) {
+      setError(err.message || t('auth.somethingWrong'));
+    } finally { setMfaSending(false); }
+  };
+
+  const handleVerifyMfaCode = async (e) => {
+    e.preventDefault();
+    if (!mfaVerificationId || !mfaCode.trim()) return;
+    setLoading(true); setError('');
+    try {
+      await completeMfaSignIn(mfaResolver, mfaVerificationId, mfaCode.trim());
+      clearMfaRecaptchaVerifier();
+      setMfaResolver(null); setMfaVerificationId(null); setMfaCode('');
+      await checkUserAuth(); onSuccess(); onClose();
+    } catch (err) {
+      setError(err.message || t('auth.somethingWrong'));
     } finally { setLoading(false); }
   };
 
@@ -119,6 +158,47 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
           </p>
         </div>
 
+        {mfaResolver ? (
+          <div className="space-y-4">
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-2xl flex items-start gap-3">
+              <Smartphone className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-blue-800 dark:text-blue-300">Two-factor verification</p>
+                <p className="text-xs text-blue-700 dark:text-blue-400 mt-0.5">
+                  {mfaResolver.hints[0]?.phoneNumber ? `Code sent to ${mfaResolver.hints[0].phoneNumber}` : 'This account requires a verification code.'}
+                </p>
+              </div>
+            </div>
+            <div id="mfa-recaptcha-container" />
+            {!mfaVerificationId ? (
+              <button onClick={handleSendMfaCode} disabled={mfaSending}
+                className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-2xl disabled:opacity-50">
+                {mfaSending ? 'Sending…' : 'Send verification code'}
+              </button>
+            ) : (
+              <form onSubmit={handleVerifyMfaCode} className="space-y-4">
+                <input
+                  value={mfaCode}
+                  onChange={e => setMfaCode(e.target.value)}
+                  placeholder="6-digit code"
+                  inputMode="numeric"
+                  autoFocus
+                  className="w-full px-4 py-3.5 bg-gray-50 dark:bg-background border border-gray-200 dark:border-border rounded-2xl text-center text-lg tracking-widest"
+                />
+                <button type="submit" disabled={loading}
+                  className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-2xl disabled:opacity-50">
+                  {loading ? 'Verifying…' : 'Verify & sign in'}
+                </button>
+              </form>
+            )}
+            {error && <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-xl"><p className="text-sm text-red-600 dark:text-red-400">{error}</p></div>}
+            <button onClick={() => { clearMfaRecaptchaVerifier(); setMfaResolver(null); setMfaVerificationId(null); setMfaCode(''); }}
+              className="w-full text-sm text-gray-500 dark:text-muted-foreground underline">
+              Cancel
+            </button>
+          </div>
+        ) : (
+        <>
         {restricted && (
           <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-2xl">
             <p className="text-sm text-amber-800 dark:text-amber-300 font-semibold mb-1">⚠️ {t('auth.inAppBrowserTitle')}</p>
@@ -201,6 +281,8 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
           className="w-full mt-4 py-3 text-gray-500 dark:text-muted-foreground font-medium hover:bg-gray-50 dark:hover:bg-accent transition-colors rounded-2xl text-sm">
           {t('auth.continueAsGuest')}
         </button>
+        </>
+        )}
       </div>
     </div>
   );

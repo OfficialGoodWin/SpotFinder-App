@@ -10,7 +10,12 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged,
   sendEmailVerification,
-  signInAnonymously
+  signInAnonymously,
+  multiFactor,
+  PhoneAuthProvider,
+  PhoneMultiFactorGenerator,
+  RecaptchaVerifier,
+  getMultiFactorResolver
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -25,7 +30,8 @@ import {
   orderBy,
   limit,
   setDoc,
-  getDoc
+  getDoc,
+  arrayUnion
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { firebaseConfig } from './firebaseConfig';
@@ -92,6 +98,70 @@ export const registerWithEmail = async (email, password) => {
   // moment those rules take effect, with no indication why.
   await sendEmailVerification(user).catch((err) => console.error('Failed to send verification email:', err));
   return user;
+};
+
+// ── Multi-factor auth (SMS) ────────────────────────────────────────────────
+// Requires: Firebase project upgraded to Identity Platform, SMS MFA enabled
+// in the console, and the signed-in user's email already verified (Firebase
+// itself enforces that last one).
+let recaptchaVerifierCache = null;
+export const getMfaRecaptchaVerifier = (containerId) => {
+  const { auth } = getFirebaseServices();
+  if (!recaptchaVerifierCache) {
+    recaptchaVerifierCache = new RecaptchaVerifier(auth, containerId, { size: 'invisible' });
+  }
+  return recaptchaVerifierCache;
+};
+export const clearMfaRecaptchaVerifier = () => {
+  recaptchaVerifierCache?.clear?.();
+  recaptchaVerifierCache = null;
+};
+
+// Step 1 of enrolling a NEW second factor on the currently signed-in user.
+// Returns a verificationId to pass into completeMfaEnrollment along with the
+// SMS code the user receives.
+export const startMfaEnrollment = async (user, phoneNumber, recaptchaVerifier) => {
+  const { auth } = getFirebaseServices();
+  const session = await multiFactor(user).getSession();
+  const phoneAuthProvider = new PhoneAuthProvider(auth);
+  return phoneAuthProvider.verifyPhoneNumber({ phoneNumber, session }, recaptchaVerifier);
+};
+
+export const completeMfaEnrollment = async (user, verificationId, code, displayName = 'Phone') => {
+  const cred = PhoneAuthProvider.credential(verificationId, code);
+  const assertion = PhoneMultiFactorGenerator.assertion(cred);
+  await multiFactor(user).enroll(assertion, displayName);
+};
+
+export const getEnrolledMfaFactors = (user) => multiFactor(user).enrolledFactors;
+
+export const unenrollMfaFactor = async (user, factorUid) => {
+  await multiFactor(user).unenroll(factorUid);
+};
+
+// Called from the login screen's catch block when signInWithEmailAndPassword
+// throws 'auth/multi-factor-auth-required'. Returns a resolver describing
+// which second factors this user has enrolled.
+export const getMfaResolverFromError = (error) => {
+  const { auth } = getFirebaseServices();
+  return getMultiFactorResolver(auth, error);
+};
+
+// Step 1 of completing sign-in with a second factor: send the SMS code.
+export const startMfaSignIn = async (resolver, hintIndex, recaptchaVerifier) => {
+  const { auth } = getFirebaseServices();
+  const phoneAuthProvider = new PhoneAuthProvider(auth);
+  return phoneAuthProvider.verifyPhoneNumber(
+    { multiFactorHint: resolver.hints[hintIndex], session: resolver.session },
+    recaptchaVerifier
+  );
+};
+
+// Step 2: finish signing in with the code the user received.
+export const completeMfaSignIn = async (resolver, verificationId, code) => {
+  const cred = PhoneAuthProvider.credential(verificationId, code);
+  const assertion = PhoneMultiFactorGenerator.assertion(cred);
+  return (await resolver.resolveSignIn(assertion)).user;
 };
 
 export const resendVerificationEmail = async () => {
@@ -640,6 +710,74 @@ export const removeDeletedAmbientPOI = async (user, id) => {
   requireSuperAdmin(user);
   const { db } = getFirebaseServices();
   await deleteDoc(doc(db, 'admin_deleted_pois', id));
+};
+
+// ── Status page admin helpers (superadmin-only, enforced by firestore.rules) ──
+// Dates/timestamps below are always computed here (never passed in by the
+// caller) so the admin UI never has to think about formatting.
+const todayStr = () => new Date().toISOString().slice(0, 10); // 'YYYY-MM-DD'
+
+export const getStatusServices = async () => {
+  const { db } = getFirebaseServices();
+  const snap = await getDocs(query(collection(db, 'status_services'), orderBy('order', 'asc')));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+};
+
+export const createStatusService = async (name, order) => {
+  const { db } = getFirebaseServices();
+  return addDoc(collection(db, 'status_services'), {
+    name, order: Number(order) || 0, days: Array(90).fill('up'), lastUpdatedDate: todayStr(),
+  });
+};
+
+// Sets TODAY's status for a service. If the service hasn't been touched yet
+// today, the 90-day window rolls forward by one (oldest day drops off);
+// if it's already been updated today, today's entry is just overwritten so
+// re-clicking a status a few times in one day doesn't skew the history.
+export const publishServiceStatus = async (service, status) => {
+  const { db } = getFirebaseServices();
+  const ref = doc(db, 'status_services', service.id);
+  const days = [...(service.days?.length ? service.days : Array(90).fill('up'))];
+  const isNewDay = service.lastUpdatedDate !== todayStr();
+  if (isNewDay) {
+    days.push(status);
+    if (days.length > 90) days.shift();
+  } else {
+    days[days.length - 1] = status;
+  }
+  await updateDoc(ref, { days, lastUpdatedDate: todayStr() });
+};
+
+export const getOpenIncidents = async () => {
+  const { db } = getFirebaseServices();
+  const snap = await getDocs(query(collection(db, 'status_incidents'), where('resolved', '==', false), orderBy('date', 'desc')));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+};
+
+export const getRecentIncidents = async (n = 10) => {
+  const { db } = getFirebaseServices();
+  const snap = await getDocs(query(collection(db, 'status_incidents'), orderBy('date', 'desc'), limit(n)));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+};
+
+// type: 'investigating' | 'identified' | 'monitoring' | 'resolved'
+export const startIncident = async (title, type, message) => {
+  const { db } = getFirebaseServices();
+  return addDoc(collection(db, 'status_incidents'), {
+    title,
+    date: todayStr(),
+    resolved: type === 'resolved',
+    updates: [{ type, message, at: new Date().toISOString() }],
+  });
+};
+
+export const addIncidentUpdate = async (incidentId, type, message) => {
+  const { db } = getFirebaseServices();
+  const ref = doc(db, 'status_incidents', incidentId);
+  await updateDoc(ref, {
+    updates: arrayUnion({ type, message, at: new Date().toISOString() }),
+    ...(type === 'resolved' ? { resolved: true } : {}),
+  });
 };
 
 export const base44 = {

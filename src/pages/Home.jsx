@@ -454,6 +454,15 @@ export default function Home() {
                 🛠️
               </button>
             )}
+            {isSuperAdmin && (
+              <a
+                href="/StatusAdmin"
+                className="w-10 h-10 rounded-xl flex items-center justify-center active:scale-95 transition-all text-base bg-gray-100 dark:bg-accent/60 text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent"
+                title="Publish Status (Superadmin)"
+              >
+                📊
+              </a>
+            )}
           </div>
         </div>
       </div>

@@ -3,6 +3,7 @@ import { X, Moon, Globe } from 'lucide-react';
 import { useTheme } from '@/lib/ThemeContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { LANGUAGES } from '@/locales/translations';
+import MfaSection from '@/components/MfaSection';
 
 export default function SettingsModal({ onClose }) {
   const { isDark, toggleTheme } = useTheme();
@@ -70,6 +71,8 @@ export default function SettingsModal({ onClose }) {
               ))}
             </select>
           </div>
+
+          <MfaSection />
 
           <p className="text-sm text-muted-foreground text-center pt-2">{t('settings.prefSaved')}</p>
         </div>

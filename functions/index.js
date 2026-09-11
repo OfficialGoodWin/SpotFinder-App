@@ -436,3 +436,4 @@ exports.adminDeleteSpot = functions.https.onCall(async (data, context) => {
 });
 
 exports.setAdminClaim = require('./setAdminClaim').setAdminClaim;
+exports.updateSuperadminEmail = require('./updateSuperadminEmail').updateSuperadminEmail;
