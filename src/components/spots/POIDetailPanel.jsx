@@ -4,6 +4,7 @@ import { getPOIPhotos, getPOIRatings, addPOIPhoto, addPOIRating, uploadSpotImage
 import { moderateSubmission } from '@/lib/moderation';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/LanguageContext';
+import { iconGlyphSVG } from '@/lib/mapIcons';
 
 
 // ─── OSM tag helpers ──────────────────────────────────────────────────────────
@@ -284,7 +285,7 @@ function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavig
           {photoUrl
             ? <img src={photoUrl} alt={poi.name} className="w-full h-full object-cover cursor-zoom-in"
                 onError={e => { e.target.style.display = 'none'; }} />
-            : <span className="text-2xl">{category.icon}</span>}
+            : <span dangerouslySetInnerHTML={{ __html: iconGlyphSVG(category.key, 24, category.color) }} />}
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-foreground text-sm leading-tight truncate">{poi.name}</p>
@@ -351,7 +352,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
             ? <img src={allPhotos[0].url} alt={poi.name} className="w-full h-full object-cover"
                 onError={e => { e.target.style.display = 'none'; }} />
             : <div className="w-full h-full flex items-center justify-center" style={{ background: `${category.color}18` }}>
-                <span className="text-7xl">{category.icon}</span>
+                <span dangerouslySetInnerHTML={{ __html: iconGlyphSVG(category.key, 64, category.color) }} />
               </div>}
           <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
           <div className="absolute top-3 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full bg-white/50 pointer-events-none" />
@@ -375,7 +376,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
             <div className="mt-1.5 mb-4">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-white"
                 style={{ background: category.color }}>
-                {category.icon} {category.name}
+                <span dangerouslySetInnerHTML={{ __html: iconGlyphSVG(category.key, 14, 'white') }} /> {category.name}
               </span>
             </div>
 

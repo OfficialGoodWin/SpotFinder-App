@@ -13,6 +13,7 @@ import { Protocol } from 'pmtiles';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { lightStyle, darkStyle, outdoorStyle, winterStyle } from '../../lib/mapStyle.js';
 import { AMBIENT_CATEGORIES } from '../../lib/ambientCategories.js';
+import { badgeSVG, iconGlyphSVG } from '../../lib/mapIcons.js';
 
 
 // ── Road shield generator ─────────────────────────────────────────────────────
@@ -380,27 +381,26 @@ function detectCat(feat) {
 
 
 // ── Marker DOM element helpers ────────────────────────────────────────────────
-function makeDot(emoji, color, size = 28) {
+function makeDot(catKey, color, size = 28) {
   const el = document.createElement('div');
-  el.style.cssText = `width:${size}px;height:${size}px;border-radius:50%;background:${color};
-    border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.35);
-    display:flex;align-items:center;justify-content:center;
-    font-size:${Math.round(size * 0.5)}px;line-height:1;cursor:pointer;user-select:none;`;
-  el.textContent = emoji;
+  el.style.cssText = `width:${size}px;height:${size}px;cursor:pointer;user-select:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.35));`;
+  el.innerHTML = badgeSVG(catKey, color, size);
   return el;
 }
 
 // ── Hybrid spot marker: photo thumbnail + cost-color ring + category badge + difficulty dot ──
-const CATEGORY_ICONS = {
-  Viewpoint: '⛰️', SecretCafe: '☕', Sunset: '🌇', Sunrise: '🌅', PhotoSpot: '📸',
-  Waterfall: '💧', Hike: '🥾', SwimSpot: '🏊', Ruin: '🏛️', UrbanExplore: '🏙️',
+const SPOT_TAG_ICON_KEY = {
+  Viewpoint: 'viewpoint', SecretCafe: 'cafe', Sunset: 'sunset', Sunrise: 'sunrise', PhotoSpot: 'speedcamera',
+  Waterfall: 'waterfall', Hike: 'hike', SwimSpot: 'swim', Ruin: 'heritage', UrbanExplore: 'urbanexplore',
 };
 const COST_RING_COLOR = { free: '#22c55e', paid: '#f59e0b', donation: '#f59e0b' };
 const DIFFICULTY_DOT_COLOR = { easy: '#22c55e', moderate: '#eab308', hard: '#ef4444' };
 
 function makeSpotDom(spot) {
   const primaryTag = spot.tags?.[0];
-  const icon = CATEGORY_ICONS[primaryTag] || '📍';
+  const iconKey = SPOT_TAG_ICON_KEY[primaryTag] || 'custom';
+  const icon = iconGlyphSVG(iconKey, 20);
+  const badgeIcon = iconGlyphSVG(iconKey, 12);
   const ringColor = COST_RING_COLOR[spot.cost] || '#22c55e';
   const diffColor = DIFFICULTY_DOT_COLOR[spot.access_difficulty];
 
@@ -416,7 +416,7 @@ function makeSpotDom(spot) {
   const photoOrFallback = spot.image_url
     ? `<div style="width:100%;height:100%;border-radius:50%;background-image:url('${spot.image_url}');background-size:cover;background-position:center;"></div>`
     : `<div style="width:100%;height:100%;border-radius:50%;background:linear-gradient(135deg,#60a5fa,#a78bfa);display:flex;align-items:center;justify-content:center;">
-         <span style="font-size:20px;filter:brightness(0) invert(1);">${icon}</span>
+         ${icon}
        </div>`;
 
   // Inner wrapper carries `position:relative` instead, so the badge/dot
@@ -427,8 +427,8 @@ function makeSpotDom(spot) {
       <div style="width:48px;height:48px;border-radius:50%;border:3px solid ${ringColor};box-shadow:0 2px 8px rgba(0,0,0,0.35);overflow:hidden;background:#fff;">
         ${photoOrFallback}
       </div>
-      <div style="position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);width:22px;height:22px;border-radius:50%;background:#fff;border:2px solid ${ringColor};display:flex;align-items:center;justify-content:center;font-size:11px;box-shadow:0 1px 3px rgba(0,0,0,0.3);">
-        ${icon}
+      <div style="position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);width:22px;height:22px;border-radius:50%;background:${ringColor};border:2px solid white;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,0.3);">
+        ${badgeIcon}
       </div>
       ${diffColor ? `<div style="position:absolute;top:-2px;right:-2px;width:12px;height:12px;border-radius:50%;background:${diffColor};border:2px solid white;box-shadow:0 1px 2px rgba(0,0,0,0.3);"></div>` : ''}
     </div>
@@ -766,7 +766,7 @@ export default function MapLibreMap({
       clear();
       for (const poi of pois) {
         const size = zoom >= 16 ? 32 : zoom >= 14 ? 28 : 24;
-        const el = makeDot(poi._cat.icon, poi._cat.color, size);
+        const el = makeDot(poi._cat.key, poi._cat.color, size);
         const mk = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([poi.lon, poi.lat]).addTo(map);
         el.addEventListener('click', e => { e.stopPropagation(); onSelectPOI?.(poi, poi._cat); });
         m.set(poi.id, mk);
@@ -810,7 +810,7 @@ export default function MapLibreMap({
           const poi = { id: p.place_id || `${lat}-${lon}`, lat, lon, name: p.name || selectedPOICategory.name, address: p.address_line2 || '', tags: {} };
           pois.push(poi);
           const size = zoom >= 16 ? 36 : zoom >= 14 ? 30 : 26;
-          const el = makeDot(selectedPOICategory.icon, selectedPOICategory.color, size);
+          const el = makeDot(selectedPOICategory.key, selectedPOICategory.color, size);
           const mk = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([lon, lat]).addTo(map);
           el.addEventListener('click', e => { e.stopPropagation(); onSelectPOI?.(poi); });
           m.set(poi.id, mk);
@@ -960,9 +960,9 @@ const addAdminMarkers = () => {
     if (zoom < catConfig.minZoom) continue;
 
     const color = catConfig.color;
-    const icon = catConfig.icon;
+    const iconKey = catConfig.key || 'custom';
     const size = zoom >= 16 ? 32 : zoom >= 14 ? 28 : 24;
-    const el = makeDot(icon, color, size);
+    const el = makeDot(iconKey, color, size);
     el.title = catConfig.name;
 
     const addressParts = [];

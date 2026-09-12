@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Navigation, X } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { getCategoryName } from '@/lib/POICategories';
+import { iconGlyphSVG } from '@/lib/mapIcons';
 
 function haversineKm([lat1, lng1], [lat2, lng2]) {
   const R = 6371;
@@ -36,9 +37,8 @@ function POIRow({ poi, category, onFlyTo, onNavigate, onSelect, onClose }) {
       <div
         className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-lg"
         style={{ background: `${category.color}20` }}
-      >
-        {category.icon}
-      </div>
+        dangerouslySetInnerHTML={{ __html: iconGlyphSVG(category.key, 18, category.color) }}
+      />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-foreground truncate">{poi.name}</p>
         {poi.address && (
@@ -178,7 +178,7 @@ export default function POIPanel({ pois, category, userPos, loading, onFlyTo, on
 
   const header = (
     <h2 className="text-lg font-bold text-foreground pt-3 flex items-center gap-2">
-      <span>{category?.icon}</span>
+      <span dangerouslySetInnerHTML={{ __html: iconGlyphSVG(category?.key, 18, category?.color || 'currentColor') }} />
       {categoryName} {!loading && `(${sortedPOIs.length})`}
     </h2>
   );

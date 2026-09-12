@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, X, Navigation, Mic, Compass } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { filterCategories, getCategoryName } from '@/lib/POICategories';
+import { iconGlyphSVG } from '@/lib/mapIcons';
 
 
 const LANG_TO_BCP47 = {
@@ -318,7 +319,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
                 >
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
                     style={{ background: `${cat.color}20`, color: cat.color }}>
-                    <span className="text-lg">{cat.icon}</span>
+                    <span dangerouslySetInnerHTML={{ __html: iconGlyphSVG(cat.key, 18, cat.color) }} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-800 dark:text-foreground truncate">{getCategoryName(cat, language)}</p>
