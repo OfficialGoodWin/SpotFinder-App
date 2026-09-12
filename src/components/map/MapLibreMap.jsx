@@ -972,10 +972,11 @@ const addAdminMarkers = () => {
     if (poi.postcode) addressParts.push(poi.postcode);
     const addressLine = addressParts.filter(Boolean).join(', ');
 
+    const tooltipIcon = iconGlyphSVG(iconKey, 14, color);
     const tooltipHTML = `
       <div style="min-width:220px;font-size:13px;line-height:1.4">
-        <div style="font-weight:600;color:${color};margin-bottom:4px;font-size:14px">
-          ${icon} ${catConfig.name}
+        <div style="font-weight:600;color:${color};margin-bottom:4px;font-size:14px;display:flex;align-items:center;gap:6px">
+          ${tooltipIcon} ${catConfig.name}
         </div>
         <div style="font-weight:500;margin-bottom:6px;color:#111">
           ${poi.name || catConfig.name}
@@ -992,7 +993,7 @@ const addAdminMarkers = () => {
     `;
 
     const syntheticCat = {
-      key: 'admin_poi',
+      key: iconKey,
       icon: catConfig.icon,
       color: catConfig.color,
       name: catConfig.name,
