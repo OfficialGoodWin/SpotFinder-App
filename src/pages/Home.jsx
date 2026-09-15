@@ -25,7 +25,6 @@ import POIDetailPanel from '../components/spots/POIDetailPanel';
 import SettingsModal from '../components/SettingsModal';
 import ProfileMenu from '../components/ProfileMenu';
  
-// Note: Leaflet marker icons are fixed via src/lib/leaflet-fix.js
  
 export default function Home() {
   const { user, logout, isAuthenticated } = useAuth();

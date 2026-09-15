@@ -436,7 +436,71 @@ function makeSpotDom(spot) {
   return el;
 }
 
-// ── In-memory POI cache ───────────────────────────────────────────────────────
+// ── Pre-baked ambient POI tiles ───────────────────────────────────────────────
+// Optional replacement for the live per-pan Geoapify calls below. When
+// VITE_AMBIENT_TILES_URL is set (a PMTiles file built by
+// scripts/ambient-tiles/, see its README), ambient POIs are rendered as a
+// MapLibre vector layer with zero network calls on pan/zoom — the tiles are
+// already local/CDN-cached. When unset, the map falls back to the original
+// live-fetch behavior further down, so this ships safely either way.
+const AMBIENT_TILES_URL = import.meta.env.VITE_AMBIENT_TILES_URL || '';
+const AMBIENT_SOURCE_ID = 'ambient-poi-tiles';
+const AMBIENT_CIRCLE_LAYER = 'ambient-poi-circle';
+const AMBIENT_LABEL_LAYER = 'ambient-poi-label';
+// Must match the `-l` layer name used by scripts/ambient-tiles/build.mjs.
+const AMBIENT_SOURCE_LAYER = 'ambient_poi';
+
+// Builds MapLibre `match` expressions from ambientCategories.js so colors/
+// icons stay in one place instead of being duplicated into the map style.
+function ambientColorExpr() {
+  const expr = ['match', ['get', 'cat']];
+  for (const c of AMBIENT_CATS) expr.push(c.key, c.color);
+  expr.push('#6B7280'); // fallback
+  return expr;
+}
+function ambientIconExpr() {
+  const expr = ['match', ['get', 'cat']];
+  for (const c of AMBIENT_CATS) expr.push(c.key, c.icon);
+  expr.push('📍');
+  return expr;
+}
+
+function addAmbientVectorLayer(map) {
+  if (!AMBIENT_TILES_URL || map.getSource(AMBIENT_SOURCE_ID)) return;
+  try {
+    map.addSource(AMBIENT_SOURCE_ID, { type: 'vector', url: `pmtiles://${AMBIENT_TILES_URL}` });
+    map.addLayer({
+      id: AMBIENT_CIRCLE_LAYER,
+      type: 'circle',
+      source: AMBIENT_SOURCE_ID,
+      'source-layer': AMBIENT_SOURCE_LAYER,
+      minzoom: 13,
+      paint: {
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 8, 16, 14],
+        'circle-color': ambientColorExpr(),
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#ffffff',
+      },
+    });
+    map.addLayer({
+      id: AMBIENT_LABEL_LAYER,
+      type: 'symbol',
+      source: AMBIENT_SOURCE_ID,
+      'source-layer': AMBIENT_SOURCE_LAYER,
+      minzoom: 13,
+      layout: {
+        'text-field': ambientIconExpr(),
+        'text-size': ['interpolate', ['linear'], ['zoom'], 13, 11, 16, 15],
+        'text-allow-overlap': true,
+        'text-ignore-placement': true,
+      },
+    });
+  } catch (e) {
+    console.warn('Ambient POI tile layer failed to load, falling back to live fetch:', e.message);
+  }
+}
+
+
 const poiCache = new Map();
 const POI_TTL = 10 * 60 * 1000;
 
@@ -620,6 +684,27 @@ export default function MapLibreMap({
     // Re-add on every subsequent style load (dark/light toggle, offline switch)
     map.on('style.load', addImages);
 
+    // Ambient POI vector tiles (if configured) also get wiped by setStyle(),
+    // same as the terrain/shield listeners above — re-add every time.
+    map.once('load', () => addAmbientVectorLayer(map));
+    map.on('style.load', () => addAmbientVectorLayer(map));
+    if (AMBIENT_TILES_URL) {
+      map.on('click', AMBIENT_CIRCLE_LAYER, (e) => {
+        const feat = e.features?.[0];
+        if (!feat) return;
+        const p = feat.properties || {};
+        const cat = AMBIENT_CATEGORIES.find(c => c.key === p.cat);
+        const [lon, lat] = feat.geometry?.coordinates || [e.lngLat.lng, e.lngLat.lat];
+        onSelectPOI?.(
+          { id: p.id || `${lat}-${lon}`, lat, lon, name: p.name || '', address: p.address || '',
+            tags: { phone: p.phone, website: p.website, opening_hours: p.opening_hours, wikidata: p.wikidata, wikimedia_commons: p.wikimedia_commons, image: p.image } },
+          cat
+        );
+      });
+      map.on('mouseenter', AMBIENT_CIRCLE_LAYER, () => { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', AMBIENT_CIRCLE_LAYER, () => { map.getCanvas().style.cursor = ''; });
+    }
+
     mapRef.current = map;
     setMapRef?.(map);
 
@@ -721,7 +806,12 @@ export default function MapLibreMap({
   }, [userPos, userAccuracy]);
 
   // ── Ambient POIs ───────────────────────────────────────────────────────────
+  // Skipped entirely when pre-baked vector tiles are configured — MapLibre
+  // renders those directly from AMBIENT_SOURCE_ID/addAmbientVectorLayer above
+  // with no JS-side fetching, so this live Geoapify path only runs as the
+  // fallback for deployments that haven't built/hosted a tile file yet.
   useEffect(() => {
+    if (AMBIENT_TILES_URL) return;
     const map = mapRef.current;
     if (!map) return;
     const m = markers.current.ambient;

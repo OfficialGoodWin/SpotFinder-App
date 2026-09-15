@@ -45,31 +45,67 @@ function parseOpenStatus(ohString, t) {
 }
 
 // ─── Photo fetching ───────────────────────────────────────────────────────────
-// Google Places API (needs VITE_GOOGLE_MAPS_KEY env var) → Wikimedia fallback
+// Priority order, each tier only tried if the previous one found nothing:
+//   1. OSM tags (`image=` / `wikimedia_commons=File:...`) — a human curated
+//      this specific photo for this specific place. Most accurate, least common.
+//   2. Google Places Photos (needs VITE_GOOGLE_MAPS_KEY) — matched by place_id,
+//      so also subject-accurate, just paid/quota-limited.
+//   3. Wikidata's P18 "image" claim (needs an OSM `wikidata=` tag) — also
+//      subject-accurate (a specific claim about a specific entity), not a
+//      radius search.
+// A prior version fell back further to `commons.wikimedia.org` geosearch
+// (nearby-by-coordinate, no subject check) — removed because it returned
+// photos of whatever else happened to be within the search radius (e.g. a
+// neighboring building or streetscape), not the actual POI. Showing no photo
+// is better than showing a wrong one. If none of the above match, the UI
+// falls back to its existing "no photo yet" state.
 //
-// COMPLIANCE NOTE (flagged, not fixed here): neither source's attribution is
-// currently shown to the user.
-//  - Google Places Photos: `details?fields=photos` also returns
-//    `html_attributions` per photo, which Google's Places API Terms require
-//    you to display. That field is discarded below (`p.photo_reference`
-//    only) — add it back and render it near the photo if you keep using
-//    Google Photos.
-//  - Wikimedia Commons images are almost always CC-BY-SA or similar, which
-//    legally requires attribution (author + license) wherever the image is
-//    used. Consider calling `imageinfo` with `iiprop=url|extmetadata` and
-//    showing "Photo: <author>, via Wikimedia Commons (<license>)" near the
-//    image, or a small credit line in the lightbox.
+// ATTRIBUTION: every photo below is returned as { url, credit } rather than
+// a bare URL. `credit` is a plain-text line rendered near the photo —
+// Google Places Photos Terms require showing `html_attributions`, and
+// Wikimedia Commons images are almost always CC-BY-SA or similar, which
+// legally requires an author + license credit wherever the image is used.
+// `credit` is null only for sources that genuinely carry none (a raw
+// `image=` tag URL with no attribution metadata attached).
 
 const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY || '';
 
-function getTagPhotos(tags = {}) {
-  const urls = [];
-  if (tags.image?.startsWith('http')) urls.push(tags.image);
+// Fetch author + license for a Wikimedia Commons file via the official
+// imageinfo/extmetadata API. Best-effort: any failure just means the photo
+// renders without a credit line rather than blocking the photo entirely.
+async function fetchCommonsCredit(fileTitle) {
+  try {
+    const r = await fetch(
+      `https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(`File:${fileTitle}`)}` +
+      `&prop=imageinfo&iiprop=extmetadata&format=json&origin=*`
+    );
+    if (!r.ok) return null;
+    const pages = (await r.json())?.query?.pages || {};
+    const page = Object.values(pages)[0];
+    const meta = page?.imageinfo?.[0]?.extmetadata;
+    if (!meta) return null;
+    // Artist/LicenseShortName come back as HTML in some cases (e.g. linked
+    // author names) — strip tags so we only ever render plain text, never
+    // markup pulled from a third-party API.
+    const strip = (html) => (html || '').replace(/<[^>]*>/g, '').trim();
+    const author = strip(meta.Artist?.value);
+    const license = strip(meta.LicenseShortName?.value);
+    if (!author && !license) return null;
+    return `Photo: ${author || 'Unknown author'}${license ? ` (${license})` : ''}, via Wikimedia Commons`;
+  } catch { return null; }
+}
+
+async function getTagPhotos(tags = {}) {
+  const results = [];
   if (tags.wikimedia_commons?.startsWith('File:')) {
     const file = tags.wikimedia_commons.replace('File:', '');
-    urls.push(`https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}?width=1200`);
+    const url = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}?width=1200`;
+    results.push({ url, credit: await fetchCommonsCredit(file) });
   }
-  return urls;
+  // A raw `image=` URL is human-curated but carries no attribution metadata
+  // we can look up — show it without a credit line rather than guessing.
+  if (tags.image?.startsWith('http')) results.push({ url: tags.image, credit: null });
+  return results;
 }
 
 async function fetchGooglePhotos(name, lat, lon) {
@@ -98,40 +134,59 @@ async function fetchGooglePhotos(name, lat, lon) {
     );
     if (!dr.ok) return [];
     const photos = (await dr.json()).result?.photos || [];
-    return photos.slice(0, 10).map(p =>
-      `/gplaces/photo?maxwidth=1200&photo_reference=${p.photo_reference}&key=${GOOGLE_KEY}`
-    );
+    // Google's Places API Terms require displaying `html_attributions` —
+    // strip tags to plain text so we never render raw HTML from a
+    // third-party response, then keep it as the photo's credit line.
+    const strip = (html) => (html || '').replace(/<[^>]*>/g, '').trim();
+    return photos.slice(0, 10).map(p => {
+      const attribution = (p.html_attributions || []).map(strip).filter(Boolean).join(', ');
+      return {
+        url: `/gplaces/photo?maxwidth=1200&photo_reference=${p.photo_reference}&key=${GOOGLE_KEY}`,
+        credit: attribution ? `Photo: ${attribution}, via Google` : null,
+      };
+    });
   } catch { return []; }
 }
 
-async function fetchWikimediaPhotos(lat, lon) {
+// Accurate, subject-verified photo lookup via Wikidata's "image" (P18) claim.
+// Unlike `commons.wikimedia.org geosearch` (removed below — it just returns
+// whatever's geotagged within a radius, with zero check that the image
+// actually depicts this place), this only returns a photo when someone
+// explicitly linked it to *this specific entity* on Wikidata. Requires the
+// OSM element to carry a `wikidata=Qxxxxxxx` tag, which is common for named
+// buildings/businesses but not universal — so this is still a "sometimes"
+// source, not a guarantee, and callers should treat an empty result as "no
+// verified photo" rather than retry with a fuzzier lookup.
+async function fetchWikidataPhoto(wikidataId) {
+  if (!wikidataId) return [];
   try {
     const r = await fetch(
-      `https://commons.wikimedia.org/w/api.php?action=query&list=geosearch` +
-      `&gscoord=${lat}|${lon}&gsradius=100&gslimit=5&gsnamespace=6&format=json&origin=*`
+      `https://www.wikidata.org/w/api.php?action=wbgetclaims&entity=${encodeURIComponent(wikidataId)}` +
+      `&property=P18&format=json&origin=*`
     );
     if (!r.ok) return [];
-    const pages = (await r.json()).query?.geosearch || [];
-    if (!pages.length) return [];
-    const titles = pages.map(p => p.title).join('|');
-    const ir = await fetch(
-      `https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(titles)}` +
-      `&prop=imageinfo&iiprop=url&iiurlwidth=1200&format=json&origin=*`
-    );
-    if (!ir.ok) return [];
-    return Object.values((await ir.json()).query?.pages || {})
-      .map(p => p.imageinfo?.[0]?.thumburl).filter(Boolean);
+    const claims = (await r.json()).claims?.P18 || [];
+    const files = claims.map(c => c.mainsnak?.datavalue?.value).filter(Boolean);
+    return Promise.all(files.map(async file => ({
+      url: `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}?width=1200`,
+      credit: await fetchCommonsCredit(file),
+    })));
   } catch { return []; }
 }
 
+// Returns [{ url, credit }], credit possibly null.
 async function tryFetchPhotos(name, lat, lon, tags = {}) {
-  const tagPhotos = getTagPhotos(tags);
+  const tagPhotos = await getTagPhotos(tags);
   if (tagPhotos.length) return tagPhotos;
   if (GOOGLE_KEY) {
     const google = await fetchGooglePhotos(name, lat, lon);
     if (google.length) return google;
   }
-  return fetchWikimediaPhotos(lat, lon);
+  // Last resort is a Wikidata-linked photo (still subject-verified), NOT a
+  // blind proximity geosearch. If nothing here matches, we show no photo
+  // rather than a photo of the wrong building — see the comment on
+  // fetchWikidataPhoto for why the geosearch approach was removed.
+  return fetchWikidataPhoto(tags.wikidata);
 }
 
 // ─── Lightbox ─────────────────────────────────────────────────────────────────
@@ -193,12 +248,20 @@ function Lightbox({ photos, startIndex, onClose }) {
       {/* Image */}
       <img
         key={idx}
-        src={photos[idx]}
+        src={photos[idx].url}
         alt=""
         className="max-w-full max-h-full object-contain select-none"
         style={{ maxHeight: '100dvh', maxWidth: '100dvw', padding: '0 60px' }}
         onError={e => { e.target.src = ''; }}
       />
+
+      {/* Attribution — Google Places Photos and Wikimedia Commons both
+          legally require a visible credit; omitted when the source has none. */}
+      {photos[idx].credit && (
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 max-w-[90vw] truncate bg-black/50 backdrop-blur-sm text-white/90 text-xs px-3 py-1 rounded-full">
+          {photos[idx].credit}
+        </div>
+      )}
 
       {/* Next */}
       {photos.length > 1 && (
@@ -346,7 +409,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
   const count = sfRating?.count || 0;
 
   const allPhotos = [
-    ...photos.map(u => ({ url: u, source: 'remote' })),
+    ...photos.map(p => ({ url: p.url, credit: p.credit, source: 'remote' })),
     ...sfPhotos.map(p => ({ url: p.image || p.photo, source: 'sf' })),
   ];
 
@@ -517,6 +580,13 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
                     </button>
                   )}
                 </div>
+                {/* Attribution for any remote (Google/Wikimedia) photos shown above —
+                    legally required credit, shown wherever those images are displayed. */}
+                {allPhotos.some(p => p.credit) && (
+                  <p className="text-[10px] text-muted-foreground mb-4 -mt-2 leading-snug">
+                    {[...new Set(allPhotos.map(p => p.credit).filter(Boolean))].join(' · ')}
+                  </p>
+                )}
               </>
             )}
 
@@ -574,7 +644,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
         ? { ratings: r, avg: r.length ? Math.round(r.reduce((s, x) => s + x.rating, 0) / r.length * 10) / 10 : 0, count: r.length }
         : (r || { ratings: [], avg: 0, count: 0 })
     ));
-    tryFetchPhotos(poi.name, poi.lat, poi.lon, poi.tags || {}).then(urls => { if (urls.length) setPhotos(urls); });
+    tryFetchPhotos(poi.name, poi.lat, poi.lon, poi.tags || {}).then(res => { if (res.length) setPhotos(res); });
   }, [poi?.id]);
 
   const handleShare = async () => {
@@ -630,10 +700,11 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
 
   const handleNavigate = () => { onNavigate?.({ lat: poi.lat, lng: poi.lon, label: poi.name }); onClose(); };
 
-  // All photos merged for lightbox
+  // All photos merged for lightbox — { url, credit } shape throughout;
+  // SpotFinder-hosted photos have no third-party attribution requirement.
   const allPhotoUrls = [
     ...photos,
-    ...sfPhotos.map(p => p.image || p.photo).filter(Boolean),
+    ...sfPhotos.map(p => p.image || p.photo).filter(Boolean).map(url => ({ url, credit: null })),
   ];
 
   if (!poi) return null;
@@ -651,7 +722,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
 
       {expanded
         ? <FullSheet {...sharedProps} onSubmitRating={handleSubmitRating} />
-        : <MiniBar {...sharedProps} photoUrl={photos[0] || null} onExpand={() => setExpanded(true)} />}
+        : <MiniBar {...sharedProps} photoUrl={photos[0]?.url || null} onExpand={() => setExpanded(true)} />}
 
       {lightboxIndex !== null && allPhotoUrls.length > 0 && (
         <Lightbox

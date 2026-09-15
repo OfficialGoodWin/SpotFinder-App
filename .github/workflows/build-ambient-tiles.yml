@@ -1,0 +1,46 @@
+name: Rebuild ambient POI tiles
+
+# Ambient POIs (cafes, museums, viewpoints...) don't change hourly — monthly
+# is plenty. See scripts/ambient-tiles/README.md for background and hosting
+# options. This workflow is inert until BBOX and an upload step are filled
+# in below; it will not run usefully as committed.
+on:
+  schedule:
+    - cron: '0 3 1 * *' # 03:00 UTC on the 1st of each month
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install tippecanoe
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libsqlite3-dev zlib1g-dev
+          git clone --depth 1 https://github.com/felt/tippecanoe.git
+          cd tippecanoe && make -j"$(nproc)" && sudo make install
+
+      - name: Install build deps
+        working-directory: scripts/ambient-tiles
+        run: npm install
+
+      - name: Build tiles
+        working-directory: scripts/ambient-tiles
+        # TODO: set your coverage area (south,west,north,east).
+        run: ./build.sh "${{ vars.AMBIENT_TILES_BBOX || '48.5,12.0,51.1,18.9' }}"
+
+      - name: Upload to hosting
+        working-directory: scripts/ambient-tiles
+        run: |
+          echo "TODO: upload ambient-poi.pmtiles to your chosen host."
+          echo "R2 example: install 'aws-cli' or 'rclone', configure repo secrets"
+          echo "(R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET), then:"
+          echo "  aws s3 cp ambient-poi.pmtiles s3://\$R2_BUCKET/ambient-poi.pmtiles --endpoint-url \$R2_ENDPOINT"
+          echo "GitHub Releases example: use softprops/action-gh-release@v2 to attach the file."
+          exit 1  # remove once the upload step above is filled in

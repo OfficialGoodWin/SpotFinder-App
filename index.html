@@ -10,6 +10,9 @@
       one dangerouslySetInnerHTML usage is unrelated fixed CSS), but a CSP
       means a future regression fails closed instead of becoming an XSS.
       Update this list if you add new API/CDN origins.
+      NOTE: if you enable the ambient-POI PMTiles pipeline
+      (scripts/ambient-tiles/), add whichever host you pick (Cloudflare R2,
+      GitHub Releases, etc.) to connect-src below — see its README.
     -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
