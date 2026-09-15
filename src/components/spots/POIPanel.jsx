@@ -151,7 +151,7 @@ function MobileSheet({ children, header, onClose, bottomOffset }) {
         >
           <div className="absolute left-1/2 top-3 -translate-x-1/2 w-10 h-1 rounded-full bg-gray-300 dark:bg-border" />
           <div className="w-full">{header}</div>
-          <button onClick={onClose} className="absolute right-4 w-8 h-8 rounded-full bg-gray-100 dark:bg-accent flex items-center justify-center">
+          <button onClick={onClose} aria-label={t('common.close')} className="absolute right-4 w-8 h-8 rounded-full bg-gray-100 dark:bg-accent flex items-center justify-center">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -221,6 +221,7 @@ export default function POIPanel({ pois, category, userPos, loading, onFlyTo, on
           {header}
           <button
             onClick={onClose}
+            aria-label={t('common.close')}
             className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-100 dark:bg-accent flex items-center justify-center"
           >
             <X className="w-4 h-4" />

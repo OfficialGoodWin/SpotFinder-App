@@ -252,12 +252,17 @@ function PlanCard({ plan, user, onClose }) {
           ) : (
             <>
               <Icon className="w-4 h-4" />
-              Get {plan.name.split(' ')[1]}
+              Subscribe & pay {price.price}{price.period}
             </>
           )}
         </button>
-        <p className="text-center text-[10px] mt-2" style={{ color: plan.mutedColor }}>
-          Cancel anytime · Secured by Stripe
+        <p className="text-center text-[10px] mt-2 leading-relaxed" style={{ color: plan.mutedColor }}>
+          Auto-renews at {price.price}{price.period} until cancelled · Cancel anytime · Secured by Stripe
+          <br />
+          By subscribing you agree to our{' '}
+          <a href="/TermsAndConditions" target="_blank" rel="noopener noreferrer" className="underline">Terms</a>,{' '}
+          <a href="/PrivacyPolicy" target="_blank" rel="noopener noreferrer" className="underline">Privacy Policy</a> &amp;{' '}
+          <a href="/RefundPolicy" target="_blank" rel="noopener noreferrer" className="underline">Refund Policy</a>
         </p>
       </div>
     </div>
@@ -275,6 +280,7 @@ export default function SubscriptionModal({ onClose, user }) {
         {/* Close button */}
         <button
           onClick={onClose}
+          aria-label="Close"
           className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full flex items-center justify-center transition-colors"
           style={{ background: '#1a1a1a', color: '#888' }}
         >

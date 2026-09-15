@@ -25,7 +25,7 @@ export default function NearbySpotsFilterModal({ isOpen, onClose, onApply, curre
       <div className="bg-white dark:bg-card rounded-3xl shadow-xl max-w-sm w-full p-5 border border-gray-100 dark:border-border">
         <div className="flex justify-between items-center mb-4">
           <h3 className="font-bold text-gray-900 dark:text-foreground text-base">Filter Nearby Spots</h3>
-          <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-accent">
+          <button onClick={onClose} aria-label="Close" className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-accent">
             <X className="w-4 h-4 text-gray-400 dark:text-muted-foreground" />
           </button>
         </div>

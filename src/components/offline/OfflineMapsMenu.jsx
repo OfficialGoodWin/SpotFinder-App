@@ -246,7 +246,7 @@ export default function OfflineMapsMenu({ onClose }) {
             <p className="text-xs text-muted-foreground">All of Europe · Vector tiles · Zoom 0–16</p>
           </div>
         </div>
-        <button onClick={onClose} className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-accent/60 flex items-center justify-center hover:bg-gray-200 active:scale-95 transition-all">
+        <button onClick={onClose} aria-label="Close" className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-accent/60 flex items-center justify-center hover:bg-gray-200 active:scale-95 transition-all">
           <X className="w-5 h-5" />
         </button>
       </div>

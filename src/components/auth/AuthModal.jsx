@@ -19,6 +19,7 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
   const [error, setError] = useState('');
   const [restricted, setRestricted] = useState(false);
   const [lockoutRemaining, setLockoutRemaining] = useState(0);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const { checkUserAuth } = useAuth();
 
   // ── MFA challenge state (only used when the account has a second factor) ──
@@ -42,6 +43,11 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (tab === 'register' && !agreedToTerms) {
+      setError(t('auth.mustAgreeToTerms'));
+      return;
+    }
 
     // Check lockout
     if (Date.now() < loginAttempts.lockedUntil) {
@@ -139,7 +145,7 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
   return (
     <div className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white dark:bg-card w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-6 sm:p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-        <button onClick={onClose} className="absolute top-4 right-4 w-10 h-10 rounded-full bg-gray-100 dark:bg-accent flex items-center justify-center">
+        <button onClick={onClose} aria-label={t('common.close')} className="absolute top-4 right-4 w-10 h-10 rounded-full bg-gray-100 dark:bg-accent flex items-center justify-center">
           <X className="w-5 h-5 text-gray-600" />
         </button>
 
@@ -271,7 +277,29 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
               <p className="text-sm text-orange-700 dark:text-orange-300 font-semibold">🔒 Locked — try again in {lockoutRemaining}s</p>
             </div>
           )}
-          <button type="submit" disabled={loading || lockoutRemaining > 0}
+          {tab === 'register' && (
+            <div className="flex items-start gap-2.5">
+              <input
+                id="auth-agree-terms"
+                type="checkbox"
+                checked={agreedToTerms}
+                onChange={e => setAgreedToTerms(e.target.checked)}
+                required
+                className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 flex-shrink-0"
+              />
+              <label htmlFor="auth-agree-terms" className="text-xs text-gray-600 dark:text-muted-foreground leading-snug">
+                {t('auth.agreeToTermsPrefix')}{' '}
+                <a href="/TermsAndConditions" target="_blank" rel="noopener noreferrer" className="underline font-medium text-gray-800 dark:text-foreground">
+                  {t('auth.termsLinkLabel')}
+                </a>{' '}
+                {t('common.and')}{' '}
+                <a href="/PrivacyPolicy" target="_blank" rel="noopener noreferrer" className="underline font-medium text-gray-800 dark:text-foreground">
+                  {t('auth.privacyLinkLabel')}
+                </a>.
+              </label>
+            </div>
+          )}
+          <button type="submit" disabled={loading || lockoutRemaining > 0 || (tab === 'register' && !agreedToTerms)}
             className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold rounded-2xl transition-all flex items-center justify-center gap-2 disabled:opacity-50">
             {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               : <>{tab === 'login' ? t('auth.signIn') : t('auth.createAccount')}<ArrowRight className="w-5 h-5" /></>}

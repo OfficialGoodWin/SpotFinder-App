@@ -1,9 +1,10 @@
 import React from 'react';
-import { X, Moon, Globe } from 'lucide-react';
+import { X, Moon, Globe, Cookie, FileText, Shield, ReceiptText } from 'lucide-react';
 import { useTheme } from '@/lib/ThemeContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { LANGUAGES } from '@/locales/translations';
 import MfaSection from '@/components/MfaSection';
+import { reopenCookieSettings } from '@/components/CookieConsentBanner';
 
 export default function SettingsModal({ onClose }) {
   const { isDark, toggleTheme } = useTheme();
@@ -20,6 +21,7 @@ export default function SettingsModal({ onClose }) {
           <h2 className="text-2xl font-bold">{t('settings.title')}</h2>
           <button
             onClick={onClose}
+            aria-label={t('common.close')}
             className="p-2 rounded-full bg-muted hover:bg-muted/80 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -73,6 +75,29 @@ export default function SettingsModal({ onClose }) {
           </div>
 
           <MfaSection />
+
+          {/* Legal & privacy */}
+          <div className="p-4 bg-muted rounded-2xl space-y-1">
+            <p className="font-semibold mb-2 flex items-center gap-2"><Shield className="w-4 h-4 text-primary" aria-hidden="true" />Legal &amp; privacy</p>
+            <button
+              onClick={reopenCookieSettings}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-background/60 text-left text-sm"
+            >
+              <Cookie className="w-4 h-4 flex-shrink-0" aria-hidden="true" /> Cookie preferences
+            </button>
+            <a href="/PrivacyPolicy" className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-background/60 text-sm">
+              <FileText className="w-4 h-4 flex-shrink-0" aria-hidden="true" /> Privacy Policy
+            </a>
+            <a href="/TermsAndConditions" className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-background/60 text-sm">
+              <FileText className="w-4 h-4 flex-shrink-0" aria-hidden="true" /> Terms &amp; Conditions
+            </a>
+            <a href="/CookiePolicy" className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-background/60 text-sm">
+              <FileText className="w-4 h-4 flex-shrink-0" aria-hidden="true" /> Cookie Policy
+            </a>
+            <a href="/RefundPolicy" className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-background/60 text-sm">
+              <ReceiptText className="w-4 h-4 flex-shrink-0" aria-hidden="true" /> Refund Policy
+            </a>
+          </div>
 
           <p className="text-sm text-muted-foreground text-center pt-2">{t('settings.prefSaved')}</p>
         </div>

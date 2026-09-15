@@ -50,7 +50,7 @@
 
     <!-- Open Graph -->
     <meta property="og:title" content="SpotFinder" />
-    <meta property="og:description" content="peak app for finding the peakest spots in your lifetime, try it trust me." />
+    <meta property="og:description" content="Discover and navigate to hidden outdoor spots rated by the community." />
     <meta property="og:image" content="https://spot-finder-app.vercel.app/og-image.png" />
     <meta property="og:url" content="https://spot-finder-app.vercel.app" />
     <meta property="og:type" content="website" />
@@ -60,15 +60,15 @@
     <meta name="twitter:title" content="SpotFinder" />
     <meta name="twitter:description" content="Discover and navigate to hidden outdoor spots rated by the community." />
     <meta name="twitter:image" content="https://spot-finder-app.vercel.app/og-image.png" />
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9210597135045895" crossorigin="anonymous"></script>
-    <!-- Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-GC7D8SVBMV"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-GC7D8SVBMV');
-    </script>
+    <!--
+      Google Analytics and Google AdSense are NOT loaded unconditionally here.
+      Both set non-essential cookies, which under GDPR/ePrivacy require the
+      user's prior opt-in consent for EU/EEA/UK visitors. They are instead
+      loaded from src/lib/consent.js only after the user accepts them in the
+      cookie banner (see src/components/CookieConsentBanner.jsx). Google
+      Consent Mode is initialized (default: denied) before anything else so
+      Google's own tags never assume consent that wasn't given.
+    -->
   </head>
   <body>
     <div id="root"></div>

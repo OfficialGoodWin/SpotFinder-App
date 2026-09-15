@@ -1,6 +1,28 @@
 // Vercel serverless function — fetches Mapy.cz place photos
 // GET /api/mapy-photos?name=PLACE_NAME&lat=49.75&lon=13.51
 //
+// ⚠️ FLAGGED — HIGH-RISK, NEEDS A DECISION BEFORE LAUNCH ⚠️
+// This function scrapes photos from Seznam's Mapy.cz / Firmy.cz web pages
+// (parsing __NEXT_DATA__ / regexing HTML for sdn.cz image URLs) rather than
+// using a licensed, documented API for photos. Two separate problems:
+//  1. Copyright: the photos served this way are not licensed to SpotFinder —
+//     they're whatever a business owner or Mapy.cz contributor uploaded to
+//     Seznam's service. Re-serving them from your own app/API without a
+//     license from Seznam is a real copyright risk.
+//  2. Terms of Service / unauthorized access: scraping HTML from firmy.cz
+//     and mapy.com (spoofing a browser User-Agent/Referer to avoid being
+//     blocked) likely violates those sites' Terms of Service, independent of
+//     the copyright question.
+// There's also a hardcoded Mapy.com API key a few lines down — move that to
+// an environment variable regardless of what you decide below.
+//
+// Recommended options: (a) use Mapy.cz's official, documented Photo/Places
+// API under its real terms and quota instead of scraping, (b) drop this
+// feature and rely only on user-submitted photos + Wikimedia/Google Places
+// (with attribution — see the note in POIDetailPanel.jsx), or (c) get
+// explicit written permission from Seznam. Do not ship this to production
+// as-is without resolving this.
+//
 // Does everything server-side to avoid CORS:
 // 1. Old api.mapy.cz suggest (returns userData.source + userData.id)
 // 2. Firmy.cz detail page → __NEXT_DATA__ JSON → sdn.cz photo URLs

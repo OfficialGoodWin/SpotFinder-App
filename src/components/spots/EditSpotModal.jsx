@@ -93,7 +93,7 @@ export default function EditSpotModal({ spot, onClose, onSave }) {
             <MapPin className="w-5 h-5 text-blue-500" />
             <h2 className="text-lg font-bold text-gray-900 dark:text-foreground">{t('common.edit')} Spot</h2>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-accent">
+          <button onClick={onClose} aria-label={t('common.close')} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-accent">
             <X className="w-5 h-5 text-gray-500 dark:text-muted-foreground" />
           </button>
         </div>
@@ -262,10 +262,10 @@ export default function EditSpotModal({ spot, onClose, onSave }) {
                 </button>
               </div>
             ) : (
-              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-border rounded-2xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-accent transition-colors">
+              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-border rounded-2xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-accent transition-colors focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-400">
                 <Camera className="w-8 h-8 text-gray-400 dark:text-muted-foreground mb-1" />
                 <span className="text-sm text-gray-500 dark:text-muted-foreground">{t('addSpot.photoHint')}</span>
-                <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+                <input type="file" accept="image/*" onChange={handleImageChange} className="sr-only" />
               </label>
             )}
           </div>

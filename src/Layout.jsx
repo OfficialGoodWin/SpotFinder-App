@@ -1,6 +1,7 @@
 import React from "react";
 import 'leaflet/dist/leaflet.css';
 import StatusBanner from '@/components/StatusBanner';
+import CookieConsentBanner from '@/components/CookieConsentBanner';
 
 export default function Layout({ children, currentPageName }) {
   // The map page needs overflow:hidden + position:fixed to prevent rubber-band
@@ -13,6 +14,7 @@ export default function Layout({ children, currentPageName }) {
       <div style={{ height: '100dvh', width: '100vw', overflow: 'hidden', position: 'fixed', top: 0, left: 0 }}>
         <StatusBanner />
         {children}
+        <CookieConsentBanner />
       </div>
     );
   }
@@ -22,6 +24,7 @@ export default function Layout({ children, currentPageName }) {
     <div style={{ minHeight: '100dvh', width: '100%', overflowX: 'hidden' }}>
       <StatusBanner />
       {children}
+      <CookieConsentBanner />
     </div>
   );
 }

@@ -489,7 +489,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
               <p className="text-sm text-muted-foreground font-medium">{t('navPanel.navigatingTo')}</p>
               <p className="font-bold text-foreground text-lg truncate">{toLabel}</p>
             </div>
-            <button onClick={onClose} className="p-2 rounded-full bg-gray-100 dark:bg-accent ml-3">
+            <button onClick={onClose} aria-label={t('common.close')} className="p-2 rounded-full bg-gray-100 dark:bg-accent ml-3">
               <X className="w-5 h-5 text-gray-600 dark:text-foreground" />
             </button>
           </div>
@@ -578,7 +578,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
                 <p className="text-xs text-muted-foreground">{formatTime(route.properties?.duration || 0)}</p>
               </div>
             )}
-            <button onClick={onClose} className="p-2 rounded-full bg-gray-100 dark:bg-accent">
+            <button onClick={onClose} aria-label={t('common.close')} className="p-2 rounded-full bg-gray-100 dark:bg-accent">
               <X className="w-5 h-5 text-gray-600 dark:text-foreground" />
             </button>
           </div>

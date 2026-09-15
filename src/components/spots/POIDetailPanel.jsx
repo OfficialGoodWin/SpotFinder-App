@@ -46,6 +46,19 @@ function parseOpenStatus(ohString, t) {
 
 // ─── Photo fetching ───────────────────────────────────────────────────────────
 // Google Places API (needs VITE_GOOGLE_MAPS_KEY env var) → Wikimedia fallback
+//
+// COMPLIANCE NOTE (flagged, not fixed here): neither source's attribution is
+// currently shown to the user.
+//  - Google Places Photos: `details?fields=photos` also returns
+//    `html_attributions` per photo, which Google's Places API Terms require
+//    you to display. That field is discarded below (`p.photo_reference`
+//    only) — add it back and render it near the photo if you keep using
+//    Google Photos.
+//  - Wikimedia Commons images are almost always CC-BY-SA or similar, which
+//    legally requires attribution (author + license) wherever the image is
+//    used. Consider calling `imageinfo` with `iiprop=url|extmetadata` and
+//    showing "Photo: <author>, via Wikimedia Commons (<license>)" near the
+//    image, or a small credit line in the lightbox.
 
 const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY || '';
 
@@ -156,6 +169,7 @@ function Lightbox({ photos, startIndex, onClose }) {
       {/* Close */}
       <button
         onClick={onClose}
+        aria-label="Close"
         className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white backdrop-blur-sm transition-colors"
       >
         <X className="w-5 h-5" />
@@ -268,15 +282,22 @@ function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavig
   return (
     <div className="fixed left-0 right-0 z-[1200] bg-white dark:bg-card shadow-2xl border-t border-gray-100 dark:border-border rounded-t-2xl"
       style={{ bottom: 0 }}>
-      <button className="w-full flex justify-center pt-2.5 pb-0" onClick={onExpand}>
+      <button className="w-full flex justify-center pt-2.5 pb-0" onClick={onExpand} aria-label="Expand details">
         <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-border" />
       </button>
       <button onClick={onClose}
+        aria-label="Close"
         className="absolute top-3 right-3 w-7 h-7 rounded-full bg-gray-100 dark:bg-accent flex items-center justify-center z-10">
         <X className="w-3.5 h-3.5 text-foreground" />
       </button>
 
-      <div className="flex items-center gap-3 px-4 pt-2 pb-3 cursor-pointer" onClick={onExpand}>
+      <div
+        className="flex items-center gap-3 px-4 pt-2 pb-3 cursor-pointer"
+        onClick={onExpand}
+        role="button"
+        tabIndex={0}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onExpand(); } }}
+      >
         <div
           className="w-14 h-14 rounded-full flex-shrink-0 overflow-hidden border-2 flex items-center justify-center"
           style={{ borderColor: category.color, background: `${category.color}18` }}
@@ -478,6 +499,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
                     <button
                       key={i}
                       onClick={() => onOpenLightbox(i)}
+                      aria-label={`View photo ${i + 1} of ${allPhotos.length}`}
                       className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 dark:bg-accent cursor-zoom-in hover:opacity-90 active:scale-95 transition-all"
                     >
                       <img src={p.url} alt="" className="w-full h-full object-cover"

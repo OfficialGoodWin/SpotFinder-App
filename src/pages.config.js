@@ -52,6 +52,10 @@ import Home from './pages/Home';
 import FAQ from './pages/FAQ';
 import Status from './pages/Status';
 import StatusAdmin from './pages/StatusAdmin';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsAndConditions from './pages/TermsAndConditions';
+import CookiePolicy from './pages/CookiePolicy';
+import RefundPolicy from './pages/RefundPolicy';
 import __Layout from './Layout.jsx';
  
  
@@ -60,6 +64,10 @@ export const PAGES = {
     "FAQ": FAQ,
     "Status": Status,
     "StatusAdmin": StatusAdmin,
+    "PrivacyPolicy": PrivacyPolicy,
+    "TermsAndConditions": TermsAndConditions,
+    "CookiePolicy": CookiePolicy,
+    "RefundPolicy": RefundPolicy,
 }
  
 export const pagesConfig = {

@@ -141,7 +141,7 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
                 </p>
               </div>
             </div>
-            <button onClick={onClose} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-accent">
+            <button onClick={onClose} aria-label={t('common.close')} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-accent">
               <X className="w-5 h-5 text-gray-500 dark:text-muted-foreground" />
             </button>
           </div>

@@ -27,7 +27,7 @@ export default function MySpotsPanel({ user, onClose, onFlyTo }) {
       <div className="bg-white dark:bg-card w-full max-w-lg rounded-t-3xl shadow-2xl max-h-[85vh] flex flex-col">
         <div className="px-6 pt-5 pb-3 border-b border-gray-100 dark:border-border flex items-center justify-between flex-shrink-0">
           <h2 className="text-lg font-bold text-gray-900 dark:text-foreground">{t('mySpots.title')}</h2>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-accent">
+          <button onClick={onClose} aria-label={t('common.close')} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-accent">
             <X className="w-5 h-5 text-gray-500 dark:text-muted-foreground" />
           </button>
         </div>

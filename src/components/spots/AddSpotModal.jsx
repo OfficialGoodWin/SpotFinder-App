@@ -253,7 +253,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
             <MapPin className="w-5 h-5 text-blue-500" />
             <h2 className="text-lg font-bold text-gray-900 dark:text-foreground">{t('addSpot.title')}</h2>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-accent">
+          <button onClick={onClose} aria-label={t('common.close')} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-accent">
             <X className="w-5 h-5 text-gray-500 dark:text-muted-foreground" />
           </button>
         </div>
@@ -437,16 +437,17 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
                 <img src={imagePreview} alt="preview" className="w-full h-40 object-cover rounded-2xl" />
                 <button
                   onClick={() => { setImageFile(null); setImagePreview(null); }}
+                  aria-label="Remove photo"
                   className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
             ) : (
-              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-border rounded-2xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-accent transition-colors">
+              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-border rounded-2xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-accent transition-colors focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-400">
                 <Camera className="w-8 h-8 text-gray-400 dark:text-muted-foreground mb-1" />
                 <span className="text-sm text-gray-500 dark:text-muted-foreground">{t('addSpot.photoHint')}</span>
-                <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+                <input type="file" accept="image/*" onChange={handleImageChange} className="sr-only" />
               </label>
             )}
           </div>
@@ -461,6 +462,12 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
             </div>
           </div>
         </div>
+
+        <p className="px-6 pt-3 text-[11px] leading-relaxed text-gray-500 dark:text-muted-foreground">
+          By saving, you confirm this description and photo are your own (or you have the right to
+          share them) and agree they'll be shown publicly on the map to other SpotFinder users. See our{' '}
+          <a href="/TermsAndConditions" target="_blank" rel="noopener noreferrer" className="underline">Terms</a>.
+        </p>
 
         <div className="px-6 py-4 border-t border-gray-100 dark:border-border flex gap-3">
           <button onClick={onClose} className="flex-1 py-3 rounded-2xl border-2 border-gray-200 dark:border-border text-gray-600 dark:text-foreground font-semibold text-sm hover:bg-gray-50 dark:hover:bg-accent">

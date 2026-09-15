@@ -1028,10 +1028,12 @@ export default function SuperAdminEditor({ user, onClose, onAdminDataChange }) {
             </span>
           )}
           <button onClick={() => setCollapsed(v => !v)}
+            aria-label={collapsed ? 'Expand' : 'Collapse'}
             className="w-8 h-8 rounded-full bg-gray-100 dark:bg-accent flex items-center justify-center">
             {collapsed ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
           <button onClick={onClose}
+            aria-label="Close"
             className="w-8 h-8 rounded-full bg-gray-100 dark:bg-accent flex items-center justify-center">
             <X className="w-4 h-4" />
           </button>
