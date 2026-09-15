@@ -1,4 +1,21 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "poi_photos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "poi_id", "order": "ASCENDING" },
+        { "fieldPath": "created_date", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "poi_ratings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "poi_id", "order": "ASCENDING" },
+        { "fieldPath": "created_date", "order": "DESCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }
