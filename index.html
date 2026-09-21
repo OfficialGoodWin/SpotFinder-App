@@ -11,8 +11,9 @@
       means a future regression fails closed instead of becoming an XSS.
       Update this list if you add new API/CDN origins.
       NOTE: if you enable the ambient-POI PMTiles pipeline
-      (scripts/ambient-tiles/), add whichever host you pick (Cloudflare R2,
-      GitHub Releases, etc.) to connect-src below — see its README.
+      (scripts/ambient-tiles/), add your Vercel Blob store's host
+      (https://<id>.public.blob.vercel-storage.com) to connect-src below —
+      see that folder's README for the one-time setup.
     -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';

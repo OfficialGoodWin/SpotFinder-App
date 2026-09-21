@@ -27,24 +27,26 @@ npm install
 ./build.sh "48.5,12.0,51.1,18.9"   # south,west,north,east — your coverage area
 ```
 
-## Hosting
+## Hosting: Vercel Blob
 
-Any static host with range-request support works. Two straightforward options:
+Since the app is already on Vercel, tiles are hosted on [Vercel Blob](https://vercel.com/docs/vercel-blob) — it explicitly supports HTTP range requests (required for PMTiles, which reads byte ranges rather than downloading the whole file) and files up to 5TB, so no separate infra/account needed.
 
-- **Cloudflare R2** — free egress, this is what Protomaps' own docs
-  recommend for self-hosted PMTiles. Needs an R2 bucket + a public custom
-  domain (or R2.dev subdomain) in front of it.
-- **GitHub Releases** — zero extra infra: attach `ambient-poi.pmtiles` as a
-  release asset and use its `github.com/.../releases/download/...` URL.
-  Simplest option if your coverage area is small enough that the file stays
-  under a few hundred MB.
+Setup (one-time):
 
-Whichever you pick, two things need updating:
+1. Vercel dashboard → your project → **Storage** → **Create Database** → **Blob**.
+2. Copy the `BLOB_READ_WRITE_TOKEN` it gives you.
+3. Run the pipeline locally once to get the file hosted and get its URL:
+   ```bash
+   cd scripts/ambient-tiles
+   npm install
+   BLOB_READ_WRITE_TOKEN=... ./build.sh "48.5,12.0,51.1,18.9"   # south,west,north,east
+   ```
+   `upload.js` (called automatically by `build.sh` when the token is set) prints the public blob URL and the exact CSP/env var values to set next.
+4. In Vercel's project env vars, set `VITE_AMBIENT_TILES_URL` to that URL.
+5. In `index.html`'s CSP, add the blob host (`https://<id>.public.blob.vercel-storage.com`) to `connect-src`.
+6. Redeploy. Leaving `VITE_AMBIENT_TILES_URL` unset is always safe — `MapLibreMap.jsx` falls back to the original live Geoapify fetch automatically.
 
-1. **CSP** (`index.html`) — add that host's domain to `connect-src`.
-2. **Env var** — set `VITE_AMBIENT_TILES_URL` to the file's public URL in
-   Vercel's env vars. Leaving it unset is safe: `MapLibreMap.jsx` falls back
-   to the original live Geoapify fetch automatically.
+To keep it current automatically, add `BLOB_READ_WRITE_TOKEN` as a **repo secret** (Settings → Secrets → Actions) so `.github/workflows/build-ambient-tiles.yml` can rebuild and re-upload monthly. `upload.js` uploads to the same fixed filename each time (`addRandomSuffix: false`), so the URL — and therefore `VITE_AMBIENT_TILES_URL` — never changes between rebuilds.
 
 ## Keeping it fresh
 

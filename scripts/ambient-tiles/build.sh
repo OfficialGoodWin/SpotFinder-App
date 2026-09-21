@@ -34,4 +34,11 @@ tippecanoe \
   --force \
   "$GEOJSON"
 
-echo "Built $OUT — upload this file to your chosen host and point VITE_AMBIENT_TILES_URL at its public URL."
+echo "Built $OUT."
+
+if [ -n "${BLOB_READ_WRITE_TOKEN:-}" ]; then
+  node upload.js "$OUT"
+else
+  echo "BLOB_READ_WRITE_TOKEN not set — skipping upload. Run:"
+  echo "  BLOB_READ_WRITE_TOKEN=... node upload.js $OUT"
+fi
