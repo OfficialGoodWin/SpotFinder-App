@@ -1,0 +1,35 @@
+{
+  "attributes": {
+    "id": "@id",
+    "type": false
+  },
+  "linear_tags": [],
+  "area_tags": [
+    "amenity=*",
+    "tourism=*",
+    "historic=*",
+    "shop=*",
+    "railway=station"
+  ],
+  "include_tags": [
+    "name",
+    "description",
+    "note",
+    "phone",
+    "contact:phone",
+    "website",
+    "contact:website",
+    "opening_hours",
+    "wikidata",
+    "wikimedia_commons",
+    "image",
+    "addr:full",
+    "addr:street",
+    "addr:housenumber",
+    "amenity=*",
+    "tourism=*",
+    "historic=*",
+    "shop=supermarket,bakery",
+    "railway=station"
+  ]
+}

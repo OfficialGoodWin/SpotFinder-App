@@ -10,10 +10,8 @@
       one dangerouslySetInnerHTML usage is unrelated fixed CSS), but a CSP
       means a future regression fails closed instead of becoming an XSS.
       Update this list if you add new API/CDN origins.
-      NOTE: if you enable the ambient-POI PMTiles pipeline
-      (scripts/ambient-tiles/), add your Vercel Blob store's host
-      (https://<id>.public.blob.vercel-storage.com) to connect-src below —
-      see that folder's README for the one-time setup.
+      NOTE: this build already permits Vercel Blob public hosts. Once your
+      Blob store exists, you can tighten this to its single exact host.
     -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
@@ -26,7 +24,7 @@
       style-src 'self' 'unsafe-inline';
       img-src 'self' data: blob: https:;
       connect-src 'self' data: https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net https://*.run.app https://www.google.com https://www.gstatic.com
-        https://*.firebase.com https://api.mapy.com https://api.mapy.cz
+        https://*.firebase.com https://*.public.blob.vercel-storage.com
         https://api.openrouteservice.org https://tile.openstreetmap.org
         https://api.stripe.com https://api.geoapify.com
         https://tiles.openfreemap.org https://protomaps.github.io

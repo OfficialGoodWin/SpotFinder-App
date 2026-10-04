@@ -1,35 +1,52 @@
 #!/usr/bin/env bash
-# Full ambient-POI tile pipeline: Overpass -> GeoJSON -> PMTiles.
+# Build Czech ambient POI PMTiles locally from a Geofabrik PBF.
 #
 # Usage:
-#   cd scripts/ambient-tiles
-#   npm install
-#   ./build.sh "48.5,12.0,51.1,18.9"     # south,west,north,east
+#   ./build.sh [path/to/czech-republic-latest.osm.pbf]
 #
-# Requires: node 18+, tippecanoe (https://github.com/felt/tippecanoe).
-#   macOS:  brew install tippecanoe
-#   Ubuntu: apt-get install -y build-essential libsqlite3-dev zlib1g-dev
-#           git clone https://github.com/felt/tippecanoe && cd tippecanoe && make -j && sudo make install
+# Requires: osmium, node 18+, tippecanoe.
+# The Czech PBF is ~900 MB, but osmium export can use substantial RAM for
+# geometry assembly. Use WSL2/Linux and keep the repo under the Linux home
+# directory for better I/O than /mnt/c.
 set -euo pipefail
 
-BBOX="${1:?Usage: ./build.sh south,west,north,east}"
+PBF="${1:-czech-republic-latest.osm.pbf}"
+FILTERED="ambient-filtered.osm.pbf"
+GEOJSON_RAW="ambient-export.geojson"
 GEOJSON="ambient-poi.geojson"
 OUT="ambient-poi.pmtiles"
 
-if ! command -v tippecanoe >/dev/null; then
-  echo "tippecanoe not found on PATH — see the header of this script for install instructions." >&2
-  exit 1
-fi
+command -v osmium >/dev/null || { echo "osmium not found" >&2; exit 1; }
+command -v tippecanoe >/dev/null || { echo "tippecanoe not found" >&2; exit 1; }
+command -v node >/dev/null || { echo "node not found" >&2; exit 1; }
+[ -f "$PBF" ] || { echo "PBF not found: $PBF" >&2; exit 1; }
 
-node build.js --bbox="$BBOX" --out="$GEOJSON"
+cat > .ambient-filter.txt <<'EOF'
+nwr/railway=station
+nwr/amenity=fuel,charging_station,hospital,restaurant,cafe,bar,pharmacy,bank,atm,parking,toilets,drinking_water
+nwr/tourism=hotel,museum,viewpoint,camp_site,caravan_site,picnic_site
+nwr/shop=supermarket,bakery
+nwr/historic
+EOF
 
-# -l ambient_poi   must match AMBIENT_SOURCE_LAYER in MapLibreMap.jsx
-# -Z10 -z16        matches the zoom range the ambient layer is actually shown at
-# --drop-densest-as-needed  keeps dense city centers from producing oversized tiles
+echo "[1/4] Filtering OSM objects..."
+osmium tags-filter --expressions=.ambient-filter.txt --overwrite -o "$FILTERED" "$PBF"
+
+echo "[2/4] Exporting POI geometries (points + polygons)..."
+osmium export --geometry-types=point,polygon --add-unique-id=type_id --overwrite \
+  --config=export-config.json -o "$GEOJSON_RAW" "$FILTERED"
+
+echo "[3/4] Normalizing category properties..."
+node build.js --in="$GEOJSON_RAW" --out="$GEOJSON"
+
+echo "[4/4] Building PMTiles..."
 tippecanoe \
   -o "$OUT" \
   -l ambient_poi \
+  -n "SpotFinder ambient POIs" \
+  -A "© OpenStreetMap contributors" \
   -Z10 -z16 \
+  --convert-polygons-to-label-points \
   --drop-densest-as-needed \
   --force \
   "$GEOJSON"
@@ -39,6 +56,10 @@ echo "Built $OUT."
 if [ -n "${BLOB_READ_WRITE_TOKEN:-}" ]; then
   node upload.js "$OUT"
 else
-  echo "BLOB_READ_WRITE_TOKEN not set — skipping upload. Run:"
-  echo "  BLOB_READ_WRITE_TOKEN=... node upload.js $OUT"
+  echo "BLOB_READ_WRITE_TOKEN not set — PMTiles upload skipped."
+  echo "Set it from your Vercel Blob store, then run: node upload.js $OUT"
+fi
+
+if [ "${KEEP_BUILD_FILES:-0}" != "1" ]; then
+  rm -f "$FILTERED" "$GEOJSON_RAW" .ambient-filter.txt
 fi

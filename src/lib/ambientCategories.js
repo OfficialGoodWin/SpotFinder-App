@@ -35,7 +35,12 @@ export const AMBIENT_CATEGORIES = [
   { key:'toilet',      minZoom:16, icon:'🚻', color:'#3498DB', geo:null },
   { key:'busstop',     minZoom:15, icon:'🚌', color:'#F39C12', geo:null },
   { key:'speedcamera', minZoom:13, icon:'📷', color:'#C0392B', geo:null },
-  { key:'viewpoint',   minZoom:13, icon:'🏔️', color:'#16A085', geo:null },
+  { key:'viewpoint',   minZoom:13, icon:'🏔️', color:'#16A085', geo:null, osmKey:'tourism', osmValue:'viewpoint' },
+  { key:'camp_site',   minZoom:12, icon:'⛺', color:'#2E8B57', geo:null, osmKey:'tourism', osmValue:'camp_site' },
+  { key:'caravan_site',minZoom:12, icon:'🚐', color:'#2E8B57', geo:null, osmKey:'tourism', osmValue:'caravan_site' },
+  { key:'toilets',     minZoom:14, icon:'🚻', color:'#3498DB', geo:null, osmKey:'amenity', osmValue:'toilets' },
+  { key:'drinking_water', minZoom:14, icon:'💧', color:'#2980B9', geo:null, osmKey:'amenity', osmValue:'drinking_water' },
+  { key:'picnic_site', minZoom:13, icon:'🧺', color:'#8E6B23', geo:null, osmKey:'tourism', osmValue:'picnic_site' },
   { key:'custom',      minZoom:13, icon:'📍', color:'#6B7280', geo:null },
 ];
 

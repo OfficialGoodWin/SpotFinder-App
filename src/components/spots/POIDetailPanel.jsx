@@ -48,11 +48,8 @@ function parseOpenStatus(ohString, t) {
 // Priority order, each tier only tried if the previous one found nothing:
 //   1. OSM tags (`image=` / `wikimedia_commons=File:...`) — a human curated
 //      this specific photo for this specific place. Most accurate, least common.
-//   2. Google Places Photos (needs VITE_GOOGLE_MAPS_KEY) — matched by place_id,
-//      so also subject-accurate, just paid/quota-limited.
-//   3. Wikidata's P18 "image" claim (needs an OSM `wikidata=` tag) — also
-//      subject-accurate (a specific claim about a specific entity), not a
-//      radius search.
+//   2. Wikidata's P18 "image" claim (needs an OSM `wikidata=` tag) —
+//      subject-accurate (a specific claim about a specific entity).
 // A prior version fell back further to `commons.wikimedia.org` geosearch
 // (nearby-by-coordinate, no subject check) — removed because it returned
 // photos of whatever else happened to be within the search radius (e.g. a
@@ -67,8 +64,6 @@ function parseOpenStatus(ohString, t) {
 // legally requires an author + license credit wherever the image is used.
 // `credit` is null only for sources that genuinely carry none (a raw
 // `image=` tag URL with no attribution metadata attached).
-
-const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY || '';
 
 // Fetch author + license for a Wikimedia Commons file via the official
 // imageinfo/extmetadata API. Best-effort: any failure just means the photo
@@ -102,61 +97,12 @@ async function getTagPhotos(tags = {}) {
     const url = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}?width=1200`;
     results.push({ url, credit: await fetchCommonsCredit(file) });
   }
-  // A raw `image=` URL is human-curated but carries no attribution metadata
-  // we can look up — show it without a credit line rather than guessing.
-  if (tags.image?.startsWith('http')) results.push({ url: tags.image, credit: null });
+  // Arbitrary image URLs have unknown licensing, so they are intentionally
+  // not reused here. The build-time enrichment script accepts Wikimedia-hosted
+  // image URLs after checking the Commons license metadata.
   return results;
 }
 
-async function fetchGooglePhotos(name, lat, lon) {
-  if (!GOOGLE_KEY) return [];
-  try {
-    // Step 1: find the place_id
-    const findRes = await fetch(
-      `/gplaces/findplacefromtext/json` +
-      `?input=${encodeURIComponent(name)}&inputtype=textquery` +
-      `&locationbias=circle:100@${lat},${lon}` +
-      `&fields=place_id,name,geometry&key=${GOOGLE_KEY}`
-    );
-    if (!findRes.ok) return [];
-    const candidate = (await findRes.json()).candidates?.[0];
-    if (!candidate?.place_id) return [];
-
-    // Reject if too far away (~100m)
-    const cLat = candidate.geometry?.location?.lat;
-    const cLon = candidate.geometry?.location?.lng;
-    if (!cLat || Math.hypot(cLat - lat, cLon - lon) > 0.001) return [];
-
-    // Step 2: always fetch details to get ALL photos (findplacefromtext only returns 1)
-    const dr = await fetch(
-      `/gplaces/details/json` +
-      `?place_id=${candidate.place_id}&fields=photos&key=${GOOGLE_KEY}`
-    );
-    if (!dr.ok) return [];
-    const photos = (await dr.json()).result?.photos || [];
-    // Google's Places API Terms require displaying `html_attributions` —
-    // strip tags to plain text so we never render raw HTML from a
-    // third-party response, then keep it as the photo's credit line.
-    const strip = (html) => (html || '').replace(/<[^>]*>/g, '').trim();
-    return photos.slice(0, 10).map(p => {
-      const attribution = (p.html_attributions || []).map(strip).filter(Boolean).join(', ');
-      return {
-        url: `/gplaces/photo?maxwidth=1200&photo_reference=${p.photo_reference}&key=${GOOGLE_KEY}`,
-        credit: attribution ? `Photo: ${attribution}, via Google` : null,
-      };
-    });
-  } catch { return []; }
-}
-
-// Accurate, subject-verified photo lookup via Wikidata's "image" (P18) claim.
-// Unlike `commons.wikimedia.org geosearch` (removed below — it just returns
-// whatever's geotagged within a radius, with zero check that the image
-// actually depicts this place), this only returns a photo when someone
-// explicitly linked it to *this specific entity* on Wikidata. Requires the
-// OSM element to carry a `wikidata=Qxxxxxxx` tag, which is common for named
-// buildings/businesses but not universal — so this is still a "sometimes"
-// source, not a guarantee, and callers should treat an empty result as "no
-// verified photo" rather than retry with a fuzzier lookup.
 async function fetchWikidataPhoto(wikidataId) {
   if (!wikidataId) return [];
   try {
@@ -178,10 +124,6 @@ async function fetchWikidataPhoto(wikidataId) {
 async function tryFetchPhotos(name, lat, lon, tags = {}) {
   const tagPhotos = await getTagPhotos(tags);
   if (tagPhotos.length) return tagPhotos;
-  if (GOOGLE_KEY) {
-    const google = await fetchGooglePhotos(name, lat, lon);
-    if (google.length) return google;
-  }
   // Last resort is a Wikidata-linked photo (still subject-verified), NOT a
   // blind proximity geosearch. If nothing here matches, we show no photo
   // rather than a photo of the wrong building — see the comment on
@@ -537,6 +479,15 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
                 <div className="h-px bg-gray-100 dark:bg-border mb-4" />
               </>
             )}
+            {poi.enrichment?.wikipedia?.text && (
+              <>
+                <p className="text-sm text-foreground leading-relaxed mb-2">{poi.enrichment.wikipedia.text}</p>
+                <p className="text-[10px] text-muted-foreground mb-4 leading-snug">{poi.enrichment.wikipedia.attribution}{' '}
+                  <a href={poi.enrichment.wikipedia.url} target="_blank" rel="noopener noreferrer" className="underline">Source</a>
+                </p>
+                <div className="h-px bg-gray-100 dark:bg-border mb-4" />
+              </>
+            )}
 
             {(phone || email || website || poi.lat) && (
               <>
@@ -644,7 +595,11 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
         ? { ratings: r, avg: r.length ? Math.round(r.reduce((s, x) => s + x.rating, 0) / r.length * 10) / 10 : 0, count: r.length }
         : (r || { ratings: [], avg: 0, count: 0 })
     ));
-    tryFetchPhotos(poi.name, poi.lat, poi.lon, poi.tags || {}).then(res => { if (res.length) setPhotos(res); });
+
+    // Ambient vector-tile clicks may carry static build-time enrichment.
+    // Only fall back to live photo lookups when no enrichment was baked in.
+    if (poi.enrichment?.photos?.length) setPhotos(poi.enrichment.photos.map(p => ({ url: p.url, credit: p.credit })));
+    else if (!poi.enrichment) tryFetchPhotos(poi.name, poi.lat, poi.lon, poi.tags || {}).then(res => { if (res.length) setPhotos(res); });
   }, [poi?.id]);
 
   const handleShare = async () => {

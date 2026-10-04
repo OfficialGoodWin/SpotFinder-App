@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 import { Plus, Settings, Crosshair, HelpCircle, Trash2 } from 'lucide-react';
 import SubscriptionModal from '../components/SubscriptionModal';
-import { getPublicSpots, createSpot, deleteSpot, updateSpot, getAdminPOIs, getAdminClosures, getAdminERouteOverrides, getAdminRoadOverrides, getDeletedAmbientPOIs, addDeletedAmbientPOI } from '@/api/firebaseClient';
+import { getPublicSpotsInBounds, createSpot, deleteSpot, updateSpot, getAdminPOIs, getAdminClosures, getAdminERouteOverrides, getAdminRoadOverrides, getDeletedAmbientPOIs, addDeletedAmbientPOI } from '@/api/firebaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
 import { useNavigate } from 'react-router-dom';
@@ -98,11 +98,33 @@ export default function Home() {
     getAdminRoadOverrides().then(setAdminRoadOverrides);
   }, []);
   const mapRef = useRef(null);
- 
- 
-  // Load spots
-  useEffect(() => {
-    getPublicSpots(200).then(setSpots).catch(console.error);
+  const spotRefreshTimer = useRef(null);
+
+  const refreshSpotsInViewport = useCallback(async () => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (spotRefreshTimer.current) clearTimeout(spotRefreshTimer.current);
+    spotRefreshTimer.current = setTimeout(async () => {
+      try {
+        const b = map.getBounds();
+        const rows = await getPublicSpotsInBounds({
+          south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast(),
+        }, 500);
+        setSpots(rows);
+      } catch (err) {
+        console.error('Failed to load visible spots:', err);
+      }
+    }, 120);
+  }, []);
+
+  const handleMapReady = useCallback((map) => {
+    mapRef.current = map;
+    map.on('moveend', refreshSpotsInViewport);
+    refreshSpotsInViewport();
+  }, [refreshSpotsInViewport]);
+
+  useEffect(() => () => {
+    if (spotRefreshTimer.current) clearTimeout(spotRefreshTimer.current);
   }, []);
  
   // Track if we've centered to user location once
@@ -286,7 +308,7 @@ export default function Home() {
         flyTo={flyTo}
         fitBoundsData={fitBoundsData}
         zoomToArea={zoomToArea}
-        setMapRef={(m) => { mapRef.current = m; }}
+        setMapRef={handleMapReady}
         addMode={addMode}
         onMapClick={handleMapClick}
         spots={spots}

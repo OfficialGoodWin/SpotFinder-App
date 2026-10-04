@@ -34,15 +34,18 @@ import {
   arrayUnion
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { encodeGeohash } from '@/lib/geohash.js';
 import { firebaseConfig } from './firebaseConfig';
 import { getRecaptchaToken } from '@/lib/recaptcha';
 
-let app, auth, db, functionsInstance;
+let app, auth, db, functionsInstance, storage;
 try {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
   functionsInstance = getFunctions(app);
+  storage = getStorage(app);
 } catch (error) {
   console.error("Firebase initialization error:", error);
 }
@@ -54,12 +57,13 @@ export const getFirebaseServices = () => {
       auth = getAuth(app);
       db = getFirestore(app);
       functionsInstance = getFunctions(app);
+      storage = getStorage(app);
         } catch (error) {
       console.error("Firebase re-initialization error:", error);
       return null;
     }
   }
-  return { app, auth, db, functions: functionsInstance };
+  return { app, auth, db, functions: functionsInstance, storage };
 };
 
 // Shared callable wrapper. Admin helpers below use the same path so every
@@ -210,14 +214,16 @@ export const handlePOIError = (error, poiData) => {
   return { blocked: true, fallback: poiData || [] };
 };
  
-// Compress image with canvas and return base64 data URL (stored in Firestore)
-// Max output size ~600KB — well within Firestore 1MB document limit
+// Compress image in-browser, then store the binary file in Firebase Storage.
+// Firestore keeps only a small URL instead of a base64 payload.
 export const uploadSpotImage = async (file) => {
-  return new Promise((resolve, reject) => {
-    const MAX_W = 1200;
-    const MAX_H = 1200;
-    const QUALITY = 0.75;
- 
+  const { auth, storage } = getFirebaseServices();
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('You must be signed in to upload a photo.');
+  if (!file?.type?.startsWith('image/')) throw new Error('Only image files are allowed.');
+
+  const blob = await new Promise((resolve, reject) => {
+    const MAX_W = 1200, MAX_H = 1200, QUALITY = 0.78;
     const reader = new FileReader();
     reader.onerror = reject;
     reader.onload = (e) => {
@@ -225,23 +231,26 @@ export const uploadSpotImage = async (file) => {
       img.onerror = reject;
       img.onload = () => {
         let { width, height } = img;
-        // Scale down if larger than max
         if (width > MAX_W || height > MAX_H) {
           const ratio = Math.min(MAX_W / width, MAX_H / height);
-          width  = Math.round(width  * ratio);
+          width = Math.round(width * ratio);
           height = Math.round(height * ratio);
         }
         const canvas = document.createElement('canvas');
-        canvas.width  = width;
-        canvas.height = height;
+        canvas.width = width; canvas.height = height;
         canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL('image/jpeg', QUALITY);
-        resolve(dataUrl);
+        canvas.toBlob(result => result ? resolve(result) : reject(new Error('Image encoding failed')), 'image/jpeg', QUALITY);
       };
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
   });
+
+  const id = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const path = `community/${uid}/${id}.jpg`;
+  const ref = storageRef(storage, path);
+  await uploadBytes(ref, blob, { contentType: 'image/jpeg', cacheControl: 'public,max-age=31536000,immutable' });
+  return getDownloadURL(ref);
 };
 
  
@@ -288,6 +297,28 @@ export const getPublicSpots = async (maxCount = 200) => {
   );
   return (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
 };
+
+// Scalable viewport query: only fetch spots currently inside the map bounds.
+// We sort after reading so Firestore does not need to order by a third field
+// while applying multiple latitude/longitude range filters.
+export const getPublicSpotsInBounds = async ({ south, west, north, east }, maxCount = 500) => {
+  const { db } = getFirebaseServices();
+  const clauses = [
+    where('is_public', '==', true),
+    where('status', 'in', ['published', 'pending_trust']),
+    where('lat', '>=', Number(south)),
+    where('lat', '<=', Number(north)),
+  ];
+
+  // The app is Czech-focused; still handle a world-wrapped viewport defensively.
+  if (Number(east) - Number(west) < 360) {
+    clauses.push(where('lng', '>=', Number(west)), where('lng', '<=', Number(east)));
+  }
+
+  const q = query(collection(db, SPOTS_COLLECTION), ...clauses, limit(maxCount));
+  const rows = (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
+  return rows.sort((a, b) => String(b.created_date || '').localeCompare(String(a.created_date || '')));
+};
  
 export const getUserSpots = async (userEmail, maxCount = 50) => {
   const { db } = getFirebaseServices();
@@ -322,6 +353,7 @@ export const createSpot = async (spotData) => {
     upvote_count: 0,
     downvote_count: 0,
     flag_count: 0,
+    geohash: encodeGeohash(Number(spotData.lat), Number(spotData.lng), 9),
     created_date: new Date().toISOString(),
   };
   const docRef = await addDoc(collection(db, SPOTS_COLLECTION), data);
@@ -537,15 +569,15 @@ export const getPOIPhotos = async (poiId) => {
   return (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
 };
 
-export const addPOIPhoto = async (poiId, imageDataUrl, userEmail) => {
+export const addPOIPhoto = async (poiId, imageUrl, userEmail) => {
   const { db } = getFirebaseServices();
   const docRef = await addDoc(collection(db, POI_PHOTOS_COLLECTION), {
     poi_id: poiId,
-    image: imageDataUrl,
+    image: imageUrl,
     created_by: userEmail || 'anonymous',
     created_date: new Date().toISOString(),
   });
-  return { id: docRef.id, poi_id: poiId, image: imageDataUrl };
+  return { id: docRef.id, poi_id: poiId, image: imageUrl };
 };
 
 // Ratings

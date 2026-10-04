@@ -1,63 +1,83 @@
-# Ambient POI tiles
+# SpotFinder ambient POI tiles — local build
 
-Replaces the live per-pan Geoapify calls in `MapLibreMap.jsx` (cafes, museums,
-viewpoints, etc.) with a pre-baked PMTiles file MapLibre streams directly —
-no network round-trip on pan/zoom. This only covers the *ambient/background*
-POI layer. Your own user-submitted Spots stay on live Firestore reads and
-are untouched by any of this.
+This folder builds a Czech Republic POI PMTiles archive from OpenStreetMap data. It does not use Overpass and does not scrape Mapy/Firmy.cz.
 
-## Pipeline
+## Windows: use WSL2
 
-1. `build.js` — queries Overpass for the categories in `osm-tags.js`
-   (kept in sync with `src/lib/ambientCategories.js`), converts to GeoJSON,
-   and (unless `--skip-credits`) pre-fetches Wikimedia author/license credit
-   for any feature with a `wikidata`/`wikimedia_commons` tag — so the client
-   never makes that round-trip per-POI either.
-2. `build.sh` — runs `build.js`, then `tippecanoe` to produce
-   `ambient-poi.pmtiles`.
-3. You host that file somewhere with HTTP range-request support (required —
-   PMTiles reads byte ranges, it doesn't download the whole file) and point
-   the app at it.
-
-Run it locally:
+Install Ubuntu from the Microsoft Store, open Ubuntu, then:
 
 ```bash
-cd scripts/ambient-tiles
-npm install
-./build.sh "48.5,12.0,51.1,18.9"   # south,west,north,east — your coverage area
+sudo apt update
+sudo apt install -y osmium-tool build-essential libsqlite3-dev zlib1g-dev git curl
 ```
 
-## Hosting: Vercel Blob
+Install Node.js 18+ using your preferred method. Then install Tippecanoe:
 
-Since the app is already on Vercel, tiles are hosted on [Vercel Blob](https://vercel.com/docs/vercel-blob) — it explicitly supports HTTP range requests (required for PMTiles, which reads byte ranges rather than downloading the whole file) and files up to 5TB, so no separate infra/account needed.
+```bash
+git clone https://github.com/felt/tippecanoe.git
+cd tippecanoe
+make -j
+sudo make install
+cd ~
+```
 
-Setup (one-time):
+Keep the repository under `~/` in WSL for speed, not under `/mnt/c/...`.
 
-1. Vercel dashboard → your project → **Storage** → **Create Database** → **Blob**.
-2. Copy the `BLOB_READ_WRITE_TOKEN` it gives you.
-3. Run the pipeline locally once to get the file hosted and get its URL:
-   ```bash
-   cd scripts/ambient-tiles
-   npm install
-   BLOB_READ_WRITE_TOKEN=... ./build.sh "48.5,12.0,51.1,18.9"   # south,west,north,east
-   ```
-   `upload.js` (called automatically by `build.sh` when the token is set) prints the public blob URL and the exact CSP/env var values to set next.
-4. In Vercel's project env vars, set `VITE_AMBIENT_TILES_URL` to that URL.
-5. In `index.html`'s CSP, add the blob host (`https://<id>.public.blob.vercel-storage.com`) to `connect-src`.
-6. Redeploy. Leaving `VITE_AMBIENT_TILES_URL` unset is always safe — `MapLibreMap.jsx` falls back to the original live Geoapify fetch automatically.
+## Download the Czech extract
 
-To keep it current automatically, add `BLOB_READ_WRITE_TOKEN` as a **repo secret** (Settings → Secrets → Actions) so `.github/workflows/build-ambient-tiles.yml` can rebuild and re-upload monthly. `upload.js` uploads to the same fixed filename each time (`addRandomSuffix: false`), so the URL — and therefore `VITE_AMBIENT_TILES_URL` — never changes between rebuilds.
+The current Geofabrik Czech extract is available here:
+https://download.geofabrik.de/europe/czech-republic.html
 
-## Keeping it fresh
+The file is roughly 900 MB as of the current snapshot, so leave several GB of free disk space for intermediate files and PMTiles.
 
-Ambient POIs don't change hourly — monthly is plenty. `.github/workflows/
-build-ambient-tiles.yml` runs this on a monthly cron. Fill in your bbox and
-upload step (R2 or a GitHub Release) before enabling it; it's written with
-placeholders since the hosting choice above is yours to make.
+```bash
+curl -L -o czech-republic-latest.osm.pbf \\
+  https://download.geofabrik.de/europe/czech-republic-latest.osm.pbf
+```
 
-## If you add a category later
+## Build PMTiles
 
-Update `src/lib/ambientCategories.js` **and** `osm-tags.js` together — the
-frontend match expressions and the Overpass query both key off the same
-category strings, and a mismatch just means that category silently returns
-no POIs from the tile source.
+From this folder:
+
+```bash
+npm install
+./build.sh ./czech-republic-latest.osm.pbf
+```
+
+The pipeline is:
+
+`Geofabrik PBF -> osmium tags-filter -> osmium export -> Node normalization -> tippecanoe -> ambient-poi.pmtiles`
+
+The tile source layer is `ambient_poi`, which must stay in sync with `src/components/map/MapLibreMap.jsx`.
+
+## Upload to Vercel Blob
+
+Create a **Public** Blob store in your Vercel project (Storage -> Create -> Blob). Vercel's public Blob URLs are CDN-backed and are suitable for direct browser reads. PMTiles reads the file using HTTP range requests.
+
+Put the Blob token into the WSL session without committing it:
+
+```bash
+export BLOB_READ_WRITE_TOKEN='PASTE_TOKEN_HERE'
+./build.sh ./czech-republic-latest.osm.pbf
+```
+
+The uploader uses one stable pathname so `VITE_AMBIENT_TILES_URL` does not change between builds.
+
+Then in Vercel Project Settings -> Environment Variables, add:
+
+`VITE_AMBIENT_TILES_URL=https://<your-store>.public.blob.vercel-storage.com/spotfinder/ambient-poi.pmtiles`
+
+Redeploy the site after changing a `VITE_` variable.
+
+## Details/photos enrichment
+
+After the PMTiles GeoJSON exists:
+
+```bash
+cd ../..
+npm run enrich:pois
+```
+
+This produces `public/poi-details/10/{x}/{y}.json` shards. The map fetches only the shard for the z10 tile when a user taps an ambient POI. It follows the OSM/Wikimedia/Wikidata chain and stores photo credit/license metadata rather than scraping a commercial map site at runtime.
+
+Do not commit API keys or the Vercel Blob token.

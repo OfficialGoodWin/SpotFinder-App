@@ -664,7 +664,7 @@ export default function MapLibreMap({
       antialias: true,
     });
 
-    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+    map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: ['© OpenStreetMap contributors'] }), 'bottom-right');
     map.on('click', e => { if (addModeRef.current) onMapClick?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }); });
 
     // Register shield image listener — generates signs on demand via styleimagemissing
@@ -689,15 +689,34 @@ export default function MapLibreMap({
     map.once('load', () => addAmbientVectorLayer(map));
     map.on('style.load', () => addAmbientVectorLayer(map));
     if (AMBIENT_TILES_URL) {
-      map.on('click', AMBIENT_CIRCLE_LAYER, (e) => {
+      map.on('click', AMBIENT_CIRCLE_LAYER, async (e) => {
         const feat = e.features?.[0];
         if (!feat) return;
         const p = feat.properties || {};
         const cat = AMBIENT_CATEGORIES.find(c => c.key === p.cat);
         const [lon, lat] = feat.geometry?.coordinates || [e.lngLat.lng, e.lngLat.lat];
+
+        const detailsBase = import.meta.env.VITE_POI_DETAILS_BASE_URL || '/poi-details/10';
+        const n = 2 ** 10;
+        const x = Math.floor((lon + 180) / 360 * n);
+        const latRad = Math.max(-85.05112878, Math.min(85.05112878, lat)) * Math.PI / 180;
+        const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n);
+        let details = null;
+        try {
+          const r = await fetch(`${String(detailsBase).replace(/\/$/, '')}/${x}/${y}.json`, { cache: 'force-cache' });
+          if (r.ok) {
+            const body = await r.json();
+            details = (body.items || []).find(item => String(item.id) === String(p.id)) || null;
+          }
+        } catch {}
+
+        const baseTags = { phone: p.phone, website: p.website, opening_hours: p.opening_hours, description: p.description, wikidata: p.wikidata, wikimedia_commons: p.wikimedia_commons, image: p.image };
+        const enrichedTags = details?.wikipedia ? { ...baseTags, wikipedia: details.wikipedia } : baseTags;
         onSelectPOI?.(
           { id: p.id || `${lat}-${lon}`, lat, lon, name: p.name || '', address: p.address || '',
-            tags: { phone: p.phone, website: p.website, opening_hours: p.opening_hours, wikidata: p.wikidata, wikimedia_commons: p.wikimedia_commons, image: p.image } },
+            tags: enrichedTags,
+            enrichment: details || null,
+          },
           cat
         );
       });

@@ -9,7 +9,8 @@
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "enrich:pois": "node scripts/enrichment/enrich-pois.js"
   },
   "dependencies": {
     "@capacitor/android": "^8.2.0",
@@ -55,8 +56,9 @@
     "cmdk": "^1.0.0",
     "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.5.2",
-    "firebase": "^12.9.0",
+    "firebase": "^12.19.0",
     "firebase-admin": "^14.3.0",
+    "firebase-functions": "^7.4.0",
     "framer-motion": "^11.16.4",
     "html2canvas": "^1.4.1",
     "input-otp": "^1.4.2",
