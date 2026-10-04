@@ -200,6 +200,16 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
 
+
+    // ── General reports: callable-only submit; admin-only moderation ─────────
+    match /reports/{docId} {
+      allow create: if false;
+      allow read, update, delete: if isSuperAdmin();
+    }
+    match /report_blocks/{docId} {
+      allow read, write: if false; // Admin SDK only
+    }
+
     // ── Feedback (public submit, admin read) ─────────────────────────────────
     // Publicly writable collections are the easiest spam target — cap size
     // and require the shape the app actually sends.

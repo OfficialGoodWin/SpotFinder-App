@@ -22,8 +22,8 @@ const STATUS_OPTIONS = [
 const UPDATE_TYPES = ['investigating', 'identified', 'monitoring', 'resolved'];
 
 export default function StatusAdmin() {
-  const { user } = useAuth();
-  const isSuperAdmin = user?.email === 'superadmin@spotfinder.cz';
+  const { isAdmin } = useAuth();
+  const isSuperAdmin = isAdmin;
 
   const [services, setServices] = useState([]);
   const [openIncidents, setOpenIncidents] = useState([]);
@@ -32,6 +32,7 @@ export default function StatusAdmin() {
   const [newServiceName, setNewServiceName] = useState('');
   const [newIncidentTitle, setNewIncidentTitle] = useState('');
   const [newIncidentMsg, setNewIncidentMsg] = useState('');
+  const [newIncidentImpact, setNewIncidentImpact] = useState('degraded');
   const [updateDrafts, setUpdateDrafts] = useState({}); // { [incidentId]: { type, message } }
   const [busy, setBusy] = useState(false);
 
@@ -76,9 +77,10 @@ export default function StatusAdmin() {
     e.preventDefault();
     if (!newIncidentTitle.trim() || !newIncidentMsg.trim()) return;
     setBusy(true);
-    await startIncident(newIncidentTitle.trim(), 'investigating', newIncidentMsg.trim());
+    await startIncident(newIncidentTitle.trim(), 'investigating', newIncidentMsg.trim(), newIncidentImpact);
     setNewIncidentTitle('');
     setNewIncidentMsg('');
+    setNewIncidentImpact('degraded');
     await refresh();
     setBusy(false);
   };
@@ -199,6 +201,14 @@ export default function StatusAdmin() {
                   placeholder="Incident title (e.g. Elevated errors on map loading)"
                   className="w-full px-3 py-2 rounded-md border border-[#DDD6C8] bg-white text-sm"
                 />
+                <select
+                  value={newIncidentImpact}
+                  onChange={e => setNewIncidentImpact(e.target.value)}
+                  className="w-full px-3 py-2 rounded-md border border-[#DDD6C8] bg-white text-sm"
+                >
+                  <option value="degraded">Degraded performance / partial outage</option>
+                  <option value="down">Major outage / unavailable</option>
+                </select>
                 <textarea
                   value={newIncidentMsg}
                   onChange={e => setNewIncidentMsg(e.target.value)}

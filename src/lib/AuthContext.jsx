@@ -10,6 +10,7 @@ export const AuthProvider = ({ children }) => {
   // content anonymous guests are allowed to create (e.g. spots).
   const [authUid, setAuthUid] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(true);
@@ -37,6 +38,7 @@ export const AuthProvider = ({ children }) => {
             if (anonymous) {
               setUser(null);
               setIsAuthenticated(false);
+              setIsAdmin(false);
             } else {
               const displayName = firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'User');
               setUser({
@@ -47,10 +49,12 @@ export const AuthProvider = ({ children }) => {
                 emailVerified: firebaseUser.emailVerified
               });
               setIsAuthenticated(true);
+              firebaseUser.getIdTokenResult().then(r => setIsAdmin(r.claims?.admin === true)).catch(() => setIsAdmin(false));
             }
           } else {
             setUser(null);
             setIsAuthenticated(false);
+            setIsAdmin(false);
             setIsAnonymous(false);
             // Only start an anonymous guest session once we know for sure
             // there's no real signed-in user — checking this here (instead
@@ -131,6 +135,8 @@ export const AuthProvider = ({ children }) => {
       if (!firebaseUser) return;
       await firebaseUser.reload();
       await firebaseUser.getIdToken(true);
+      const tokenResult = await firebaseUser.getIdTokenResult();
+      setIsAdmin(tokenResult.claims?.admin === true);
       if (firebaseUser.isAnonymous) {
         setUser(null);
         setIsAuthenticated(false);
@@ -189,6 +195,7 @@ export const AuthProvider = ({ children }) => {
       user, 
       authUid,
       isAuthenticated, 
+      isAdmin,
       isLoadingAuth,
       isLoadingPublicSettings,
       authError,

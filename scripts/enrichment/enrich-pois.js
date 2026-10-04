@@ -54,6 +54,52 @@ async function commonsMetadata(fileTitle) {
   };
 }
 
+const MATCH_BY_NAME = process.env.POI_MATCH_WIKIDATA !== '0';
+const MATCH_RADIUS_M = Number(process.env.POI_MATCH_RADIUS_M || 150);
+const searchCache = new Map();
+
+function haversineMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000, toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2-lat1), dLon = toRad(lon2-lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+function entityCoord(entity) {
+  const v = entity?.claims?.P625?.[0]?.mainsnak?.datavalue?.value;
+  return v && Number.isFinite(v.latitude) && Number.isFinite(v.longitude) ? [v.longitude, v.latitude] : null;
+}
+function poiName(tags) { return tags.name || tags['name:cs'] || tags['name:en'] || ''; }
+function isNotable(tags) {
+  // Free build-time matching is intentionally aimed at named places where a
+  // Wikidata/Commons photo is likely to exist, rather than every bench/shop.
+  return Boolean(poiName(tags)) && Boolean(
+    tags.tourism || tags.historic || tags.heritage || tags.castle_type ||
+    tags.man_made === 'tower' || tags.amenity === 'place_of_worship' ||
+    tags.amenity === 'theatre' || tags.amenity === 'arts_centre' ||
+    tags.amenity === 'library' || tags.leisure === 'stadium' ||
+    tags.natural === 'peak' || tags.tourism === 'viewpoint' ||
+    tags.tourism === 'hotel' || tags.tourism === 'museum'
+  );
+}
+async function matchWikidataByNameAndCoord(name, lon, lat) {
+  const key = `${name.toLowerCase()}|${lat.toFixed(3)}|${lon.toFixed(3)}`;
+  if (searchCache.has(key)) return searchCache.get(key);
+  const url = 'https://www.wikidata.org/w/api.php?' + new URLSearchParams({
+    action:'wbsearchentities', search:name, language:'cs', uselang:'cs', type:'item', limit:'8', format:'json', origin:'*'
+  });
+  try {
+    const found = await getJson(url); await sleep(90);
+    for (const hit of found?.search || []) {
+      const entity = await wikidataEntity(hit.id); await sleep(75);
+      const c = entityCoord(entity); if (!c) continue;
+      if (haversineMeters(lat, lon, c[1], c[0]) <= MATCH_RADIUS_M) {
+        const out = { id: hit.id, entity }; searchCache.set(key, out); return out;
+      }
+    }
+  } catch {}
+  searchCache.set(key, null); return null;
+}
+
 async function wikidataEntity(id) {
   const url = 'https://www.wikidata.org/w/api.php?' + new URLSearchParams({
     action: 'wbgetentities', ids: id, props: 'claims|sitelinks', format: 'json', origin: '*'
@@ -134,19 +180,24 @@ async function main() {
 
   for (const feature of input.features || []) {
     const tags = feature.properties || {};
-    // Nothing to enrich (and nothing a photo could be verified against) -> skip.
-    // Without this the script walks every restaurant/parking lot in the country
-    // at 125ms+ each, i.e. many hours, for zero extra output.
-    if (!tags.wikidata && !tags.wikimedia_commons && !tags.image && !tags.description && !tags.note) continue;
+    // Existing tags are enriched directly. Named notable POIs without tags are
+    // also matched to Wikidata by name + coordinates, then accepted only when
+    // the Wikidata coordinate is within 150 m (configurable).
+    const hasDirectEnrichment = tags.wikidata || tags.wikimedia_commons || tags.image || tags.description || tags.note;
+    if (!hasDirectEnrichment && !(MATCH_BY_NAME && isNotable(tags))) continue;
     const coord = centroid(feature.geometry);
     if (!coord) continue;
     const [lon, lat] = coord;
     const id = tags.id || feature.id || `${lat},${lon}`;
 
     let entity = null;
-    if (tags.wikidata) {
-      try { entity = await wikidataEntity(tags.wikidata); } catch {}
+    let matchedWikidata = tags.wikidata || null;
+    if (matchedWikidata) {
+      try { entity = await wikidataEntity(matchedWikidata); } catch {}
       await sleep(75);
+    } else if (MATCH_BY_NAME && isNotable(tags)) {
+      const matched = await matchWikidataByNameAndCoord(poiName(tags), lon, lat);
+      if (matched) { matchedWikidata = matched.id; entity = matched.entity; }
     }
 
     const photos = (await pickPhoto(tags, entity)).slice(0, MAX_PHOTOS);
@@ -163,7 +214,7 @@ async function main() {
       description: desc,
       photos,
       wikipedia,
-      wikidata: tags.wikidata || null,
+      wikidata: matchedWikidata || null,
       source: 'OpenStreetMap',
     };
 

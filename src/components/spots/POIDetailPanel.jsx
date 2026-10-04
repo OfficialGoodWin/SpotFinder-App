@@ -191,22 +191,24 @@ async function tryFetchPhotos(name, lat, lon, tags = {}) {
 
 // ─── Address fallback ─────────────────────────────────────────────────────────
 // Ambient tiles only carry an address when OSM had addr:* tags. Reverse-geocode
-// (Nominatim, one request per opened POI) so the sheet always shows a location
-// line under the name: "Hlavní 27, 337 01 Ejpovice, Czechia".
+// via Geoapify (already allowed by the CSP and already used by the app) so the
+// sheet always shows a location line: "Hlavní 27, 337 01 Ejpovice, Czechia".
+const GEOAPIFY_KEY = import.meta.env.VITE_GEOAPIFY_KEY || '';
 const addressCache = new Map();
 async function reverseGeocodeAddress(lat, lon, lang = 'en') {
+  if (!GEOAPIFY_KEY) return '';
   const key = `${lat.toFixed(5)},${lon.toFixed(5)}`;
   if (addressCache.has(key)) return addressCache.get(key);
   try {
     const r = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1&accept-language=${encodeURIComponent(lang)}`
+      `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lon}&lang=${encodeURIComponent(lang)}&limit=1&format=json&apiKey=${GEOAPIFY_KEY}`
     );
     if (!r.ok) return '';
-    const a = (await r.json()).address || {};
-    const street = [a.road || a.pedestrian || a.footway || a.square, a.house_number].filter(Boolean).join(' ');
-    const city = a.city || a.town || a.village || a.hamlet || a.suburb || '';
-    const cityLine = [a.postcode, city].filter(Boolean).join(' ');
-    const out = [street, cityLine, a.country].filter(Boolean).join(', ');
+    const p = (await r.json()).results?.[0];
+    if (!p) return '';
+    const street = [p.street, p.housenumber].filter(Boolean).join(' ');
+    const city = [p.postcode, p.city || p.town || p.village || p.suburb].filter(Boolean).join(' ');
+    const out = [street, city, p.country].filter(Boolean).join(', ') || p.formatted || '';
     addressCache.set(key, out);
     return out;
   } catch { return ''; }

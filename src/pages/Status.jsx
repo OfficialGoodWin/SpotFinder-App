@@ -37,13 +37,13 @@ function uptimePct(days) {
 
 function ServiceRow({ service }) {
   const days = service.days?.length ? service.days : Array(90).fill('up');
-  const worst = days.includes('down') ? 'down' : days.includes('degraded') ? 'degraded' : 'up';
+  const current = days.at(-1) || 'up';
 
   return (
     <div className="py-5 border-b border-[#DDD6C8] last:border-0">
       <div className="flex items-baseline justify-between mb-2.5">
         <div className="flex items-center gap-2">
-          <span className={`w-1.5 h-1.5 rounded-full ${STATUS_META[worst].dot}`} />
+          <span className={`w-1.5 h-1.5 rounded-full ${STATUS_META[current]?.dot || STATUS_META.up.dot}`} />
           <span className="font-medium text-[#1B2A1E]">{service.name}</span>
         </div>
         <span className="text-sm font-mono text-[#5C5546]">{uptimePct(days)}% uptime</span>
@@ -95,7 +95,7 @@ function IncidentGroup({ date, incidents }) {
 
 export default function StatusPage() {
   const [services, setServices] = useState(null);
-  const [incidentGroups, setIncidentGroups] = useState([]);
+  const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -107,25 +107,35 @@ export default function StatusPage() {
         setServices(svcs.length ? svcs : [{ id: 'spotfinder', name: 'SpotFinder', days: Array(90).fill('up') }]);
 
         const incSnap = await getDocs(query(collection(db, 'status_incidents'), orderBy('date', 'desc'), limit(30)));
-        const byDate = {};
-        incSnap.docs.forEach(d => {
-          const inc = d.data();
-          (byDate[inc.date] ||= []).push(inc);
-        });
-        setIncidentGroups(Object.entries(byDate));
+        setIncidents(incSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (e) {
         // Collections not created yet, or rules not deployed — fail open
         // to the "all operational, no incidents" default rather than error.
         setServices([{ id: 'spotfinder', name: 'SpotFinder', days: Array(90).fill('up') }]);
-        setIncidentGroups([]);
+        setIncidents([]);
       } finally {
         setLoading(false);
       }
     })();
   }, []);
 
-  const overallDown = services?.some(s => s.days?.at(-1) === 'down');
-  const overallDegraded = services?.some(s => s.days?.at(-1) === 'degraded');
+  const activeIncidents = incidents.filter(inc => !inc.resolved);
+  const pastIncidents = incidents.filter(inc => inc.resolved);
+  const groupByDate = (items) => {
+    const byDate = {};
+    items.forEach(inc => { (byDate[inc.date] ||= []).push(inc); });
+    return Object.entries(byDate);
+  };
+  const activeIncidentGroups = groupByDate(activeIncidents);
+  const pastIncidentGroups = groupByDate(pastIncidents);
+
+  // An active incident affects the headline even if the service history was
+  // not manually changed. Legacy incidents have no `impact`, so default them
+  // to degraded. This makes already-open incidents behave correctly too.
+  const incidentDown = activeIncidents.some(inc => inc.impact === 'down');
+  const incidentDegraded = activeIncidents.some(inc => inc.impact !== 'down');
+  const overallDown = services?.some(s => s.days?.at(-1) === 'down') || incidentDown;
+  const overallDegraded = services?.some(s => s.days?.at(-1) === 'degraded') || incidentDegraded;
   const bannerColor = overallDown ? 'bg-[#B4453A]' : overallDegraded ? 'bg-[#C98A2C]' : 'bg-[#4C7A52]';
   const bannerText = overallDown ? 'Some systems are down' : overallDegraded ? 'Some systems are degraded' : 'All systems operational';
 
@@ -151,15 +161,26 @@ export default function StatusPage() {
               {services.map(s => <ServiceRow key={s.id} service={s} />)}
             </section>
 
+            {activeIncidentGroups.length > 0 && (
+              <section className="mt-4">
+                <h2 className="font-mono text-xs tracking-wide text-[#B4453A] mb-1 pt-6 border-t border-[#DDD6C8]">
+                  ACTIVE INCIDENTS
+                </h2>
+                {activeIncidentGroups.map(([date, groupedIncidents]) => (
+                  <IncidentGroup key={`active-${date}`} date={date} incidents={groupedIncidents} />
+                ))}
+              </section>
+            )}
+
             <section className="mt-4">
               <h2 className="font-mono text-xs tracking-wide text-[#8A8270] mb-1 pt-6 border-t border-[#DDD6C8]">
                 PAST INCIDENTS
               </h2>
-              {incidentGroups.length === 0 ? (
-                <p className="text-sm text-[#8A8270] py-6">No incidents reported.</p>
+              {pastIncidentGroups.length === 0 ? (
+                <p className="text-sm text-[#8A8270] py-6">No resolved incidents yet.</p>
               ) : (
-                incidentGroups.map(([date, incidents]) => (
-                  <IncidentGroup key={date} date={date} incidents={incidents} />
+                pastIncidentGroups.map(([date, groupedIncidents]) => (
+                  <IncidentGroup key={`past-${date}`} date={date} incidents={groupedIncidents} />
                 ))
               )}
             </section>

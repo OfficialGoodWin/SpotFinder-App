@@ -793,12 +793,17 @@ export const getRecentIncidents = async (n = 10) => {
 };
 
 // type: 'investigating' | 'identified' | 'monitoring' | 'resolved'
-export const startIncident = async (title, type, message) => {
+export const startIncident = async (title, type, message, impact = 'degraded') => {
   const { db } = getFirebaseServices();
+  // `impact` controls the public status banner while the incident is open.
+  // Old incidents without this field are treated as degraded by Status.jsx,
+  // so publishing this update also fixes already-open incidents.
+  const safeImpact = impact === 'down' ? 'down' : 'degraded';
   return addDoc(collection(db, 'status_incidents'), {
     title,
     date: todayStr(),
     resolved: type === 'resolved',
+    impact: safeImpact,
     updates: [{ type, message, at: new Date().toISOString() }],
   });
 };
@@ -844,3 +849,39 @@ export const base44 = {
 };
  
 export default base44;
+// ─── Central moderation/admin panel ──────────────────────────────────────────
+export const getAdminAccess = async () => {
+  const { auth } = getFirebaseServices();
+  const u = auth.currentUser;
+  if (!u || u.isAnonymous) return false;
+  const token = await u.getIdTokenResult();
+  return token.claims?.admin === true;
+};
+
+export const submitGeneralReport = async ({ category, subject, message, targetType = 'other', targetId = '', deviceId = '' }) => {
+  const recaptchaToken = await getRecaptchaToken('report');
+  return callFn('submitReport')({ category, subject, message, targetType, targetId, deviceId, recaptchaToken });
+};
+
+export const getAdminReports = async (maxCount = 200) => {
+  const { db } = getFirebaseServices();
+  const snap = await getDocs(query(collection(db, 'reports'), orderBy('created_at', 'desc'), limit(maxCount)));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+};
+export const adminResolveReport = (reportId, resolution = 'resolved') => callFn('adminResolveReport')({ reportId, resolution });
+export const adminDeleteReport = (reportId) => callFn('adminDeleteReport')({ reportId });
+export const adminBlockReporter = (reportId, reason = 'Report spam') => callFn('adminBlockReporter')({ reportId, reason });
+
+export const getAdminSpots = async (maxCount = 300) => {
+  const { db } = getFirebaseServices();
+  const snap = await getDocs(query(collection(db, 'spots'), orderBy('created_date', 'desc'), limit(maxCount)));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+};
+export const adminUpdateSpot = (spotId, patch) => callFn('adminUpdateSpot')({ spotId, patch });
+
+export const getAdminPOIPhotos = async (maxCount = 300) => {
+  const { db } = getFirebaseServices();
+  const snap = await getDocs(query(collection(db, 'poi_photos'), orderBy('created_date', 'desc'), limit(maxCount)));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+};
+export const adminDeletePOIPhoto = (photoId) => callFn('adminDeletePOIPhoto')({ photoId });
