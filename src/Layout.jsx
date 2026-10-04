@@ -1,5 +1,4 @@
 import React from "react";
-import 'leaflet/dist/leaflet.css';
 import StatusBanner from '@/components/StatusBanner';
 import CookieConsentBanner from '@/components/CookieConsentBanner';
 
