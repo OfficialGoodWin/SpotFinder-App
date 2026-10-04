@@ -6,6 +6,15 @@
 
 import { readFile, writeFile } from 'node:fs/promises';
 import { OSM_TAG_MAP, KEPT_TAGS } from './osm-tags.js';
+import { AMBIENT_CATEGORIES } from '../../src/lib/ambientCategories.js';
+
+// category -> minZoom, so tippecanoe only puts a feature in tiles from that zoom
+// up. Keeps low-zoom tiles small and stops --drop-densest-as-needed from
+// discarding important POIs in favour of parking lots.
+const MIN_ZOOM = Object.fromEntries(AMBIENT_CATEGORIES.map(c => [c.key, c.minZoom]));
+
+const PRIVATE_ACCESS = new Set(['private', 'customers', 'permit', 'no', 'delivery']);
+const STREET_PARKING = new Set(['street_side', 'lane', 'on_kerb', 'half_on_kerb', 'shoulder']);
 
 function parseArgs() {
   const args = Object.fromEntries(process.argv.slice(2).map(a => {
@@ -21,7 +30,9 @@ function parseArgs() {
 
 function categoryForTags(tags) {
   for (const [cat, rule] of Object.entries(OSM_TAG_MAP)) {
-    if (rule.value == null ? tags?.[rule.key] : tags?.[rule.key] === rule.value) return cat;
+    const v = tags?.[rule.key];
+    if (rule.values) { if (rule.values.includes(v)) return cat; continue; }
+    if (rule.value == null ? v : v === rule.value) return cat;
   }
   return null;
 }
@@ -47,6 +58,8 @@ async function main() {
     const tags = feat.properties || {};
     const cat = categoryForTags(tags);
     if (!cat) continue;
+    // Private / customer-only / kerbside parking is noise on a public map.
+    if (cat === 'parking' && (PRIVATE_ACCESS.has(tags.access) || STREET_PARKING.has(tags.parking))) continue;
     if (!['Point', 'Polygon', 'MultiPolygon'].includes(feat.geometry?.type)) continue;
 
     const props = { cat, id: tags['@id'] || tags.id || `${feat.id ?? ''}` };
@@ -60,7 +73,9 @@ async function main() {
     const address = normalizeAddress(tags);
     if (address) props.address = address;
     if (!props.name && tags['name:en']) props.name = tags['name:en'];
-    features.push({ type: 'Feature', geometry: feat.geometry, properties: props });
+    const feature = { type: 'Feature', geometry: feat.geometry, properties: props };
+    if (MIN_ZOOM[cat] != null) feature.tippecanoe = { minzoom: Math.max(10, MIN_ZOOM[cat]) };
+    features.push(feature);
   }
 
   await writeFile(out, JSON.stringify({ type: 'FeatureCollection', features }));

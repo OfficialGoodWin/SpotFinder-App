@@ -443,58 +443,137 @@ function makeSpotDom(spot) {
 // MapLibre vector layer with zero network calls on pan/zoom — the tiles are
 // already local/CDN-cached. When unset, the map falls back to the original
 // live-fetch behavior further down, so this ships safely either way.
+//
+// Rendering notes (why it looks the way it does):
+//  * Icons are real raster images (lucide SVG badges from mapIcons.js, the same
+//    ones the DOM markers use) registered with map.addImage. They are NOT emoji
+//    in a `text-field`: the glyph server has no emoji glyphs, so MapLibre drew
+//    them as black silhouettes.
+//  * Zoom gating is per category (minZoom in ambientCategories.js). MapLibre
+//    can't use ["zoom"] inside a filter, so there is one symbol layer per
+//    distinct minZoom, each with its own `minzoom` and a category filter.
+//  * Collision detection is ON, so crowded areas thin out instead of piling up.
+//    Layers are added least-important-first (highest minZoom first) so that
+//    hotels/stations/museums win collisions against parking and ATMs.
 const AMBIENT_TILES_URL = import.meta.env.VITE_AMBIENT_TILES_URL || '';
 const AMBIENT_SOURCE_ID = 'ambient-poi-tiles';
-const AMBIENT_CIRCLE_LAYER = 'ambient-poi-circle';
-const AMBIENT_LABEL_LAYER = 'ambient-poi-label';
-// Must match the `-l` layer name used by scripts/ambient-tiles/build.mjs.
+const AMBIENT_LAYER_PREFIX = 'ambient-poi-z';
+// Must match the `-l` layer name used by scripts/ambient-tiles/build.sh.
 const AMBIENT_SOURCE_LAYER = 'ambient_poi';
 
-// Builds MapLibre `match` expressions from ambientCategories.js so colors/
-// icons stay in one place instead of being duplicated into the map style.
-function ambientColorExpr() {
-  const expr = ['match', ['get', 'cat']];
-  for (const c of AMBIENT_CATS) expr.push(c.key, c.color);
-  expr.push('#6B7280'); // fallback
-  return expr;
+// Every category that can exist in the tiles (Geoapify `geo` ones + the OSM-only
+// ones like viewpoint/camp_site). The old `c.geo`-only filter dropped the
+// OSM-only ones, so they fell through to the grey pin fallback.
+const AMBIENT_TILE_CATS = AMBIENT_CATEGORIES.filter(c => c.geo || c.osmKey);
+
+// category key -> icon key in mapIcons.js (for categories that share/lack an icon)
+const AMBIENT_ICON_ALIAS = {
+  toilets: 'toilet', camp_site: 'tent', caravan_site: 'tent',
+  drinking_water: 'droplet', picnic_site: 'custom',
+};
+const ambientIconId = key => `amb-${key}`;
+
+// [[minZoom, [cats...]], ...] sorted ascending
+const AMBIENT_ZOOM_GROUPS = (() => {
+  const m = new Map();
+  for (const c of AMBIENT_TILE_CATS) {
+    if (!m.has(c.minZoom)) m.set(c.minZoom, []);
+    m.get(c.minZoom).push(c);
+  }
+  return [...m.entries()].sort((a, b) => a[0] - b[0]);
+})();
+const AMBIENT_LAYER_IDS = AMBIENT_ZOOM_GROUPS.map(([z]) => `${AMBIENT_LAYER_PREFIX}${z}`);
+
+const AMBIENT_ICON_CSS_PX = 28;
+const AMBIENT_ICON_RATIO = 2;
+let ambientIconData = null;      // Map<imageId, ImageData>, filled once, reused after every setStyle()
+let ambientIconPromise = null;
+
+function rasterizeSvg(svg, px) {
+  return new Promise((resolve, reject) => {
+    const img = new Image(px, px);
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = px;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, px, px);
+      resolve(ctx.getImageData(0, 0, px, px));
+    };
+    img.onerror = reject;
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  });
 }
-function ambientIconExpr() {
-  const expr = ['match', ['get', 'cat']];
-  for (const c of AMBIENT_CATS) expr.push(c.key, c.icon);
-  expr.push('📍');
-  return expr;
+
+function loadAmbientIcons() {
+  if (!ambientIconPromise) {
+    const px = AMBIENT_ICON_CSS_PX * AMBIENT_ICON_RATIO;
+    const jobs = AMBIENT_TILE_CATS.map(async c => {
+      const iconKey = AMBIENT_ICON_ALIAS[c.key] || c.key;
+      return [ambientIconId(c.key), await rasterizeSvg(badgeSVG(iconKey, c.color, px), px)];
+    });
+    jobs.push(rasterizeSvg(badgeSVG('custom', '#6B7280', px), px).then(d => [ambientIconId('custom'), d]));
+    ambientIconPromise = Promise.all(jobs).then(entries => { ambientIconData = new Map(entries); });
+    ambientIconPromise.catch(() => { ambientIconPromise = null; }); // allow retry
+  }
+  return ambientIconPromise;
 }
 
 function addAmbientVectorLayer(map) {
   if (!AMBIENT_TILES_URL || map.getSource(AMBIENT_SOURCE_ID)) return;
+  // First call: rasterize icons (async), then come back. After a setStyle() the
+  // cached ImageData is reused, so re-adding is synchronous.
+  if (!ambientIconData) {
+    loadAmbientIcons()
+      .then(() => addAmbientVectorLayer(map))
+      .catch(e => console.warn('Ambient POI icons failed to render:', e?.message || e));
+    return;
+  }
   try {
+    for (const [id, data] of ambientIconData) {
+      if (!map.hasImage(id)) map.addImage(id, data, { pixelRatio: AMBIENT_ICON_RATIO });
+    }
     map.addSource(AMBIENT_SOURCE_ID, { type: 'vector', url: `pmtiles://${AMBIENT_TILES_URL}` });
-    map.addLayer({
-      id: AMBIENT_CIRCLE_LAYER,
-      type: 'circle',
-      source: AMBIENT_SOURCE_ID,
-      'source-layer': AMBIENT_SOURCE_LAYER,
-      minzoom: 13,
-      paint: {
-        'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 8, 16, 14],
-        'circle-color': ambientColorExpr(),
-        'circle-stroke-width': 2,
-        'circle-stroke-color': '#ffffff',
-      },
-    });
-    map.addLayer({
-      id: AMBIENT_LABEL_LAYER,
-      type: 'symbol',
-      source: AMBIENT_SOURCE_ID,
-      'source-layer': AMBIENT_SOURCE_LAYER,
-      minzoom: 13,
-      layout: {
-        'text-field': ambientIconExpr(),
-        'text-size': ['interpolate', ['linear'], ['zoom'], 13, 11, 16, 15],
-        'text-allow-overlap': true,
-        'text-ignore-placement': true,
-      },
-    });
+
+    const iconExpr = ['match', ['get', 'cat']];
+    const sortExpr = ['match', ['get', 'cat']];
+    for (const c of AMBIENT_TILE_CATS) {
+      iconExpr.push(c.key, ambientIconId(c.key));
+      sortExpr.push(c.key, c.minZoom); // lower = placed first = wins collisions
+    }
+    iconExpr.push(ambientIconId('custom'));
+    sortExpr.push(99);
+
+    // Highest minZoom first -> lowest minZoom ends up on top / placed first.
+    for (const [z, cats] of [...AMBIENT_ZOOM_GROUPS].reverse()) {
+      map.addLayer({
+        id: `${AMBIENT_LAYER_PREFIX}${z}`,
+        type: 'symbol',
+        source: AMBIENT_SOURCE_ID,
+        'source-layer': AMBIENT_SOURCE_LAYER,
+        minzoom: z,
+        filter: ['in', ['get', 'cat'], ['literal', cats.map(c => c.key)]],
+        layout: {
+          'icon-image': iconExpr,
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.55, 15, 0.7, 18, 0.9],
+          'icon-allow-overlap': false,
+          'icon-padding': 3,
+          'symbol-sort-key': sortExpr,
+          // Names only once zoomed in; `text-optional` drops the label (not the icon) if it collides.
+          'text-field': ['step', ['zoom'], '', 16, ['coalesce', ['get', 'name'], '']],
+          'text-font': ['Noto Sans Regular'],
+          'text-size': 11,
+          'text-anchor': 'top',
+          'text-offset': [0, 1.1],
+          'text-max-width': 8,
+          'text-optional': true,
+        },
+        paint: {
+          'text-color': '#1f2937',
+          'text-halo-color': '#ffffff',
+          'text-halo-width': 1.2,
+        },
+      });
+    }
   } catch (e) {
     console.warn('Ambient POI tile layer failed to load, falling back to live fetch:', e.message);
   }
@@ -689,8 +768,15 @@ export default function MapLibreMap({
     map.once('load', () => addAmbientVectorLayer(map));
     map.on('style.load', () => addAmbientVectorLayer(map));
     if (AMBIENT_TILES_URL) {
-      map.on('click', AMBIENT_CIRCLE_LAYER, async (e) => {
-        const feat = e.features?.[0];
+      // Query a small box around the tap so icons are easy to hit on touch screens.
+      const ambientHits = (point) => {
+        const layers = AMBIENT_LAYER_IDS.filter(id => map.getLayer(id));
+        if (!layers.length) return [];
+        const r = 8;
+        return map.queryRenderedFeatures([[point.x - r, point.y - r], [point.x + r, point.y + r]], { layers });
+      };
+      map.on('click', async (e) => {
+        const feat = ambientHits(e.point)[0];
         if (!feat) return;
         const p = feat.properties || {};
         const cat = AMBIENT_CATEGORIES.find(c => c.key === p.cat);
@@ -720,8 +806,14 @@ export default function MapLibreMap({
           cat
         );
       });
-      map.on('mouseenter', AMBIENT_CIRCLE_LAYER, () => { map.getCanvas().style.cursor = 'pointer'; });
-      map.on('mouseleave', AMBIENT_CIRCLE_LAYER, () => { map.getCanvas().style.cursor = ''; });
+      let ambientHover = false;
+      map.on('mousemove', (e) => {
+        const hit = ambientHits(e.point).length > 0;
+        if (hit !== ambientHover) {
+          ambientHover = hit;
+          map.getCanvas().style.cursor = hit ? 'pointer' : '';
+        }
+      });
     }
 
     mapRef.current = map;

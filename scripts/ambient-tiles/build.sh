@@ -26,7 +26,7 @@ nwr/railway=station
 nwr/amenity=fuel,charging_station,hospital,restaurant,cafe,bar,pharmacy,bank,atm,parking,toilets,drinking_water
 nwr/tourism=hotel,museum,viewpoint,camp_site,caravan_site,picnic_site
 nwr/shop=supermarket,bakery
-nwr/historic
+nwr/historic=castle,fort,manor,palace,monastery,ruins,archaeological_site,monument,city_gate
 EOF
 
 echo "[1/4] Filtering OSM objects..."

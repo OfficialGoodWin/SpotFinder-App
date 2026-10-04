@@ -6,7 +6,9 @@ export const OSM_TAG_MAP = {
   charging:      { key: 'amenity', value: 'charging_station' },
   hotel:         { key: 'tourism', value: 'hotel' },
   museum:        { key: 'tourism', value: 'museum' },
-  heritage:      { key: 'historic', value: null },
+  // Only real landmarks. `historic=*` alone pulls in every memorial, wayside cross
+  // and boundary stone, which is what produced the black clusters on the map.
+  heritage:      { key: 'historic', value: null, values: ['castle','fort','manor','palace','monastery','ruins','archaeological_site','monument','city_gate'] },
   hospital:      { key: 'amenity', value: 'hospital' },
   restaurant:    { key: 'amenity', value: 'restaurant' },
   cafe:          { key: 'amenity', value: 'cafe' },
@@ -30,8 +32,9 @@ export const KEPT_TAGS = [
   'name', 'description', 'note', 'phone', 'contact:phone', 'website', 'contact:website',
   'opening_hours', 'wikidata', 'wikimedia_commons', 'image', 'addr:full',
   'addr:street', 'addr:housenumber',
+  'access', 'parking',
 ];
 
-export const FILTER_EXPRESSIONS = Object.values(OSM_TAG_MAP).map(({ key, value }) =>
-  `nwr/${key}${value ? `=${value}` : ''}`
+export const FILTER_EXPRESSIONS = Object.values(OSM_TAG_MAP).map(({ key, value, values }) =>
+  `nwr/${key}${values ? `=${values.join(',')}` : value ? `=${value}` : ''}`
 );

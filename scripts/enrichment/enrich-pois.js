@@ -134,6 +134,10 @@ async function main() {
 
   for (const feature of input.features || []) {
     const tags = feature.properties || {};
+    // Nothing to enrich (and nothing a photo could be verified against) -> skip.
+    // Without this the script walks every restaurant/parking lot in the country
+    // at 125ms+ each, i.e. many hours, for zero extra output.
+    if (!tags.wikidata && !tags.wikimedia_commons && !tags.image && !tags.description && !tags.note) continue;
     const coord = centroid(feature.geometry);
     if (!coord) continue;
     const [lon, lat] = coord;

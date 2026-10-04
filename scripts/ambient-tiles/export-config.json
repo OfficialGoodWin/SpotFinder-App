@@ -23,6 +23,8 @@
     "wikidata",
     "wikimedia_commons",
     "image",
+    "parking",
+    "access",
     "addr:full",
     "addr:street",
     "addr:housenumber",
