@@ -52,6 +52,7 @@ import Home from './pages/Home';
 import FAQ from './pages/FAQ';
 import Status from './pages/Status';
 import StatusAdmin from './pages/StatusAdmin';
+import Admin from './pages/Admin';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsAndConditions from './pages/TermsAndConditions';
 import CookiePolicy from './pages/CookiePolicy';
@@ -64,6 +65,7 @@ export const PAGES = {
     "FAQ": FAQ,
     "Status": Status,
     "StatusAdmin": StatusAdmin,
+    "Admin": Admin,
     "PrivacyPolicy": PrivacyPolicy,
     "TermsAndConditions": TermsAndConditions,
     "CookiePolicy": CookiePolicy,
