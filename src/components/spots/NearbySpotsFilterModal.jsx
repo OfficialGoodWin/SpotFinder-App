@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import { NEARBY_DEFAULT_KM, NEARBY_SLIDER_MAX, sliderToKm, kmToSlider, formatMaxDistance } from '@/lib/nearbyFilters';
 
 export default function NearbySpotsFilterModal({ isOpen, onClose, onApply, currentFilters }) {
-  const [maxDistance, setMaxDistance] = useState(currentFilters?.maxDistance ?? 50);
+  const [maxDistance, setMaxDistance] = useState(currentFilters?.maxDistance ?? NEARBY_DEFAULT_KM);
   const [minRating, setMinRating] = useState(currentFilters?.minRating ?? 0);
 
   // Re-seed local state whenever the modal is (re)opened so it reflects live filters
   useEffect(() => {
     if (isOpen) {
-      setMaxDistance(currentFilters?.maxDistance ?? 50);
+      setMaxDistance(currentFilters?.maxDistance ?? NEARBY_DEFAULT_KM);
       setMinRating(currentFilters?.minRating ?? 0);
     }
   }, [isOpen, currentFilters?.maxDistance, currentFilters?.minRating]);
@@ -35,16 +36,19 @@ export default function NearbySpotsFilterModal({ isOpen, onClose, onApply, curre
           <div>
             <div className="flex justify-between text-xs font-semibold text-gray-600 dark:text-muted-foreground mb-1">
               <span>Max Distance</span>
-              <span className="text-purple-600 dark:text-purple-400">{maxDistance} km</span>
+              <span className="text-purple-600 dark:text-purple-400">{formatMaxDistance(maxDistance)}</span>
             </div>
             <input
               type="range"
               min="1"
-              max="50"
-              value={maxDistance}
-              onChange={(e) => setMaxDistance(Number(e.target.value))}
+              max={NEARBY_SLIDER_MAX}
+              value={kmToSlider(maxDistance)}
+              onChange={(e) => setMaxDistance(sliderToKm(e.target.value))}
               className="w-full accent-purple-600 cursor-pointer"
             />
+            <div className="flex justify-between text-[10px] text-gray-400 dark:text-muted-foreground mt-0.5">
+              <span>1 km</span><span>50 km</span><span>∞</span>
+            </div>
           </div>
 
           {/* Min Rating Buttons */}
@@ -72,7 +76,7 @@ export default function NearbySpotsFilterModal({ isOpen, onClose, onApply, curre
         {/* Buttons */}
         <div className="flex gap-2 mt-6">
           <button
-            onClick={() => { setMaxDistance(50); setMinRating(0); onApply({ maxDistance: 50, minRating: 0 }); onClose(); }}
+            onClick={() => { setMaxDistance(NEARBY_DEFAULT_KM); setMinRating(0); onApply({ maxDistance: NEARBY_DEFAULT_KM, minRating: 0 }); onClose(); }}
             className="flex-1 py-2 rounded-xl text-xs font-medium text-gray-500 dark:text-muted-foreground hover:bg-gray-100 dark:hover:bg-accent border border-gray-200 dark:border-border"
           >
             Reset

@@ -381,10 +381,18 @@ function detectCat(feat) {
 
 
 // ── Marker DOM element helpers ────────────────────────────────────────────────
-function makeDot(catKey, color, size = 28) {
+const escapeHtml = (str) => String(str).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+
+// `label` (optional) renders the place name directly under the icon. It's an
+// absolutely-positioned child, so the marker's own box (and therefore its
+// anchor/position on the map) is unchanged.
+function makeDot(catKey, color, size = 28, label = '') {
   const el = document.createElement('div');
-  el.style.cssText = `width:${size}px;height:${size}px;cursor:pointer;user-select:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.35));`;
-  el.innerHTML = badgeSVG(catKey, color, size);
+  el.style.cssText = `width:${size}px;height:${size}px;cursor:pointer;user-select:none;`;
+  const labelHtml = label
+    ? `<div style="position:absolute;top:${size + 2}px;left:50%;transform:translateX(-50%);max-width:120px;width:max-content;text-align:center;font:600 12px/1.15 system-ui,sans-serif;color:#1f2937;text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff,0 0 3px #fff;pointer-events:none;white-space:normal;">${escapeHtml(label)}</div>`
+    : '';
+  el.innerHTML = `<div style="width:${size}px;height:${size}px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.35));">${badgeSVG(catKey, color, size)}</div>${labelHtml}`;
   return el;
 }
 
@@ -484,7 +492,7 @@ const AMBIENT_ZOOM_GROUPS = (() => {
 })();
 const AMBIENT_LAYER_IDS = AMBIENT_ZOOM_GROUPS.map(([z]) => `${AMBIENT_LAYER_PREFIX}${z}`);
 
-const AMBIENT_ICON_CSS_PX = 28;
+const AMBIENT_ICON_CSS_PX = 44; // rasterized size; was 28 (icons rendered ~20px, too small to tap)
 const AMBIENT_ICON_RATIO = 2;
 let ambientIconData = null;      // Map<imageId, ImageData>, filled once, reused after every setStyle()
 let ambientIconPromise = null;
@@ -554,23 +562,24 @@ function addAmbientVectorLayer(map) {
         filter: ['in', ['get', 'cat'], ['literal', cats.map(c => c.key)]],
         layout: {
           'icon-image': iconExpr,
-          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.55, 15, 0.7, 18, 0.9],
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.7, 15, 0.85, 18, 1.0], // ≈31px → 37px → 44px
           'icon-allow-overlap': false,
-          'icon-padding': 3,
+          'icon-padding': 4,
           'symbol-sort-key': sortExpr,
           // Names only once zoomed in; `text-optional` drops the label (not the icon) if it collides.
-          'text-field': ['step', ['zoom'], '', 16, ['coalesce', ['get', 'name'], '']],
+          // Name sits directly below the icon (Mapy.cz style), from z14 up.
+          'text-field': ['step', ['zoom'], '', 14, ['coalesce', ['get', 'name'], '']],
           'text-font': ['Noto Sans Regular'],
-          'text-size': 11,
+          'text-size': ['interpolate', ['linear'], ['zoom'], 14, 11, 17, 13],
           'text-anchor': 'top',
-          'text-offset': [0, 1.1],
-          'text-max-width': 8,
+          'text-offset': [0, 1.25],
+          'text-max-width': 9,
           'text-optional': true,
         },
         paint: {
           'text-color': '#1f2937',
           'text-halo-color': '#ffffff',
-          'text-halo-width': 1.2,
+          'text-halo-width': 1.6,
         },
       });
     }
@@ -772,7 +781,7 @@ export default function MapLibreMap({
       const ambientHits = (point) => {
         const layers = AMBIENT_LAYER_IDS.filter(id => map.getLayer(id));
         if (!layers.length) return [];
-        const r = 8;
+        const r = 14;
         return map.queryRenderedFeatures([[point.x - r, point.y - r], [point.x + r, point.y + r]], { layers });
       };
       map.on('click', async (e) => {
@@ -966,8 +975,8 @@ export default function MapLibreMap({
 
       clear();
       for (const poi of pois) {
-        const size = zoom >= 16 ? 32 : zoom >= 14 ? 28 : 24;
-        const el = makeDot(poi._cat.key, poi._cat.color, size);
+        const size = zoom >= 16 ? 44 : zoom >= 14 ? 40 : 34;
+        const el = makeDot(poi._cat.key, poi._cat.color, size, zoom >= 14 ? poi.name : '');
         const mk = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([poi.lon, poi.lat]).addTo(map);
         el.addEventListener('click', e => { e.stopPropagation(); onSelectPOI?.(poi, poi._cat); });
         m.set(poi.id, mk);
@@ -1010,8 +1019,8 @@ export default function MapLibreMap({
           const p = feat.properties || {};
           const poi = { id: p.place_id || `${lat}-${lon}`, lat, lon, name: p.name || selectedPOICategory.name, address: p.address_line2 || '', tags: {} };
           pois.push(poi);
-          const size = zoom >= 16 ? 36 : zoom >= 14 ? 30 : 26;
-          const el = makeDot(selectedPOICategory.key, selectedPOICategory.color, size);
+          const size = zoom >= 16 ? 46 : zoom >= 14 ? 40 : 34;
+          const el = makeDot(selectedPOICategory.key, selectedPOICategory.color, size, zoom >= 14 ? poi.name : '');
           const mk = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([lon, lat]).addTo(map);
           el.addEventListener('click', e => { e.stopPropagation(); onSelectPOI?.(poi); });
           m.set(poi.id, mk);
@@ -1162,7 +1171,7 @@ const addAdminMarkers = () => {
 
     const color = catConfig.color;
     const iconKey = catConfig.key || 'custom';
-    const size = zoom >= 16 ? 32 : zoom >= 14 ? 28 : 24;
+    const size = zoom >= 16 ? 44 : zoom >= 14 ? 40 : 34;
     const el = makeDot(iconKey, color, size);
     el.title = catConfig.name;
 

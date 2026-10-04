@@ -46,7 +46,7 @@ export default function Home() {
   const [showAuth, setShowAuth] = useState(false);
   const [showMySpots, setShowMySpots] = useState(false);
   const [showNearbySpots, setShowNearbySpots] = useState(false);
-  const [nearbyFilters, setNearbyFilters] = useState({ maxDistance: 50, minRating: 0 });
+  const [nearbyFilters, setNearbyFilters] = useState({ maxDistance: 50, minRating: 0 }); // maxDistance may be Infinity (= unlimited)
   const [terrainEnabled, setTerrainEnabled] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);

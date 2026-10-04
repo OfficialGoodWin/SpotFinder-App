@@ -120,15 +120,96 @@ async function fetchWikidataPhoto(wikidataId) {
   } catch { return []; }
 }
 
+// Wikipedia article lead image (subject-accurate: it's the article's own picture).
+// `wikipedia` tag format is "lang:Title" (e.g. "cs:Hrad Křivoklát").
+async function fetchWikipediaPhoto(wikipediaTag) {
+  if (typeof wikipediaTag !== 'string' || !wikipediaTag.includes(':')) return [];
+  const [lang, ...rest] = wikipediaTag.split(':');
+  const title = rest.join(':');
+  try {
+    const r = await fetch(`https://${encodeURIComponent(lang)}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title.replace(/ /g, '_'))}`);
+    if (!r.ok) return [];
+    const data = await r.json();
+    const src = data.originalimage?.source || data.thumbnail?.source;
+    if (!src) return [];
+    // Resize via Commons' FilePath redirect when the image is a Commons file so
+    // we can also fetch its credit; otherwise use the thumbnail as-is.
+    const m = src.match(/\/commons\/(?:thumb\/)?[0-9a-f]\/[0-9a-f]{2}\/([^/]+)/);
+    if (m) {
+      const file = decodeURIComponent(m[1]);
+      return [{ url: `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}?width=1200`, credit: await fetchCommonsCredit(file) }];
+    }
+    return [{ url: src, credit: `Photo via Wikipedia (${lang})` }];
+  } catch { return []; }
+}
+
+function distMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000, toRad = d => d * Math.PI / 180;
+  const a = Math.sin(toRad(lat2 - lat1) / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(toRad(lon2 - lon1) / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+// For POIs with no wikidata tag: search Wikidata by name, then ACCEPT a hit only
+// if it has a photo (P18) AND its own coordinates (P625) are within 150 m of the
+// POI. The coordinate check is what keeps this subject-accurate — it's the same
+// guarantee the old (removed) blind geosearch lacked.
+async function fetchWikidataPhotoByName(name, lat, lon) {
+  if (!name || name.length < 3) return [];
+  try {
+    const sr = await fetch(
+      `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(name)}&language=cs&uselang=cs&limit=5&format=json&origin=*`
+    );
+    if (!sr.ok) return [];
+    const hits = (await sr.json()).search || [];
+    for (const h of hits) {
+      const er = await fetch(`https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${h.id}&props=claims&format=json&origin=*`);
+      if (!er.ok) continue;
+      const claims = (await er.json()).entities?.[h.id]?.claims || {};
+      const c = claims.P625?.[0]?.mainsnak?.datavalue?.value;
+      if (!c || distMeters(lat, lon, c.latitude, c.longitude) > 150) continue;
+      const photos = await fetchWikidataPhoto(h.id);
+      if (photos.length) return photos;
+    }
+  } catch {}
+  return [];
+}
+
 // Returns [{ url, credit }], credit possibly null.
+// Every tier is subject-verified (a human-curated tag, the place's own Wikipedia
+// article, its own Wikidata item, or a name+coordinate-matched Wikidata item).
+// We still never do a blind proximity photo search — a missing photo beats a
+// photo of the neighbouring building.
 async function tryFetchPhotos(name, lat, lon, tags = {}) {
   const tagPhotos = await getTagPhotos(tags);
   if (tagPhotos.length) return tagPhotos;
-  // Last resort is a Wikidata-linked photo (still subject-verified), NOT a
-  // blind proximity geosearch. If nothing here matches, we show no photo
-  // rather than a photo of the wrong building — see the comment on
-  // fetchWikidataPhoto for why the geosearch approach was removed.
-  return fetchWikidataPhoto(tags.wikidata);
+  const wp = await fetchWikipediaPhoto(tags.wikipedia);
+  if (wp.length) return wp;
+  const wd = await fetchWikidataPhoto(tags.wikidata);
+  if (wd.length) return wd;
+  return fetchWikidataPhotoByName(name, lat, lon);
+}
+
+// ─── Address fallback ─────────────────────────────────────────────────────────
+// Ambient tiles only carry an address when OSM had addr:* tags. Reverse-geocode
+// (Nominatim, one request per opened POI) so the sheet always shows a location
+// line under the name: "Hlavní 27, 337 01 Ejpovice, Czechia".
+const addressCache = new Map();
+async function reverseGeocodeAddress(lat, lon, lang = 'en') {
+  const key = `${lat.toFixed(5)},${lon.toFixed(5)}`;
+  if (addressCache.has(key)) return addressCache.get(key);
+  try {
+    const r = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1&accept-language=${encodeURIComponent(lang)}`
+    );
+    if (!r.ok) return '';
+    const a = (await r.json()).address || {};
+    const street = [a.road || a.pedestrian || a.footway || a.square, a.house_number].filter(Boolean).join(' ');
+    const city = a.city || a.town || a.village || a.hamlet || a.suburb || '';
+    const cityLine = [a.postcode, city].filter(Boolean).join(' ');
+    const out = [street, cityLine, a.country].filter(Boolean).join(', ');
+    addressCache.set(key, out);
+    return out;
+  } catch { return ''; }
 }
 
 // ─── Lightbox ─────────────────────────────────────────────────────────────────
@@ -399,6 +480,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
         <div className="overflow-y-auto overscroll-contain" style={{ maxHeight: 'calc(92vh - 200px)' }}>
           <div className="px-5 pt-4" style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
             <h1 className="text-xl font-bold text-foreground leading-tight">{poi.name}</h1>
+            {poi.address && <p className="text-sm text-muted-foreground mt-0.5">{poi.address}</p>}
             <div className="mt-1.5 mb-4">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-white"
                 style={{ background: category.color }}>
@@ -580,7 +662,18 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
   const [sfRating, setSfRating] = useState({ ratings: [], avg: 0, count: 0 });
   const [photos, setPhotos] = useState([]);
   const [lightboxIndex, setLightboxIndex] = useState(null); // null = closed
+  const [resolvedAddress, setResolvedAddress] = useState('');
   const fileInputRef = useRef(null);
+  const { language } = useLanguage();
+
+  // Always show a location line: use the tile's address, else reverse-geocode.
+  useEffect(() => {
+    setResolvedAddress('');
+    if (!poi || poi.address) return;
+    let cancelled = false;
+    reverseGeocodeAddress(poi.lat, poi.lon, language || 'en').then(a => { if (!cancelled && a) setResolvedAddress(a); });
+    return () => { cancelled = true; };
+  }, [poi?.id]);
 
   useEffect(() => {
     if (!poi) return;
@@ -598,14 +691,16 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
 
     // Ambient vector-tile clicks may carry static build-time enrichment.
     // Only fall back to live photo lookups when no enrichment was baked in.
+    // Baked-in enrichment photos win; otherwise (including when enrichment exists
+    // but found no photo) fall back to the live subject-verified lookup.
     if (poi.enrichment?.photos?.length) setPhotos(poi.enrichment.photos.map(p => ({ url: p.url, credit: p.credit })));
-    else if (!poi.enrichment) tryFetchPhotos(poi.name, poi.lat, poi.lon, poi.tags || {}).then(res => { if (res.length) setPhotos(res); });
+    else tryFetchPhotos(poi.name, poi.lat, poi.lon, poi.tags || {}).then(res => { if (res.length) setPhotos(res); });
   }, [poi?.id]);
 
   const handleShare = async () => {
     const url = `https://maps.google.com/?q=${poi.lat},${poi.lon}`;
     try {
-      if (navigator.share) await navigator.share({ title: poi.name, text: poi.address || poi.name, url });
+      if (navigator.share) await navigator.share({ title: poi.name, text: poi.address || resolvedAddress || poi.name, url });
       else if (navigator.clipboard) { await navigator.clipboard.writeText(`${poi.name}\n${url}`); alert(t('poiDetail.linkCopied')); }
       else window.open(url, '_blank');
     } catch (e) { if (e.name !== 'AbortError') window.open(url, '_blank'); }
@@ -664,8 +759,10 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
 
   if (!poi) return null;
 
+  const poiForView = poi.address || !resolvedAddress ? poi : { ...poi, address: resolvedAddress };
+
   const sharedProps = {
-    poi, category, sfPhotos, sfRating, photos,
+    poi: poiForView, category, sfPhotos, sfRating, photos,
     onClose, onNavigate: handleNavigate, onShare: handleShare,
     onAddPhoto: handleAddPhoto, user,
     onOpenLightbox: (i) => setLightboxIndex(i),

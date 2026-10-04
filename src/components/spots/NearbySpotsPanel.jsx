@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Navigation, X, SlidersHorizontal } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import NearbySpotsFilterModal from './NearbySpotsFilterModal';
+import { NEARBY_DEFAULT_KM, isDefaultNearbyFilters } from '@/lib/nearbyFilters';
 
 function haversineKm([lat1, lng1], [lat2, lng2]) {
   const R = 6371;
@@ -78,7 +79,7 @@ function SpotRow({ spot, onSelectSpot, onNavigate, onClose }) {
 
 export default function NearbySpotsPanel({ spots, userPos, onSelectSpot, onNavigate, onClose, initialFilters }) {
   const { t } = useLanguage();
-  const [filters, setFilters] = useState(initialFilters || { maxDistance: 50, minRating: 0 });
+  const [filters, setFilters] = useState(initialFilters || { maxDistance: NEARBY_DEFAULT_KM, minRating: 0 });
   const [showFilterModal, setShowFilterModal] = useState(false);
 
   const nearby = useMemo(() => {
@@ -109,7 +110,7 @@ export default function NearbySpotsPanel({ spots, userPos, onSelectSpot, onNavig
         <button
           onClick={() => setShowFilterModal(true)}
           className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-            (filters.maxDistance < 50 || filters.minRating > 0)
+            !isDefaultNearbyFilters(filters)
               ? 'bg-purple-600 text-white border-purple-600'
               : 'bg-white dark:bg-background text-gray-600 dark:text-muted-foreground border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent'
           }`}

@@ -3,6 +3,7 @@ import { Search, X, Navigation, Mic, Compass } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { filterCategories, getCategoryName } from '@/lib/POICategories';
 import { iconGlyphSVG } from '@/lib/mapIcons';
+import { NEARBY_DEFAULT_KM, NEARBY_SLIDER_MAX, sliderToKm, kmToSlider, formatMaxDistance } from '@/lib/nearbyFilters';
 
 
 const LANG_TO_BCP47 = {
@@ -22,7 +23,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
   const [listening, setListening] = useState(false);
   const [micError, setMicError] = useState('');
   const [showNearbyFilter, setShowNearbyFilter] = useState(false);
-  const [nearbyDraft, setNearbyDraft] = useState({ maxDistance: 50, minRating: 0 });
+  const [nearbyDraft, setNearbyDraft] = useState({ maxDistance: NEARBY_DEFAULT_KM, minRating: 0 });
   const debounce = useRef(null);
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -244,13 +245,16 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
                   <div className="mb-3">
                     <div className="flex justify-between text-xs font-semibold text-gray-600 dark:text-muted-foreground mb-1">
                       <span>Max Distance</span>
-                      <span className="text-purple-600 dark:text-purple-400">{nearbyDraft.maxDistance} km</span>
+                      <span className="text-purple-600 dark:text-purple-400">{formatMaxDistance(nearbyDraft.maxDistance)}</span>
                     </div>
                     <input
-                      type="range" min="1" max="50" value={nearbyDraft.maxDistance}
-                      onChange={(e) => setNearbyDraft(d => ({ ...d, maxDistance: Number(e.target.value) }))}
+                      type="range" min="1" max={NEARBY_SLIDER_MAX} value={kmToSlider(nearbyDraft.maxDistance)}
+                      onChange={(e) => setNearbyDraft(d => ({ ...d, maxDistance: sliderToKm(e.target.value) }))}
                       className="w-full accent-purple-600 cursor-pointer"
                     />
+                    <div className="flex justify-between text-[10px] text-gray-400 dark:text-muted-foreground mt-0.5">
+                      <span>1 km</span><span>50 km</span><span>∞</span>
+                    </div>
                   </div>
                   <div className="mb-4">
                     <label className="block text-xs font-semibold text-gray-600 dark:text-muted-foreground mb-1.5">Minimum Rating</label>
