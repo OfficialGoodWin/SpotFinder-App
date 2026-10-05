@@ -1,5 +1,5 @@
 const SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || '';
-const SCRIPT_URL = 'https://www.google.com/recaptcha/api.js?render=';
+const SCRIPT_URL = 'https://www.google.com/recaptcha/enterprise.js?render=';
 let loadPromise = null;
 
 const isBrowser = () => typeof window !== 'undefined' && typeof document !== 'undefined';
@@ -7,13 +7,13 @@ const isBrowser = () => typeof window !== 'undefined' && typeof document !== 'un
 const loadRecaptcha = () => {
   if (!isBrowser()) return Promise.reject(new Error('reCAPTCHA requires a browser'));
   if (!SITE_KEY) return Promise.reject(new Error('VITE_RECAPTCHA_SITE_KEY is not configured'));
-  if (window.grecaptcha?.execute) return Promise.resolve(window.grecaptcha);
+  if (window.grecaptcha?.enterprise?.execute) return Promise.resolve(window.grecaptcha);
   if (loadPromise) return loadPromise;
 
   loadPromise = new Promise((resolve, reject) => {
     const existing = document.querySelector('script[data-spotfinder-recaptcha="true"]');
     const onReady = () => {
-      if (window.grecaptcha?.execute) resolve(window.grecaptcha);
+      if (window.grecaptcha?.enterprise?.execute) resolve(window.grecaptcha);
       else reject(new Error('reCAPTCHA failed to initialize'));
     };
 
@@ -40,8 +40,8 @@ export const isRecaptchaConfigured = () => Boolean(SITE_KEY);
 
 export const getRecaptchaToken = async (action) => {
   const grecaptcha = await loadRecaptcha();
-  await new Promise((resolve) => grecaptcha.ready(resolve));
-  const token = await grecaptcha.execute(SITE_KEY, { action });
+  await new Promise((resolve) => grecaptcha.enterprise.ready(resolve));
+  const token = await grecaptcha.enterprise.execute(SITE_KEY, { action });
   if (!token) throw new Error('reCAPTCHA did not return a token');
   return token;
 };

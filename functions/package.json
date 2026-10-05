@@ -8,7 +8,8 @@
   "dependencies": {
     "firebase-admin": "^14.3.0",
     "firebase-functions": "^7.3.2",
-    "nodemailer": "^10.0.14"
+    "nodemailer": "^10.0.14",
+    "google-auth-library": "^10.3.0"
   },
   "scripts": {
     "deploy": "firebase deploy --only functions",

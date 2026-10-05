@@ -19,8 +19,12 @@ const { initializeApp } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const { GoogleAuth } = require('google-auth-library');
+const { defineString } = require('firebase-functions/params');
 initializeApp();
 const db = getFirestore();
+const RECAPTCHA_SITE_KEY = defineString('RECAPTCHA_SITE_KEY');
+const googleAuth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
 
 // ─── Feedback email notifications ──────────────────────────────────────────
 // The feedback form in FAQ.jsx was only ever writing to Firestore — nothing
@@ -87,7 +91,8 @@ function getRequestIp(context) {
 }
 
 function hashIp(ip) {
-  const salt = process.env.ANTI_SPAM_IP_SALT || process.env.RECAPTCHA_SECRET_KEY || 'spotfinder-anti-spam';
+  const salt = process.env.ANTI_SPAM_IP_SALT;
+  if (!salt) throw new Error('ANTI_SPAM_IP_SALT is not configured');
   return crypto.createHash('sha256').update(`${salt}:${ip}`).digest('hex');
 }
 
@@ -98,26 +103,50 @@ function isAllowedRecaptchaHostname(hostname) {
 }
 
 async function verifyRecaptcha(token, action) {
-  const secret = process.env.RECAPTCHA_SECRET_KEY;
-  if (!secret) throw new Error('RECAPTCHA_SECRET_KEY is not configured');
   if (!token || typeof token !== 'string') return { ok: false, reason: 'missing_token' };
 
-  const body = new URLSearchParams({ secret, response: token });
-  const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body,
-  });
-  if (!response.ok) throw new Error(`reCAPTCHA verification HTTP ${response.status}`);
+  const siteKey = RECAPTCHA_SITE_KEY.value();
+  if (!siteKey) throw new Error('RECAPTCHA_SITE_KEY is not configured');
+  const projectId = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT;
+  if (!projectId) throw new Error('Google Cloud project ID is unavailable');
+
+  const client = await googleAuth.getClient();
+  const access = await client.getAccessToken();
+  const accessToken = typeof access === 'string' ? access : access?.token;
+  if (!accessToken) throw new Error('Could not obtain Google Cloud access token for reCAPTCHA Enterprise');
+
+  const response = await fetch(
+    `https://recaptchaenterprise.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/assessments`,
+    {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        event: { token, siteKey, expectedAction: action },
+      }),
+    },
+  );
   const result = await response.json();
+  if (!response.ok) {
+    console.error('reCAPTCHA Enterprise assessment failed', { status: response.status, error: result?.error?.message });
+    throw new Error(`reCAPTCHA Enterprise assessment HTTP ${response.status}`);
+  }
+
+  const props = result.tokenProperties || {};
+  const score = Number(result.riskAnalysis?.score || 0);
+  const hostname = props.hostname || '';
+  const reasons = Array.isArray(result.riskAnalysis?.reasons) ? result.riskAnalysis.reasons : [];
+  const minScore = Number(process.env.RECAPTCHA_MIN_SCORE || 0.5);
   return {
-    ok: result.success === true
-      && Number(result.score || 0) >= Number(process.env.RECAPTCHA_MIN_SCORE || 0.5)
-      && result.action === action
-      && isAllowedRecaptchaHostname(result.hostname),
-    score: Number(result.score || 0),
-    hostname: result.hostname || '',
-    reason: result['error-codes']?.join(',') || '',
+    ok: props.valid === true
+      && props.action === action
+      && score >= minScore
+      && isAllowedRecaptchaHostname(hostname),
+    score,
+    hostname,
+    reason: props.invalidReason || reasons.join(',') || '',
   };
 }
 
@@ -281,7 +310,9 @@ exports.onPoiRatingCreated = functions.firestore
 // ─── Feedback: protected public submit endpoint ─────────────────────────────
 // Guest-friendly: Firebase anonymous auth supplies a stable session key while
 // reCAPTCHA + IP limits stop an attacker from creating unlimited sessions.
-exports.submitFeedback = functions.https.onCall(async (data, context) => {
+exports.submitFeedback = functions.runWith({
+  secrets: ['ANTI_SPAM_IP_SALT'],
+}).https.onCall(async (data, context) => {
   const payload = data || {};
   const message = String(payload.message || '').trim();
   const email = String(payload.email || '').trim().slice(0, 320);
@@ -443,7 +474,9 @@ const REPORT_REASONS = {
   poi: new Set(['wrong_info','wrong_location','does_not_exist','duplicate','inappropriate','spam','other']),
   poi_photo: new Set(['wrong_place','inappropriate','copyright','private_info','misleading','spam','other']),
 };
-exports.submitReport = functions.https.onCall(async (data, context) => {
+exports.submitReport = functions.runWith({
+  secrets: ['ANTI_SPAM_IP_SALT'],
+}).https.onCall(async (data, context) => {
   if (!context.auth || context.auth.token.email_verified !== true || context.auth.token.firebase?.sign_in_provider === 'anonymous') {
     throw new functions.https.HttpsError('permission-denied', 'A signed-in account with a verified email is required.');
   }
