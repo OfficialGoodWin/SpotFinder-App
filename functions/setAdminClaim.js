@@ -36,13 +36,23 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('permission-denied', 'Only an existing admin can grant admin access.');
   }
 
-  const targetEmail = data?.targetEmail;
+  const targetEmail = data?.targetEmail?.trim()?.toLowerCase();
   if (!targetEmail) {
     throw new functions.https.HttpsError('invalid-argument', 'targetEmail is required.');
   }
 
+  // During bootstrap, the legacy email exception may ONLY promote itself.
+  // Once a caller already has the signed admin claim, it may grant the claim
+  // to another account through a future admin-management UI.
+  if (!callerAlreadyHasClaim && targetEmail !== callerEmail?.toLowerCase()) {
+    throw new functions.https.HttpsError('permission-denied', 'The bootstrap admin may only activate its own account.');
+  }
+
   const user = await getAuth().getUserByEmail(targetEmail);
-  await getAuth().setCustomUserClaims(user.uid, { admin: true });
+  await getAuth().setCustomUserClaims(user.uid, {
+    ...(user.customClaims || {}),
+    admin: true,
+  });
 
   await getFirestore().collection('admin_audit_log').add({
     action: 'grant_admin_claim',

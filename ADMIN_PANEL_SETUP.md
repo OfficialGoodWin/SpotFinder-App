@@ -19,14 +19,14 @@ From the project root:
 3. Deploy the web app normally (Vercel).
 
 ## IMPORTANT: migrate admin security
-The admin UI now requires the custom claim. The existing `setAdminClaim` function is included as a one-time bootstrap helper. Deploy functions, grant your current admin account the claim, then sign out/in so a fresh ID token contains `admin: true`.
+The admin UI now requires the custom claim. The existing `setAdminClaim` function is included as a one-time bootstrap helper. After deploying functions and the web app, sign in as `superadmin@spotfinder.cz`, open `/Admin`, and click **Activate admin access**. The page force-refreshes the Firebase ID token after the server grants the claim, so the admin dashboard should open without a manual sign-out/sign-in. The server only allows the legacy bootstrap account to promote itself.
 
 After you confirm `/Admin` works, harden `firestore.rules` by changing `isSuperAdmin()` from:
 `request.auth.token.admin == true || authEmail() == 'superadmin@spotfinder.cz'`
 to:
 `request.auth.token.admin == true`
 
-Also change `assertIsAdmin()` in `functions/index.js` to accept only `context.auth?.token?.admin === true`, then redeploy functions. This removes the hard-coded email bootstrap path completely.
+Also change `assertIsAdmin()` in `functions/index.js` to accept only `context.auth?.token?.admin === true`, then redeploy functions. This removes the hard-coded email bootstrap path completely. If you do not need to grant admin access to other accounts, remove the `setAdminClaim` export as well after bootstrap and redeploy functions.
 
 Enable MFA for the admin account. A custom claim limits who is an admin, but MFA is what materially reduces the damage from a stolen password/session.
 

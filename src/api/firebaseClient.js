@@ -858,6 +858,12 @@ export const getAdminAccess = async () => {
   return token.claims?.admin === true;
 };
 
+// One-time bootstrap for the original SpotFinder superadmin account.
+// The callable function performs the real authorization check server-side;
+// this client helper cannot grant a claim by itself.
+export const activateBootstrapAdmin = (targetEmail) =>
+  callFn('setAdminClaim')({ targetEmail });
+
 export const submitGeneralReport = async ({ category, subject, message, targetType = 'other', targetId = '', deviceId = '' }) => {
   const recaptchaToken = await getRecaptchaToken('report');
   return callFn('submitReport')({ category, subject, message, targetType, targetId, deviceId, recaptchaToken });
