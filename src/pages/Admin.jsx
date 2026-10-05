@@ -1,38 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import StatusAdmin from './StatusAdmin';
-import { getAdminReports, adminResolveReport, adminDeleteReport, adminBlockReporter, getAdminSpots, adminUpdateSpot, deleteSpotAsSuperAdmin, getAdminPOIPhotos, adminDeletePOIPhoto, activateBootstrapAdmin } from '@/api/firebaseClient';
+import { getAdminReports, adminResolveReport, adminDeleteReport, adminBlockReporter, getAdminSpots, adminUpdateSpot, deleteSpotAsSuperAdmin, getAdminPOIPhotos, adminDeletePOIPhoto } from '@/api/firebaseClient';
 
 const tabs = ['Reports','Spots','Photos','Status'];
 export default function Admin(){
-  const { user, isAdmin, isLoadingAuth, refreshUser } = useAuth();
-  const [activationState, setActivationState] = useState('idle');
-  const [activationError, setActivationError] = useState('');
+  const { user, isAdmin, isLoadingAuth } = useAuth();
   const [tab,setTab]=useState('Reports'); const [reports,setReports]=useState([]); const [spots,setSpots]=useState([]); const [photos,setPhotos]=useState([]); const [filter,setFilter]=useState('all'); const [typeFilter,setTypeFilter]=useState('all'); const [reasonFilter,setReasonFilter]=useState('all'); const [q,setQ]=useState('');
   const refresh=async()=>{ if(!isAdmin)return; const [r,s,p]=await Promise.all([getAdminReports(),getAdminSpots(),getAdminPOIPhotos()]); setReports(r);setSpots(s);setPhotos(p); };
   useEffect(()=>{refresh()},[isAdmin]);
   const visibleReports=useMemo(()=>reports.filter(r=>(filter==='all'||r.status===filter)&&(typeFilter==='all'||r.target_type===typeFilter)&&(reasonFilter==='all'||r.category===reasonFilter)&&(!q||JSON.stringify(r).toLowerCase().includes(q.toLowerCase()))),[reports,filter,typeFilter,reasonFilter,q]);
   if(isLoadingAuth)return <div className="p-10">Loading…</div>;
-  if(!isAdmin){
-    const isBootstrapAccount = user?.email?.toLowerCase() === 'superadmin@spotfinder.cz';
-    const activate = async () => {
-      if (!user?.email || activationState === 'working') return;
-      setActivationState('working');
-      setActivationError('');
-      try {
-        await activateBootstrapAdmin(user.email);
-        // Force a brand-new Firebase ID token so the new signed custom claim
-        // is picked up immediately; no manual sign-out/sign-in is required.
-        await refreshUser();
-        setActivationState('done');
-      } catch (err) {
-        console.error('Admin activation failed:', err);
-        setActivationError(err?.message || 'Could not activate admin access.');
-        setActivationState('error');
-      }
-    };
-    return <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50 dark:bg-slate-950"><div className="w-full max-w-lg bg-white dark:bg-slate-900 border rounded-2xl p-6 shadow-sm"><h1 className="text-xl font-semibold">Admin access required</h1><p className="text-sm text-slate-500 mt-2">This area requires the Firebase <code>admin</code> custom claim.</p>{user?<><p className="text-sm mt-4">Signed in as <strong>{user.email}</strong>.</p>{isBootstrapAccount?<><p className="text-sm text-slate-500 mt-2">This is the original SpotFinder bootstrap admin account. Activate it once to add the server-signed admin claim.</p><button onClick={activate} disabled={activationState==='working'} className="mt-4 px-4 py-2 rounded-lg bg-slate-900 text-white disabled:opacity-50">{activationState==='working'?'Activating…':'Activate admin access'}</button>{activationState==='done'&&<p className="text-sm text-green-600 mt-3">Admin claim activated. Refreshing access…</p>}{activationError&&<p className="text-sm text-red-600 mt-3 break-words">{activationError}</p>}</>:<p className="text-sm text-amber-600 mt-3">This signed-in account is not the bootstrap admin account, so it cannot self-activate.</p>}</>:<p className="text-sm text-amber-600 mt-4">Sign in with the SpotFinder admin account first.</p>}</div></div>;
-  }
+  if(!isAdmin) return <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50 dark:bg-slate-950"><div className="w-full max-w-lg bg-white dark:bg-slate-900 border rounded-2xl p-6 shadow-sm"><h1 className="text-xl font-semibold">Admin access required</h1><p className="text-sm text-slate-500 mt-2">This area requires the Firebase <code>admin: true</code> custom claim.</p>{user?<p className="text-sm mt-4">Signed in as <strong>{user.email}</strong>.</p>:<p className="text-sm text-amber-600 mt-4">Sign in with an authorized admin account first.</p>}</div></div>;
   return <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 md:p-8"><div className="max-w-6xl mx-auto">
     <h1 className="text-2xl font-bold mb-1">SpotFinder Admin</h1><p className="text-sm text-slate-500 mb-6">Moderation and operations. Privileged writes run through logged Cloud Functions.</p>
     <div className="flex gap-2 flex-wrap mb-6">{tabs.map(t=><button key={t} onClick={()=>setTab(t)} className={`px-4 py-2 rounded-lg text-sm ${tab===t?'bg-slate-900 text-white':'bg-white border dark:bg-slate-900'}`}>{t}</button>)}</div>

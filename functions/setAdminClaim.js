@@ -1,51 +1,35 @@
 /**
- * One-time migration: grant the `admin` custom claim to the existing
- * hardcoded superadmin account, so firestore.rules can stop trusting a
- * plain email-string comparison.
+ * Grant the `admin` custom claim to an account. The caller must already
+ * have a signed `admin: true` claim.
  *
  * HOW TO RUN (once):
  *   1. Deploy this alongside the rest of functions/ (it's exported from
  *      index.js — see the require() at the bottom of this file, or just
  *      add `exports.setAdminClaim = require('./setAdminClaim').setAdminClaim;`
  *      to index.js).
- *   2. Sign in to the app as superadmin@spotfinder.cz.
- *   3. Call the callable function once from the browser console:
+ *   2. Sign in with an existing claimed admin account.
+ *   3. Call the callable function:
  *        const fn = firebase.functions().httpsCallable('setAdminClaim');
- *        await fn({ targetEmail: 'superadmin@spotfinder.cz' });
- *   4. Sign out and back in (custom claims only apply to freshly-issued
- *      tokens) — `request.auth.token.admin` will now be true.
- *   5. Once confirmed working, remove the `|| authEmail() == '...'` fallback
- *      from `isSuperAdmin()` in firestore.rules.
+ *        await fn({ targetEmail: 'new-admin@example.com' });
+ *   4. The target signs out and back in so its refreshed token includes the claim.
  *
- * This function only ever lets an account that is ALREADY recognized as
- * admin (by the existing hardcoded-email check) grant the claim — it can't
- * be used by an arbitrary user to promote themselves.
+ * This function only lets an already-claimed admin grant the claim.
  */
 const functions = require('firebase-functions/v1');
 const { getAuth } = require('firebase-admin/auth');
 const { getFirestore } = require('firebase-admin/firestore');
 
-const HARDCODED_BOOTSTRAP_ADMIN = 'superadmin@spotfinder.cz';
-
 exports.setAdminClaim = functions.https.onCall(async (data, context) => {
   const callerEmail = context.auth?.token?.email;
-  const callerIsBootstrapAdmin = callerEmail === HARDCODED_BOOTSTRAP_ADMIN;
   const callerAlreadyHasClaim = context.auth?.token?.admin === true;
 
-  if (!context.auth || !(callerIsBootstrapAdmin || callerAlreadyHasClaim)) {
+  if (!context.auth || !callerAlreadyHasClaim) {
     throw new functions.https.HttpsError('permission-denied', 'Only an existing admin can grant admin access.');
   }
 
   const targetEmail = data?.targetEmail?.trim()?.toLowerCase();
   if (!targetEmail) {
     throw new functions.https.HttpsError('invalid-argument', 'targetEmail is required.');
-  }
-
-  // During bootstrap, the legacy email exception may ONLY promote itself.
-  // Once a caller already has the signed admin claim, it may grant the claim
-  // to another account through a future admin-management UI.
-  if (!callerAlreadyHasClaim && targetEmail !== callerEmail?.toLowerCase()) {
-    throw new functions.https.HttpsError('permission-denied', 'The bootstrap admin may only activate its own account.');
   }
 
   const user = await getAuth().getUserByEmail(targetEmail);

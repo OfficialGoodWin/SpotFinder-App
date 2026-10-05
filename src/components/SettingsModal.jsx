@@ -4,6 +4,7 @@ import { useTheme } from '@/lib/ThemeContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { LANGUAGES } from '@/locales/translations';
 import MfaSection from '@/components/MfaSection';
+import AccountSecuritySection from '@/components/AccountSecuritySection';
 import { reopenCookieSettings } from '@/components/CookieConsentBanner';
 
 export default function SettingsModal({ onClose }) {
@@ -16,7 +17,7 @@ export default function SettingsModal({ onClose }) {
         className="fixed inset-0 bg-black/50 backdrop-blur-sm pointer-events-auto"
         onClick={onClose}
       />
-      <div className="relative w-full bg-background text-foreground rounded-t-3xl shadow-2xl p-6 pointer-events-auto">
+      <div className="relative w-full max-h-[92dvh] overflow-y-auto bg-background text-foreground rounded-t-3xl shadow-2xl p-6 pointer-events-auto" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold">{t('settings.title')}</h2>
           <button
@@ -74,6 +75,7 @@ export default function SettingsModal({ onClose }) {
             </select>
           </div>
 
+          <AccountSecuritySection />
           <MfaSection />
 
           {/* Legal & privacy */}

@@ -191,7 +191,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
   const isExpanded = showDropdown || listening || (micError && !listening);
 
   return (
-    <div ref={containerRef} className="absolute top-4 left-4 z-[1002]" style={{ right: '3.75rem' }}>
+    <div ref={containerRef} className="absolute left-4 z-[1002]" style={{ top: 'max(1rem, env(safe-area-inset-top))', right: '3.75rem' }}>
       <div className={`bg-white dark:bg-card shadow-lg border transition-all ${isExpanded ? 'rounded-t-2xl' : 'rounded-full'} ${focused ? 'border-blue-400 dark:border-blue-500' : 'border-gray-200 dark:border-border'}`}>
         <div className="flex items-center px-3 gap-1.5">
           <Search className="w-4 h-4 text-gray-400 dark:text-muted-foreground flex-shrink-0" />

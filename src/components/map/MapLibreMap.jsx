@@ -691,6 +691,7 @@ export default function MapLibreMap({
 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
+  const appliedStyleRef = useRef(null);
   // Ref so the map's click handler (registered once on mount) always reads
   // the current addMode value instead of the stale value from init time.
   const addModeRef = useRef(addMode);
@@ -739,7 +740,7 @@ export default function MapLibreMap({
 
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: isDark ? darkStyle : lightStyle,
+      style: getMapStyle(isDark, mapLayer),
       center: [center.lng, center.lat],
       zoom: 13,
       minZoom: 3,
@@ -826,6 +827,7 @@ export default function MapLibreMap({
     }
 
     mapRef.current = map;
+    appliedStyleRef.current = `${isDark ? 'dark' : 'light'}:${mapLayer}`;
     setMapRef?.(map);
 
     const onOnline = () => setIsOnline(true);
@@ -846,6 +848,9 @@ export default function MapLibreMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+    const styleKey = `${isDark ? 'dark' : 'light'}:${mapLayer}`;
+    if (appliedStyleRef.current === styleKey) return;
+    appliedStyleRef.current = styleKey;
     const doSwitch = () => {
       map.setStyle(getMapStyle(isDark, mapLayer));
       map.once('idle', () => {

@@ -1,10 +1,10 @@
 /**
  * SuperAdminEditor.jsx
- * Full map editor for superadmin@spotfinder.cz
+ * Full map editor for users with the Firebase admin custom claim.
  * Tabs: Custom POIs · Road Closures · Nav Overrides · Road Editor · E-Routes
  */
 import { useState, useEffect, useCallback } from 'react';
-import { X, MapPin, AlertTriangle, Navigation, Trash2, ChevronDown, ChevronUp, Pencil, Check } from 'lucide-react';
+import { X, MapPin, AlertTriangle, Navigation, Trash2, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
 import {
   getAdminPOIs, addAdminPOI, updateAdminPOI, deleteAdminPOI,
   getAdminClosures, addAdminClosure, deleteAdminClosure,
@@ -1024,7 +1024,7 @@ export default function SuperAdminEditor({ user, onClose, onAdminDataChange }) {
           </div>
           <div className="flex-1">
             <p className="text-sm font-bold text-foreground leading-tight">Map Editor</p>
-            <p className="text-[11px] text-muted-foreground">superadmin@spotfinder.cz</p>
+            <p className="text-[11px] text-muted-foreground">Admin claim verified</p>
           </div>
           {adminNavMode && (
             <span className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full font-semibold animate-pulse">

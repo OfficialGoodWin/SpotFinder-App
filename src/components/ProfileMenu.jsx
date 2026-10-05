@@ -5,7 +5,7 @@ import { useLanguage } from '@/lib/LanguageContext';
 export default function ProfileMenu({ user, isAuthenticated, showMenu, onToggleMenu, onShowMySpots, onSignOut, onShowDeleteConfirm, onShowAuth }) {
   const { t } = useLanguage();
   return (
-    <div className="absolute top-4 right-4 z-[1003]">
+    <div className="absolute right-4 z-[1003]" style={{ top: 'max(1rem, env(safe-area-inset-top))' }}>
       {isAuthenticated && user ? (
         <>
           <button onClick={onToggleMenu}

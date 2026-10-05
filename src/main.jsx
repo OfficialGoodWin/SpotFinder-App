@@ -12,3 +12,14 @@ bootConsent()
 ReactDOM.createRoot(document.getElementById('root')).render(
   <App />
 )
+
+// Register after the critical map UI has loaded. The worker only caches
+// same-origin app-shell assets; map tiles, Firebase, and API traffic stay live.
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    const register = () => navigator.serviceWorker.register('/sw.js')
+      .catch(error => console.warn('Service worker registration failed:', error));
+    if ('requestIdleCallback' in window) window.requestIdleCallback(register);
+    else window.setTimeout(register, 1000);
+  }, { once: true });
+}

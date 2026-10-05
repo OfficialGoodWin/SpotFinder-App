@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronDown, ArrowLeft, MapPin, Star, Navigation, Layers, Share2, Mic, Car, Wifi, Lock, Trash2, Send, MessageSquare } from 'lucide-react';
+import React, { useState } from 'react';
+import { ChevronDown, ArrowLeft, MapPin, Star, Navigation, Layers, Share2, Mic, Send, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/lib/LanguageContext';
 import { submitFeedback } from '@/api/firebaseClient';

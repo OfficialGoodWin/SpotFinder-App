@@ -7,12 +7,7 @@ service cloud.firestore {
     function isAuth() { return request.auth != null; }
     function authEmail() { return request.auth.token.email; }
     function isSuperAdmin() {
-      // Prefer a Firebase custom claim (set via functions/setAdminClaim.js,
-      // callable once by the existing hardcoded admin) — it's revocable and
-      // auditable, unlike a string baked into rules and client code.
-      // The hardcoded email is kept ONLY as a bootstrap fallback until the
-      // claim has been set once; remove the `||` branch after migrating.
-      return isAuth() && (request.auth.token.admin == true || authEmail() == 'superadmin@spotfinder.cz');
+      return isAuth() && request.auth.token.admin == true;
     }
     // True if none of `fields` changed between the existing doc and the
     // incoming write. Use this to lock aggregate/moderation fields so a
@@ -21,9 +16,6 @@ service cloud.firestore {
     // and can update them.
     function unchanged(fields) {
       return request.resource.data.diff(resource.data).affectedKeys().hasAny(fields) == false;
-    }
-    function isNewOwner() {
-      return request.resource.data.created_by == authEmail();
     }
     function strLen(v, max) {
       return v is string && v.size() <= max;

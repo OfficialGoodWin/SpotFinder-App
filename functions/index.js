@@ -17,6 +17,7 @@
 const functions = require('firebase-functions/v1');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
+const { getStorage } = require('firebase-admin/storage');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const { GoogleAuth } = require('google-auth-library');
@@ -415,8 +416,23 @@ async function logAdminAction(action, performedBy, details = {}) {
   });
 }
 
+async function deleteManagedUpload(downloadUrl) {
+  if (!downloadUrl) return;
+  try {
+    const parsed = new URL(downloadUrl);
+    if (parsed.hostname !== 'firebasestorage.googleapis.com') return;
+    const match = parsed.pathname.match(/^\/v0\/b\/([^/]+)\/o\/(.+)$/);
+    if (!match) return;
+    const bucket = getStorage().bucket();
+    if (decodeURIComponent(match[1]) !== bucket.name) return;
+    await bucket.file(decodeURIComponent(match[2])).delete({ ignoreNotFound: true });
+  } catch (error) {
+    console.warn('Could not delete managed upload', { message: error?.message });
+  }
+}
+
 function assertIsAdmin(context) {
-  const isAdmin = context.auth?.token?.admin === true || context.auth?.token?.email === 'superadmin@spotfinder.cz';
+  const isAdmin = context.auth?.token?.admin === true;
   if (!context.auth || !isAdmin) {
     throw new functions.https.HttpsError('permission-denied', 'Admin only.');
   }
@@ -461,17 +477,20 @@ exports.adminDeleteSpot = functions.https.onCall(async (data, context) => {
   assertIsAdmin(context);
   const { spotId } = data || {};
   if (!spotId) throw new functions.https.HttpsError('invalid-argument', 'spotId is required.');
-  await db.collection('spots').doc(spotId).delete();
+  const ref = db.collection('spots').doc(spotId);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) throw new functions.https.HttpsError('not-found', 'Spot not found.');
+  await deleteManagedUpload(snapshot.data()?.image_url);
+  await ref.delete();
   await logAdminAction('delete_spot', context.auth.token.email, { spotId });
   return { success: true };
 });
 
 exports.setAdminClaim = require('./setAdminClaim').setAdminClaim;
-exports.updateSuperadminEmail = require('./updateSuperadminEmail').updateSuperadminEmail;
 // ─── Unified content reports (spots, dataset POIs, community POI photos) ───
 const REPORT_REASONS = {
-  spot: new Set(['wrong_info','wrong_location','does_not_exist','duplicate','inappropriate','spam','other']),
-  poi: new Set(['wrong_info','wrong_location','does_not_exist','duplicate','inappropriate','spam','other']),
+  spot: new Set(['wrong_info','wrong_location','closed_or_missing','duplicate','inappropriate','spam_scam','other_safety']),
+  poi: new Set(['wrong_info','wrong_location','closed_or_missing','duplicate','inappropriate','spam_scam','other_safety']),
   poi_photo: new Set(['wrong_place','inappropriate','copyright','private_info','misleading','spam','other']),
 };
 exports.submitReport = functions.runWith({
@@ -506,31 +525,43 @@ exports.adminResolveReport=functions.https.onCall(async(data,context)=>{assertIs
 exports.adminDeleteReport=functions.https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.reportId||'');if(!id)throw new functions.https.HttpsError('invalid-argument','reportId required');await db.collection('reports').doc(id).delete();await logAdminAction('delete_report',context.auth.token.email,{reportId:id});return{success:true}});
 exports.adminBlockReporter=functions.https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.reportId||'');const snap=await db.collection('reports').doc(id).get();if(!snap.exists)throw new functions.https.HttpsError('not-found','Report not found');const r=snap.data(), batch=db.batch(), now=new Date().toISOString();for(const [k,v] of [['uid',r.reporter_uid],['ip',r.ip_hash],['device',r.device_hash]])if(v)batch.set(db.collection('report_blocks').doc(`${k}_${v}`),{kind:k,value:v,reason:String(data?.reason||'Report spam').slice(0,200),blocked_at:now,blocked_by:context.auth.token.email||context.auth.uid});await batch.commit();await logAdminAction('block_reporter',context.auth.token.email,{reportId:id,reporter_uid:r.reporter_uid});return{success:true}});
 exports.adminUpdateSpot=functions.https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.spotId||''),src=data?.patch||{},patch={};for(const k of ['title','description','image_url','status'])if(Object.prototype.hasOwnProperty.call(src,k))patch[k]=src[k];if(!id||!Object.keys(patch).length)throw new functions.https.HttpsError('invalid-argument','spotId and patch required');await db.collection('spots').doc(id).update(patch);await logAdminAction('update_spot',context.auth.token.email,{spotId:id,fields:Object.keys(patch)});return{success:true}});
-exports.adminDeletePOIPhoto=functions.https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.photoId||'');if(!id)throw new functions.https.HttpsError('invalid-argument','photoId required');await db.collection('poi_photos').doc(id).delete();await logAdminAction('delete_poi_photo',context.auth.token.email,{photoId:id});return{success:true}});
+exports.adminDeletePOIPhoto=functions.https.onCall(async(data,context)=>{
+  assertIsAdmin(context);
+  const id=String(data?.photoId||'');
+  if(!id)throw new functions.https.HttpsError('invalid-argument','photoId required');
+  const ref=db.collection('poi_photos').doc(id);
+  const snapshot=await ref.get();
+  if(!snapshot.exists)throw new functions.https.HttpsError('not-found','Photo not found');
+  await deleteManagedUpload(snapshot.data()?.image);
+  await ref.delete();
+  await logAdminAction('delete_poi_photo',context.auth.token.email,{photoId:id});
+  return{success:true};
+});
 
 // ─── Spot likes/saves: trusted aggregate counters ──────────────────────────
-async function recountSpotSocial(spotId) {
+async function recountSpotSocial(spotId, collectionName, counterField) {
   if (!spotId) return;
-  const [likes, saves] = await Promise.all([
-    db.collection('spot_likes').where('spot_id', '==', spotId).get(),
-    db.collection('spot_saves').where('spot_id', '==', spotId).get(),
-  ]);
+  const aggregate = await db.collection(collectionName)
+    .where('spot_id', '==', spotId)
+    .count()
+    .get();
+  const count = aggregate.data().count;
   const ref = db.collection('spots').doc(spotId);
   const snap = await ref.get();
   if (!snap.exists) return;
-  await ref.update({ likes_count: likes.size, saves_count: saves.size });
+  await ref.update({ [counterField]: Math.max(0, count) });
 }
 
 exports.onSpotLikeWritten = functions.firestore
   .document('spot_likes/{relationId}')
   .onWrite(async (change) => {
     const data = change.after.exists ? change.after.data() : change.before.data();
-    await recountSpotSocial(data?.spot_id);
+    await recountSpotSocial(data?.spot_id, 'spot_likes', 'likes_count');
   });
 
 exports.onSpotSaveWritten = functions.firestore
   .document('spot_saves/{relationId}')
   .onWrite(async (change) => {
     const data = change.after.exists ? change.after.data() : change.before.data();
-    await recountSpotSocial(data?.spot_id);
+    await recountSpotSocial(data?.spot_id, 'spot_saves', 'saves_count');
   });

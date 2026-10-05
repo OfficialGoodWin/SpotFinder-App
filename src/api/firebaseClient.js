@@ -10,6 +10,10 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged,
   sendEmailVerification,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword,
+  verifyBeforeUpdateEmail,
   signInAnonymously,
   multiFactor,
   PhoneAuthProvider,
@@ -31,8 +35,8 @@ import {
   limit,
   setDoc,
   getDoc,
+  documentId,
   arrayUnion,
-  onSnapshot
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -173,6 +177,28 @@ export const resendVerificationEmail = async () => {
   const { auth } = getFirebaseServices();
   if (!auth.currentUser) throw new Error('Not signed in');
   await sendEmailVerification(auth.currentUser);
+};
+
+const reauthenticateWithPassword = async (currentPassword) => {
+  const { auth } = getFirebaseServices();
+  const user = auth.currentUser;
+  if (!user?.email || user.isAnonymous) throw new Error('A signed-in email account is required');
+  const credential = EmailAuthProvider.credential(user.email, currentPassword);
+  await reauthenticateWithCredential(user, credential);
+  return user;
+};
+
+export const changeAccountPassword = async (currentPassword, nextPassword) => {
+  if (String(nextPassword || '').length < 8) throw new Error('New password must be at least 8 characters');
+  const user = await reauthenticateWithPassword(currentPassword);
+  await updatePassword(user, nextPassword);
+};
+
+export const requestAccountEmailChange = async (currentPassword, nextEmail) => {
+  const email = String(nextEmail || '').trim();
+  if (!email || !email.includes('@')) throw new Error('Enter a valid email address');
+  const user = await reauthenticateWithPassword(currentPassword);
+  await verifyBeforeUpdateEmail(user, email);
 };
  
 export const loginWithGoogle = async () => {
@@ -539,9 +565,8 @@ function requireVerifiedUser(user) {
   if (!user.emailVerified) throw new Error('Verify your email to continue');
 }
 
-export const getSpotSocialState = async (spotId, user) => {
+export const getSpotSocialState = async (spotId, user, initialCounts = {}) => {
   const { db } = getFirebaseServices();
-  const spotSnap = await getDoc(doc(db, SPOTS_COLLECTION, spotId));
   let liked = false, saved = false;
   if (user?.id) {
     const [l, s] = await Promise.all([
@@ -550,16 +575,12 @@ export const getSpotSocialState = async (spotId, user) => {
     ]);
     liked = l.exists(); saved = s.exists();
   }
-  const data = spotSnap.data() || {};
-  return { liked, saved, likesCount: data.likes_count || 0, savesCount: data.saves_count || 0 };
-};
-
-export const watchSpotSocialCounts = (spotId, callback) => {
-  const { db } = getFirebaseServices();
-  return onSnapshot(doc(db, SPOTS_COLLECTION, spotId), snap => {
-    const d = snap.data() || {};
-    callback({ likesCount: d.likes_count || 0, savesCount: d.saves_count || 0 });
-  });
+  return {
+    liked,
+    saved,
+    likesCount: initialCounts.likesCount || 0,
+    savesCount: initialCounts.savesCount || 0,
+  };
 };
 
 export const toggleSpotLike = async (spotId, user, currentlyLiked) => {
@@ -585,8 +606,16 @@ async function getSpotsForRelations(collectionName, uid, maxCount = 100) {
   if (!uid) return [];
   const relQ = query(collection(db, collectionName), where('user_id', '==', uid), limit(maxCount));
   const rels = (await getDocs(relQ)).docs.map(d => d.data()).sort((a,b) => String(b.created_date || '').localeCompare(String(a.created_date || '')));
-  const snaps = await Promise.all(rels.map(r => getDoc(doc(db, SPOTS_COLLECTION, r.spot_id))));
-  return snaps.filter(x => x.exists()).map(x => ({ id: x.id, ...x.data() }));
+  const ids = [...new Set(rels.map(r => r.spot_id).filter(Boolean))];
+  const spotsById = new Map();
+  // Firestore supports up to 30 values for an `in` query. Batching avoids the
+  // previous burst of as many as 100 independent document requests.
+  for (let offset = 0; offset < ids.length; offset += 30) {
+    const batchIds = ids.slice(offset, offset + 30);
+    const batch = await getDocs(query(collection(db, SPOTS_COLLECTION), where(documentId(), 'in', batchIds)));
+    batch.docs.forEach(snap => spotsById.set(snap.id, { id: snap.id, ...snap.data() }));
+  }
+  return ids.map(id => spotsById.get(id)).filter(Boolean);
 }
 
 export const getSavedSpots = (uid, maxCount = 100) => getSpotsForRelations(SPOT_SAVES_COLLECTION, uid, maxCount);
@@ -688,7 +717,7 @@ export const addPOIRating = async (poiId, rating, reviewText, userEmail) => {
 
 // ─── Superadmin map editor ────────────────────────────────────────────────────
 const requireSuperAdmin = (user) => {
-  if (!user || user.email !== 'superadmin@spotfinder.cz') throw new Error('Unauthorized');
+  if (!user) throw new Error('Unauthorized');
 };
 
 // Custom POIs

@@ -2,24 +2,29 @@ import React, { useState, useEffect } from 'react';
 import { X, Navigation, MapPin, Edit2, Trash2, Share2, Check, Flag, Heart, Bookmark } from 'lucide-react';
 import StarRating from './StarRating';
 import LabeledRatingScale from './LabeledRatingScale';
-import { submitCategoryRatings, getSpotSocialState, watchSpotSocialCounts, toggleSpotLike, toggleSpotSave } from '@/api/firebaseClient';
+import { submitCategoryRatings, getSpotSocialState, toggleSpotLike, toggleSpotSave } from '@/api/firebaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import ReportDialog from '@/components/moderation/ReportDialog';
+import NavigationProviderSheet from '@/components/navigation/NavigationProviderSheet';
 
 const RATED_KEY = (spotId, userId) => `sf_rated_${spotId}_${userId || 'guest'}`;
 
-export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdit, onDelete, onSpotUpdate, onShowAuth }) {
+export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, onNavigate, onEdit, onDelete, onSpotUpdate, onShowAuth }) {
   const { t } = useLanguage();
   const [localSpot, setLocalSpot] = useState(spot);
   const [shareTooltip, setShareTooltip] = useState(false);
   const [social, setSocial] = useState({ liked: false, saved: false, likesCount: spot.likes_count || 0, savesCount: spot.saves_count || 0 });
   const [socialBusy, setSocialBusy] = useState('');
+  const [showNavigationProviders, setShowNavigationProviders] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    getSpotSocialState(spot.id, user).then(v => alive && setSocial(v)).catch(() => {});
-    const unsub = watchSpotSocialCounts(spot.id, counts => alive && setSocial(v => ({ ...v, ...counts })));
-    return () => { alive = false; unsub?.(); };
+    setSocial(v => ({ ...v, likesCount: spot.likes_count || 0, savesCount: spot.saves_count || 0 }));
+    getSpotSocialState(spot.id, user, {
+      likesCount: spot.likes_count,
+      savesCount: spot.saves_count,
+    }).then(v => alive && setSocial(v)).catch(() => {});
+    return () => { alive = false; };
   }, [spot.id, user?.id]);
 
   const requireVerified = () => {
@@ -53,7 +58,6 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
   const [submitting, setSubmitting] = useState(false);
 
   const isOwner      = user && spot.created_by === user.email;
-  const isSuperAdmin = user && user.email === 'superadmin@spotfinder.cz';
 
   useEffect(() => {
     try {
@@ -103,10 +107,10 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
         condition: pendingCondition,
         safety: pendingSafety,
         crowdedness: pendingCrowdedness,
-      }, user.uid);
+      }, user.id);
       setLocalSpot(updated);
       onSpotUpdate?.(updated);
-      try { localStorage.setItem(RATED_KEY(spot.id, user?.uid || user?.email), '1'); } catch (_) {}
+      try { localStorage.setItem(RATED_KEY(spot.id, user?.id || user?.email), '1'); } catch (_) {}
       setRatingSubmitted(true);
     } catch (err) {
       console.error('Rating submit failed:', err);
@@ -164,7 +168,7 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
         <div className="px-6 py-4 space-y-4">
           {/* Image */}
           {localSpot.image_url && (
-            <img src={localSpot.image_url} alt="spot" className="w-full h-48 object-cover rounded-2xl" />
+            <img src={localSpot.image_url} alt={localSpot.title || 'Spot'} loading="lazy" decoding="async" className="w-full h-48 object-cover rounded-2xl" />
           )}
 
           {/* Description */}
@@ -211,18 +215,18 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
 
           {/* Directions */}
           {localSpot.directions && (
-            <p className="text-xs text-gray-500 dark:text-muted-foreground bg-gray-50 dark:bg-accent/40 rounded-xl px-3 py-2">
-              🧭 {localSpot.directions}
+            <p className="text-xs text-gray-500 dark:text-muted-foreground bg-gray-50 dark:bg-accent/40 rounded-xl px-3 py-2 flex items-start gap-2">
+              <Navigation className="w-4 h-4 shrink-0" aria-hidden="true" /> {localSpot.directions}
             </p>
           )}
 
           {/* Community actions — counts are server-maintained and update live */}
           <div className="grid grid-cols-2 gap-2">
-            <button onClick={handleLike} disabled={!!socialBusy} className={`min-h-[48px] rounded-2xl border flex items-center justify-center gap-2 font-semibold text-sm transition-all ${social.liked ? 'bg-rose-50 border-rose-200 text-rose-600 dark:bg-rose-950/30 dark:border-rose-900' : 'border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent'}`}>
+            <button onClick={handleLike} disabled={!!socialBusy} aria-pressed={social.liked} aria-label={`${social.liked ? 'Unlike' : 'Like'} this spot; ${social.likesCount} likes`} className={`min-h-[48px] rounded-2xl border flex items-center justify-center gap-2 font-semibold text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${social.liked ? 'bg-rose-50 border-rose-200 text-rose-600 dark:bg-rose-950/30 dark:border-rose-900' : 'border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent'}`}>
               <Heart className={`w-5 h-5 ${social.liked ? 'fill-current' : ''}`} />
               <span>{social.liked ? 'Liked' : 'Like'}</span><span className="tabular-nums text-xs opacity-70">{social.likesCount}</span>
             </button>
-            <button onClick={handleSave} disabled={!!socialBusy} className={`min-h-[48px] rounded-2xl border flex items-center justify-center gap-2 font-semibold text-sm transition-all ${social.saved ? 'bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-950/30 dark:border-blue-900' : 'border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent'}`}>
+            <button onClick={handleSave} disabled={!!socialBusy} aria-pressed={social.saved} aria-label={`${social.saved ? 'Remove from saved' : 'Save'} this spot; ${social.savesCount} saves`} className={`min-h-[48px] rounded-2xl border flex items-center justify-center gap-2 font-semibold text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${social.saved ? 'bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-950/30 dark:border-blue-900' : 'border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent'}`}>
               <Bookmark className={`w-5 h-5 ${social.saved ? 'fill-current' : ''}`} />
               <span>{social.saved ? 'Saved' : 'Save'}</span><span className="tabular-nums text-xs opacity-70">{social.savesCount}</span>
             </button>
@@ -330,7 +334,7 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-100 dark:border-border flex gap-3 flex-wrap" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
-          {(isOwner || isSuperAdmin) && (
+          {(isOwner || isAdmin) && (
             <>
               {isOwner && (
                 <button onClick={onEdit} className="p-3 rounded-2xl border-2 border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent transition-colors">
@@ -365,7 +369,7 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
           </div>
 
           <button
-            onClick={() => onNavigate(localSpot)}
+            onClick={() => setShowNavigationProviders(true)}
             className="flex-1 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-2xl flex items-center justify-center gap-2 transition-colors"
           >
             <Navigation className="w-5 h-5" />
@@ -374,6 +378,12 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
         </div>
       </div>
       <ReportDialog open={showReport} onClose={() => setShowReport(false)} user={user} targetType="spot" targetId={String(spot.id)} targetLabel={localSpot.title || 'Spot'} targetSnapshot={{ title: localSpot.title || '', lat: localSpot.lat || '', lon: localSpot.lng || localSpot.lon || '', created_by: localSpot.created_by || '' }} />
+      <NavigationProviderSheet
+        open={showNavigationProviders}
+        destination={localSpot}
+        onClose={() => setShowNavigationProviders(false)}
+        onInternalNavigate={onNavigate}
+      />
     </div>
   );
 }

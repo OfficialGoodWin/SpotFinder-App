@@ -48,15 +48,16 @@ import FAQ from './pages/FAQ';
  *
  * The mainPage value must match a key in the PAGES object exactly.
  */
+import { lazy } from 'react';
 import Home from './pages/Home';
-import FAQ from './pages/FAQ';
-import Status from './pages/Status';
-import StatusAdmin from './pages/StatusAdmin';
-import Admin from './pages/Admin';
-import PrivacyPolicy from './pages/PrivacyPolicy';
-import TermsAndConditions from './pages/TermsAndConditions';
-import CookiePolicy from './pages/CookiePolicy';
-import RefundPolicy from './pages/RefundPolicy';
+const FAQ = lazy(() => import('./pages/FAQ'));
+const Status = lazy(() => import('./pages/Status'));
+const StatusAdmin = lazy(() => import('./pages/StatusAdmin'));
+const Admin = lazy(() => import('./pages/Admin'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions'));
+const CookiePolicy = lazy(() => import('./pages/CookiePolicy'));
+const RefundPolicy = lazy(() => import('./pages/RefundPolicy'));
 import __Layout from './Layout.jsx';
  
  

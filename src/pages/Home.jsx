@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 import { Plus, Settings, Crosshair, HelpCircle, Trash2 } from 'lucide-react';
-import SubscriptionModal from '../components/SubscriptionModal';
 import { getPublicSpotsInBounds, createSpot, deleteSpot, updateSpot, getAdminPOIs, getAdminClosures, getAdminERouteOverrides, getAdminRoadOverrides, getDeletedAmbientPOIs, addDeletedAmbientPOI } from '@/api/firebaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
@@ -11,23 +10,24 @@ import { useLanguage } from '@/lib/LanguageContext';
 import MapLayerSwitcher from '../components/map/MapLayerSwitcher';
 import SearchBar from '../components/map/SearchBar';
 import MapLibreMap from '../components/map/MapLibreMap';
-import SuperAdminEditor from '../components/map/SuperAdminEditor';
-import AddSpotModal from '../components/spots/AddSpotModal';
-import EditSpotModal from '../components/spots/EditSpotModal';
-import SpotDetailModal from '../components/spots/SpotDetailModal';
-import NavigationPanel from '../components/navigation/NavigationPanel';
-import AuthModal from '../components/auth/AuthModal';
-import MySpotsPanel from '../components/spots/MySpotsPanel';
-
-import NearbySpotsPanel from '../components/spots/NearbySpotsPanel';
-import POIPanel from '../components/spots/POIPanel';
-import POIDetailPanel from '../components/spots/POIDetailPanel';
-import SettingsModal from '../components/SettingsModal';
 import ProfileMenu from '../components/ProfileMenu';
+
+const SubscriptionModal = React.lazy(() => import('../components/SubscriptionModal'));
+const SuperAdminEditor = React.lazy(() => import('../components/map/SuperAdminEditor'));
+const AddSpotModal = React.lazy(() => import('../components/spots/AddSpotModal'));
+const EditSpotModal = React.lazy(() => import('../components/spots/EditSpotModal'));
+const SpotDetailModal = React.lazy(() => import('../components/spots/SpotDetailModal'));
+const NavigationPanel = React.lazy(() => import('../components/navigation/NavigationPanel'));
+const AuthModal = React.lazy(() => import('../components/auth/AuthModal'));
+const MySpotsPanel = React.lazy(() => import('../components/spots/MySpotsPanel'));
+const NearbySpotsPanel = React.lazy(() => import('../components/spots/NearbySpotsPanel'));
+const POIPanel = React.lazy(() => import('../components/spots/POIPanel'));
+const POIDetailPanel = React.lazy(() => import('../components/spots/POIDetailPanel'));
+const SettingsModal = React.lazy(() => import('../components/SettingsModal'));
  
  
 export default function Home() {
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout, isAuthenticated, isAdmin } = useAuth();
   const { t, language } = useLanguage();
   const { isDark } = useTheme();
   const navigate = useNavigate();
@@ -81,7 +81,7 @@ export default function Home() {
   };
 
   // ── Superadmin editor state ────────────────────────────────────────────────
-  const isSuperAdmin = user?.email === 'superadmin@spotfinder.cz';
+  const isSuperAdmin = isAdmin;
   const [showAdminEditor, setShowAdminEditor] = useState(false);
   const [adminPOIs, setAdminPOIs] = useState([]);
   const [adminClosures, setAdminClosures] = useState([]);
@@ -99,6 +99,7 @@ export default function Home() {
   }, []);
   const mapRef = useRef(null);
   const spotRefreshTimer = useRef(null);
+  const moveEndMapRef = useRef(null);
 
   const refreshSpotsInViewport = useCallback(async () => {
     const map = mapRef.current;
@@ -118,14 +119,21 @@ export default function Home() {
   }, []);
 
   const handleMapReady = useCallback((map) => {
+    if (moveEndMapRef.current && moveEndMapRef.current !== map) {
+      moveEndMapRef.current.off('moveend', refreshSpotsInViewport);
+    }
     mapRef.current = map;
+    moveEndMapRef.current = map;
+    map.off('moveend', refreshSpotsInViewport);
     map.on('moveend', refreshSpotsInViewport);
     refreshSpotsInViewport();
   }, [refreshSpotsInViewport]);
 
   useEffect(() => () => {
     if (spotRefreshTimer.current) clearTimeout(spotRefreshTimer.current);
-  }, []);
+    moveEndMapRef.current?.off('moveend', refreshSpotsInViewport);
+    moveEndMapRef.current = null;
+  }, [refreshSpotsInViewport]);
  
   // Track if we've centered to user location once
   const hasCenteredToUser = useRef(false);
@@ -502,6 +510,7 @@ export default function Home() {
         <SpotDetailModal
           spot={selectedSpot}
           user={user}
+          isAdmin={isAdmin}
           onClose={() => setSelectedSpot(null)}
           onNavigate={handleNavigate}
           onEdit={() => { setEditingSpot(selectedSpot); setSelectedSpot(null); }}
