@@ -31,12 +31,69 @@ const UPDATE_META = {
 
 function uptimePct(days) {
   if (!days?.length) return 100;
+  // Degraded service is still reachable, so it counts as uptime. Only a
+  // full outage lowers the uptime percentage.
   const up = days.filter(d => d !== 'down').length;
   return ((up / days.length) * 100).toFixed(2).replace(/\.00$/, '');
 }
 
-function ServiceRow({ service }) {
-  const days = service.days?.length ? service.days : Array(90).fill('up');
+const STATUS_SEVERITY = { up: 0, degraded: 1, down: 2 };
+
+function localDateKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+// The stored service history is intentionally simple, but incidents should
+// still be visible in the 90-day bars without requiring the admin to manually
+// edit every day. Overlay each incident from its start date through today (or
+// through the date of its resolved update). Existing manual service history is
+// preserved and the more severe state wins.
+function incidentAdjustedDays(rawDays, incidents) {
+  const days = rawDays?.length ? [...rawDays] : Array(90).fill('up');
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  const todayKey = localDateKey(today);
+
+  return days.map((storedStatus, index) => {
+    const day = new Date(today);
+    day.setDate(today.getDate() - (days.length - 1 - index));
+    const dayKey = localDateKey(day);
+    let effectiveStatus = storedStatus || 'up';
+
+    for (const incident of incidents || []) {
+      const startKey = incident.date;
+      if (!startKey) continue;
+
+      let endKey = todayKey;
+      if (incident.resolved) {
+        const resolvedUpdate = [...(incident.updates || [])]
+          .reverse()
+          .find(update => update.type === 'resolved');
+        endKey = resolvedUpdate?.at
+          ? localDateKey(new Date(resolvedUpdate.at))
+          : startKey;
+      }
+
+      if (dayKey < startKey || dayKey > endKey) continue;
+
+      // Old incidents did not have an impact field. Treat those as degraded,
+      // matching the headline compatibility behaviour below.
+      const incidentStatus = incident.impact === 'down' ? 'down' : 'degraded';
+      if ((STATUS_SEVERITY[incidentStatus] || 0) > (STATUS_SEVERITY[effectiveStatus] || 0)) {
+        effectiveStatus = incidentStatus;
+      }
+    }
+
+    return effectiveStatus;
+  });
+}
+
+function ServiceRow({ service, incidents }) {
+  const rawDays = service.days?.length ? service.days : Array(90).fill('up');
+  const days = incidentAdjustedDays(rawDays, incidents);
   const current = days.at(-1) || 'up';
 
   return (
@@ -49,16 +106,21 @@ function ServiceRow({ service }) {
         <span className="text-sm font-mono text-[#5C5546]">{uptimePct(days)}% uptime</span>
       </div>
       <div className="flex gap-[2px] h-8">
-        {days.map((d, i) => (
-          <div
-            key={i}
-            className={`flex-1 rounded-[1px] ${STATUS_META[d]?.bar || STATUS_META.up.bar}`}
-            title={d}
-          />
-        ))}
+        {days.map((d, i) => {
+          const day = new Date();
+          day.setHours(12, 0, 0, 0);
+          day.setDate(day.getDate() - (days.length - 1 - i));
+          return (
+            <div
+              key={i}
+              className={`flex-1 rounded-[1px] ${STATUS_META[d]?.bar || STATUS_META.up.bar}`}
+              title={`${localDateKey(day)} — ${STATUS_META[d]?.label || 'Operational'}`}
+            />
+          );
+        })}
       </div>
       <div className="flex justify-between mt-1.5 text-xs font-mono text-[#8A8270]">
-        <span>{days.length} days ago</span>
+        <span>{Math.max(days.length - 1, 0)} days ago</span>
         <span>Today</span>
       </div>
     </div>
@@ -158,7 +220,7 @@ export default function StatusPage() {
         {!loading && (
           <>
             <section>
-              {services.map(s => <ServiceRow key={s.id} service={s} />)}
+              {services.map(s => <ServiceRow key={s.id} service={s} incidents={incidents} />)}
             </section>
 
             {activeIncidentGroups.length > 0 && (

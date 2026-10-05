@@ -39,6 +39,8 @@ service cloud.firestore {
         // Never trust a client-supplied moderation state on create.
         && request.resource.data.status in ['pending_trust', 'published']
         && (!('flag_count' in request.resource.data) || request.resource.data.flag_count == 0)
+        && (!('likes_count' in request.resource.data) || request.resource.data.likes_count == 0)
+        && (!('saves_count' in request.resource.data) || request.resource.data.saves_count == 0)
         // Ownership is by uid so anonymous guests can post too.
         && request.resource.data.created_by_uid == request.auth.uid
         // Community-abuse mitigation: throwaway/unverified/anonymous
@@ -54,8 +56,11 @@ service cloud.firestore {
         ((resource.data.created_by == authEmail() || resource.data.created_by_uid == request.auth.uid)
           && unchanged(['rating', 'rating_count', 'parking_rating', 'parking_rating_count',
                         'beauty_rating', 'beauty_rating_count', 'privacy_rating',
-                        'privacy_rating_count', 'flag_count', 'status', 'created_by',
-                        'created_by_uid', 'upvote_count', 'downvote_count', 'quality_score']))
+                        'privacy_rating_count', 'access_rating', 'access_rating_count',
+                        'condition_rating', 'condition_rating_count', 'safety_rating', 'safety_rating_count',
+                        'crowdedness_rating', 'crowdedness_rating_count', 'rating_schema', 'flag_count', 'status', 'created_by',
+                        'created_by_uid', 'upvote_count', 'downvote_count', 'quality_score',
+                        'likes_count', 'saves_count']))
         || isSuperAdmin()
       );
 
@@ -75,9 +80,12 @@ service cloud.firestore {
         && request.auth.token.email_verified == true
         && ratingId == request.resource.data.spot_id + '_' + request.auth.uid
         && request.resource.data.user_id == request.auth.uid
-        && request.resource.data.parking is number && request.resource.data.parking >= 0 && request.resource.data.parking <= 5
-        && request.resource.data.beauty  is number && request.resource.data.beauty  >= 0 && request.resource.data.beauty  <= 5
-        && request.resource.data.privacy is number && request.resource.data.privacy >= 0 && request.resource.data.privacy <= 5;
+        && request.resource.data.schema == 2
+        && request.resource.data.overall is number && request.resource.data.overall >= 1 && request.resource.data.overall <= 5
+        && request.resource.data.access is number && request.resource.data.access >= 0 && request.resource.data.access <= 5
+        && request.resource.data.condition is number && request.resource.data.condition >= 0 && request.resource.data.condition <= 5
+        && request.resource.data.safety is number && request.resource.data.safety >= 0 && request.resource.data.safety <= 5
+        && request.resource.data.crowdedness is number && request.resource.data.crowdedness >= 0 && request.resource.data.crowdedness <= 5;
       allow delete: if isSuperAdmin();
     }
 
@@ -134,6 +142,25 @@ service cloud.firestore {
     match /bookmarks/{bookmarkId} {
       allow read, delete: if isAuth() && resource.data.user_email == authEmail();
       allow create: if isAuth() && request.resource.data.user_email == authEmail();
+    }
+
+    // ── Spot likes + saves — verified accounts, one doc per user/spot ──────
+    // Aggregate counters on /spots are maintained by Cloud Functions only.
+    match /spot_likes/{relationId} {
+      allow read: if isAuth() && (resource.data.user_id == request.auth.uid || isSuperAdmin());
+      allow create: if isAuth() && request.auth.token.email_verified == true
+        && relationId == request.resource.data.spot_id + '_' + request.auth.uid
+        && request.resource.data.user_id == request.auth.uid;
+      allow delete: if isAuth() && resource.data.user_id == request.auth.uid;
+      allow update: if false;
+    }
+    match /spot_saves/{relationId} {
+      allow read: if isAuth() && (resource.data.user_id == request.auth.uid || isSuperAdmin());
+      allow create: if isAuth() && request.auth.token.email_verified == true
+        && relationId == request.resource.data.spot_id + '_' + request.auth.uid
+        && request.resource.data.user_id == request.auth.uid;
+      allow delete: if isAuth() && resource.data.user_id == request.auth.uid;
+      allow update: if false;
     }
 
     // ── User profile / subscription state ──────────────────────────────────────

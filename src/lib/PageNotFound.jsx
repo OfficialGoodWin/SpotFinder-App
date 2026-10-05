@@ -10,12 +10,14 @@ export default function PageNotFound({}) {
         <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
             <div className="max-w-md w-full">
                 <div className="text-center space-y-6">
-                    {/* 404 Error Code */}
-                    <div className="space-y-2">
-                        <h1 className="text-7xl font-light text-slate-300">404</h1>
-                        <div className="h-0.5 w-16 bg-slate-200 mx-auto"></div>
-                    </div>
-                    
+                    {/* SpotFinder's custom 404 artwork. Kept as a static local asset so
+                        the error page never depends on a third-party image host. */}
+                    <img
+                        src="/spotfinder-404.png"
+                        alt="Lost visitors looking at a 404 sign"
+                        className="w-full max-w-md mx-auto h-auto object-contain"
+                    />
+
                     {/* Main Message */}
                     <div className="space-y-3">
                         <h2 className="text-2xl font-medium text-slate-800">

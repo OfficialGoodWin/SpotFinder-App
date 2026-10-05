@@ -31,7 +31,8 @@ import {
   limit,
   setDoc,
   getDoc,
-  arrayUnion
+  arrayUnion,
+  onSnapshot
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -352,6 +353,8 @@ export const createSpot = async (spotData) => {
     quality_score: 0,
     upvote_count: 0,
     downvote_count: 0,
+    likes_count: 0,
+    saves_count: 0,
     flag_count: 0,
     geohash: encodeGeohash(Number(spotData.lat), Number(spotData.lng), 9),
     created_date: new Date().toISOString(),
@@ -406,7 +409,7 @@ export const updateSpotDetailRating = async (spotId, field, newVal, count) => {
  * shape directly, and a Cloud Function (onSpotRatingWritten) recomputes the
  * trusted averages on spots/{id} server-side after every write.
  *
- * @param {{parking:number, beauty:number, privacy:number}} ratings - 0 = not rated
+ * @param {{overall:number, access:number, condition:number, safety:number, crowdedness:number}} ratings - schema v2
  */
 export const submitCategoryRatings = async (spotId, currentSpot, ratings, userId) => {
   const { db } = getFirebaseServices();
@@ -416,9 +419,12 @@ export const submitCategoryRatings = async (spotId, currentSpot, ratings, userId
   await setDoc(doc(db, 'spot_ratings', ratingId), {
     spot_id: spotId,
     user_id: userId,
-    parking: ratings.parking || 0,
-    beauty: ratings.beauty || 0,
-    privacy: ratings.privacy || 0,
+    overall: ratings.overall || 0,
+    access: ratings.access || 0,
+    condition: ratings.condition || 0,
+    safety: ratings.safety || 0,
+    crowdedness: ratings.crowdedness || 0,
+    schema: 2,
     updated_date: new Date().toISOString(),
   });
 
@@ -523,6 +529,69 @@ export const getUserBookmarks = async (userEmail) => {
   return (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
 };
 
+
+// ─── Likes + saves (verified accounts, one relation doc per user/spot) ─────
+const SPOT_LIKES_COLLECTION = 'spot_likes';
+const SPOT_SAVES_COLLECTION = 'spot_saves';
+
+function requireVerifiedUser(user) {
+  if (!user?.id) throw new Error('Sign in to continue');
+  if (!user.emailVerified) throw new Error('Verify your email to continue');
+}
+
+export const getSpotSocialState = async (spotId, user) => {
+  const { db } = getFirebaseServices();
+  const spotSnap = await getDoc(doc(db, SPOTS_COLLECTION, spotId));
+  let liked = false, saved = false;
+  if (user?.id) {
+    const [l, s] = await Promise.all([
+      getDoc(doc(db, SPOT_LIKES_COLLECTION, `${spotId}_${user.id}`)),
+      getDoc(doc(db, SPOT_SAVES_COLLECTION, `${spotId}_${user.id}`)),
+    ]);
+    liked = l.exists(); saved = s.exists();
+  }
+  const data = spotSnap.data() || {};
+  return { liked, saved, likesCount: data.likes_count || 0, savesCount: data.saves_count || 0 };
+};
+
+export const watchSpotSocialCounts = (spotId, callback) => {
+  const { db } = getFirebaseServices();
+  return onSnapshot(doc(db, SPOTS_COLLECTION, spotId), snap => {
+    const d = snap.data() || {};
+    callback({ likesCount: d.likes_count || 0, savesCount: d.saves_count || 0 });
+  });
+};
+
+export const toggleSpotLike = async (spotId, user, currentlyLiked) => {
+  requireVerifiedUser(user);
+  const { db } = getFirebaseServices();
+  const ref = doc(db, SPOT_LIKES_COLLECTION, `${spotId}_${user.id}`);
+  if (currentlyLiked) await deleteDoc(ref);
+  else await setDoc(ref, { spot_id: spotId, user_id: user.id, created_date: new Date().toISOString() });
+  return !currentlyLiked;
+};
+
+export const toggleSpotSave = async (spotId, user, currentlySaved) => {
+  requireVerifiedUser(user);
+  const { db } = getFirebaseServices();
+  const ref = doc(db, SPOT_SAVES_COLLECTION, `${spotId}_${user.id}`);
+  if (currentlySaved) await deleteDoc(ref);
+  else await setDoc(ref, { spot_id: spotId, user_id: user.id, created_date: new Date().toISOString() });
+  return !currentlySaved;
+};
+
+async function getSpotsForRelations(collectionName, uid, maxCount = 100) {
+  const { db } = getFirebaseServices();
+  if (!uid) return [];
+  const relQ = query(collection(db, collectionName), where('user_id', '==', uid), limit(maxCount));
+  const rels = (await getDocs(relQ)).docs.map(d => d.data()).sort((a,b) => String(b.created_date || '').localeCompare(String(a.created_date || '')));
+  const snaps = await Promise.all(rels.map(r => getDoc(doc(db, SPOTS_COLLECTION, r.spot_id))));
+  return snaps.filter(x => x.exists()).map(x => ({ id: x.id, ...x.data() }));
+}
+
+export const getSavedSpots = (uid, maxCount = 100) => getSpotsForRelations(SPOT_SAVES_COLLECTION, uid, maxCount);
+export const getLikedSpots = (uid, maxCount = 100) => getSpotsForRelations(SPOT_LIKES_COLLECTION, uid, maxCount);
+
 // ─── Site status / kill switch ─────────────────────────────────────────────────
 // Single doc: config/maintenance. Read is public (no auth needed) so the
 // banner/lockout screen works for signed-out visitors too. Writes are
@@ -541,9 +610,22 @@ export const getMaintenanceStatus = async () => {
 // isn't the superadmin — that's firestore.rules doing its job, not a bug.
 export const setMaintenanceStatus = async ({ status, message = '', showBanner = false }) => {
   const { db } = getFirebaseServices();
+
+  // The public banner deliberately supports plain text only. Its Status Page
+  // link is hard-coded in StatusBanner.jsx, so admins never provide a URL.
+  // Sanitise here as well as at render time for defence in depth.
+  const safeMessage = String(message || '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/(?:https?:\/\/|www\.)\S+/gi, '')
+    .replace(/\b(?:[a-z0-9-]+\.)+[a-z]{2,63}(?:\/\S*)?/gi, '')
+    .replace(/\b(?:see|read|view)\s+(?:more\s+)?(?:on|in|at)?\s*(?:the\s+)?status\s+page\.?\s*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 300);
+
   await setDoc(doc(db, ...MAINTENANCE_DOC_PATH), {
     status,
-    message,
+    message: safeMessage,
     showBanner,
     updated_date: new Date().toISOString(),
   });
@@ -864,9 +946,9 @@ export const getAdminAccess = async () => {
 export const activateBootstrapAdmin = (targetEmail) =>
   callFn('setAdminClaim')({ targetEmail });
 
-export const submitGeneralReport = async ({ category, subject, message, targetType = 'other', targetId = '', deviceId = '' }) => {
+export const submitGeneralReport = async ({ category, subject, message, targetType = 'other', targetId = '', deviceId = '', targetSnapshot = {} }) => {
   const recaptchaToken = await getRecaptchaToken('report');
-  return callFn('submitReport')({ category, subject, message, targetType, targetId, deviceId, recaptchaToken });
+  return callFn('submitReport')({ category, subject, message, targetType, targetId, deviceId, targetSnapshot, recaptchaToken });
 };
 
 export const getAdminReports = async (maxCount = 200) => {

@@ -931,10 +931,14 @@ function ModerationTab({ user }) {
         <textarea
           value={statusForm.message}
           onChange={(e) => setStatusForm((f) => ({ ...f, message: e.target.value }))}
-          placeholder="Message shown to users"
+          placeholder="Message shown to users — Status Page link is added automatically"
           className="w-full mb-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-border bg-white dark:bg-background text-sm"
           rows={2}
+          maxLength={300}
         />
+        <p className="text-[11px] text-muted-foreground mb-2">
+          Plain text only. External URLs/HTML are removed; the banner always links to SpotFinder's own Status Page.
+        </p>
         <button
           onClick={saveStatus}
           disabled={savingStatus}

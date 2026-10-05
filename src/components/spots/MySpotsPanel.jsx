@@ -1,67 +1,64 @@
 import React, { useEffect, useState } from 'react';
-import { X, MapPin } from 'lucide-react';
-import StarRating from './StarRating';
-import { getUserSpots, deleteSpot as firebaseDeleteSpot } from '@/api/firebaseClient';
-import { useLanguage } from '@/lib/LanguageContext';
+import { X, MapPin, Heart, Bookmark, PlusCircle, Trash2, Eye } from 'lucide-react';
+import { getUserSpots, getSavedSpots, getLikedSpots, deleteSpot as firebaseDeleteSpot } from '@/api/firebaseClient';
+
+const tabs = [
+  { id: 'saved', label: 'Saved', icon: Bookmark },
+  { id: 'created', label: 'Created', icon: PlusCircle },
+  { id: 'liked', label: 'Liked', icon: Heart },
+];
 
 export default function MySpotsPanel({ user, onClose, onFlyTo }) {
-  const { t } = useLanguage();
-  const [spots, setSpots] = useState([]);
+  const [tab, setTab] = useState('saved');
+  const [data, setData] = useState({ saved: [], created: [], liked: [] });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (user?.email) {
-      getUserSpots(user.email, 50)
-        .then(data => { setSpots(data); setLoading(false); })
-        .catch(err => { console.error(err); setLoading(false); });
-    }
-  }, [user?.email]);
+  const load = async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    try {
+      const [saved, created, liked] = await Promise.all([
+        getSavedSpots(user.id, 100),
+        getUserSpots(user.email, 100),
+        getLikedSpots(user.id, 100),
+      ]);
+      setData({ saved, created, liked });
+    } catch (e) { console.error('My Spots load failed', e); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, [user?.id]);
 
+  const spots = data[tab] || [];
   const handleDelete = async (id) => {
+    if (!confirm('Delete this spot permanently?')) return;
     await firebaseDeleteSpot(id);
-    setSpots(spots.filter(s => s.id !== id));
+    setData(v => ({ ...v, created: v.created.filter(s => s.id !== id), saved: v.saved.filter(s => s.id !== id), liked: v.liked.filter(s => s.id !== id) }));
   };
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-card w-full max-w-lg rounded-t-3xl shadow-2xl max-h-[85vh] flex flex-col">
-        <div className="px-6 pt-5 pb-3 border-b border-gray-100 dark:border-border flex items-center justify-between flex-shrink-0">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-foreground">{t('mySpots.title')}</h2>
-          <button onClick={onClose} aria-label={t('common.close')} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-accent">
-            <X className="w-5 h-5 text-gray-500 dark:text-muted-foreground" />
-          </button>
+    <div className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center bg-black/45 backdrop-blur-sm">
+      <div className="bg-white dark:bg-card w-full sm:max-w-2xl rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[88dvh] flex flex-col overflow-hidden">
+        <div className="px-5 pt-5 pb-3 border-b border-gray-100 dark:border-border">
+          <div className="flex items-center justify-between mb-4">
+            <div><h2 className="text-xl font-bold text-gray-900 dark:text-foreground">My Spots</h2><p className="text-xs text-gray-500 dark:text-muted-foreground mt-0.5">Places you've kept, created, or liked.</p></div>
+            <button onClick={onClose} className="w-11 h-11 grid place-items-center rounded-full hover:bg-gray-100 dark:hover:bg-accent" aria-label="Close"><X className="w-5 h-5" /></button>
+          </div>
+          <div className="grid grid-cols-3 bg-gray-100 dark:bg-accent/70 p-1 rounded-xl">
+            {tabs.map(({id,label,icon:Icon}) => <button key={id} onClick={() => setTab(id)} className={`min-h-[40px] rounded-lg flex items-center justify-center gap-1.5 text-sm font-semibold transition ${tab===id ? 'bg-white dark:bg-card shadow-sm text-gray-900 dark:text-foreground' : 'text-gray-500 dark:text-muted-foreground'}`}><Icon className="w-4 h-4" />{label}<span className="text-[11px] opacity-60">{data[id].length}</span></button>)}
+          </div>
         </div>
-        <div className="overflow-y-auto flex-1 px-4 py-3 space-y-3">
-          {loading && <p className="text-center text-gray-400 dark:text-muted-foreground py-6">{t('mySpots.loading')}</p>}
-          {!loading && spots.length === 0 && (
-            <div className="text-center py-10">
-              <MapPin className="w-12 h-12 text-gray-300 dark:text-muted-foreground mx-auto mb-3" />
-              <p className="text-gray-400 dark:text-muted-foreground font-medium">{t('mySpots.noSpotsYet')}</p>
-              <p className="text-gray-300 dark:text-muted-foreground text-sm">{t('mySpots.addFirst')}</p>
-            </div>
-          )}
-          {spots.map(spot => (
-            <div key={spot.id} className="bg-gray-50 dark:bg-accent rounded-2xl p-4 flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
-                <MapPin className="w-5 h-5 text-blue-500" />
+        <div className="overflow-y-auto flex-1 p-4" style={{paddingBottom:'max(1rem, env(safe-area-inset-bottom))'}}>
+          {loading ? <div className="grid sm:grid-cols-2 gap-3">{[1,2,3,4].map(x=><div key={x} className="h-28 rounded-2xl bg-gray-100 dark:bg-accent animate-pulse" />)}</div> : spots.length === 0 ? (
+            <div className="min-h-64 grid place-items-center text-center px-8"><div><div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-accent grid place-items-center mx-auto mb-3">{tab==='saved'?<Bookmark className="w-6 h-6 text-gray-400"/>:tab==='liked'?<Heart className="w-6 h-6 text-gray-400"/>:<MapPin className="w-6 h-6 text-gray-400"/>}</div><p className="font-semibold">No {tab} spots yet</p><p className="text-sm text-gray-500 mt-1">{tab==='saved'?'Save places you want to come back to.':tab==='liked'?'Like a spot and it will appear here.':'Add a spot to start your collection.'}</p></div></div>
+          ) : <div className="grid sm:grid-cols-2 gap-3">{spots.map(spot => (
+            <article key={spot.id} className="group rounded-2xl border border-gray-200 dark:border-border bg-white dark:bg-card overflow-hidden hover:shadow-md transition-shadow">
+              <div className="flex min-h-[112px]">
+                <div className="w-28 bg-gray-100 dark:bg-accent shrink-0">{spot.image_url?<img src={spot.image_url} alt="" className="w-full h-full object-cover"/>:<div className="w-full h-full grid place-items-center"><MapPin className="w-6 h-6 text-gray-300"/></div>}</div>
+                <div className="p-3 min-w-0 flex-1 flex flex-col"><h3 className="font-semibold truncate">{spot.title || 'Spot'}</h3><p className="text-xs text-gray-500 line-clamp-2 mt-1 flex-1">{spot.description || 'No description'}</p><div className="flex items-center gap-3 text-xs text-gray-500 mt-2"><span className="flex items-center gap-1"><Heart className="w-3.5 h-3.5"/>{spot.likes_count||0}</span><span className="flex items-center gap-1"><Bookmark className="w-3.5 h-3.5"/>{spot.saves_count||0}</span></div></div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-800 dark:text-foreground truncate">{spot.title || 'Spot'}</p>
-                {spot.description && <p className="text-xs text-gray-500 dark:text-muted-foreground truncate mt-0.5">{spot.description}</p>}
-                <div className="mt-1"><StarRating value={Math.round(spot.rating || 0)} readOnly size="sm" /></div>
-              </div>
-              <div className="flex flex-col gap-1">
-                <button onClick={() => { onFlyTo([spot.lat, spot.lng]); onClose(); }}
-                  className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-1 rounded-lg font-semibold">
-                  {t('mySpots.view')}
-                </button>
-                <button onClick={() => handleDelete(spot.id)}
-                  className="text-xs bg-red-100 dark:bg-red-900/30 text-red-500 px-2 py-1 rounded-lg font-semibold">
-                  {t('mySpots.delete')}
-                </button>
-              </div>
-            </div>
-          ))}
+              <div className="border-t border-gray-100 dark:border-border flex"><button onClick={()=>{onFlyTo([spot.lat,spot.lng]);onClose();}} className="flex-1 min-h-[42px] text-sm font-semibold flex items-center justify-center gap-1.5 hover:bg-gray-50 dark:hover:bg-accent"><Eye className="w-4 h-4"/>View</button>{tab==='created'&&<button onClick={()=>handleDelete(spot.id)} className="w-12 min-h-[42px] grid place-items-center text-red-500 border-l border-gray-100 dark:border-border hover:bg-red-50 dark:hover:bg-red-950/20" aria-label="Delete"><Trash2 className="w-4 h-4"/></button>}</div>
+            </article>
+          ))}</div>}
         </div>
       </div>
     </div>

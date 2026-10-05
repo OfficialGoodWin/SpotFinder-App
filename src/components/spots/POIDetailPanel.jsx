@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Navigation, Share2, Camera, Star, Phone, Mail, Globe, MapPin, ChevronUp, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Navigation, Share2, Camera, Star, Phone, Mail, Globe, MapPin, ChevronUp, Clock, ChevronLeft, ChevronRight, Flag } from 'lucide-react';
 import { getPOIPhotos, getPOIRatings, addPOIPhoto, addPOIRating, uploadSpotImage, makePOIId } from '@/api/firebaseClient';
 import { moderateSubmission } from '@/lib/moderation';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/LanguageContext';
 import { iconGlyphSVG } from '@/lib/mapIcons';
+import ReportDialog from '@/components/moderation/ReportDialog';
 
 
 // ─── OSM tag helpers ──────────────────────────────────────────────────────────
@@ -420,7 +421,7 @@ function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavig
 }
 
 // ─── Full sheet ───────────────────────────────────────────────────────────────
-function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavigate, onShare, onAddPhoto, onSubmitRating, user, onOpenLightbox }) {
+function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavigate, onShare, onAddPhoto, onSubmitRating, user, onOpenLightbox, onReportPOI, onReportPhoto }) {
   const { t } = useLanguage();
   const [ratingVal, setRatingVal] = useState(0);
   const [ratingComment, setRatingComment] = useState('');
@@ -435,7 +436,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
 
   const allPhotos = [
     ...photos.map(p => ({ url: p.url, credit: p.credit, source: 'remote' })),
-    ...sfPhotos.map(p => ({ url: p.image || p.photo, source: 'sf' })),
+    ...sfPhotos.map(p => ({ url: p.image || p.photo, source: 'sf', photoId: p.id })),
   ];
 
   const handleRateSubmit = async () => {
@@ -585,6 +586,8 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
               </>
             )}
 
+            <button onClick={onReportPOI} className="w-full mb-4 flex items-center justify-center gap-2 border rounded-xl py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"><Flag className="w-4 h-4"/>Report this place</button>
+
             {/* Photo gallery — full grid, all photos visible */}
             {allPhotos.length > 0 && (
               <>
@@ -602,9 +605,10 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
                     >
                       <img src={p.url} alt="" className="w-full h-full object-cover"
                         onError={e => { e.target.parentNode.style.display = 'none'; }} />
-                      {p.source === 'sf' && (
+                      {p.source === 'sf' && (<>
                         <div className="absolute bottom-1 right-1 bg-green-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">SF</div>
-                      )}
+                        <span role="button" tabIndex={0} onClick={(e)=>{e.stopPropagation();onReportPhoto?.(p)}} onKeyDown={(e)=>{if(e.key==='Enter'){e.stopPropagation();onReportPhoto?.(p)}}} className="absolute top-1 right-1 bg-black/70 text-white rounded-full p-1" title="Report this photo"><Flag className="w-3.5 h-3.5"/></span>
+                      </>)}
                     </button>
                   ))}
                   {user && (
@@ -665,6 +669,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
   const [photos, setPhotos] = useState([]);
   const [lightboxIndex, setLightboxIndex] = useState(null); // null = closed
   const [resolvedAddress, setResolvedAddress] = useState('');
+  const [reportTarget, setReportTarget] = useState(null);
   const fileInputRef = useRef(null);
   const { language } = useLanguage();
 
@@ -768,6 +773,8 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
     onClose, onNavigate: handleNavigate, onShare: handleShare,
     onAddPhoto: handleAddPhoto, user,
     onOpenLightbox: (i) => setLightboxIndex(i),
+    onReportPOI: () => setReportTarget({ type: 'poi', id: makePOIId(poi.lat, poi.lon, poi.name), label: poi.name, snapshot: { name: poi.name, lat: poi.lat, lon: poi.lon } }),
+    onReportPhoto: (p) => setReportTarget({ type: 'poi_photo', id: String(p.photoId), label: `photo at ${poi.name}`, snapshot: { name: poi.name, lat: poi.lat, lon: poi.lon, image: p.url } }),
   };
 
   return (
@@ -785,6 +792,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
           onClose={() => setLightboxIndex(null)}
         />
       )}
+      <ReportDialog open={!!reportTarget} onClose={() => setReportTarget(null)} user={user} targetType={reportTarget?.type} targetId={reportTarget?.id || ''} targetLabel={reportTarget?.label} targetSnapshot={reportTarget?.snapshot || {}} />
     </>
   );
 }

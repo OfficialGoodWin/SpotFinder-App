@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X, Navigation, MapPin, Edit2, Trash2, Share2, Check, Flag } from 'lucide-react';
+import { X, Navigation, MapPin, Edit2, Trash2, Share2, Check, Flag, Heart, Bookmark } from 'lucide-react';
 import StarRating from './StarRating';
-import { submitCategoryRatings } from '@/api/firebaseClient';
+import LabeledRatingScale from './LabeledRatingScale';
+import { submitCategoryRatings, getSpotSocialState, watchSpotSocialCounts, toggleSpotLike, toggleSpotSave } from '@/api/firebaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
+import ReportDialog from '@/components/moderation/ReportDialog';
 
 const RATED_KEY = (spotId, userId) => `sf_rated_${spotId}_${userId || 'guest'}`;
 
@@ -10,10 +12,43 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
   const { t } = useLanguage();
   const [localSpot, setLocalSpot] = useState(spot);
   const [shareTooltip, setShareTooltip] = useState(false);
+  const [social, setSocial] = useState({ liked: false, saved: false, likesCount: spot.likes_count || 0, savesCount: spot.saves_count || 0 });
+  const [socialBusy, setSocialBusy] = useState('');
 
-  const [pendingParking, setPendingParking] = useState(0);
-  const [pendingBeauty,  setPendingBeauty]  = useState(0);
-  const [pendingPrivacy, setPendingPrivacy] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    getSpotSocialState(spot.id, user).then(v => alive && setSocial(v)).catch(() => {});
+    const unsub = watchSpotSocialCounts(spot.id, counts => alive && setSocial(v => ({ ...v, ...counts })));
+    return () => { alive = false; unsub?.(); };
+  }, [spot.id, user?.id]);
+
+  const requireVerified = () => {
+    if (!user) { onShowAuth?.(); return false; }
+    if (!user.emailVerified) { alert('Please verify your email before liking or saving spots.'); return false; }
+    return true;
+  };
+  const handleLike = async () => {
+    if (!requireVerified() || socialBusy) return;
+    const old = social.liked; setSocialBusy('like');
+    setSocial(v => ({ ...v, liked: !old, likesCount: Math.max(0, v.likesCount + (old ? -1 : 1)) }));
+    try { await toggleSpotLike(spot.id, user, old); }
+    catch (e) { setSocial(v => ({ ...v, liked: old, likesCount: Math.max(0, v.likesCount + (old ? 1 : -1)) })); alert(e.message || 'Could not update like'); }
+    finally { setSocialBusy(''); }
+  };
+  const handleSave = async () => {
+    if (!requireVerified() || socialBusy) return;
+    const old = social.saved; setSocialBusy('save');
+    setSocial(v => ({ ...v, saved: !old, savesCount: Math.max(0, v.savesCount + (old ? -1 : 1)) }));
+    try { await toggleSpotSave(spot.id, user, old); }
+    catch (e) { setSocial(v => ({ ...v, saved: old, savesCount: Math.max(0, v.savesCount + (old ? 1 : -1)) })); alert(e.message || 'Could not update save'); }
+    finally { setSocialBusy(''); }
+  };
+
+  const [pendingOverall, setPendingOverall] = useState(0);
+  const [pendingAccess, setPendingAccess] = useState(0);
+  const [pendingCondition, setPendingCondition] = useState(0);
+  const [pendingSafety, setPendingSafety] = useState(0);
+  const [pendingCrowdedness, setPendingCrowdedness] = useState(0);
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -30,12 +65,18 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
   const overallCount  = localSpot.rating_count || 0;
 
   const catRows = [
-    { key: 'parking', label: t('spotDetail.parkingQuality'), val: localSpot.parking_rating || 0, count: localSpot.parking_rating_count || 0 },
-    { key: 'beauty',  label: t('spotDetail.beauty'),         val: localSpot.beauty_rating  || 0, count: localSpot.beauty_rating_count  || 0 },
-    { key: 'privacy', label: t('spotDetail.privacy'),        val: localSpot.privacy_rating || 0, count: localSpot.privacy_rating_count || 0 },
+    { key: 'access', label: 'Ease of access', val: localSpot.access_rating || 0, count: localSpot.access_rating_count || 0, labels: ['Very difficult','Difficult','Moderate','Easy','Very easy'] },
+    { key: 'condition', label: 'Condition & cleanliness', val: localSpot.condition_rating || 0, count: localSpot.condition_rating_count || 0, labels: ['Very poor','Poor','Okay','Good','Excellent'] },
+    { key: 'safety', label: 'Safety & comfort', val: localSpot.safety_rating || 0, count: localSpot.safety_rating_count || 0, labels: ['Very uncomfortable','Uncomfortable','Okay','Comfortable','Very safe'] },
+    { key: 'crowdedness', label: 'Crowdedness', val: localSpot.crowdedness_rating || 0, count: localSpot.crowdedness_rating_count || 0, labels: ['Very quiet','Quiet','Moderate','Busy','Very busy'] },
+  ];
+  const legacyRows = localSpot.rating_schema === 2 ? [] : [
+    { key: 'parking', label: 'Parking quality (legacy)', val: localSpot.parking_rating || 0, count: localSpot.parking_rating_count || 0 },
+    { key: 'beauty', label: 'Scenery (legacy)', val: localSpot.beauty_rating || 0, count: localSpot.beauty_rating_count || 0 },
+    { key: 'privacy', label: 'Privacy (legacy)', val: localSpot.privacy_rating || 0, count: localSpot.privacy_rating_count || 0 },
   ];
 
-  const hasCategoryRatings = catRows.some(r => r.val > 0);
+  const hasCategoryRatings = catRows.some(r => r.val > 0) || legacyRows.some(r => r.val > 0);
 
   // Fractional star display for overall
   const renderOverallStars = (value) =>
@@ -49,7 +90,7 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
       );
     });
 
-  const canSubmit = (pendingParking > 0 || pendingBeauty > 0 || pendingPrivacy > 0) && !submitting;
+  const canSubmit = pendingOverall > 0 && !submitting;
 
   const handleSubmitRatings = async () => {
     if (!canSubmit) return;
@@ -57,9 +98,11 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
     setSubmitting(true);
     try {
       const updated = await submitCategoryRatings(spot.id, localSpot, {
-        parking: pendingParking,
-        beauty:  pendingBeauty,
-        privacy: pendingPrivacy,
+        overall: pendingOverall,
+        access: pendingAccess,
+        condition: pendingCondition,
+        safety: pendingSafety,
+        crowdedness: pendingCrowdedness,
       }, user.uid);
       setLocalSpot(updated);
       onSpotUpdate?.(updated);
@@ -72,36 +115,7 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
     }
   };
 
-  const [showReportMenu, setShowReportMenu] = useState(false);
-  const [reportSent, setReportSent] = useState(false);
-  const [reporting, setReporting] = useState(false);
-
-  const REPORT_REASONS = [
-    { value: 'private_property',    label: t('spotDetail.reportPrivateProperty') },
-    { value: 'dangerous',           label: t('spotDetail.reportDangerous') },
-    { value: 'duplicate',           label: t('spotDetail.reportDuplicate') },
-    { value: 'spam',                label: t('spotDetail.reportSpam') },
-    { value: 'inaccurate_location', label: t('spotDetail.reportInaccurate') },
-  ];
-
-  const handleReport = async (reason) => {
-    if (!user) { onShowAuth?.(); return; }
-    setReporting(true);
-    try {
-      const { flagSpot } = await import('@/api/firebaseClient');
-      const result = await flagSpot(spot.id, user.email, reason);
-      setReportSent(true);
-      setShowReportMenu(false);
-      if (result?.alreadyFlagged) {
-        // Already reported by this account — still show confirmation, no
-        // need to alarm the user with an error for a no-op.
-      }
-    } catch (err) {
-      console.error('Report failed:', err);
-    } finally {
-      setReporting(false);
-    }
-  };
+  const [showReport, setShowReport] = useState(false);
 
   const handleShare = async () => {
     const url = `${window.location.origin}${window.location.pathname}?spot=${spot.id}`;
@@ -202,6 +216,18 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
             </p>
           )}
 
+          {/* Community actions — counts are server-maintained and update live */}
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={handleLike} disabled={!!socialBusy} className={`min-h-[48px] rounded-2xl border flex items-center justify-center gap-2 font-semibold text-sm transition-all ${social.liked ? 'bg-rose-50 border-rose-200 text-rose-600 dark:bg-rose-950/30 dark:border-rose-900' : 'border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent'}`}>
+              <Heart className={`w-5 h-5 ${social.liked ? 'fill-current' : ''}`} />
+              <span>{social.liked ? 'Liked' : 'Like'}</span><span className="tabular-nums text-xs opacity-70">{social.likesCount}</span>
+            </button>
+            <button onClick={handleSave} disabled={!!socialBusy} className={`min-h-[48px] rounded-2xl border flex items-center justify-center gap-2 font-semibold text-sm transition-all ${social.saved ? 'bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-950/30 dark:border-blue-900' : 'border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent'}`}>
+              <Bookmark className={`w-5 h-5 ${social.saved ? 'fill-current' : ''}`} />
+              <span>{social.saved ? 'Saved' : 'Save'}</span><span className="tabular-nums text-xs opacity-70">{social.savesCount}</span>
+            </button>
+          </div>
+
           {/* Overall Rating — read-only, derived from category reviews */}
           <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-accent rounded-2xl">
             <div className="flex-1">
@@ -217,7 +243,7 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
               </div>
               {overallCount > 0 && (
                 <p className="text-xs text-gray-400 dark:text-muted-foreground mt-0.5 italic">
-                  {t('spotDetail.overallAuto')}
+                  Overall stars are rated directly; the scales describe what the place is like.
                 </p>
               )}
             </div>
@@ -230,30 +256,12 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
                 {t('spotDetail.detailedRatings')}
               </p>
               {catRows.filter(r => r.val > 0).map(row => (
-                <div key={row.key} className="flex items-center justify-between gap-2">
-                  <span className="text-sm text-gray-700 dark:text-foreground w-28 flex-shrink-0">{row.label}</span>
-                  <div className="flex items-center gap-1.5 flex-1 justify-end">
-                    {/* Fractional stars for category averages too */}
-                    <div className="flex gap-0.5">
-                      {[1,2,3,4,5].map(star => {
-                        const fill = Math.min(Math.max(row.val - (star - 1), 0), 1);
-                        return (
-                          <span key={star} className="relative inline-block text-lg leading-none">
-                            <span className="text-gray-200 dark:text-gray-600">★</span>
-                            <span className="absolute inset-0 overflow-hidden text-yellow-400" style={{ width: `${fill * 100}%` }}>★</span>
-                          </span>
-                        );
-                      })}
-                    </div>
-                    <span className="text-sm font-semibold text-gray-700 dark:text-foreground w-8 text-right">
-                      {row.val.toFixed(1)}
-                    </span>
-                    <span className="text-xs text-gray-400 dark:text-muted-foreground w-16 text-right">
-                      ({row.count} {t('spotDetail.ratings')})
-                    </span>
-                  </div>
+                <div key={row.key} className="flex items-center justify-between gap-3 py-1">
+                  <span className="text-sm text-gray-700 dark:text-foreground">{row.label}</span>
+                  <span className="text-sm font-semibold text-gray-800 dark:text-foreground text-right">{row.labels[Math.max(0, Math.round(row.val)-1)]} · {row.val.toFixed(1)} <span className="text-xs font-normal text-gray-400">({row.count})</span></span>
                 </div>
               ))}
+              {legacyRows.filter(r => r.val > 0).map(row => <div key={row.key} className="flex justify-between text-xs text-gray-400"><span>{row.label}</span><span>{row.val.toFixed(1)} ({row.count})</span></div>)}
             </div>
           )}
 
@@ -271,59 +279,28 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
               </button>
             </div>
           )}
-          {user && !isOwner && !ratingSubmitted && (
+          {user && !user.emailVerified && !isOwner && !ratingSubmitted && (
+            <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-2xl border border-amber-200 dark:border-amber-800 text-sm text-amber-800 dark:text-amber-300">Verify your email to rate this spot.</div>
+          )}
+          {user && user.emailVerified && !isOwner && !ratingSubmitted && (
             <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-2xl border border-purple-200 dark:border-purple-800 space-y-3">
               <div className="mb-1">
                 <p className="text-sm font-semibold text-purple-800 dark:text-purple-300">
                   {t('spotDetail.rateCategories')}
                 </p>
                 <p className="text-xs text-purple-500 dark:text-purple-400 mt-0.5">
-                  {t('spotDetail.overallAuto')}
+                  Overall stars are rated directly; the scales describe what the place is like.
                 </p>
               </div>
 
-              {[
-                { label: t('spotDetail.parkingQuality'), val: pendingParking, set: setPendingParking },
-                { label: t('spotDetail.beauty'),         val: pendingBeauty,  set: setPendingBeauty  },
-                { label: t('spotDetail.privacy'),        val: pendingPrivacy, set: setPendingPrivacy },
-              ].map(({ label, val, set }) => (
-                <div key={label} className="flex items-center justify-between gap-3">
-                  <span className="text-sm text-gray-700 dark:text-foreground w-28 flex-shrink-0">{label}</span>
-                  <div className="flex items-center gap-2">
-                    <StarRating value={val} onChange={set} size="md" />
-                    {val > 0 && (
-                      <span className="text-sm font-bold text-purple-700 dark:text-purple-300 w-4">{val}</span>
-                    )}
-                  </div>
-                </div>
-              ))}
-
-              {/* Live preview of this review's overall */}
-              {(pendingParking > 0 || pendingBeauty > 0 || pendingPrivacy > 0) && (() => {
-                const vals = [pendingParking, pendingBeauty, pendingPrivacy].filter(x => x > 0);
-                const preview = vals.reduce((s, x) => s + x, 0) / vals.length;
-                return (
-                  <div className="flex items-center justify-between pt-2 border-t border-purple-200 dark:border-purple-700 mt-1">
-                    <span className="text-xs font-semibold text-purple-600 dark:text-purple-400">
-                      {t('spotDetail.yourOverall') || 'Your overall'}
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      {[1,2,3,4,5].map(star => {
-                        const fill = Math.min(Math.max(preview - (star - 1), 0), 1);
-                        return (
-                          <span key={star} className="relative inline-block text-lg leading-none">
-                            <span className="text-gray-200 dark:text-gray-600">★</span>
-                            <span className="absolute inset-0 overflow-hidden text-yellow-400" style={{ width: `${fill * 100}%` }}>★</span>
-                          </span>
-                        );
-                      })}
-                      <span className="text-sm font-bold text-purple-700 dark:text-purple-300 ml-1">
-                        {preview.toFixed(1)}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })()}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 dark:text-foreground mb-2 block">Overall experience <span className="text-red-500">*</span></label>
+                <StarRating value={pendingOverall} onChange={setPendingOverall} size="lg" />
+              </div>
+              <div><label className="text-sm font-semibold block mb-2">Ease of access</label><LabeledRatingScale value={pendingAccess} onChange={setPendingAccess} labels={['Very difficult','Difficult','Moderate','Easy','Very easy']} /></div>
+              <div><label className="text-sm font-semibold block mb-2">Condition & cleanliness</label><LabeledRatingScale value={pendingCondition} onChange={setPendingCondition} labels={['Very poor','Poor','Okay','Good','Excellent']} /></div>
+              <div><label className="text-sm font-semibold block mb-2">Safety & comfort</label><LabeledRatingScale value={pendingSafety} onChange={setPendingSafety} labels={['Very uncomfortable','Uncomfortable','Okay','Comfortable','Very safe']} /></div>
+              <div><label className="text-sm font-semibold block mb-2">Crowdedness</label><LabeledRatingScale value={pendingCrowdedness} onChange={setPendingCrowdedness} labels={['Very quiet','Quiet','Moderate','Busy','Very busy']} /></div>
 
               <button
                 onClick={handleSubmitRatings}
@@ -367,35 +344,9 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
           )}
 
           {!isOwner && (
-            <div className="relative">
-              <button
-                onClick={() => { if (!user) { onShowAuth?.(); return; } setShowReportMenu(v => !v); }}
-                disabled={reportSent}
-                className="p-3 rounded-2xl border-2 border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent transition-colors disabled:opacity-50"
-                title={t('spotDetail.report')}
-              >
-                {reportSent ? <Check className="w-5 h-5 text-green-500" /> : <Flag className="w-5 h-5 text-gray-500" />}
-              </button>
-              {showReportMenu && (
-                <div className="absolute bottom-full left-0 mb-2 w-56 bg-white dark:bg-gray-900 border border-gray-200 dark:border-border rounded-xl shadow-lg overflow-hidden z-10">
-                  {REPORT_REASONS.map(r => (
-                    <button
-                      key={r.value}
-                      onClick={() => handleReport(r.value)}
-                      disabled={reporting}
-                      className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-accent disabled:opacity-50"
-                    >
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {reportSent && (
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-lg whitespace-nowrap">
-                  {t('spotDetail.reportSent')}
-                </div>
-              )}
-            </div>
+            <button onClick={() => { if (!user) { onShowAuth?.(); return; } setShowReport(true); }} className="p-3 rounded-2xl border-2 border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent transition-colors" title="Report spot">
+              <Flag className="w-5 h-5 text-gray-500" />
+            </button>
           )}
 
           <div className="relative">
@@ -422,6 +373,7 @@ export default function SpotDetailModal({ spot, user, onClose, onNavigate, onEdi
           </button>
         </div>
       </div>
+      <ReportDialog open={showReport} onClose={() => setShowReport(false)} user={user} targetType="spot" targetId={String(spot.id)} targetLabel={localSpot.title || 'Spot'} targetSnapshot={{ title: localSpot.title || '', lat: localSpot.lat || '', lon: localSpot.lng || localSpot.lon || '', created_by: localSpot.created_by || '' }} />
     </div>
   );
 }

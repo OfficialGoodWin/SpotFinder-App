@@ -78,3 +78,9 @@
 | Traffic layer | Not available offline (requires TomTom API) |
 | Aerial/satellite layer | Not available offline (requires Esri CDN) |
 fg
+## Phase 3 — Spot rating redesign
+- Replaced generic Parking/Scenery/Privacy star ratings with an explicit Overall Experience star score plus descriptive scales for Ease of Access, Condition & Cleanliness, Safety & Comfort, and Crowdedness.
+- Overall rating is no longer mathematically inferred from unrelated attributes.
+- Added rating schema v2 with server-computed trusted aggregates and verified-account validation.
+- Existing legacy ratings remain visible as legacy data instead of being silently discarded.
+- Spot owners can no longer edit community rating aggregates through the Edit Spot form.

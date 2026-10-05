@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { X, Camera, MapPin } from 'lucide-react';
-import StarRating from './StarRating';
 import { useLanguage } from '@/lib/LanguageContext';
 
 const AVAILABLE_TAGS = [
@@ -24,9 +23,6 @@ const toKeySuffix = (opt) => opt.split('_').map(w => w[0].toUpperCase() + w.slic
 export default function EditSpotModal({ spot, onClose, onSave }) {
   const { t } = useLanguage();
   const [description, setDescription] = useState(spot.description || '');
-  const [parkingRating, setParkingRating] = useState(spot.parking_rating || 0);
-  const [beautyRating, setBeautyRating] = useState(spot.beauty_rating || 0);
-  const [privacyRating, setPrivacyRating] = useState(spot.privacy_rating || 0);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(spot.image_url || null);
   const [loading, setLoading] = useState(false);
@@ -50,11 +46,7 @@ export default function EditSpotModal({ spot, onClose, onSave }) {
   };
 
   const handleSave = async () => {
-    // Calculate overall rating as average of the three ratings
-    const ratingsProvided = [parkingRating, beautyRating, privacyRating].filter(r => r > 0);
-    const overallRating = ratingsProvided.length > 0 
-      ? ratingsProvided.reduce((sum, r) => sum + r, 0) / ratingsProvided.length 
-      : 0;
+    // Community ratings are separate from editable spot metadata.
 
     setLoading(true);
     let image_url = spot.image_url;
@@ -70,10 +62,6 @@ export default function EditSpotModal({ spot, onClose, onSave }) {
     await onSave({
       ...spot,
       description,
-      rating: overallRating,
-      parking_rating: parkingRating,
-      beauty_rating: beautyRating,
-      privacy_rating: privacyRating,
       image_url,
       tags,
       cost,
@@ -111,26 +99,7 @@ export default function EditSpotModal({ spot, onClose, onSave }) {
             />
           </div>
 
-          {/* Parking Quality Rating */}
-          <div>
-            <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpot.parkingRating')}</label>
-            <p className="text-xs text-gray-500 dark:text-muted-foreground mb-2">{t('addSpot.parkingHint')}</p>
-            <StarRating value={parkingRating} onChange={setParkingRating} size="lg" />
-          </div>
-
-          {/* Beauty/Scenery Rating */}
-          <div>
-            <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpot.beautyRating')}</label>
-            <p className="text-xs text-gray-500 dark:text-muted-foreground mb-2">{t('addSpot.beautyHint')}</p>
-            <StarRating value={beautyRating} onChange={setBeautyRating} size="lg" />
-          </div>
-
-          {/* Privacy Rating */}
-          <div>
-            <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpot.privacyRating')}</label>
-            <p className="text-xs text-gray-500 dark:text-muted-foreground mb-2">{t('addSpot.privacyHint')}</p>
-            <StarRating value={privacyRating} onChange={setPrivacyRating} size="lg" />
-          </div>
+          <div className="rounded-xl bg-gray-50 dark:bg-accent/40 px-3 py-2 text-xs text-gray-500 dark:text-muted-foreground">Community ratings are managed separately and cannot be edited with spot details.</div>
 
           {/* Category tags */}
           <div>

@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { X, Camera, MapPin, Mic, Loader2 } from 'lucide-react';
 import StarRating from './StarRating';
+import LabeledRatingScale from './LabeledRatingScale';
 import AdBanner from '../AdBanner';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
@@ -44,9 +45,11 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   const { t, language } = useLanguage();
   const spotType = 'general';
   const [description, setDescription] = useState('');
-  const [parkingRating, setParkingRating] = useState(0);
-  const [beautyRating, setBeautyRating] = useState(0);
-  const [privacyRating, setPrivacyRating] = useState(0);
+  const [overallRating, setOverallRating] = useState(0);
+  const [accessRating, setAccessRating] = useState(0);
+  const [conditionRating, setConditionRating] = useState(0);
+  const [safetyRating, setSafetyRating] = useState(0);
+  const [crowdednessRating, setCrowdednessRating] = useState(0);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -183,13 +186,8 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
       return;
     }
 
-    const ratingsProvided = [];
-    if (parkingRating > 0) ratingsProvided.push(parkingRating);
-    if (beautyRating > 0) ratingsProvided.push(beautyRating);
-    if (privacyRating > 0) ratingsProvided.push(privacyRating);
-    const overallRating = ratingsProvided.length > 0
-      ? ratingsProvided.reduce((sum, r) => sum + r, 0) / ratingsProvided.length
-      : 0;
+    // Overall is an explicit opinion; the practical scales describe the place
+    // and are intentionally not averaged together into a fake star score.
 
     setLoading(true);
     let image_url = null;
@@ -212,7 +210,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
       spot_type: spotType,
       title: 'Spot',
       description,
-      rating: Math.round(overallRating * 10) / 10,
+      rating: overallRating,
       rating_count: overallRating > 0 ? 1 : 0,
       image_url,
       is_public: true,
@@ -228,12 +226,11 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
     };
 
     Object.assign(baseData, {
-      parking_rating: parkingRating,
-      parking_rating_count: parkingRating > 0 ? 1 : 0,
-      beauty_rating: beautyRating,
-      beauty_rating_count: beautyRating > 0 ? 1 : 0,
-      privacy_rating: privacyRating,
-      privacy_rating_count: privacyRating > 0 ? 1 : 0,
+      access_rating: accessRating, access_rating_count: accessRating > 0 ? 1 : 0,
+      condition_rating: conditionRating, condition_rating_count: conditionRating > 0 ? 1 : 0,
+      safety_rating: safetyRating, safety_rating_count: safetyRating > 0 ? 1 : 0,
+      crowdedness_rating: crowdednessRating, crowdedness_rating_count: crowdednessRating > 0 ? 1 : 0,
+      rating_schema: 2,
     });
 
     try {
@@ -296,21 +293,17 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
             )}
           </div>
 
-          {/* Ratings */}
-          <div>
-            <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpot.parkingRating')}</label>
-            <p className="text-xs text-gray-500 dark:text-muted-foreground mb-2">{t('addSpot.parkingHint')}</p>
-            <StarRating value={parkingRating} onChange={setParkingRating} size="lg" />
-          </div>
-          <div>
-            <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpot.beautyRating')}</label>
-            <p className="text-xs text-gray-500 dark:text-muted-foreground mb-2">{t('addSpot.beautyHint')}</p>
-            <StarRating value={beautyRating} onChange={setBeautyRating} size="lg" />
-          </div>
-          <div>
-            <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpot.privacyRating')}</label>
-            <p className="text-xs text-gray-500 dark:text-muted-foreground mb-2">{t('addSpot.privacyHint')}</p>
-            <StarRating value={privacyRating} onChange={setPrivacyRating} size="lg" />
+          {/* Experience rating + descriptive scales (rating schema v2) */}
+          <div className="rounded-2xl border border-gray-200 dark:border-border p-4 space-y-5">
+            <div>
+              <label className="text-sm font-semibold text-gray-700 dark:text-foreground mb-1 block">Overall experience</label>
+              <p className="text-xs text-gray-500 dark:text-muted-foreground mb-2">How would you rate this spot overall?</p>
+              <StarRating value={overallRating} onChange={setOverallRating} size="lg" />
+            </div>
+            <div><label className="text-sm font-semibold block mb-2">Ease of access</label><LabeledRatingScale value={accessRating} onChange={setAccessRating} labels={['Very difficult','Difficult','Moderate','Easy','Very easy']} /></div>
+            <div><label className="text-sm font-semibold block mb-2">Condition & cleanliness</label><LabeledRatingScale value={conditionRating} onChange={setConditionRating} labels={['Very poor','Poor','Okay','Good','Excellent']} /></div>
+            <div><label className="text-sm font-semibold block mb-2">Safety & comfort</label><LabeledRatingScale value={safetyRating} onChange={setSafetyRating} labels={['Very uncomfortable','Uncomfortable','Okay','Comfortable','Very safe']} /></div>
+            <div><label className="text-sm font-semibold block mb-2">Crowdedness</label><LabeledRatingScale value={crowdednessRating} onChange={setCrowdednessRating} labels={['Very quiet','Quiet','Moderate','Busy','Very busy']} /></div>
           </div>
 
           {/* Category tags */}

@@ -92,7 +92,7 @@ function hashIp(ip) {
 }
 
 function isAllowedRecaptchaHostname(hostname) {
-  const configured = (process.env.RECAPTCHA_ALLOWED_HOSTNAMES || 'spotfinder.cz,www.spotfinder.cz,localhost,127.0.0.1')
+  const configured = (process.env.RECAPTCHA_ALLOWED_HOSTNAMES || 'spotfinder.cz,www.spotfinder.cz,spot-finder-app.vercel.app,localhost,127.0.0.1')
     .split(',').map((v) => v.trim().toLowerCase()).filter(Boolean);
   return configured.includes(String(hostname || '').toLowerCase());
 }
@@ -217,19 +217,19 @@ exports.onSpotRatingWritten = functions.firestore
         : { avg: 0, count: 0 };
     };
 
-    const parking = avg('parking');
-    const beauty = avg('beauty');
-    const privacy = avg('privacy');
-    const overallVals = [parking.avg, beauty.avg, privacy.avg].filter((v) => v > 0);
-    const overall = overallVals.length
-      ? Math.round((overallVals.reduce((s, v) => s + v, 0) / overallVals.length) * 10) / 10
-      : 0;
+    const overall = avg('overall');
+    const access = avg('access');
+    const condition = avg('condition');
+    const safety = avg('safety');
+    const crowdedness = avg('crowdedness');
 
     await db.collection('spots').doc(spotId).update({
-      parking_rating: parking.avg, parking_rating_count: parking.count,
-      beauty_rating: beauty.avg, beauty_rating_count: beauty.count,
-      privacy_rating: privacy.avg, privacy_rating_count: privacy.count,
-      rating: overall, rating_count: rows.length,
+      rating: overall.avg, rating_count: overall.count,
+      access_rating: access.avg, access_rating_count: access.count,
+      condition_rating: condition.avg, condition_rating_count: condition.count,
+      safety_rating: safety.avg, safety_rating_count: safety.count,
+      crowdedness_rating: crowdedness.avg, crowdedness_rating_count: crowdedness.count,
+      rating_schema: 2,
     });
   });
 
@@ -437,3 +437,67 @@ exports.adminDeleteSpot = functions.https.onCall(async (data, context) => {
 
 exports.setAdminClaim = require('./setAdminClaim').setAdminClaim;
 exports.updateSuperadminEmail = require('./updateSuperadminEmail').updateSuperadminEmail;
+// ─── Unified content reports (spots, dataset POIs, community POI photos) ───
+const REPORT_REASONS = {
+  spot: new Set(['wrong_info','wrong_location','does_not_exist','duplicate','inappropriate','spam','other']),
+  poi: new Set(['wrong_info','wrong_location','does_not_exist','duplicate','inappropriate','spam','other']),
+  poi_photo: new Set(['wrong_place','inappropriate','copyright','private_info','misleading','spam','other']),
+};
+exports.submitReport = functions.https.onCall(async (data, context) => {
+  if (!context.auth || context.auth.token.email_verified !== true || context.auth.token.firebase?.sign_in_provider === 'anonymous') {
+    throw new functions.https.HttpsError('permission-denied', 'A signed-in account with a verified email is required.');
+  }
+  const p=data||{}, targetType=String(p.targetType||''), targetId=String(p.targetId||'').slice(0,500), reason=String(p.category||'');
+  if (!REPORT_REASONS[targetType]?.has(reason) || !targetId) throw new functions.https.HttpsError('invalid-argument','Invalid report target or reason.');
+  const message=String(p.message||'').trim().slice(0,1000), subject=String(p.subject||'Report').slice(0,200);
+  const captcha=await verifyRecaptcha(p.recaptchaToken,'report');
+  if(!captcha.ok) throw new functions.https.HttpsError('permission-denied','reCAPTCHA verification failed.');
+  const uid=context.auth.uid, ipHash=hashIp(getRequestIp(context));
+  const deviceHash=crypto.createHash('sha256').update(String(p.deviceId||'none').slice(0,200)).digest('hex');
+  for (const key of [`uid_${uid}`,`ip_${ipHash}`,`device_${deviceHash}`]) {
+    const b=await db.collection('report_blocks').doc(key).get(); if(b.exists) throw new functions.https.HttpsError('permission-denied','Reporting is blocked for this account or device.');
+  }
+  const okUid=await checkServerRateLimit(uid,'content_report',8,60*60*1000);
+  const okIp=await checkIpRateLimit(ipHash,'content_report',20,60*60*1000);
+  if(!okUid||!okIp) throw new functions.https.HttpsError('resource-exhausted','Too many reports. Try again later.');
+  // One open report from the same account for the same target prevents report flooding.
+  const duplicate=await db.collection('reports').where('reporter_uid','==',uid).where('target_key','==',`${targetType}:${targetId}`).where('status','==','open').limit(1).get();
+  if(!duplicate.empty) return {success:true,alreadyReported:true,id:duplicate.docs[0].id};
+  const rawSnap=(p.targetSnapshot&&typeof p.targetSnapshot==='object')?p.targetSnapshot:{};
+  const snapshot={}; for(const k of ['name','title','lat','lon','image','created_by']) if(rawSnap[k]!=null) snapshot[k]=String(rawSnap[k]).slice(0,500);
+  const ref=db.collection('reports').doc();
+  await ref.set({category:reason,subject,message,target_type:targetType,target_id:targetId,target_key:`${targetType}:${targetId}`,target_snapshot:snapshot,status:'open',reporter_uid:uid,reporter_email:context.auth.token.email||null,ip_hash:ipHash,device_hash:deviceHash,created_at:new Date().toISOString(),recaptcha_score:captcha.score});
+  return {success:true,id:ref.id};
+});
+exports.adminResolveReport=functions.https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.reportId||'');if(!id)throw new functions.https.HttpsError('invalid-argument','reportId required');await db.collection('reports').doc(id).update({status:'resolved',resolution:String(data?.resolution||'resolved').slice(0,100),resolved_at:new Date().toISOString(),resolved_by:context.auth.token.email||context.auth.uid});await logAdminAction('resolve_report',context.auth.token.email,{reportId:id});return{success:true}});
+exports.adminDeleteReport=functions.https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.reportId||'');if(!id)throw new functions.https.HttpsError('invalid-argument','reportId required');await db.collection('reports').doc(id).delete();await logAdminAction('delete_report',context.auth.token.email,{reportId:id});return{success:true}});
+exports.adminBlockReporter=functions.https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.reportId||'');const snap=await db.collection('reports').doc(id).get();if(!snap.exists)throw new functions.https.HttpsError('not-found','Report not found');const r=snap.data(), batch=db.batch(), now=new Date().toISOString();for(const [k,v] of [['uid',r.reporter_uid],['ip',r.ip_hash],['device',r.device_hash]])if(v)batch.set(db.collection('report_blocks').doc(`${k}_${v}`),{kind:k,value:v,reason:String(data?.reason||'Report spam').slice(0,200),blocked_at:now,blocked_by:context.auth.token.email||context.auth.uid});await batch.commit();await logAdminAction('block_reporter',context.auth.token.email,{reportId:id,reporter_uid:r.reporter_uid});return{success:true}});
+exports.adminUpdateSpot=functions.https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.spotId||''),src=data?.patch||{},patch={};for(const k of ['title','description','image_url','status'])if(Object.prototype.hasOwnProperty.call(src,k))patch[k]=src[k];if(!id||!Object.keys(patch).length)throw new functions.https.HttpsError('invalid-argument','spotId and patch required');await db.collection('spots').doc(id).update(patch);await logAdminAction('update_spot',context.auth.token.email,{spotId:id,fields:Object.keys(patch)});return{success:true}});
+exports.adminDeletePOIPhoto=functions.https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.photoId||'');if(!id)throw new functions.https.HttpsError('invalid-argument','photoId required');await db.collection('poi_photos').doc(id).delete();await logAdminAction('delete_poi_photo',context.auth.token.email,{photoId:id});return{success:true}});
+
+// ─── Spot likes/saves: trusted aggregate counters ──────────────────────────
+async function recountSpotSocial(spotId) {
+  if (!spotId) return;
+  const [likes, saves] = await Promise.all([
+    db.collection('spot_likes').where('spot_id', '==', spotId).get(),
+    db.collection('spot_saves').where('spot_id', '==', spotId).get(),
+  ]);
+  const ref = db.collection('spots').doc(spotId);
+  const snap = await ref.get();
+  if (!snap.exists) return;
+  await ref.update({ likes_count: likes.size, saves_count: saves.size });
+}
+
+exports.onSpotLikeWritten = functions.firestore
+  .document('spot_likes/{relationId}')
+  .onWrite(async (change) => {
+    const data = change.after.exists ? change.after.data() : change.before.data();
+    await recountSpotSocial(data?.spot_id);
+  });
+
+exports.onSpotSaveWritten = functions.firestore
+  .document('spot_saves/{relationId}')
+  .onWrite(async (change) => {
+    const data = change.after.exists ? change.after.data() : change.before.data();
+    await recountSpotSocial(data?.spot_id);
+  });
