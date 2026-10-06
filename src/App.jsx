@@ -16,7 +16,15 @@ const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
 const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
 
-const RouteFallback = () => <div className="fixed inset-0 grid place-items-center bg-background"><div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin" /></div>;
+const RouteFallback = () => (
+  <div
+    className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-full border border-border bg-background/90 p-3 shadow-lg backdrop-blur-sm pointer-events-none"
+    role="status"
+    aria-label="Loading page"
+  >
+    <div className="w-6 h-6 border-[3px] border-slate-200 border-t-slate-800 rounded-full animate-spin" />
+  </div>
+);
 const LayoutWrapper = ({ children, currentPageName }) => Layout ?
   <Layout currentPageName={currentPageName}><Suspense fallback={<RouteFallback />}>{children}</Suspense></Layout>
   : <Suspense fallback={<RouteFallback />}>{children}</Suspense>;
