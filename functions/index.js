@@ -22,6 +22,7 @@ const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const { GoogleAuth } = require('google-auth-library');
 const { defineString } = require('firebase-functions/params');
+const { validateSocialPostUrl, INVALID_SOCIAL_URL_MESSAGE } = require('./socialUrlPolicy');
 initializeApp();
 const db = getFirestore();
 const RECAPTCHA_SITE_KEY = defineString('RECAPTCHA_SITE_KEY');
@@ -496,13 +497,126 @@ const REPORT_REASONS = {
   spot: new Set(['wrong_info','wrong_location','closed_or_missing','duplicate','inappropriate','spam_scam','other_safety']),
   poi: new Set(['wrong_info','wrong_location','closed_or_missing','duplicate','inappropriate','spam_scam','other_safety']),
   poi_photo: new Set(['wrong_place','inappropriate','copyright','private_info','misleading','spam','other']),
+  social_post: new Set(['unrelated','inappropriate','spam','misleading','privacy','unavailable','other']),
 };
-exports.submitReport = functions.runWith({
-  secrets: ['ANTI_SPAM_IP_SALT'],
-}).https.onCall(async (data, context) => {
+
+function assertVerifiedUser(context) {
   if (!context.auth || context.auth.token.email_verified !== true || context.auth.token.firebase?.sign_in_provider === 'anonymous') {
     throw new functions.https.HttpsError('permission-denied', 'A signed-in account with a verified email is required.');
   }
+}
+
+function normalizeSocialTarget(data) {
+  const targetType = String(data?.targetType || '');
+  const targetId = String(data?.targetId || '');
+  if (!['spot', 'poi'].includes(targetType) || !targetId || targetId.length > 500 || !/^[A-Za-z0-9_.:-]+$/.test(targetId)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid social post target.');
+  }
+  if (targetType === 'poi') {
+    const match = targetId.match(/^(-?\d{1,3}\.\d{4})_(-?\d{1,3}\.\d{4})_[a-z0-9]{0,20}$/);
+    const lat = Number(match?.[1]);
+    const lon = Number(match?.[2]);
+    if (!match || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+      throw new functions.https.HttpsError('invalid-argument', 'Invalid POI target.');
+    }
+  }
+  return { targetType, targetId, targetKey: `${targetType}:${targetId}` };
+}
+
+// Social references are callable-only: clients cannot write social_posts in
+// Firestore. Provider, type, content ID, canonical URL, ownership, status and
+// timestamps are all derived or assigned here.
+exports.addSocialPost = functions.runWith({
+  secrets: ['ANTI_SPAM_IP_SALT'],
+}).https.onCall(async (data, context) => {
+  assertVerifiedUser(context);
+  const validated = validateSocialPostUrl(data?.url);
+  if (!validated.ok) throw new functions.https.HttpsError('invalid-argument', INVALID_SOCIAL_URL_MESSAGE);
+  const target = normalizeSocialTarget(data);
+  if (target.targetType === 'spot') {
+    const spot = await db.collection('spots').doc(target.targetId).get();
+    if (!spot.exists || !['published', 'pending_trust'].includes(spot.data()?.status)) {
+      throw new functions.https.HttpsError('not-found', 'Spot not found.');
+    }
+  }
+
+  const captcha = await verifyRecaptcha(data?.recaptchaToken, 'social_post');
+  if (!captcha.ok) throw new functions.https.HttpsError('permission-denied', 'reCAPTCHA verification failed.');
+  const uid = context.auth.uid;
+  const ipHash = hashIp(getRequestIp(context));
+  const [uidAllowed, ipAllowed] = await Promise.all([
+    checkServerRateLimit(uid, 'social_post', 6, 60 * 60 * 1000),
+    checkIpRateLimit(ipHash, 'social_post', 15, 60 * 60 * 1000),
+  ]);
+  if (!uidAllowed || !ipAllowed) throw new functions.https.HttpsError('resource-exhausted', 'Too many social post submissions. Try again later.');
+
+  const rawName = typeof data?.targetName === 'string' ? data.targetName.trim() : '';
+  const deterministicId = crypto.createHash('sha256')
+    .update(`${target.targetKey}\n${validated.canonicalUrl}`).digest('hex');
+  const ref = db.collection('social_posts').doc(deterministicId);
+  const record = {
+    provider: validated.provider,
+    content_type: validated.contentType,
+    content_id: validated.contentId,
+    canonical_url: validated.canonicalUrl,
+    target_type: target.targetType,
+    target_id: target.targetId,
+    target_key: target.targetKey,
+    target_name: rawName.slice(0, 120),
+    status: 'active',
+    added_by: uid,
+    added_by_email: context.auth.token.email || null,
+    created_at: new Date().toISOString(),
+  };
+  try {
+    await ref.create(record);
+  } catch (error) {
+    if (error?.code === 6 || error?.code === 'already-exists') {
+      throw new functions.https.HttpsError('already-exists', 'This post is already attached to this place.');
+    }
+    throw error;
+  }
+  if (target.targetType === 'spot') {
+    await db.collection('spots').doc(target.targetId).update({ has_social: true });
+  }
+  return { id: ref.id, ...record };
+});
+
+async function refreshSpotSocialIndicator(targetType, targetId) {
+  if (targetType !== 'spot' || !targetId) return;
+  const active = await db.collection('social_posts')
+    .where('target_key', '==', `spot:${targetId}`)
+    .where('status', '==', 'active').limit(1).get();
+  const spotRef = db.collection('spots').doc(targetId);
+  const spot = await spotRef.get();
+  if (spot.exists) await spotRef.update({ has_social: !active.empty });
+}
+
+exports.adminSetSocialPostStatus = functions.https.onCall(async (data, context) => {
+  assertIsAdmin(context);
+  const socialPostId = String(data?.socialPostId || '');
+  const status = String(data?.status || '');
+  if (!socialPostId || !['active', 'hidden', 'unavailable'].includes(status)) {
+    throw new functions.https.HttpsError('invalid-argument', 'A valid social post and status are required.');
+  }
+  const ref = db.collection('social_posts').doc(socialPostId);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) throw new functions.https.HttpsError('not-found', 'Social post not found.');
+  await ref.update({
+    status,
+    moderated_at: new Date().toISOString(),
+    moderated_by: context.auth.token.email || context.auth.uid,
+  });
+  const socialPost = snapshot.data() || {};
+  await refreshSpotSocialIndicator(socialPost.target_type, socialPost.target_id);
+  await logAdminAction('set_social_post_status', context.auth.token.email || context.auth.uid, { socialPostId, status });
+  return { success: true };
+});
+
+exports.submitReport = functions.runWith({
+  secrets: ['ANTI_SPAM_IP_SALT'],
+}).https.onCall(async (data, context) => {
+  assertVerifiedUser(context);
   const p=data||{}, targetType=String(p.targetType||''), targetId=String(p.targetId||'').slice(0,500), reason=String(p.category||'');
   if (!REPORT_REASONS[targetType]?.has(reason) || !targetId) throw new functions.https.HttpsError('invalid-argument','Invalid report target or reason.');
   const message=String(p.message||'').trim().slice(0,1000), subject=String(p.subject||'Report').slice(0,200);

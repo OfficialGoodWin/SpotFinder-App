@@ -414,7 +414,7 @@ function makeDot(catKey, color, size = 28, label = '') {
   return el;
 }
 
-// ── Hybrid spot marker: photo thumbnail + cost-color ring + category badge + difficulty dot ──
+// ── Discovery spot marker: equal-weight photo and category variants ──────────
 const SPOT_TAG_ICON_KEY = {
   Viewpoint: 'viewpoint', SecretCafe: 'cafe', Sunset: 'sunset', Sunrise: 'sunrise', PhotoSpot: 'speedcamera',
   Waterfall: 'waterfall', Hike: 'hike', SwimSpot: 'swim', Ruin: 'heritage', UrbanExplore: 'urbanexplore',
@@ -422,13 +422,32 @@ const SPOT_TAG_ICON_KEY = {
 const COST_RING_COLOR = { free: '#22c55e', paid: '#f59e0b', donation: '#f59e0b' };
 const DIFFICULTY_DOT_COLOR = { easy: '#22c55e', moderate: '#eab308', hard: '#ef4444' };
 
+const TRUSTED_DISCOVERY_STATES = new Set(['spotfinder_pick', 'highly_rated', 'popular', 'hidden_gem', 'new', 'visited']);
+const DISCOVERY_STATE_LABEL = { spotfinder_pick: 'SpotFinder Pick', highly_rated: 'Highly Rated', popular: 'Popular', hidden_gem: 'Hidden Gem', new: 'New', visited: 'Visited' };
+
+function discoveryTeaser(spot, trustedState = '') {
+  if (trustedState) return DISCOVERY_STATE_LABEL[trustedState] || '';
+  const elevation = Number(spot.elevation ?? spot.ele);
+  if (Number.isFinite(elevation) && elevation >= -500 && elevation <= 9000) return `${Math.round(elevation)} m`;
+  const rating = Number(spot.rating);
+  const ratingCount = Number(spot.rating_count);
+  if (ratingCount > 0 && Number.isFinite(rating) && rating >= 1 && rating <= 5) return `★ ${rating.toFixed(1)}`;
+  const likes = Number(spot.likes_count);
+  if (Number.isInteger(likes) && likes > 0) return `${likes} like${likes === 1 ? '' : 's'}`;
+  return '';
+}
+
 function makeSpotDom(spot) {
   const primaryTag = spot.tags?.[0];
   const iconKey = SPOT_TAG_ICON_KEY[primaryTag] || 'custom';
-  const icon = iconGlyphSVG(iconKey, 20);
-  const badgeIcon = iconGlyphSVG(iconKey, 12);
-  const ringColor = COST_RING_COLOR[spot.cost] || '#22c55e';
+  const icon = iconGlyphSVG(iconKey, 24, '#15803d');
+  const badgeIcon = iconGlyphSVG(iconKey, 13, 'white');
+  const accentColor = '#16a34a';
+  const costColor = COST_RING_COLOR[spot.cost] || accentColor;
   const diffColor = DIFFICULTY_DOT_COLOR[spot.access_difficulty];
+  const discoveryState = TRUSTED_DISCOVERY_STATES.has(spot.discovery_state) ? spot.discovery_state : '';
+  const teaser = discoveryTeaser(spot, discoveryState);
+  const photoUrl = typeof spot.image_url === 'string' && /^https:\/\//i.test(spot.image_url) ? spot.image_url : '';
 
   const el = document.createElement('div');
   // IMPORTANT: don't set `position` here — MapLibre's own CSS class
@@ -437,28 +456,43 @@ function makeSpotDom(spot) {
   // `position:relative` here previously overrode that (inline styles beat
   // a stylesheet class rule), which is what caused markers to drift or
   // freeze during zoom instead of tracking their real lng/lat.
-  el.style.cssText = 'width:52px;height:52px;cursor:pointer;';
+  el.className = 'sf-discovery-marker';
+  el.dataset.discoveryState = discoveryState;
+  el.setAttribute('role', 'button');
+  el.setAttribute('tabindex', '0');
+  el.setAttribute('aria-label', `Open ${spot.title || 'community spot'}`);
+  el.style.cssText = 'width:92px;height:82px;cursor:pointer;';
 
-  const photoOrFallback = spot.image_url
-    ? `<div style="width:100%;height:100%;border-radius:50%;background-image:url('${spot.image_url}');background-size:cover;background-position:center;"></div>`
-    : `<div style="width:100%;height:100%;border-radius:50%;background:linear-gradient(135deg,#60a5fa,#a78bfa);display:flex;align-items:center;justify-content:center;">
-         ${icon}
-       </div>`;
+  const photoOrFallback = photoUrl
+    ? `<img src="${escapeHtml(photoUrl)}" alt="" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block;" />`
+    : `<div class="sf-discovery-marker__fallback">${icon}${teaser ? `<span>${escapeHtml(teaser)}</span>` : ''}</div>`;
 
   // Inner wrapper carries `position:relative` instead, so the badge/dot
   // overlays below still anchor correctly without touching the outer
   // element MapLibre positions.
   el.innerHTML = `
-    <div style="position:relative;width:52px;height:52px;">
-      <div style="width:48px;height:48px;border-radius:50%;border:3px solid ${ringColor};box-shadow:0 2px 8px rgba(0,0,0,0.35);overflow:hidden;background:#fff;">
+    <div class="sf-discovery-marker__motion">
+      <div class="sf-discovery-marker__card">
         ${photoOrFallback}
       </div>
-      <div style="position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);width:22px;height:22px;border-radius:50%;background:${ringColor};border:2px solid white;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,0.3);">
+      <div class="sf-discovery-marker__stem"></div><div class="sf-discovery-marker__tip"></div>
+      <div class="sf-discovery-marker__badge" style="background:${accentColor};">
         ${badgeIcon}
       </div>
-      ${diffColor ? `<div style="position:absolute;top:-2px;right:-2px;width:12px;height:12px;border-radius:50%;background:${diffColor};border:2px solid white;box-shadow:0 1px 2px rgba(0,0,0,0.3);"></div>` : ''}
+      ${spot.has_social ? '<div class="sf-discovery-marker__social" aria-hidden="true"><span></span></div>' : ''}
+      ${diffColor ? `<div class="sf-discovery-marker__difficulty" style="background:${diffColor};"></div>` : ''}
+      ${spot.cost && spot.cost !== 'free' ? `<div class="sf-discovery-marker__cost" style="background:${costColor};"></div>` : ''}
+      <div class="sf-discovery-marker__label">${escapeHtml(spot.title || '')}</div>
     </div>
   `;
+  const select = () => {
+    document.querySelectorAll('.sf-discovery-marker.is-selected').forEach(marker => marker.classList.remove('is-selected'));
+    el.classList.add('is-selected');
+  };
+  el.addEventListener('click', select);
+  el.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); select(); el.click(); }
+  });
   return el;
 }
 
@@ -926,7 +960,7 @@ export default function MapLibreMap({
     for (const spot of spots) {
       if (m.has(spot.id)) continue;
       const el = makeSpotDom(spot);
-      const mk = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat([spot.lng, spot.lat]).addTo(map);
+      const mk = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([spot.lng, spot.lat]).addTo(map);
       el.addEventListener('click', e => { e.stopPropagation(); onSelectSpot?.(spot); });
       m.set(spot.id, mk);
     }

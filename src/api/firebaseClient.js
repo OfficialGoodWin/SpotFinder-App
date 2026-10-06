@@ -1002,3 +1002,26 @@ export const getAdminPOIPhotos = async (maxCount = 300) => {
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 };
 export const adminDeletePOIPhoto = (photoId) => callFn('adminDeletePOIPhoto')({ photoId });
+
+export const getSocialPosts = async (targetType, targetId, includeModerated = false) => {
+  const { db } = getFirebaseServices();
+  const constraints = [where('target_key', '==', `${targetType}:${targetId}`), limit(20)];
+  if (!includeModerated) constraints.splice(1, 0, where('status', '==', 'active'));
+  const snap = await getDocs(query(collection(db, 'social_posts'), ...constraints));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+};
+
+export const addSocialPost = async ({ url, targetType, targetId, targetName }) => {
+  const recaptchaToken = await getRecaptchaToken('social_post');
+  return callFn('addSocialPost')({ url, targetType, targetId, targetName, recaptchaToken });
+};
+
+export const getAdminSocialPosts = async (maxCount = 300) => {
+  const { db } = getFirebaseServices();
+  const snap = await getDocs(query(collection(db, 'social_posts'), orderBy('created_at', 'desc'), limit(maxCount)));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+};
+
+export const adminSetSocialPostStatus = (socialPostId, status) =>
+  callFn('adminSetSocialPostStatus')({ socialPostId, status });

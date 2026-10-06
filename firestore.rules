@@ -52,7 +52,7 @@ service cloud.firestore {
                         'condition_rating', 'condition_rating_count', 'safety_rating', 'safety_rating_count',
                         'crowdedness_rating', 'crowdedness_rating_count', 'rating_schema', 'flag_count', 'status', 'created_by',
                         'created_by_uid', 'upvote_count', 'downvote_count', 'quality_score',
-                        'likes_count', 'saves_count']))
+                        'likes_count', 'saves_count', 'has_social', 'discovery_state']))
         || isSuperAdmin()
       );
 
@@ -104,6 +104,15 @@ service cloud.firestore {
         && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
         && strLen(request.resource.data.get('comment', ''), 1000);
       allow delete: if isSuperAdmin() || (isAuth() && resource.data.user_email == authEmail());
+    }
+
+    // Social references are validated and written only by callable Cloud
+    // Functions. Public clients may read active records for place details;
+    // admins read every status for moderation. No client can forge provider,
+    // content ID, ownership, timestamps, or moderation state.
+    match /social_posts/{docId} {
+      allow read: if resource.data.status == 'active' || isSuperAdmin();
+      allow write: if false;
     }
 
     // ── Community moderation: flags (report a spot) ────────────────────────────

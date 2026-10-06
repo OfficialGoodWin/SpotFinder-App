@@ -6,6 +6,7 @@ const REASONS = {
   spot: [['wrong_info', 'Wrong or outdated information'], ['wrong_location', 'Wrong location'], ['closed_or_missing', 'Closed or missing'], ['duplicate', 'Duplicate'], ['inappropriate', 'Inappropriate or offensive'], ['spam_scam', 'Spam or scam'], ['other_safety', 'Other / safety concern']],
   poi: [['wrong_info', 'Wrong or outdated information'], ['wrong_location', 'Wrong location'], ['closed_or_missing', 'Closed or missing'], ['duplicate', 'Duplicate'], ['inappropriate', 'Inappropriate or offensive'], ['spam_scam', 'Spam or scam'], ['other_safety', 'Other / safety concern']],
   poi_photo: [['wrong_place', 'Not a photo of this place'], ['inappropriate', 'Inappropriate or offensive'], ['copyright', 'Copyright / stolen image'], ['private_info', 'Contains private information'], ['misleading', 'Misleading or heavily edited'], ['spam', 'Spam / advertisement'], ['other', 'Other problem']],
+  social_post: [['unrelated', 'Unrelated to this place'], ['inappropriate', 'Inappropriate content'], ['spam', 'Spam or advertisement'], ['misleading', 'Misleading'], ['privacy', 'Privacy concern'], ['unavailable', 'Unavailable or broken'], ['other', 'Other problem']],
 };
 
 function deviceId() {
@@ -81,7 +82,7 @@ export default function ReportDialog({ open, onClose, user, targetType, targetId
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Flag className="h-5 w-5" />
-            <h2 className="text-lg font-semibold">Report {targetType === 'poi_photo' ? 'photo' : targetType === 'spot' ? 'spot' : 'place'}</h2>
+            <h2 className="text-lg font-semibold">Report {targetType === 'poi_photo' ? 'photo' : targetType === 'social_post' ? 'social post' : targetType === 'spot' ? 'spot' : 'place'}</h2>
           </div>
           <button type="button" onClick={onClose} className="rounded-full p-2 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Close report">
             <X className="h-5 w-5" />

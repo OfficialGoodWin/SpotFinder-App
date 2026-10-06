@@ -7,6 +7,7 @@ import { useLanguage } from '@/lib/LanguageContext';
 import { iconGlyphSVG } from '@/lib/mapIcons';
 import ReportDialog from '@/components/moderation/ReportDialog';
 
+const SocialPostsSection = React.lazy(() => import('@/components/social/SocialPostsSection'));
 
 // ─── OSM tag helpers ──────────────────────────────────────────────────────────
 function getPhone(tags = {}) { return tags.phone || tags['contact:phone'] || tags['contact:mobile'] || null; }
@@ -421,7 +422,7 @@ function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavig
 }
 
 // ─── Full sheet ───────────────────────────────────────────────────────────────
-function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavigate, onShare, onAddPhoto, onSubmitRating, user, onOpenLightbox, onReportPOI, onReportPhoto }) {
+function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavigate, onShare, onAddPhoto, onSubmitRating, user, onOpenLightbox, onReportPOI, onReportPhoto, socialTargetId }) {
   const { t } = useLanguage();
   const [ratingVal, setRatingVal] = useState(0);
   const [ratingComment, setRatingComment] = useState('');
@@ -573,6 +574,10 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
                 <div className="h-px bg-gray-100 dark:bg-border mb-4" />
               </>
             )}
+
+            <React.Suspense fallback={<div className="my-5 h-24 animate-pulse rounded-2xl bg-gray-100 motion-reduce:animate-none dark:bg-accent" />}>
+              <SocialPostsSection targetType="poi" targetId={socialTargetId} targetName={poi.name} user={user} />
+            </React.Suspense>
 
             {(phone || email || website || poi.lat) && (
               <>
@@ -770,6 +775,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
 
   const sharedProps = {
     poi: poiForView, category, sfPhotos, sfRating, photos,
+    socialTargetId: makePOIId(poi.lat, poi.lon, poi.name),
     onClose, onNavigate: handleNavigate, onShare: handleShare,
     onAddPhoto: handleAddPhoto, user,
     onOpenLightbox: (i) => setLightboxIndex(i),

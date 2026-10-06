@@ -7,6 +7,8 @@ import { useLanguage } from '@/lib/LanguageContext';
 import ReportDialog from '@/components/moderation/ReportDialog';
 import NavigationProviderSheet from '@/components/navigation/NavigationProviderSheet';
 
+const SocialPostsSection = React.lazy(() => import('@/components/social/SocialPostsSection'));
+
 const RATED_KEY = (spotId, userId) => `sf_rated_${spotId}_${userId || 'guest'}`;
 
 export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, onNavigate, onEdit, onDelete, onSpotUpdate, onShowAuth }) {
@@ -217,6 +219,10 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
               ))}
             </div>
           )}
+
+          <React.Suspense fallback={<div className="h-24 animate-pulse rounded-2xl bg-gray-100 motion-reduce:animate-none dark:bg-accent" />}>
+            <SocialPostsSection targetType="spot" targetId={String(spot.id)} targetName={localSpot.title || 'Spot'} user={user} />
+          </React.Suspense>
 
           {poiMatch && (
             <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4 dark:border-blue-900/60 dark:bg-blue-950/20">
