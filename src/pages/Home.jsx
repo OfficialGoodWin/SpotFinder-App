@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-import { Plus, Settings, Crosshair, HelpCircle, Trash2 } from 'lucide-react';
+import { Plus, Settings, Crosshair, HelpCircle, Trash2, MoreHorizontal, Mountain } from 'lucide-react';
 import { getPublicSpotsInBounds, createSpot, deleteSpot, updateSpot, getAdminPOIs, getAdminClosures, getAdminERouteOverrides, getAdminRoadOverrides, getDeletedAmbientPOIs, addDeletedAmbientPOI } from '@/api/firebaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
@@ -52,6 +52,7 @@ export default function Home() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
+  const [showMobileMore, setShowMobileMore] = useState(false);
 
   const [navRouteData, setNavRouteData] = useState({ coordinates: [], turns: [], currentStep: 0 });
   const [showSpots, setShowSpots] = useState(true);
@@ -431,7 +432,7 @@ export default function Home() {
         {/* Controls row */}
         <div className="flex items-center px-4 gap-2 bg-background/95 backdrop-blur-md border-t border" style={{ height: 56, paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
           {/* Left: Layers + Location */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
             <MapLayerSwitcher activeLayer={mapLayer} onLayerChange={setMapLayer} />
             <button
               onClick={() => userPos && setFlyTo([...userPos])}
@@ -459,7 +460,7 @@ export default function Home() {
           <div className="flex-1" />
 
           {/* Right: FAQ + Settings */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
             <button
               onClick={() => navigate('/faq')}
               className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-accent/60 flex items-center justify-center text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent active:scale-95 transition-all"
@@ -492,6 +493,70 @@ export default function Home() {
                 📊
               </a>
             )}
+          </div>
+
+          {/* Mobile: keep the map clear with only the three essential controls. */}
+          <div className="ml-auto flex items-center gap-1.5 sm:hidden">
+            <MapLayerSwitcher activeLayer={mapLayer} onLayerChange={setMapLayer} />
+            <button
+              type="button"
+              onClick={() => userPos && setFlyTo([...userPos])}
+              className="grid h-10 w-10 place-items-center rounded-xl bg-gray-100 text-gray-600 transition-all active:scale-95 dark:bg-accent/60 dark:text-foreground"
+              aria-label="Center on my location"
+              title="Center location"
+            >
+              <Crosshair className="h-5 w-5" />
+            </button>
+            <div className="relative">
+              {showMobileMore && (
+                <>
+                  <button
+                    type="button"
+                    className="fixed inset-0 z-40 cursor-default"
+                    onClick={() => setShowMobileMore(false)}
+                    aria-label="Close more menu"
+                  />
+                  <div className="absolute bottom-full right-0 z-50 mb-3 w-52 overflow-hidden rounded-2xl border border-border/80 bg-background/95 p-1.5 shadow-2xl backdrop-blur-xl">
+                    <button
+                      type="button"
+                      onClick={() => { navigate('/faq'); setShowMobileMore(false); }}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium hover:bg-accent"
+                    >
+                      <HelpCircle className="h-5 w-5 text-muted-foreground" />
+                      FAQ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowSettings(true); setShowMobileMore(false); }}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium hover:bg-accent"
+                    >
+                      <Settings className="h-5 w-5 text-muted-foreground" />
+                      Settings
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setTerrainEnabled(value => !value); setShowMobileMore(false); }}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium hover:bg-accent"
+                      aria-pressed={terrainEnabled}
+                    >
+                      <Mountain className={`h-5 w-5 ${terrainEnabled ? 'text-emerald-600' : 'text-muted-foreground'}`} />
+                      <span className="flex-1">3D terrain</span>
+                      <span className={`h-2.5 w-2.5 rounded-full ${terrainEnabled ? 'bg-emerald-500' : 'bg-muted'}`} />
+                    </button>
+                  </div>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowMobileMore(value => !value)}
+                className={`grid h-10 w-10 place-items-center rounded-xl transition-all active:scale-95 ${showMobileMore ? 'bg-primary text-primary-foreground' : 'bg-gray-100 text-gray-600 dark:bg-accent/60 dark:text-foreground'}`}
+                aria-label="More map options"
+                aria-expanded={showMobileMore}
+                title="More"
+              >
+                <MoreHorizontal className="h-5 w-5" />
+              </button>
+            </div>
           </div>
         </div>
       </div>

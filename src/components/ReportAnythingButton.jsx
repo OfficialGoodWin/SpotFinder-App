@@ -37,6 +37,11 @@ export default function ReportAnythingButton() {
           </select>
           <input value={form.subject} maxLength={120} onChange={e=>setForm({...form,subject:e.target.value})} placeholder="Short title (optional)" className="w-full border rounded-lg p-2 bg-transparent"/>
           <textarea value={form.message} maxLength={3000} onChange={e=>setForm({...form,message:e.target.value})} rows={5} placeholder="What happened?" className="w-full border rounded-lg p-2 bg-transparent" required/>
+          <p className="text-[11px] leading-4 text-slate-400">
+            This site is protected by reCAPTCHA and the Google{' '}
+            <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer" className="underline">Privacy Policy</a>{' '}
+            and <a href="https://policies.google.com/terms" target="_blank" rel="noreferrer" className="underline">Terms of Service</a> apply.
+          </p>
           <button disabled={busy} className="w-full bg-slate-900 text-white rounded-lg py-2.5 disabled:opacity-50">{busy?'Sending…':'Send report'}</button>
         </form>}
       </div>

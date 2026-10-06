@@ -34,6 +34,7 @@ export default function MapLayerSwitcher({ activeLayer, onLayerChange }) {
         </>
       )}
       <button
+        type="button"
         onClick={() => setOpen(o => !o)}
         className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95
           ${open
@@ -41,6 +42,7 @@ export default function MapLayerSwitcher({ activeLayer, onLayerChange }) {
             : 'bg-gray-100 dark:bg-accent/60 text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent'}`}
       >
         <Layers className="w-5 h-5" />
+        <span className="sr-only">Map layers</span>
       </button>
     </div>
   );

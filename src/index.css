@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* reCAPTCHA is disclosed inside the report form, so its injected floating
+   badge does not remain over the map after the report flow is finished. */
+.grecaptcha-badge {
+  visibility: hidden !important;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

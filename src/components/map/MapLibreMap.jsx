@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import { Protocol } from 'pmtiles';
+import { Minus, Plus } from 'lucide-react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { lightStyle, darkStyle, outdoorStyle, winterStyle } from '../../lib/mapStyle.js';
 import { AMBIENT_CATEGORIES } from '../../lib/ambientCategories.js';
@@ -322,11 +323,28 @@ function applyTerrain(map, enabled) {
           maxzoom: 14,
         });
       }
-      map.setTerrain({ source: 'terrain-dem', exaggeration: 1.4 });
-      if (map.getPitch() < 30) map.easeTo({ pitch: 50, duration: 500 });
+      if (!map.getLayer('terrain-hillshade')) {
+        const firstSymbol = map.getStyle().layers.find(layer => layer.type === 'symbol')?.id;
+        map.addLayer({
+          id: 'terrain-hillshade',
+          type: 'hillshade',
+          source: 'terrain-dem',
+          paint: {
+            'hillshade-exaggeration': 0.45,
+            'hillshade-shadow-color': '#33462f',
+            'hillshade-highlight-color': '#f6f1df',
+            'hillshade-accent-color': '#647b54',
+          },
+        }, firstSymbol);
+      } else {
+        map.setLayoutProperty('terrain-hillshade', 'visibility', 'visible');
+      }
+      map.setTerrain({ source: 'terrain-dem', exaggeration: 1.8 });
+      map.easeTo({ pitch: Math.max(map.getPitch(), 58), bearing: map.getBearing() || -12, duration: 700 });
     } else {
       map.setTerrain(null);
-      if (map.getPitch() > 0) map.easeTo({ pitch: 0, duration: 500 });
+      if (map.getLayer('terrain-hillshade')) map.setLayoutProperty('terrain-hillshade', 'visibility', 'none');
+      if (map.getPitch() > 0 || map.getBearing() !== 0) map.easeTo({ pitch: 0, bearing: 0, duration: 500 });
     }
   } catch (e) {
     console.warn('Terrain toggle failed:', e);
@@ -710,6 +728,7 @@ export default function MapLibreMap({
   const poiAbort = useRef(null);
   const poiTimer = useRef(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [mapZoom, setMapZoom] = useState(13);
 
   // ── Apply admin E-route shield removals ───────────────────────────────────
   useEffect(() => {
@@ -830,6 +849,10 @@ export default function MapLibreMap({
     appliedStyleRef.current = `${isDark ? 'dark' : 'light'}:${mapLayer}`;
     setMapRef?.(map);
 
+    const syncZoom = () => setMapZoom(map.getZoom());
+    map.on('zoom', syncZoom);
+    syncZoom();
+
     const onOnline = () => setIsOnline(true);
     const onOffline = () => setIsOnline(false);
     window.addEventListener('online', onOnline);
@@ -838,6 +861,7 @@ export default function MapLibreMap({
     return () => {
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
+      map.off('zoom', syncZoom);
       map.remove();
       mapRef.current = null;
     };
@@ -1386,95 +1410,32 @@ const addAdminMarkers = () => {
     if (map.isStyleLoaded()) add(); else map.once('styledata', add);
   }, [mapLayer]);
 
-  const handleZoomSlide = (e) => {
-    const newZoom = parseFloat(e.target.value);
-    if (mapRef.current) mapRef.current.setZoom(newZoom);
-  };
-
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
 
-      {/* Mobile zoom slider on right side */}
-      <div style={{
-        position: 'absolute',
-        right: 12,
-        top: '50%',
-        transform: 'translateY(-50%)',
-        zIndex: 20,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '8px',
-        background: 'rgba(255, 255, 255, 0.9)',
-        padding: '8px',
-        borderRadius: '8px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-        backdropFilter: 'blur(4px)',
-      }}>
-        {/* Zoom out button */}
+      {/* Compact map zoom control — large enough for touch without obscuring the map. */}
+      <div className="absolute right-3 top-1/2 z-20 -translate-y-1/2 overflow-hidden rounded-2xl border border-white/70 bg-white/90 text-slate-700 shadow-[0_8px_30px_rgba(15,23,42,0.18)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-100">
         <button
-          onClick={() => mapRef.current?.setZoom((mapRef.current?.getZoom() || 13) - 1)}
-          style={{
-            width: '32px',
-            height: '32px',
-            border: 'none',
-            borderRadius: '4px',
-            background: '#f0f0f0',
-            cursor: 'pointer',
-            fontSize: '18px',
-            lineHeight: '1',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'background 0.2s',
-          }}
-          onMouseEnter={(e) => e.target.style.background = '#e0e0e0'}
-          onMouseLeave={(e) => e.target.style.background = '#f0f0f0'}
+          type="button"
+          onClick={() => mapRef.current?.zoomIn({ duration: 250 })}
+          className="grid h-11 w-11 place-items-center transition-colors hover:bg-slate-100 active:bg-slate-200 dark:hover:bg-white/10 dark:active:bg-white/15"
+          aria-label="Zoom in"
+          title="Zoom in"
         >
-          −
+          <Plus className="h-5 w-5" strokeWidth={2.25} />
         </button>
-
-        {/* Zoom slider (vertical) */}
-        <input
-          type="range"
-          min="3"
-          max="22"
-          step="0.1"
-          value={mapRef.current?.getZoom() || 13}
-          onChange={handleZoomSlide}
-          style={{
-            width: '32px',
-            height: '120px',
-            cursor: 'pointer',
-            writingMode: 'bt-lr',
-            WebkitAppearance: 'slider-vertical',
-            appearance: 'slider-vertical',
-          }}
-          title="Zoom level"
-        />
-
-        {/* Zoom in button */}
+        <div className="grid h-8 w-11 place-items-center border-y border-slate-200/80 bg-slate-50/70 text-[11px] font-bold tabular-nums text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400" aria-hidden="true">
+          {Math.round(mapZoom)}
+        </div>
         <button
-          onClick={() => mapRef.current?.setZoom((mapRef.current?.getZoom() || 13) + 1)}
-          style={{
-            width: '32px',
-            height: '32px',
-            border: 'none',
-            borderRadius: '4px',
-            background: '#f0f0f0',
-            cursor: 'pointer',
-            fontSize: '18px',
-            lineHeight: '1',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'background 0.2s',
-          }}
-          onMouseEnter={(e) => e.target.style.background = '#e0e0e0'}
-          onMouseLeave={(e) => e.target.style.background = '#f0f0f0'}
+          type="button"
+          onClick={() => mapRef.current?.zoomOut({ duration: 250 })}
+          className="grid h-11 w-11 place-items-center transition-colors hover:bg-slate-100 active:bg-slate-200 dark:hover:bg-white/10 dark:active:bg-white/15"
+          aria-label="Zoom out"
+          title="Zoom out"
         >
-          +
+          <Minus className="h-5 w-5" strokeWidth={2.25} />
         </button>
       </div>
 
