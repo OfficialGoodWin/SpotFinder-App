@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 import { Plus, Settings, Crosshair, HelpCircle, Trash2, MoreHorizontal, Mountain } from 'lucide-react';
-import { getPublicSpotsInBounds, createSpot, deleteSpot, updateSpot, getAdminPOIs, getAdminClosures, getAdminERouteOverrides, getAdminRoadOverrides, getDeletedAmbientPOIs, addDeletedAmbientPOI } from '@/api/firebaseClient';
+import { getPublicSpotsInBounds, createSpot, deleteSpot, updateSpot, getAdminPOIs, getAdminClosures, getAdminERouteOverrides, getAdminRoadOverrides, getDeletedAmbientPOIs, addDeletedAmbientPOI, addSocialPost } from '@/api/firebaseClient';
+import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
 import { useNavigate } from 'react-router-dom';
@@ -197,11 +198,21 @@ export default function Home() {
     setAddMode(false);
   }, []);
  
-  const handleSaveSpot = async (data) => {
+  const handleSaveSpot = async (data, socialUrl = '') => {
     try {
-      const spot = await createSpot(data);
+      let spot = await createSpot(data);
+      if (socialUrl) {
+        try {
+          await addSocialPost({ url: socialUrl, targetType: 'spot', targetId: String(spot.id), targetName: spot.title || 'Spot' });
+          spot = { ...spot, has_social: true };
+        } catch (socialError) {
+          console.error('Spot saved but social post attachment failed:', socialError);
+          toast.error('Spot saved, but the social post could not be attached. You can add it from the spot details.');
+        }
+      }
       setSpots(prev => [spot, ...prev]);
       setPendingLatlng(null);
+      return spot;
     } catch (err) {
       console.error('Failed to create spot:', err);
       alert('Failed to save spot: ' + (err.message || 'unknown error'));

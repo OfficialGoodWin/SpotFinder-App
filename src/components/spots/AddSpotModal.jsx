@@ -6,6 +6,7 @@ import AdBanner from '../AdBanner';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
 import { uploadSpotImage } from '@/api/firebaseClient';
+import { INVALID_SOCIAL_URL_MESSAGE, validateSocialPostUrl } from '@/lib/socialUrlPolicy';
 import { moderateSubmission } from '@/lib/moderation';
 import { findNearbyPoi } from '@/lib/nearbyPoi';
 import { toast } from 'sonner';
@@ -24,6 +25,7 @@ const AVAILABLE_TAGS = [
   { id: 'SwimSpot', emoji: '🏊' },
   { id: 'Ruin', emoji: '🏛️' },
   { id: 'UrbanExplore', emoji: '🏙️' },
+  { id: 'Mountain', emoji: '⛰️' },
 ];
 // Each option maps to an addSpot.<prefix><CapitalizedOption> translation key.
 const COST_OPTIONS = ['free', 'paid', 'donation'];
@@ -58,6 +60,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   const [interimText, setInterimText] = useState('');
   const [micError, setMicError] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [socialUrl, setSocialUrl] = useState('');
 
   // ── New fields per submission spec ──────────────────────────────────────────
   const [tags, setTags] = useState([]);
@@ -173,6 +176,15 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   };
 
   const handleSave = async () => {
+    const socialValidation = socialUrl ? validateSocialPostUrl(socialUrl) : null;
+    if (socialUrl && !socialValidation?.ok) {
+      toast.error(INVALID_SOCIAL_URL_MESSAGE);
+      return;
+    }
+    if (socialUrl && (!user || user.isAnonymous || user.emailVerified !== true)) {
+      toast.error('A verified account is required to add a social post.');
+      return;
+    }
     // Anti-spam / moderation pre-check (client-side UX only — the
     // authoritative check runs server-side in the Cloud Functions trigger
     // on `spots` creation; see functions/index.js).
@@ -256,7 +268,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
     });
 
     try {
-      await onSave(baseData);
+      await onSave(baseData, socialValidation?.canonicalUrl || '');
     } catch (err) {
       console.error('Save failed:', err);
     } finally {
@@ -476,6 +488,17 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
                 <input type="file" accept="image/*" multiple onChange={handleImageChange} className="sr-only" />
               </label>
             )}
+          </div>
+
+          {/* Optional social post. The callable backend attaches this only
+              after the spot exists and independently validates it again. */}
+          <div className="rounded-2xl border border-gray-200 p-4 dark:border-border">
+            <label htmlFor="new-spot-social-url" className="text-sm font-semibold text-gray-700 dark:text-foreground">Instagram or TikTok post</label>
+            <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-muted-foreground">Optional. Useful when you do not have a photo. Supported: Instagram posts/reels and TikTok videos.</p>
+            <input id="new-spot-social-url" type="url" value={socialUrl} onChange={event => setSocialUrl(event.target.value)} autoCapitalize="none" autoCorrect="off" spellCheck="false" placeholder="Paste a supported post link" className="mt-3 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500 dark:border-border dark:bg-background" />
+            {socialUrl && validateSocialPostUrl(socialUrl).ok && <p className="mt-2 text-xs font-medium text-green-700 dark:text-green-400">✓ {validateSocialPostUrl(socialUrl).provider === 'instagram' ? 'Instagram post' : 'TikTok video'} recognized</p>}
+            {socialUrl && !validateSocialPostUrl(socialUrl).ok && <p className="mt-2 text-xs text-red-600">{INVALID_SOCIAL_URL_MESSAGE}</p>}
+            {socialUrl && (!user || user.isAnonymous || user.emailVerified !== true) && <p className="mt-2 text-xs text-amber-600">Sign in with a verified account to attach social content.</p>}
           </div>
 
           {/* Ad Banners */}

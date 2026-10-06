@@ -418,6 +418,7 @@ function makeDot(catKey, color, size = 28, label = '') {
 const SPOT_TAG_ICON_KEY = {
   Viewpoint: 'viewpoint', SecretCafe: 'cafe', Sunset: 'sunset', Sunrise: 'sunrise', PhotoSpot: 'speedcamera',
   Waterfall: 'waterfall', Hike: 'hike', SwimSpot: 'swim', Ruin: 'heritage', UrbanExplore: 'urbanexplore',
+  Mountain: 'mountain',
 };
 const COST_RING_COLOR = { free: '#22c55e', paid: '#f59e0b', donation: '#f59e0b' };
 const DIFFICULTY_DOT_COLOR = { easy: '#22c55e', moderate: '#eab308', hard: '#ef4444' };
