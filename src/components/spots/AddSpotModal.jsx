@@ -7,6 +7,7 @@ import { useLanguage } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
 import { uploadSpotImage } from '@/api/firebaseClient';
 import { moderateSubmission } from '@/lib/moderation';
+import { findNearbyPoi } from '@/lib/nearbyPoi';
 import { toast } from 'sonner';
 
 // Category tags per spec — separate from the existing rating-group `spotType`.
@@ -50,8 +51,8 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   const [conditionRating, setConditionRating] = useState(0);
   const [safetyRating, setSafetyRating] = useState(0);
   const [crowdednessRating, setCrowdednessRating] = useState(0);
-  const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
+  const [imageFiles, setImageFiles] = useState([]);
+  const [imagePreviews, setImagePreviews] = useState([]);
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
   const [interimText, setInterimText] = useState('');
@@ -75,11 +76,20 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   const committedRef = useRef(''); // tracks already-committed final transcript
 
   const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setImageFile(file);
-      setImagePreview(URL.createObjectURL(file));
-    }
+    const remaining = 3 - imageFiles.length;
+    const selected = Array.from(e.target.files || []).filter(file => file.type.startsWith('image/'));
+    if (!remaining || !selected.length) return;
+    const accepted = selected.slice(0, remaining);
+    setImageFiles(current => [...current, ...accepted]);
+    setImagePreviews(current => [...current, ...accepted.map(file => URL.createObjectURL(file))]);
+    if (selected.length > remaining) toast.info('You can add up to 3 photos per spot.');
+    e.target.value = '';
+  };
+
+  const removeImage = (index) => {
+    URL.revokeObjectURL(imagePreviews[index]);
+    setImageFiles(current => current.filter((_, itemIndex) => itemIndex !== index));
+    setImagePreviews(current => current.filter((_, itemIndex) => itemIndex !== index));
   };
 
   // Voice dictation
@@ -190,19 +200,29 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
     // and are intentionally not averaged together into a fake star score.
 
     setLoading(true);
-    let image_url = null;
+    let image_urls = [];
 
-    if (imageFile) {
+    const nearbyPoiPromise = findNearbyPoi(Number(latlng.lat), Number(latlng.lng), language)
+      .catch(error => {
+        console.warn('Nearby POI matching skipped:', error);
+        return null;
+      });
+
+    if (imageFiles.length) {
       try {
         setUploadingImage(true);
-        image_url = await uploadSpotImage(imageFile);
+        const uploads = await Promise.allSettled(imageFiles.map(file => uploadSpotImage(file)));
+        image_urls = uploads.filter(result => result.status === 'fulfilled').map(result => result.value);
+        const failedCount = uploads.length - image_urls.length;
+        if (failedCount) toast.error(`${failedCount} photo${failedCount === 1 ? '' : 's'} could not be uploaded.`);
       } catch (err) {
-        console.error('Image upload failed:', err);
-        image_url = null;
+        console.error('Image uploads failed:', err);
       } finally {
         setUploadingImage(false);
       }
     }
+
+    const poi_match = await nearbyPoiPromise;
 
     const baseData = {
       lat: latlng.lat,
@@ -212,7 +232,8 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
       description,
       rating: overallRating,
       rating_count: overallRating > 0 ? 1 : 0,
-      image_url,
+      image_url: image_urls[0] || null,
+      image_urls,
       is_public: true,
       created_by: user?.email || 'anonymous',
       created_by_name: user?.displayName || user?.email?.split('@')[0] || 'Anonymous',
@@ -223,6 +244,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
       parking,
       best_time: bestTime,
       directions,
+      poi_match,
     };
 
     Object.assign(baseData, {
@@ -422,25 +444,36 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
             />
           </div>
 
-          {/* Photo */}
+          {/* Photos */}
           <div>
-            <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-2 block">{t('addSpot.photo')}</label>
-            {imagePreview ? (
-              <div className="relative">
-                <img src={imagePreview} alt="preview" className="w-full h-40 object-cover rounded-2xl" />
-                <button
-                  onClick={() => { setImageFile(null); setImagePreview(null); }}
-                  aria-label="Remove photo"
-                  className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-sm font-semibold text-gray-600 dark:text-foreground">Photos</label>
+              <span className="text-xs text-gray-400 dark:text-muted-foreground">{imageFiles.length}/3</span>
+            </div>
+            {imagePreviews.length > 0 && (
+              <div className="mb-3 grid grid-cols-3 gap-2">
+                {imagePreviews.map((preview, index) => (
+                  <div key={preview} className="relative aspect-square overflow-hidden rounded-2xl">
+                    <img src={preview} alt={`Spot preview ${index + 1}`} className="h-full w-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      aria-label={`Remove photo ${index + 1}`}
+                      className="absolute right-1.5 top-1.5 rounded-full bg-black/60 p-1.5 text-white backdrop-blur-sm"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                    {index === 0 && <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white">Cover</span>}
+                  </div>
+                ))}
               </div>
-            ) : (
+            )}
+            {imageFiles.length < 3 && (
               <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-border rounded-2xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-accent transition-colors focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-400">
                 <Camera className="w-8 h-8 text-gray-400 dark:text-muted-foreground mb-1" />
-                <span className="text-sm text-gray-500 dark:text-muted-foreground">{t('addSpot.photoHint')}</span>
-                <input type="file" accept="image/*" onChange={handleImageChange} className="sr-only" />
+                <span className="text-sm text-gray-500 dark:text-muted-foreground">Add up to {3 - imageFiles.length} more photo{3 - imageFiles.length === 1 ? '' : 's'}</span>
+                <span className="mt-1 text-xs text-gray-400">Choose several at once or add them one by one</span>
+                <input type="file" accept="image/*" multiple onChange={handleImageChange} className="sr-only" />
               </label>
             )}
           </div>
@@ -457,7 +490,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
         </div>
 
         <p className="px-6 pt-3 text-[11px] leading-relaxed text-gray-500 dark:text-muted-foreground">
-          By saving, you confirm this description and photo are your own (or you have the right to
+          By saving, you confirm this description and these photos are your own (or you have the right to
           share them) and agree they'll be shown publicly on the map to other SpotFinder users. See our{' '}
           <a href="/TermsAndConditions" target="_blank" rel="noopener noreferrer" className="underline">Terms</a>.
         </p>

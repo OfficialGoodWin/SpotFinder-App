@@ -480,7 +480,11 @@ exports.adminDeleteSpot = functions.https.onCall(async (data, context) => {
   const ref = db.collection('spots').doc(spotId);
   const snapshot = await ref.get();
   if (!snapshot.exists) throw new functions.https.HttpsError('not-found', 'Spot not found.');
-  await deleteManagedUpload(snapshot.data()?.image_url);
+  const spotData = snapshot.data() || {};
+  const imageUrls = Array.isArray(spotData.image_urls) && spotData.image_urls.length
+    ? spotData.image_urls
+    : [spotData.image_url].filter(Boolean);
+  await Promise.all(imageUrls.map(deleteManagedUpload));
   await ref.delete();
   await logAdminAction('delete_spot', context.auth.token.email, { spotId });
   return { success: true };
@@ -524,7 +528,7 @@ exports.submitReport = functions.runWith({
 exports.adminResolveReport=functions.https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.reportId||'');if(!id)throw new functions.https.HttpsError('invalid-argument','reportId required');await db.collection('reports').doc(id).update({status:'resolved',resolution:String(data?.resolution||'resolved').slice(0,100),resolved_at:new Date().toISOString(),resolved_by:context.auth.token.email||context.auth.uid});await logAdminAction('resolve_report',context.auth.token.email,{reportId:id});return{success:true}});
 exports.adminDeleteReport=functions.https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.reportId||'');if(!id)throw new functions.https.HttpsError('invalid-argument','reportId required');await db.collection('reports').doc(id).delete();await logAdminAction('delete_report',context.auth.token.email,{reportId:id});return{success:true}});
 exports.adminBlockReporter=functions.https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.reportId||'');const snap=await db.collection('reports').doc(id).get();if(!snap.exists)throw new functions.https.HttpsError('not-found','Report not found');const r=snap.data(), batch=db.batch(), now=new Date().toISOString();for(const [k,v] of [['uid',r.reporter_uid],['ip',r.ip_hash],['device',r.device_hash]])if(v)batch.set(db.collection('report_blocks').doc(`${k}_${v}`),{kind:k,value:v,reason:String(data?.reason||'Report spam').slice(0,200),blocked_at:now,blocked_by:context.auth.token.email||context.auth.uid});await batch.commit();await logAdminAction('block_reporter',context.auth.token.email,{reportId:id,reporter_uid:r.reporter_uid});return{success:true}});
-exports.adminUpdateSpot=functions.https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.spotId||''),src=data?.patch||{},patch={};for(const k of ['title','description','image_url','status'])if(Object.prototype.hasOwnProperty.call(src,k))patch[k]=src[k];if(!id||!Object.keys(patch).length)throw new functions.https.HttpsError('invalid-argument','spotId and patch required');await db.collection('spots').doc(id).update(patch);await logAdminAction('update_spot',context.auth.token.email,{spotId:id,fields:Object.keys(patch)});return{success:true}});
+exports.adminUpdateSpot=functions.https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.spotId||''),src=data?.patch||{},patch={};for(const k of ['title','description','image_url','image_urls','status'])if(Object.prototype.hasOwnProperty.call(src,k))patch[k]=src[k];if(!id||!Object.keys(patch).length)throw new functions.https.HttpsError('invalid-argument','spotId and patch required');await db.collection('spots').doc(id).update(patch);await logAdminAction('update_spot',context.auth.token.email,{spotId:id,fields:Object.keys(patch)});return{success:true}});
 exports.adminDeletePOIPhoto=functions.https.onCall(async(data,context)=>{
   assertIsAdmin(context);
   const id=String(data?.photoId||'');

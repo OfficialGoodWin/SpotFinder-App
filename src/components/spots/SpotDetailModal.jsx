@@ -139,6 +139,17 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
   };
 
   const formatDate = (d) => d ? new Date(d).toLocaleDateString() : '';
+  const uploadedPhotos = (Array.isArray(localSpot.image_urls) && localSpot.image_urls.length
+    ? localSpot.image_urls
+    : [localSpot.image_url]).filter(Boolean);
+  const poiMatch = localSpot.poi_match?.name ? localSpot.poi_match : null;
+  const detailPhotos = [
+    ...uploadedPhotos.map(url => ({ url, source: 'community' })),
+    ...(poiMatch?.image_url && !uploadedPhotos.includes(poiMatch.image_url)
+      ? [{ url: poiMatch.image_url, source: 'poi', credit: poiMatch.image_credit }]
+      : []),
+  ];
+  const poiWebsite = poiMatch?.tags?.website || poiMatch?.tags?.['contact:website'];
 
   return (
     <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/50 backdrop-blur-sm">
@@ -153,6 +164,9 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
               </div>
               <div>
                 <h2 className="text-lg font-bold text-gray-900 dark:text-foreground">{localSpot.title || 'Spot'}</h2>
+                {poiMatch && (
+                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400">Also known as {poiMatch.name}</p>
+                )}
                 <p className="text-xs text-gray-500 dark:text-muted-foreground">
                   {t('spotDetail.addedBy')} {localSpot.created_by_name || localSpot.created_by || 'Anonymous'}
                   {localSpot.created_date && ` ${t('spotDetail.addedOn')} ${formatDate(localSpot.created_date)}`}
@@ -166,9 +180,26 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
         </div>
 
         <div className="px-6 py-4 space-y-4">
-          {/* Image */}
-          {localSpot.image_url && (
-            <img src={localSpot.image_url} alt={localSpot.title || 'Spot'} loading="lazy" decoding="async" className="w-full h-48 object-cover rounded-2xl" />
+          {/* Community photos plus a safely attributed POI reference image, when available. */}
+          {detailPhotos.length > 0 && (
+            <div className="space-y-2">
+              <div className="relative overflow-hidden rounded-2xl">
+                <img src={detailPhotos[0].url} alt={localSpot.title || 'Spot'} loading="lazy" decoding="async" className="h-52 w-full object-cover" />
+                {detailPhotos[0].source === 'poi' && (
+                  <span className="absolute bottom-2 left-2 rounded-full bg-black/65 px-2.5 py-1 text-[10px] font-medium text-white backdrop-blur-sm">{detailPhotos[0].credit || 'POI reference photo'}</span>
+                )}
+              </div>
+              {detailPhotos.length > 1 && (
+                <div className="grid grid-cols-3 gap-2">
+                  {detailPhotos.slice(1).map((photo, index) => (
+                    <div key={`${photo.url}-${index}`} className="relative aspect-square overflow-hidden rounded-xl">
+                      <img src={photo.url} alt={`${localSpot.title || 'Spot'} photo ${index + 2}`} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                      {photo.source === 'poi' && <span className="absolute bottom-1 left-1 rounded bg-black/65 px-1.5 py-0.5 text-[9px] text-white">POI</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           {/* Description */}
@@ -184,6 +215,26 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
                   #{tag}
                 </span>
               ))}
+            </div>
+          )}
+
+          {poiMatch && (
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4 dark:border-blue-900/60 dark:bg-blue-950/20">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">Nearby place match · {poiMatch.distance_m} m away</p>
+              <p className="mt-1 font-semibold text-gray-900 dark:text-foreground">Also known as {poiMatch.name}</p>
+              {poiMatch.address && <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-muted-foreground">{poiMatch.address}</p>}
+              {poiMatch.categories?.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {poiMatch.categories.slice(0, 5).map(category => (
+                    <span key={category} className="rounded-full bg-white/80 px-2 py-1 text-[10px] font-medium text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
+                      {category.split('.').at(-1).replaceAll('_', ' ')}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {poiWebsite && /^https?:\/\//i.test(poiWebsite) && (
+                <a href={poiWebsite} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex text-xs font-semibold text-blue-600 underline underline-offset-2 dark:text-blue-400">Visit place website</a>
+              )}
             </div>
           )}
 

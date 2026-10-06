@@ -24,7 +24,8 @@ export default function EditSpotModal({ spot, onClose, onSave }) {
   const { t } = useLanguage();
   const [description, setDescription] = useState(spot.description || '');
   const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState(spot.image_url || null);
+  const existingImageUrls = Array.isArray(spot.image_urls) && spot.image_urls.length ? spot.image_urls : [spot.image_url].filter(Boolean);
+  const [imagePreview, setImagePreview] = useState(existingImageUrls[0] || null);
   const [loading, setLoading] = useState(false);
 
   const [tags, setTags] = useState(spot.tags || []);
@@ -50,19 +51,25 @@ export default function EditSpotModal({ spot, onClose, onSave }) {
 
     setLoading(true);
     let image_url = spot.image_url;
+    let image_urls = [...existingImageUrls];
     if (imageFile) {
       try {
         const { uploadSpotImage } = await import('@/api/firebaseClient');
         image_url = await uploadSpotImage(imageFile);
+        image_urls = [image_url, ...image_urls.slice(1)];
       } catch (e) {
         image_url = imagePreview;
       }
+    } else if (!imagePreview) {
+      image_url = null;
+      image_urls = [];
     }
     
     await onSave({
       ...spot,
       description,
       image_url,
+      image_urls,
       tags,
       cost,
       access_difficulty: accessDifficulty,
