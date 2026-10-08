@@ -24,8 +24,8 @@ maplibregl.setWorkerUrl(maplibreWorkerUrl);
 
 // ── Road shield generator ─────────────────────────────────────────────────────
 // Draws a real road sign on an offscreen canvas and returns ImageData.
-// Called lazily via map.on('styleimagemissing', ...) — only generates each
-// unique ref once, then caches it.
+// Called lazily by MapLibre's missing-image resolver — only generates each
+// unique ref once, then caches it before symbol layout continues.
 
 const SHIELD_COLORS = {
   motorway: { bg: '#cc1111' },
@@ -673,7 +673,7 @@ async function fetchAmbientPOIs(south, west, north, east, zoom, signal) {
 
 // ── One-way arrow image generator ─────────────────────────────────────────────
 // Draws a white right-pointing chevron arrow on a transparent canvas.
-// Registered once on map load; survives style changes via 'styleimagemissing'.
+// Registered once on map load; the resolver survives style changes.
 function createOnewayArrowImage() {
   const W = 20, H = 20;
   const canvas = document.createElement('canvas');
@@ -708,24 +708,23 @@ function addOnewayArrow(map) {
   map.addImage('oneway-arrow', createOnewayArrowImage());
 }
 
-function registerShieldListener(map) {
-  map.on('styleimagemissing', (e) => {
-    if (e.id && e.id.startsWith('shield-')) {
-      addShieldImage(map, e.id);
+function registerMissingImageResolver(map) {
+  map.setMissingStyleImageResolver((imageId) => {
+    if (imageId?.startsWith('shield-')) {
+      addShieldImage(map, imageId);
     }
-    // Re-add one-way arrow if it gets wiped by a style reload
-    if (e.id === 'oneway-arrow') {
+    if (imageId === 'oneway-arrow') {
       addOnewayArrow(map);
     }
   });
 }
 
 function reRegisterShieldListener(map, getTerrainEnabled) {
-  // styleimagemissing survives setStyle in MapLibre — no need to re-add
+  // The missing-image resolver survives setStyle in MapLibre — no need to re-add
   // BUT we need to clear the image cache so shields get redrawn after style reload
   // (setStyle wipes all images including our shields)
     map.on('style.load', () => {
-      // Shields are gone after style reload — they'll be re-requested via styleimagemissing
+      // Shields are gone after style reload — the resolver recreates them on demand
       // No action needed, the listener persists
       // Re-apply 3D terrain + buildings after a style reload wipes them
       applyTerrain(map, getTerrainEnabled());
@@ -811,11 +810,13 @@ export default function MapLibreMap({
       antialias: true,
     });
 
+    // MapLibre 6 event listeners are notification-only and cannot satisfy the
+    // current missing-image request. Its resolver is awaited before warning.
+    registerMissingImageResolver(map);
+
     map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: ['© OpenStreetMap contributors'] }), 'bottom-right');
     map.on('click', e => { if (addModeRef.current) onMapClick?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }); });
 
-    // Register shield image listener — generates signs on demand via styleimagemissing
-    registerShieldListener(map);
     // Re-apply 3D terrain + buildings after any style reload (dark mode toggle,
     // map layer switch, offline mode switch all call map.setStyle(), which wipes
     // both). Previously this listener was defined but never registered, so 3D
