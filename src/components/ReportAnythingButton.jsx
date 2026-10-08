@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Flag, X } from 'lucide-react';
 import { submitGeneralReport } from '@/api/firebaseClient';
+import SmoothSelect from '@/components/ui/SmoothSelect';
 
 function deviceId() {
   let id = localStorage.getItem('sf_device_id');
@@ -32,9 +33,7 @@ export default function ReportAnythingButton() {
         <p className="text-sm text-slate-500 mb-4">Report a bug, unsafe content, spam, wrong map data, or another problem.</p>
         {done ? <div className="py-8 text-center"><p className="font-medium">Report sent. Thank you.</p></div> :
         <form onSubmit={submit} className="space-y-3">
-          <select value={form.category} onChange={e=>setForm({...form,category:e.target.value})} className="w-full border rounded-lg p-2 bg-transparent">
-            <option value="bug">Bug / broken feature</option><option value="content">Bad or unsafe content</option><option value="spam">Spam / abuse</option><option value="map">Wrong map / POI data</option><option value="security">Security concern</option><option value="other">Other</option>
-          </select>
+          <SmoothSelect value={form.category} onChange={category => setForm({ ...form, category })} ariaLabel="Report category" options={[['bug','Bug / broken feature'],['content','Bad or unsafe content'],['spam','Spam / abuse'],['map','Wrong map / POI data'],['security','Security concern'],['other','Other']].map(([value,label]) => ({ value,label }))} />
           <input value={form.subject} maxLength={120} onChange={e=>setForm({...form,subject:e.target.value})} placeholder="Short title (optional)" className="w-full border rounded-lg p-2 bg-transparent"/>
           <textarea value={form.message} maxLength={3000} onChange={e=>setForm({...form,message:e.target.value})} rows={5} placeholder="What happened?" className="w-full border rounded-lg p-2 bg-transparent" required/>
           <p className="text-[11px] leading-4 text-slate-400">

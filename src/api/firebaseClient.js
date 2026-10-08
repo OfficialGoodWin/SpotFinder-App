@@ -352,6 +352,48 @@ export const getPublicSpotsInBounds = async ({ south, west, north, east }, maxCo
   const rows = (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
   return rows.sort((a, b) => String(b.created_date || '').localeCompare(String(a.created_date || '')));
 };
+
+export const getPublicSpotById = async (spotId) => {
+  if (!spotId) return null;
+  const { db } = getFirebaseServices();
+  const snapshot = await getDoc(doc(db, SPOTS_COLLECTION, String(spotId)));
+  if (!snapshot.exists()) return null;
+  const spot = { id: snapshot.id, ...snapshot.data() };
+  return spot.is_public && ['published', 'pending_trust'].includes(spot.status) ? spot : null;
+};
+
+const distanceKm = (origin, spot) => {
+  const toRad = value => value * Math.PI / 180;
+  const dLat = toRad(Number(spot.lat) - origin[0]);
+  const dLng = toRad(Number(spot.lng) - origin[1]);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(origin[0])) * Math.cos(toRad(Number(spot.lat))) * Math.sin(dLng / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+// Nearby discovery is independent from the visible viewport. For an unlimited
+// search, expand progressively and stop as soon as the nearest 20 are known.
+export const getPublicSpotsNear = async (origin, maxDistance = Infinity, targetCount = 20) => {
+  const lat = Number(origin?.[0]);
+  const lng = Number(origin?.[1]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return [];
+  const radii = Number.isFinite(maxDistance) ? [Math.max(1, maxDistance)] : [25, 100, 400, 1600, 5000];
+  const found = new Map();
+  for (const radius of radii) {
+    const latDelta = Math.min(89, radius / 111);
+    const lngDelta = Math.min(180, radius / Math.max(12, 111 * Math.cos(lat * Math.PI / 180)));
+    const rows = await getPublicSpotsInBounds({
+      south: Math.max(-90, lat - latDelta), north: Math.min(90, lat + latDelta),
+      west: lng - lngDelta, east: lng + lngDelta,
+    }, 500);
+    rows.forEach(row => found.set(row.id, row));
+    if (Number.isFinite(maxDistance) || found.size >= targetCount) break;
+  }
+  return [...found.values()]
+    .map(spot => ({ ...spot, _km: distanceKm([lat, lng], spot) }))
+    .filter(spot => !Number.isFinite(maxDistance) || spot._km <= maxDistance)
+    .sort((a, b) => a._km - b._km)
+    .slice(0, targetCount);
+};
  
 export const getUserSpots = async (userEmail, maxCount = 50) => {
   const { db } = getFirebaseServices();

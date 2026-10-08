@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  AlertCircle, ArrowUpDown, Bookmark, ChevronDown, Eye, Heart, MapPin, PlusCircle,
+  AlertCircle, ArrowUpDown, Bookmark, Eye, Heart, MapPin, PlusCircle,
   RefreshCw, Search, Star, Trash2, X,
 } from 'lucide-react';
 import {
@@ -10,6 +10,7 @@ import {
   getUserSpots,
 } from '@/api/firebaseClient';
 import LiquidSegmentedControl from '../ui/LiquidSegmentedControl';
+import SmoothSelect from '../ui/SmoothSelect';
 
 const TABS = [
   { id: 'saved', label: 'Saved', icon: Bookmark },
@@ -139,14 +140,10 @@ export default function MySpotsPanel({ user, onClose, onFlyTo }) {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" aria-hidden="true" />
               <input value={query} onChange={event => setQuery(event.target.value)} placeholder={`Search ${tab} spots`} className="w-full h-11 pl-9 pr-3 rounded-xl border border-gray-200 dark:border-border bg-white/70 dark:bg-black/10 text-sm outline-none focus-visible:ring-2 focus-visible:ring-green-500" />
             </label>
-            <label className="relative">
-              <span className="sr-only">Sort spots</span>
+            <div className="relative">
               <ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-600" aria-hidden="true" />
-              <select value={sort} onChange={event => setSort(event.target.value)} className="h-11 max-w-[10.5rem] appearance-none rounded-xl border border-emerald-500/20 bg-emerald-50/60 pl-9 pr-8 text-sm font-semibold text-slate-700 shadow-sm outline-none backdrop-blur-md focus-visible:ring-2 focus-visible:ring-emerald-500 dark:bg-emerald-950/20 dark:text-slate-200">
-                {SORTS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-            </label>
+              <SmoothSelect value={sort} onChange={setSort} ariaLabel="Sort spots" options={SORTS.map(([value, label]) => ({ value, label }))} className="max-w-[11rem] pl-9" />
+            </div>
           </div>
         </header>
 

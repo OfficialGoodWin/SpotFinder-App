@@ -16,6 +16,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { lightStyle, darkStyle, outdoorStyle, winterStyle } from '../../lib/mapStyle.js';
 import { AMBIENT_CATEGORIES } from '../../lib/ambientCategories.js';
 import { badgeSVG, iconGlyphSVG } from '../../lib/mapIcons.js';
+import { useLanguage } from '@/lib/LanguageContext';
 
 // MapLibre v6 publishes its worker as a separate module. Importing it as a URL
 // makes Vite emit the file instead of leaving a broken package-relative URL.
@@ -745,6 +746,7 @@ export default function MapLibreMap({
   adminPOIs, adminClosures, adminNavMode, onAdminMapClick,
   adminERouteOverrides, adminRoadOverrides,
 }) {
+  const { language } = useLanguage();
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const appliedStyleRef = useRef(null);
@@ -1077,7 +1079,7 @@ export default function MapLibreMap({
       try {
         if (!GEOAPIFY_KEY) { onLoadingChange?.(false); return; }
         const cat = selectedPOICategory.geoapifyCategory || 'leisure';
-        const res = await fetch(`https://api.geoapify.com/v2/places?categories=${encodeURIComponent(cat)}&filter=rect:${w},${s},${e},${n}&limit=${limit}&apiKey=${GEOAPIFY_KEY}`);
+        const res = await fetch(`https://api.geoapify.com/v2/places?categories=${encodeURIComponent(cat)}&filter=rect:${w},${s},${e},${n}&limit=${limit}&lang=${encodeURIComponent(language)}&apiKey=${GEOAPIFY_KEY}`);
         if (!res.ok) throw new Error(`${res.status}`);
         const data = await res.json();
         clear();
@@ -1104,7 +1106,7 @@ export default function MapLibreMap({
     const onMove = () => { clearTimeout(poiTimer.current); poiTimer.current = setTimeout(load, 500); };
     map.on('moveend', onMove); map.on('zoomend', onMove);
     return () => { map.off('moveend', onMove); map.off('zoomend', onMove); };
-  }, [selectedPOICategory]);
+  }, [selectedPOICategory, language]);
 
   // ── Route overlay ──────────────────────────────────────────────────────────
   useEffect(() => {

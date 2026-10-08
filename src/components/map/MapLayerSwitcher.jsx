@@ -20,7 +20,7 @@ export default function MapLayerSwitcher({ activeLayer, onLayerChange, menuPlace
         <>
           {/* Backdrop to close */}
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className={`absolute z-50 min-w-[130px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-border dark:bg-card ${
+          <div className={`sf-menu-motion absolute z-50 min-w-[130px] overflow-hidden rounded-xl border border-gray-200 bg-white/95 backdrop-blur-xl shadow-xl dark:border-border dark:bg-card/95 ${
             menuPlacement === 'right' ? 'left-full top-0 ml-3' : 'bottom-full left-0 mb-3'
           }`}>
             {LAYERS.map(l => (

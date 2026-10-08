@@ -407,6 +407,21 @@
 .dark .sf-discovery-marker__card { background: rgb(15 23 42 / .96); box-shadow: 0 5px 16px rgb(0 0 0 / .48), inset 0 1px 0 rgb(255 255 255 / .1); }
 .dark .sf-discovery-marker__fallback { color: #bbf7d0; background: linear-gradient(145deg, rgb(20 83 45 / .96), rgb(6 78 59 / .94)); }.dark .sf-discovery-marker__fallback span { color: #dcfce7; }
 @media (prefers-reduced-motion: reduce) { .sf-discovery-marker__motion,.sf-discovery-marker__label { transition-duration: .01ms; }.sf-discovery-marker:hover .sf-discovery-marker__motion,.sf-discovery-marker:focus-visible .sf-discovery-marker__motion { transform: none; } }
+@keyframes sf-menu-enter {
+  from { opacity: 0; transform: translateY(-8px) scale(.975); filter: blur(3px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+.sf-menu-motion,
+[data-radix-popper-content-wrapper] > [role='menu'],
+[data-radix-popper-content-wrapper] > [role='listbox'] {
+  transform-origin: top center;
+  animation: sf-menu-enter 260ms cubic-bezier(.16, 1, .3, 1) both;
+  will-change: transform, opacity;
+}
+.sf-menu-motion button { transition: background-color 160ms ease, color 160ms ease, transform 120ms ease; }
+.sf-menu-motion button:active { transform: scale(.985); }
+
 html, body, #root {
   max-width: 100%;
   overflow-x: hidden;
@@ -420,4 +435,10 @@ html, body, #root {
   input, select, textarea {
     font-size: 16px;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sf-menu-motion,
+  [data-radix-popper-content-wrapper] > [role='menu'],
+  [data-radix-popper-content-wrapper] > [role='listbox'] { animation-duration: .01ms; }
 }

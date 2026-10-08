@@ -6,13 +6,14 @@ import { submitCategoryRatings, getSpotSocialState, toggleSpotLike, toggleSpotSa
 import { useLanguage } from '@/lib/LanguageContext';
 import ReportDialog from '@/components/moderation/ReportDialog';
 import NavigationProviderSheet from '@/components/navigation/NavigationProviderSheet';
+import { localizedShareMessage, reversePlaceContext } from '@/lib/placeContext';
 
 const SocialPostsSection = React.lazy(() => import('@/components/social/SocialPostsSection'));
 
 const RATED_KEY = (spotId, userId) => `sf_rated_${spotId}_${userId || 'guest'}`;
 
 export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, onNavigate, onEdit, onDelete, onSpotUpdate, onShowAuth }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [localSpot, setLocalSpot] = useState(spot);
   const [shareTooltip, setShareTooltip] = useState(false);
   const [social, setSocial] = useState({ liked: false, saved: false, likesCount: spot.likes_count || 0, savesCount: spot.saves_count || 0 });
@@ -59,7 +60,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const isOwner      = user && spot.created_by === user.email;
+  const isOwner = !!user && (spot.created_by === user.email || spot.created_by_uid === (user.id || user.uid));
 
   useEffect(() => {
     try {
@@ -124,17 +125,20 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
   const [showReport, setShowReport] = useState(false);
 
   const handleShare = async () => {
-    const url = `${window.location.origin}${window.location.pathname}?spot=${spot.id}`;
+    const url = new URL('/', window.location.origin);
+    url.searchParams.set('spot', spot.id);
+    const place = await reversePlaceContext(Number(localSpot.lat), Number(localSpot.lng ?? localSpot.lon), language);
+    const message = localizedShareMessage(language, place, localSpot.title || 'this area');
     try {
       if (navigator.share) {
-        await navigator.share({ title: spot.title || 'Spot', text: spot.description || 'Check out this spot!', url });
+        await navigator.share({ title: localSpot.title || 'Spot', text: message, url: url.toString() });
       } else {
-        await navigator.clipboard.writeText(url);
+        await navigator.clipboard.writeText(`${message} ${url}`);
         setShareTooltip(true);
         setTimeout(() => setShareTooltip(false), 2000);
       }
     } catch {
-      await navigator.clipboard.writeText(url).catch(() => {});
+      await navigator.clipboard.writeText(`${message} ${url}`).catch(() => {});
       setShareTooltip(true);
       setTimeout(() => setShareTooltip(false), 2000);
     }

@@ -16,7 +16,7 @@ export default function ProfileMenu({ user, isAuthenticated, showMenu, onToggleM
               : <span className="text-sm font-bold text-blue-500">{user.displayName?.[0] || user.email?.[0] || '?'}</span>}
           </button>
           {showMenu && (
-            <div className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-card rounded-2xl shadow-2xl border border-gray-100 dark:border-border py-1.5 overflow-hidden">
+            <div className="sf-menu-motion absolute top-full right-0 mt-2 w-48 bg-white/95 dark:bg-card/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-100 dark:border-border py-1.5 overflow-hidden">
               <div className="px-4 py-2 border-b border-gray-100 dark:border-border">
                 <p className="text-xs font-semibold text-foreground truncate">{user.displayName || user.email}</p>
                 <p className="text-xs text-muted-foreground truncate">{user.email}</p>

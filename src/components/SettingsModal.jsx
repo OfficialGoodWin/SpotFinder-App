@@ -6,6 +6,7 @@ import { LANGUAGES } from '@/locales/translations';
 import MfaSection from '@/components/MfaSection';
 import AccountSecuritySection from '@/components/AccountSecuritySection';
 import { reopenCookieSettings } from '@/components/CookieConsentBanner';
+import SmoothSelect from '@/components/ui/SmoothSelect';
 
 export default function SettingsModal({ onClose }) {
   const { isDark, toggleTheme } = useTheme();
@@ -64,15 +65,7 @@ export default function SettingsModal({ onClose }) {
                 <p className="text-sm text-muted-foreground">{t('settings.selectLanguage')}</p>
               </div>
             </div>
-            <select
-              value={language}
-              onChange={e => setLanguage(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              {LANGUAGES.map(lang => (
-                <option key={lang.code} value={lang.code}>{lang.nativeName}</option>
-              ))}
-            </select>
+            <SmoothSelect value={language} onChange={setLanguage} ariaLabel={t('settings.selectLanguage')} options={LANGUAGES.map(lang => ({ value: lang.code, label: lang.nativeName }))} />
           </div>
 
           <AccountSecuritySection />

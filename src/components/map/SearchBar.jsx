@@ -3,6 +3,7 @@ import { Search, X, Navigation, Mic, Compass, SlidersHorizontal } from 'lucide-r
 import { useLanguage } from '@/lib/LanguageContext';
 import { filterCategories, getCategoryName } from '@/lib/POICategories';
 import { iconGlyphSVG } from '@/lib/mapIcons';
+import { searchPlaces } from '@/lib/placeSearch';
 import { NEARBY_DEFAULT_KM, NEARBY_SLIDER_MAX, sliderToKm, kmToSlider, formatMaxDistance } from '@/lib/nearbyFilters';
 import LiquidSegmentedControl from '@/components/ui/LiquidSegmentedControl';
 
@@ -28,6 +29,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
   const debounce = useRef(null);
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
+  const searchAbortRef = useRef(null);
   const containerRef = useRef(null);
   const bcp47 = LANG_TO_BCP47[language] || 'en-US';
 
@@ -73,58 +75,23 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
     setSpotResults(matched);
 
     clearTimeout(debounce.current);
+    searchAbortRef.current?.abort();
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
     debounce.current = setTimeout(async () => {
       setLoading(true);
       try {
-        // OSM Nominatim — search with local language names.
-        // We request both the user's language AND no language preference so
-        // Nominatim returns local names (Plzeň, not Pilsen).
-        // Also send a second request for the user's query language so searching
-        // "Pilsen" still finds Plzeň via Nominatim's name matching.
-        const near = mapCenter
-          ? `&lat=${mapCenter.lat}&lon=${mapCenter.lng}&bounded=0`
-          : '';
-        // Use /nominatim proxy (defined in vercel.json) to avoid CORS issues
-        const base = `/nominatim/search?format=json&limit=6&addressdetails=1&namedetails=1${near}`;
-
-        // Two parallel fetches: local language + fallback for cross-language search
-        const [res1, res2] = await Promise.all([
-          fetch(`${base}&q=${encodeURIComponent(query)}&accept-language=cs,sk,de,pl,en`),
-          fetch(`${base}&q=${encodeURIComponent(query)}&accept-language=${language}`),
-        ]);
-
-        const [data1, data2] = await Promise.all([res1.json(), res2.json()]);
-
-        // Merge and deduplicate by place_id, preferring local names
-        const seen = new Set();
-        const merged = [...(data1 || []), ...(data2 || [])].filter(item => {
-          if (seen.has(item.place_id)) return false;
-          seen.add(item.place_id);
-          return true;
-        });
-
-        setResults(merged.map(item => {
-          // Prefer local name over English name
-          const localName = item.namedetails?.name
-            || item.namedetails?.['name:cs']
-            || item.namedetails?.['name:sk']
-            || item.display_name?.split(',')[0]
-            || item.name
-            || '';
-          const country  = item.address?.country || '';
-          const state    = item.address?.state || item.address?.county || '';
-          const subtitle = [state, country].filter(Boolean).join(', ');
-          return {
-            name:     localName,
-            label:    localName,
-            location: subtitle,
-            position: { lat: parseFloat(item.lat), lon: parseFloat(item.lon) },
-          };
-        }));
-      } catch { setResults([]); }
-      setLoading(false);
-    }, 400);
-  }, [query]);
+        // Merge independent POI/place providers and request one selected UI language.
+        const places = await searchPlaces(query, { center: mapCenter, language, signal: controller.signal, limit: 10 });
+        if (!controller.signal.aborted) setResults(places);
+      } catch (error) {
+        if (error?.name !== 'AbortError') setResults([]);
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }, 350);
+    return () => { clearTimeout(debounce.current); controller.abort(); };
+  }, [query, language, mapCenter?.lat, mapCenter?.lng, spots]);
 
   const handleSelect = (item) => {
     const pos = item.position || item.regionalStructure?.[0];
@@ -310,7 +277,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
         )}
 
         {showDropdown && (
-          <div className="border-t border-gray-100 dark:border-border max-h-64 overflow-y-auto rounded-b-2xl bg-white dark:bg-card">
+          <div className="sf-menu-motion border-t border-gray-100 dark:border-border max-h-[min(26rem,65dvh)] overflow-y-auto rounded-b-2xl bg-white/95 dark:bg-card/95 backdrop-blur-xl">
             {poiCategories.map((cat, i) => (
               <div key={`cat-${i}`} className="flex items-center hover:bg-gray-50 dark:hover:bg-accent transition-colors">
                 <button
@@ -324,7 +291,6 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-800 dark:text-foreground truncate">{getCategoryName(cat, language)}</p>
-                    <p className="text-xs text-gray-400 dark:text-muted-foreground truncate">{cat.desc}</p>
                   </div>
                 </button>
               </div>
@@ -343,6 +309,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
                     <p className="text-xs text-gray-400 dark:text-muted-foreground truncate">
                       {item.location || item.regionalStructure?.map(r => r.name).join(', ')}
                     </p>
+                    {item.provider && <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-600/80 dark:text-emerald-400/80">{item.provider}</p>}
                   </button>
                   {pos && onNavigate && (
                     <button

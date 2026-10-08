@@ -1,4 +1,7 @@
-import { ExternalLink, Map, Navigation, X } from 'lucide-react';
+import { useState } from 'react';
+import { ExternalLink, LoaderCircle, Map, Navigation, X } from 'lucide-react';
+import { useLanguage } from '@/lib/LanguageContext';
+import { nearestParking } from '@/lib/placeContext';
 
 const PREFERENCE_KEY = 'spotfinder_navigation_provider';
 
@@ -42,6 +45,8 @@ const preferredProvider = () => {
 };
 
 export default function NavigationProviderSheet({ open, destination, onClose, onInternalNavigate }) {
+  const { language } = useLanguage();
+  const [launching, setLaunching] = useState('');
   if (!open || !destination) return null;
   const lat = Number(destination.lat);
   const lng = Number(destination.lng ?? destination.lon);
@@ -51,9 +56,17 @@ export default function NavigationProviderSheet({ open, destination, onClose, on
   const ordered = Object.entries(PROVIDERS).sort(([a], [b]) =>
     Number(b === preferred) - Number(a === preferred));
 
-  const launch = (id, provider) => {
+  const launch = async (id, provider) => {
     try { localStorage.setItem(PREFERENCE_KEY, id); } catch {}
-    window.open(provider.build(lat, lng), '_blank', 'noopener,noreferrer');
+    setLaunching(id);
+    const newWindow = window.open('', '_blank');
+    if (newWindow) newWindow.opener = null;
+    const parking = await nearestParking(lat, lng, language);
+    const target = parking || { lat, lng };
+    const routeUrl = provider.build(target.lat, target.lng);
+    if (newWindow) newWindow.location.replace(routeUrl);
+    else window.location.assign(routeUrl);
+    setLaunching('');
     onClose?.();
   };
 
@@ -61,7 +74,7 @@ export default function NavigationProviderSheet({ open, destination, onClose, on
     <div className="fixed inset-0 z-[6000] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm" onMouseDown={event => { if (event.target === event.currentTarget) onClose?.(); }}>
       <section className="w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl border border-white/20 bg-white/95 dark:bg-slate-900/95 shadow-2xl p-5" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }} aria-labelledby="navigation-provider-title">
         <div className="flex items-start justify-between gap-4 mb-4">
-          <div><h2 id="navigation-provider-title" className="text-lg font-bold">Choose navigation</h2><p className="text-sm text-muted-foreground mt-0.5">Directions to {destination.title || destination.label || 'this spot'}</p></div>
+          <div><h2 id="navigation-provider-title" className="text-lg font-bold">Choose navigation</h2><p className="text-sm text-muted-foreground mt-0.5">External maps route to the nearest parking, then you can walk to {destination.title || destination.label || 'this spot'}.</p></div>
           <button onClick={onClose} className="w-11 h-11 -mr-2 -mt-2 grid place-items-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-blue-500" aria-label="Close navigation choices"><X className="w-5 h-5" /></button>
         </div>
 
@@ -70,8 +83,8 @@ export default function NavigationProviderSheet({ open, destination, onClose, on
             <Navigation className="w-5 h-5 text-blue-600" /><span className="flex-1">SpotFinder navigation</span>
           </button>
           {ordered.map(([id, provider]) => (
-            <button key={id} onClick={() => launch(id, provider)} className="w-full min-h-12 px-4 rounded-2xl border border-gray-200 dark:border-border bg-white/70 dark:bg-white/[0.03] flex items-center gap-3 text-left hover:bg-gray-50 dark:hover:bg-white/[0.07] focus-visible:ring-2 focus-visible:ring-blue-500">
-              <Map className="w-5 h-5 text-gray-500" />
+            <button key={id} disabled={!!launching} onClick={() => launch(id, provider)} className="w-full min-h-12 px-4 rounded-2xl border border-gray-200 dark:border-border bg-white/70 dark:bg-white/[0.03] flex items-center gap-3 text-left hover:bg-gray-50 dark:hover:bg-white/[0.07] focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-60">
+              {launching === id ? <LoaderCircle className="w-5 h-5 animate-spin text-emerald-500" /> : <Map className="w-5 h-5 text-gray-500" />}
               <span className="flex-1 font-semibold">{provider.label}</span>
               {id === preferred && <span className="text-[11px] text-muted-foreground">Preferred</span>}
               <ExternalLink className="w-4 h-4 text-muted-foreground" aria-hidden="true" />

@@ -77,7 +77,7 @@ function SpotRow({ spot, onSelectSpot, onNavigate, onClose }) {
   );
 }
 
-export default function NearbySpotsPanel({ spots, userPos, onSelectSpot, onNavigate, onClose, initialFilters }) {
+export default function NearbySpotsPanel({ spots, userPos, loading = false, onSelectSpot, onNavigate, onClose, initialFilters, onFiltersChange }) {
   const { t } = useLanguage();
   const [filters, setFilters] = useState(initialFilters || { maxDistance: NEARBY_DEFAULT_KM, minRating: 0 });
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -96,7 +96,8 @@ export default function NearbySpotsPanel({ spots, userPos, onSelectSpot, onNavig
         if (userPos && s._km != null && s._km > filters.maxDistance) return false;
         return true;
       })
-      .sort((a, b) => (a._km ?? Infinity) - (b._km ?? Infinity));
+      .sort((a, b) => (a._km ?? Infinity) - (b._km ?? Infinity))
+      .slice(0, 20);
   }, [spots, userPos, filters]);
 
   const header = (
@@ -111,7 +112,7 @@ export default function NearbySpotsPanel({ spots, userPos, onSelectSpot, onNavig
           onClick={() => setShowFilterModal(true)}
           className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
             !isDefaultNearbyFilters(filters)
-              ? 'bg-purple-600 text-white border-purple-600'
+              ? 'bg-emerald-600 text-white border-emerald-600'
               : 'bg-white dark:bg-background text-gray-600 dark:text-muted-foreground border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent'
           }`}
           title="Filter"
@@ -131,12 +132,18 @@ export default function NearbySpotsPanel({ spots, userPos, onSelectSpot, onNavig
 
   const listContent = (
     <>
-      {nearby.length === 0 && (
+      {loading && (
+        <div className="flex items-center justify-center gap-2 py-10 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+          <span className="h-5 w-5 animate-spin rounded-full border-2 border-emerald-500/25 border-t-emerald-500" />
+          Finding the nearest spots…
+        </div>
+      )}
+      {!loading && nearby.length === 0 && (
         <p className="text-sm text-muted-foreground text-center py-8">
           {t('spotsPanel.noSpots') || 'No spots match your filters.'}
         </p>
       )}
-      {nearby.map(spot => (
+      {!loading && nearby.map(spot => (
         <SpotRow key={spot.id} spot={spot} onSelectSpot={onSelectSpot} onNavigate={onNavigate} onClose={onClose} />
       ))}
       <div style={{ height: 16 }} />
@@ -172,7 +179,7 @@ export default function NearbySpotsPanel({ spots, userPos, onSelectSpot, onNavig
       <NearbySpotsFilterModal
         isOpen={showFilterModal}
         onClose={() => setShowFilterModal(false)}
-        onApply={(newFilters) => setFilters(newFilters)}
+        onApply={(newFilters) => { setFilters(newFilters); onFiltersChange?.(newFilters); }}
         currentFilters={filters}
       />
     </>

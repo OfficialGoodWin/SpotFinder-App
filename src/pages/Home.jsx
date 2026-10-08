@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 import { Plus, Settings, Crosshair, HelpCircle, Trash2, MoreHorizontal } from 'lucide-react';
-import { getPublicSpotsInBounds, createSpot, deleteSpot, updateSpot, getAdminPOIs, getAdminClosures, getAdminERouteOverrides, getAdminRoadOverrides, getDeletedAmbientPOIs, addDeletedAmbientPOI, addSocialPost } from '@/api/firebaseClient';
+import { getPublicSpotsInBounds, getPublicSpotsNear, getPublicSpotById, createSpot, deleteSpot, updateSpot, getAdminPOIs, getAdminClosures, getAdminERouteOverrides, getAdminRoadOverrides, getDeletedAmbientPOIs, addDeletedAmbientPOI, addSocialPost } from '@/api/firebaseClient';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
@@ -35,6 +35,7 @@ export default function Home() {
   const [spots, setSpots] = useState([]);
   const [mapLayer, setMapLayer] = useState('basic');
   const [userPos, setUserPos] = useState(null);
+  const [viewportCenter, setViewportCenter] = useState(null);
   const [userAccuracy, setUserAccuracy] = useState(null);
   const [addMode, setAddMode] = useState(false);
   const [pendingLatlng, setPendingLatlng] = useState(null);
@@ -48,6 +49,8 @@ export default function Home() {
   const [showMySpots, setShowMySpots] = useState(false);
   const [showNearbySpots, setShowNearbySpots] = useState(false);
   const [nearbyFilters, setNearbyFilters] = useState({ maxDistance: 50, minRating: 0 }); // maxDistance may be Infinity (= unlimited)
+  const [nearbySpots, setNearbySpots] = useState([]);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
   const [terrainEnabled, setTerrainEnabled] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -66,6 +69,7 @@ export default function Home() {
   const [selectedPOI, setSelectedPOI] = useState(null);
   const [selectedPOIDirectCat, setSelectedPOIDirectCat] = useState(null);
   const [poiLoading, setPoiLoading] = useState(false);
+  const fitCategoryResultsRef = useRef(false);
 
   // ── Deleted ambient POIs (superadmin blocklist) ────────────────────────────
   const [deletedAmbientPOIIds, setDeletedAmbientPOIIds] = useState([]);
@@ -106,6 +110,8 @@ export default function Home() {
   const refreshSpotsInViewport = useCallback(async () => {
     const map = mapRef.current;
     if (!map) return;
+    const center = map.getCenter();
+    setViewportCenter({ lat: center.lat, lng: center.lng });
     if (spotRefreshTimer.current) clearTimeout(spotRefreshTimer.current);
     spotRefreshTimer.current = setTimeout(async () => {
       try {
@@ -228,21 +234,13 @@ export default function Home() {
     const spotId = params.get('spot');
     if (!spotId) return;
     deepLinkProcessed.current = true;
-    const tryOpen = (retries = 0) => {
-      setSpots(current => {
-        const found = current.find(s => s.id === spotId);
-        if (found) {
-          setSelectedSpot(found);
-          setFlyTo([found.lat, found.lng]);
-          setTimeout(() => setFlyTo(null), 1200);
-          window.history.replaceState({}, '', window.location.pathname);
-        } else if (retries < 10) {
-          setTimeout(() => tryOpen(retries + 1), 600);
-        }
-        return current;
-      });
-    };
-    setTimeout(() => tryOpen(), 800);
+    getPublicSpotById(spotId).then(found => {
+      if (!found) return;
+      setSpots(current => current.some(item => item.id === found.id) ? current : [...current, found]);
+      setSelectedSpot(found);
+      setFlyTo([found.lat, found.lng]);
+      setTimeout(() => setFlyTo(null), 1200);
+    }).catch(error => console.error('Could not open shared spot:', error));
   }, []);  
  
   const handleDeleteSpot = async (spot) => {
@@ -268,6 +266,22 @@ export default function Home() {
     setFlyTo([lat, lng]);
     setTimeout(() => setFlyTo(null), 1000);
   };
+
+  const openNearby = useCallback(async (filters) => {
+    if (!userPos) return alert(t('home.enableLocation'));
+    setNearbyFilters(filters);
+    setShowNearbySpots(true);
+    setNearbyLoading(true);
+    try {
+      const rows = await getPublicSpotsNear(userPos, filters.maxDistance, 20);
+      setNearbySpots(rows);
+    } catch (error) {
+      console.error('Failed to load nearby spots:', error);
+      toast.error('Nearby spots could not be loaded. Please try again.');
+    } finally {
+      setNearbyLoading(false);
+    }
+  }, [userPos, t]);
  
   const showNearby = () => {
     if (!userPos) return alert(t('home.enableLocation'));
@@ -304,9 +318,9 @@ export default function Home() {
     setNavTarget(destination);
   };
 
-  const mapCenter = userPos
+  const mapCenter = viewportCenter || (userPos
     ? { lat: userPos[0], lng: userPos[1] }
-    : { lat: 50.0755, lng: 14.4378 };
+    : { lat: 50.0755, lng: 14.4378 });
  
   return (
     <div className="relative w-full h-full" style={{ touchAction: addMode ? 'none' : undefined }}>
@@ -348,7 +362,14 @@ export default function Home() {
           }
           setSelectedPOI(poi);
         }}
-        onPOIsLoaded={(pois) => setCurrentPOIs(pois)}
+        onPOIsLoaded={(pois) => {
+          setCurrentPOIs(pois);
+          if (fitCategoryResultsRef.current && pois.length) {
+            fitCategoryResultsRef.current = false;
+            setFitBoundsData(pois.map(poi => [poi.lat, poi.lon]));
+            setTimeout(() => setFitBoundsData(null), 1200);
+          }
+        }}
         onLoadingChange={(loading) => setPoiLoading(loading)}
         navTarget={navTarget}
         navRouteData={navRouteData}
@@ -370,7 +391,7 @@ export default function Home() {
         mapCenter={mapCenter}
         spots={spots}
         userPos={userPos}
-        onNearby={(filters) => { setNearbyFilters(filters); setShowNearbySpots(true); }}
+        onNearby={openNearby}
         onSelectSpot={(spot) => {
           setSelectedSpot(spot);
           setFlyTo([spot.lat, spot.lng]);
@@ -381,12 +402,13 @@ export default function Home() {
           startNavTo(destination);
         }}
         onSelectCategory={(category) => {
+          fitCategoryResultsRef.current = true;
           setSelectedPOICategory(category);
           setShowPOIPanel(true);
           if (mapRef.current) {
             const center = mapRef.current.getCenter();
             const zoom   = mapRef.current.getZoom();
-            if (zoom < 14) mapRef.current.flyTo({ center, zoom: 14, duration: 800 });
+            if (zoom < 13) mapRef.current.flyTo({ center, zoom: 13, duration: 800 });
           }
         }}
       />
@@ -460,9 +482,11 @@ export default function Home() {
       {/* Nearby Spots panel (distance + rating filtered) */}
       {showNearbySpots && (
         <NearbySpotsPanel
-          spots={spots}
+          spots={nearbySpots}
           userPos={userPos}
+          loading={nearbyLoading}
           initialFilters={nearbyFilters}
+          onFiltersChange={openNearby}
           onSelectSpot={(spot) => {
             setSelectedSpot(spot);
             setFlyTo([spot.lat, spot.lng]);
@@ -593,6 +617,7 @@ export default function Home() {
       {editingSpot && (
         <EditSpotModal
           spot={editingSpot}
+          user={user}
           onClose={() => setEditingSpot(null)}
           onSave={handleEditSpot}
         />

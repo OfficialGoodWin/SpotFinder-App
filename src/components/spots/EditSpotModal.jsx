@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { X, Camera, MapPin } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import LiquidSegmentedControl from '../ui/LiquidSegmentedControl';
+import StarRating from './StarRating';
+import LabeledRatingScale from './LabeledRatingScale';
+import { submitCategoryRatings } from '@/api/firebaseClient';
 
 const AVAILABLE_TAGS = [
   { id: 'Viewpoint', emoji: '🏞️' },
@@ -21,7 +24,7 @@ const PARKING_OPTIONS = ['yes', 'no', 'street', 'paid'];
 const BEST_TIME_OPTIONS = ['sunrise', 'sunset', 'golden_hour', 'night', 'anytime'];
 const toKeySuffix = (opt) => opt.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join('');
 
-export default function EditSpotModal({ spot, onClose, onSave }) {
+export default function EditSpotModal({ spot, user, onClose, onSave }) {
   const { t } = useLanguage();
   const [description, setDescription] = useState(spot.description || '');
   const [imageFile, setImageFile] = useState(null);
@@ -35,6 +38,7 @@ export default function EditSpotModal({ spot, onClose, onSave }) {
   const [parking, setParking] = useState(spot.parking || 'yes');
   const [bestTime, setBestTime] = useState(spot.best_time || []);
   const [directions, setDirections] = useState(spot.directions || '');
+  const [rating, setRating] = useState({ overall: 0, access: 0, condition: 0, safety: 0, crowdedness: 0 });
 
   const toggleTag = (tag) => setTags(t => t.includes(tag) ? t.filter(x => x !== tag) : [...t, tag]);
   const toggleBestTime = (val) => setBestTime(t => t.includes(val) ? t.filter(x => x !== val) : [...t, val]);
@@ -48,8 +52,6 @@ export default function EditSpotModal({ spot, onClose, onSave }) {
   };
 
   const handleSave = async () => {
-    // Community ratings are separate from editable spot metadata.
-
     setLoading(true);
     let image_url = spot.image_url;
     let image_urls = [...existingImageUrls];
@@ -78,6 +80,9 @@ export default function EditSpotModal({ spot, onClose, onSave }) {
       best_time: bestTime,
       directions,
     });
+    if (rating.overall > 0 && user?.emailVerified) {
+      await submitCategoryRatings(spot.id, spot, rating, user.id || user.uid);
+    }
     setLoading(false);
   };
 
@@ -107,7 +112,23 @@ export default function EditSpotModal({ spot, onClose, onSave }) {
             />
           </div>
 
-          <div className="rounded-xl bg-gray-50 dark:bg-accent/40 px-3 py-2 text-xs text-gray-500 dark:text-muted-foreground">Community ratings are managed separately and cannot be edited with spot details.</div>
+          <div className="rounded-2xl border border-emerald-500/15 bg-emerald-50/60 p-4 dark:bg-emerald-950/15">
+            <p className="text-sm font-bold text-foreground">Your rating</p>
+            <p className="mt-1 text-xs text-muted-foreground">Your rating is stored separately from the spot details, so older spots can safely move to the current rating system.</p>
+            {user?.emailVerified ? (
+              <div className="mt-3 space-y-3">
+                <StarRating value={rating.overall} onChange={overall => setRating(value => ({ ...value, overall }))} />
+                {[
+                  ['access', 'Ease of access', ['Very difficult', '', '', '', 'Very easy']],
+                  ['condition', 'Condition & cleanliness', ['Very poor', '', '', '', 'Excellent']],
+                  ['safety', 'Safety & comfort', ['Uncomfortable', '', '', '', 'Very safe']],
+                  ['crowdedness', 'Crowdedness', ['Very quiet', '', '', '', 'Very busy']],
+                ].map(([key, label, labels]) => (
+                  <div key={key}><p className="mb-1 text-xs font-semibold text-muted-foreground">{label}</p><LabeledRatingScale value={rating[key]} labels={labels} onChange={value => setRating(current => ({ ...current, [key]: value }))} /></div>
+                ))}
+              </div>
+            ) : <p className="mt-2 text-xs font-medium text-amber-600">Verify your email to submit a rating.</p>}
+          </div>
 
           {/* Category tags */}
           <div>

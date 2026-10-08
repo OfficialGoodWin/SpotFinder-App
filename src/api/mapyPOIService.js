@@ -514,6 +514,16 @@ export async function searchPlacesWithDetails(query, center, lang = 'en', limit 
   }
 }
 
+// Fast search variant for live autocomplete. Details/photos are intentionally
+// deferred until a result is opened so keystrokes never fan out into N calls.
+export async function searchMapySuggestions(query, center, lang = 'en', limit = 6, signal) {
+  const near = center ? `&lat=${center.lat}&lon=${center.lng}&radius=100000` : '';
+  const url = `https://api.mapy.com/v1/suggest?apikey=${MAPY_API_KEY}&query=${encodeURIComponent(query)}&lang=${encodeURIComponent(lang)}&limit=${limit}${near}&category=poi`;
+  const response = await fetch(url, { signal });
+  if (!response.ok) throw new Error(`Mapy search failed (${response.status})`);
+  return (await response.json()).items || [];
+}
+
 export default {
   searchPOIsInBounds,
   searchPOIsNearPoint,
