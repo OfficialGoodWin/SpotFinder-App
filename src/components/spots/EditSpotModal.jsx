@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Camera, MapPin } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
+import LiquidSegmentedControl from '../ui/LiquidSegmentedControl';
 
 const AVAILABLE_TAGS = [
   { id: 'Viewpoint', emoji: '🏞️' },
@@ -82,8 +83,8 @@ export default function EditSpotModal({ spot, onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-card w-full max-w-lg rounded-t-3xl shadow-2xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white dark:bg-card px-6 pt-5 pb-3 border-b border-gray-100 dark:border-border flex items-center justify-between">
+      <div className="isolate bg-white dark:bg-card w-full max-w-lg rounded-t-3xl shadow-2xl max-h-[90dvh] overflow-y-auto overscroll-contain">
+        <div className="sticky top-0 z-30 bg-white/90 dark:bg-card/90 px-6 pt-5 pb-3 border-b border-gray-100/80 dark:border-border flex items-center justify-between backdrop-blur-xl">
           <div className="flex items-center gap-2">
             <MapPin className="w-5 h-5 text-blue-500" />
             <h2 className="text-lg font-bold text-gray-900 dark:text-foreground">{t('common.edit')} Spot</h2>
@@ -117,10 +118,10 @@ export default function EditSpotModal({ spot, onClose, onSave }) {
                   key={id}
                   type="button"
                   onClick={() => toggleTag(id)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all ${
+                  className={`sf-glass-pill ${
                     tags.includes(id)
-                      ? 'bg-blue-500 text-white border-blue-500 scale-105 shadow-sm'
-                      : 'bg-white dark:bg-background text-gray-600 dark:text-foreground border-gray-200 dark:border-border hover:border-blue-300'
+                      ? 'sf-glass-pill--selected sf-glass-pill--blue'
+                      : ''
                   }`}
                 >
                   {emoji} #{id}
@@ -133,62 +134,17 @@ export default function EditSpotModal({ spot, onClose, onSave }) {
           <div className="space-y-3">
             <div>
               <label className="text-xs font-semibold text-gray-600 dark:text-foreground mb-1.5 block">{t('addSpot.cost')}</label>
-              <div className="flex flex-wrap gap-1.5">
-                {COST_OPTIONS.map(o => (
-                  <button
-                    key={o}
-                    type="button"
-                    onClick={() => setCost(o)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all ${
-                      cost === o
-                        ? 'bg-emerald-500 text-white border-emerald-500 scale-105 shadow-sm'
-                        : 'bg-white dark:bg-background text-gray-600 dark:text-foreground border-gray-200 dark:border-border hover:border-emerald-300'
-                    }`}
-                  >
-                    {t(`addSpot.cost${toKeySuffix(o)}`)}
-                  </button>
-                ))}
-              </div>
+              <LiquidSegmentedControl ariaLabel={t('addSpot.cost')} tone="green" value={cost} onChange={setCost} options={COST_OPTIONS.map(o => ({ value: o, label: t(`addSpot.cost${toKeySuffix(o)}`) }))} />
             </div>
 
             <div>
               <label className="text-xs font-semibold text-gray-600 dark:text-foreground mb-1.5 block">{t('addSpot.accessDifficulty')}</label>
-              <div className="flex flex-wrap gap-1.5">
-                {ACCESS_OPTIONS.map(o => (
-                  <button
-                    key={o}
-                    type="button"
-                    onClick={() => setAccessDifficulty(o)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all ${
-                      accessDifficulty === o
-                        ? 'bg-orange-500 text-white border-orange-500 scale-105 shadow-sm'
-                        : 'bg-white dark:bg-background text-gray-600 dark:text-foreground border-gray-200 dark:border-border hover:border-orange-300'
-                    }`}
-                  >
-                    {t(`addSpot.access${toKeySuffix(o)}`)}
-                  </button>
-                ))}
-              </div>
+              <LiquidSegmentedControl ariaLabel={t('addSpot.accessDifficulty')} tone="orange" value={accessDifficulty} onChange={setAccessDifficulty} options={ACCESS_OPTIONS.map(o => ({ value: o, label: t(`addSpot.access${toKeySuffix(o)}`) }))} />
             </div>
 
             <div>
               <label className="text-xs font-semibold text-gray-600 dark:text-foreground mb-1.5 block">{t('addSpot.parkingAvailability')}</label>
-              <div className="flex flex-wrap gap-1.5">
-                {PARKING_OPTIONS.map(o => (
-                  <button
-                    key={o}
-                    type="button"
-                    onClick={() => setParking(o)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all ${
-                      parking === o
-                        ? 'bg-blue-500 text-white border-blue-500 scale-105 shadow-sm'
-                        : 'bg-white dark:bg-background text-gray-600 dark:text-foreground border-gray-200 dark:border-border hover:border-blue-300'
-                    }`}
-                  >
-                    {t(`addSpot.parking${toKeySuffix(o)}`)}
-                  </button>
-                ))}
-              </div>
+              <LiquidSegmentedControl ariaLabel={t('addSpot.parkingAvailability')} tone="blue" value={parking} onChange={setParking} options={PARKING_OPTIONS.map(o => ({ value: o, label: t(`addSpot.parking${toKeySuffix(o)}`) }))} />
             </div>
 
             <div>
@@ -199,10 +155,10 @@ export default function EditSpotModal({ spot, onClose, onSave }) {
                     key={o}
                     type="button"
                     onClick={() => toggleBestTime(o)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all ${
+                    className={`sf-glass-pill ${
                       bestTime.includes(o)
-                        ? 'bg-purple-500 text-white border-purple-500 scale-105 shadow-sm'
-                        : 'bg-white dark:bg-background text-gray-600 dark:text-foreground border-gray-200 dark:border-border hover:border-purple-300'
+                        ? 'sf-glass-pill--selected sf-glass-pill--purple'
+                        : ''
                     }`}
                   >
                     {t(`addSpot.bestTime${toKeySuffix(o)}`)}

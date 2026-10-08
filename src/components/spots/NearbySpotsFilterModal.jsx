@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { NEARBY_DEFAULT_KM, NEARBY_SLIDER_MAX, sliderToKm, kmToSlider, formatMaxDistance } from '@/lib/nearbyFilters';
+import LiquidSegmentedControl from '../ui/LiquidSegmentedControl';
 
 export default function NearbySpotsFilterModal({ isOpen, onClose, onApply, currentFilters }) {
   const [maxDistance, setMaxDistance] = useState(currentFilters?.maxDistance ?? NEARBY_DEFAULT_KM);
@@ -44,7 +45,7 @@ export default function NearbySpotsFilterModal({ isOpen, onClose, onApply, curre
               max={NEARBY_SLIDER_MAX}
               value={kmToSlider(maxDistance)}
               onChange={(e) => setMaxDistance(sliderToKm(e.target.value))}
-              className="w-full accent-purple-600 cursor-pointer"
+              className="sf-glass-range w-full"
             />
             <div className="flex justify-between text-[10px] text-gray-400 dark:text-muted-foreground mt-0.5">
               <span>1 km</span><span>50 km</span><span>∞</span>
@@ -54,22 +55,14 @@ export default function NearbySpotsFilterModal({ isOpen, onClose, onApply, curre
           {/* Min Rating Buttons */}
           <div>
             <label className="block text-xs font-semibold text-gray-600 dark:text-muted-foreground mb-1.5">Minimum Rating</label>
-            <div className="flex items-center gap-1.5">
-              {[0, 3, 3.5, 4, 4.5].map((rating) => (
-                <button
-                  key={rating}
-                  type="button"
-                  onClick={() => setMinRating(rating)}
-                  className={`flex-1 py-1.5 rounded-xl text-xs font-medium border transition ${
-                    minRating === rating
-                      ? 'bg-purple-600 text-white border-purple-600'
-                      : 'bg-white dark:bg-background text-gray-700 dark:text-foreground border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent'
-                  }`}
-                >
-                  {rating === 0 ? 'Any' : `${rating}★`}
-                </button>
-              ))}
-            </div>
+            <LiquidSegmentedControl
+              ariaLabel="Minimum rating"
+              equal
+              tone="purple"
+              value={String(minRating)}
+              onChange={rating => setMinRating(Number(rating))}
+              options={[0, 3, 3.5, 4, 4.5].map(rating => ({ value: String(rating), label: rating === 0 ? 'Any' : `${rating}★` }))}
+            />
           </div>
         </div>
 

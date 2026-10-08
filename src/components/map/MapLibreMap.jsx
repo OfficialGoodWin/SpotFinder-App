@@ -9,12 +9,17 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { Protocol } from 'pmtiles';
 import { Minus, Plus } from 'lucide-react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { lightStyle, darkStyle, outdoorStyle, winterStyle } from '../../lib/mapStyle.js';
 import { AMBIENT_CATEGORIES } from '../../lib/ambientCategories.js';
 import { badgeSVG, iconGlyphSVG } from '../../lib/mapIcons.js';
+
+// MapLibre v6 publishes its worker as a separate module. Importing it as a URL
+// makes Vite emit the file instead of leaving a broken package-relative URL.
+maplibregl.setWorkerUrl(maplibreWorkerUrl);
 
 
 // ── Road shield generator ─────────────────────────────────────────────────────

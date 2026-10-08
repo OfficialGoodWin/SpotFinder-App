@@ -4,6 +4,7 @@ import { useLanguage } from '@/lib/LanguageContext';
 import { filterCategories, getCategoryName } from '@/lib/POICategories';
 import { iconGlyphSVG } from '@/lib/mapIcons';
 import { NEARBY_DEFAULT_KM, NEARBY_SLIDER_MAX, sliderToKm, kmToSlider, formatMaxDistance } from '@/lib/nearbyFilters';
+import LiquidSegmentedControl from '@/components/ui/LiquidSegmentedControl';
 
 
 const LANG_TO_BCP47 = {
@@ -250,7 +251,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
                     <input
                       type="range" min="1" max={NEARBY_SLIDER_MAX} value={kmToSlider(nearbyDraft.maxDistance)}
                       onChange={(e) => setNearbyDraft(d => ({ ...d, maxDistance: sliderToKm(e.target.value) }))}
-                      className="w-full accent-purple-600 cursor-pointer"
+                      className="sf-glass-range w-full"
                     />
                     <div className="flex justify-between text-[10px] text-gray-400 dark:text-muted-foreground mt-0.5">
                       <span>1 km</span><span>50 km</span><span>∞</span>
@@ -258,22 +259,14 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
                   </div>
                   <div className="mb-4">
                     <label className="block text-xs font-semibold text-gray-600 dark:text-muted-foreground mb-1.5">Minimum Rating</label>
-                    <div className="flex items-center gap-1.5">
-                      {[0, 3, 3.5, 4, 4.5].map((rating) => (
-                        <button
-                          key={rating}
-                          type="button"
-                          onClick={() => setNearbyDraft(d => ({ ...d, minRating: rating }))}
-                          className={`flex-1 py-1.5 rounded-xl text-xs font-medium border transition ${
-                            nearbyDraft.minRating === rating
-                              ? 'bg-purple-600 text-white border-purple-600'
-                              : 'bg-white dark:bg-background text-gray-700 dark:text-foreground border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent'
-                          }`}
-                        >
-                          {rating === 0 ? 'Any' : `${rating}★`}
-                        </button>
-                      ))}
-                    </div>
+                    <LiquidSegmentedControl
+                      ariaLabel="Minimum rating"
+                      equal
+                      tone="purple"
+                      value={String(nearbyDraft.minRating)}
+                      onChange={rating => setNearbyDraft(d => ({ ...d, minRating: Number(rating) }))}
+                      options={[0, 3, 3.5, 4, 4.5].map(rating => ({ value: String(rating), label: rating === 0 ? 'Any' : `${rating}★` }))}
+                    />
                   </div>
                   <div className="flex gap-2">
                     <button

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle, Bookmark, Eye, Heart, MapPin, PlusCircle,
   RefreshCw, Search, Star, Trash2, X,
@@ -9,6 +9,7 @@ import {
   getSavedSpots,
   getUserSpots,
 } from '@/api/firebaseClient';
+import LiquidSegmentedControl from '../ui/LiquidSegmentedControl';
 
 const TABS = [
   { id: 'saved', label: 'Saved', icon: Bookmark },
@@ -50,7 +51,6 @@ export default function MySpotsPanel({ user, onClose, onFlyTo }) {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('newest');
   const [deletingId, setDeletingId] = useState('');
-  const tabRefs = useRef([]);
 
   const loadTab = useCallback(async (tabId) => {
     if (!user?.id) return;
@@ -88,20 +88,9 @@ export default function MySpotsPanel({ user, onClose, onFlyTo }) {
     });
   }, [data, query, sort, tab]);
 
-  const selectTab = (nextTab, focus = false) => {
+  const selectTab = (nextTab) => {
     setTab(nextTab);
     setQuery('');
-    if (focus) tabRefs.current[TABS.findIndex(item => item.id === nextTab)]?.focus();
-  };
-
-  const handleTabKeyDown = (event, index) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    let next = index;
-    if (event.key === 'Home') next = 0;
-    else if (event.key === 'End') next = TABS.length - 1;
-    else next = (index + (event.key === 'ArrowRight' ? 1 : -1) + TABS.length) % TABS.length;
-    selectTab(TABS[next].id, true);
   };
 
   const handleDelete = async (id) => {
@@ -118,13 +107,12 @@ export default function MySpotsPanel({ user, onClose, onFlyTo }) {
     }
   };
 
-  const activeIndex = TABS.findIndex(item => item.id === tab);
   const isLoading = loading[tab] && data[tab] === null;
   const error = errors[tab];
 
   return (
     <div className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center bg-black/45 backdrop-blur-sm" role="presentation">
-      <section className="bg-white/95 dark:bg-card/95 w-full sm:max-w-3xl rounded-t-[28px] sm:rounded-[28px] shadow-2xl max-h-[92dvh] sm:max-h-[88dvh] flex flex-col overflow-hidden border border-white/60 dark:border-white/10" aria-labelledby="my-spots-title">
+      <section className="bg-white/95 dark:bg-card/95 w-full sm:max-w-3xl rounded-t-[28px] sm:rounded-[28px] shadow-2xl h-[92dvh] sm:h-[min(88dvh,760px)] flex flex-col overflow-hidden border border-white/60 dark:border-white/10" aria-labelledby="my-spots-title">
         <header className="px-4 sm:px-6 pt-4 sm:pt-5 pb-4 border-b border-gray-200/70 dark:border-border">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -136,28 +124,14 @@ export default function MySpotsPanel({ user, onClose, onFlyTo }) {
             </button>
           </div>
 
-          <div className="sf-liquid-tabs" role="tablist" aria-label="My Spots collections">
-            <span className="sf-liquid-tabs__indicator" aria-hidden="true" style={{ transform: `translate3d(${activeIndex * 100}%, 0, 0)` }} />
-            {TABS.map(({ id, label, icon: Icon }, index) => (
-              <button
-                key={id}
-                ref={element => { tabRefs.current[index] = element; }}
-                id={`my-spots-tab-${id}`}
-                type="button"
-                role="tab"
-                aria-selected={tab === id}
-                aria-controls="my-spots-tabpanel"
-                tabIndex={tab === id ? 0 : -1}
-                onClick={() => selectTab(id)}
-                onKeyDown={event => handleTabKeyDown(event, index)}
-                className="sf-liquid-tabs__tab"
-              >
-                <Icon className="w-4 h-4" aria-hidden="true" />
-                <span>{label}</span>
-                {data[id] !== null && <span className="sf-liquid-tabs__count">{data[id].length}</span>}
-              </button>
-            ))}
-          </div>
+          <LiquidSegmentedControl
+            ariaLabel="My Spots collections"
+            equal
+            value={tab}
+            onChange={selectTab}
+            options={TABS.map(item => ({ ...item, value: item.id }))}
+            renderOption={({ id, label, icon: Icon }) => <><Icon className="w-4 h-4" aria-hidden="true" /><span>{label}</span>{data[id] !== null && <span className="sf-liquid-tabs__count">{data[id].length}</span>}</>}
+          />
 
           <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 mt-3">
             <label className="relative min-w-0">
@@ -174,7 +148,7 @@ export default function MySpotsPanel({ user, onClose, onFlyTo }) {
           </div>
         </header>
 
-        <div id="my-spots-tabpanel" role="tabpanel" aria-labelledby={`my-spots-tab-${tab}`} tabIndex={0} className="overflow-y-auto flex-1 p-4 sm:p-5 focus:outline-none" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+        <div id="my-spots-tabpanel" role="tabpanel" aria-label={`${tab} spots`} tabIndex={0} className="overflow-y-auto flex-1 p-4 sm:p-5 focus:outline-none" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
           {isLoading ? (
             <div className="grid sm:grid-cols-2 gap-3" aria-label="Loading spots">
               {[1, 2, 3, 4].map(item => <div key={item} className="h-36 rounded-2xl bg-gray-100 dark:bg-accent animate-pulse" />)}
