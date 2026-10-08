@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Search, X, Navigation, Mic, Compass } from 'lucide-react';
+import { Search, X, Navigation, Mic, Compass, SlidersHorizontal } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { filterCategories, getCategoryName } from '@/lib/POICategories';
 import { iconGlyphSVG } from '@/lib/mapIcons';
@@ -226,7 +226,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
               }}
               className={`px-2 py-1.5 rounded-lg flex-shrink-0 transition-all active:scale-95 ${
                 showNearbyFilter
-                  ? 'text-purple-600 bg-purple-600/10'
+                  ? 'text-emerald-600 bg-emerald-500/15 ring-1 ring-emerald-500/20'
                   : 'text-gray-500 dark:text-muted-foreground hover:text-gray-700'
               }`}
               title="Nearby spots"
@@ -236,48 +236,52 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
             {showNearbyFilter && (
               <>
                 <div className="fixed inset-0 z-[1500]" onClick={() => setShowNearbyFilter(false)} />
-                <div className="absolute top-full right-0 mt-3 z-[1600] w-64 rounded-2xl shadow-xl border border-gray-200 dark:border-border bg-white dark:bg-card p-4">
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="text-sm font-bold text-gray-900 dark:text-foreground">Filter Nearby</span>
-                    <button onClick={() => setShowNearbyFilter(false)} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-accent">
-                      <X className="w-3.5 h-3.5 text-gray-400 dark:text-muted-foreground" />
+                <div className="sf-nearby-filter-card absolute top-full right-0 mt-3 z-[1600] w-[min(19rem,calc(100vw-1.5rem))] p-4 sm:p-5">
+                  <div className="flex justify-between items-center mb-5">
+                    <div className="flex items-center gap-3">
+                      <span className="grid h-10 w-10 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-500 ring-1 ring-emerald-500/20"><SlidersHorizontal className="h-5 w-5" /></span>
+                      <div><p className="text-sm font-bold text-gray-900 dark:text-foreground">Nearby spots</p><p className="text-[11px] text-gray-500 dark:text-muted-foreground">Fine-tune what appears</p></div>
+                    </div>
+                    <button onClick={() => setShowNearbyFilter(false)} className="sf-filter-icon-button" aria-label="Close nearby filters">
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
-                  <div className="mb-3">
-                    <div className="flex justify-between text-xs font-semibold text-gray-600 dark:text-muted-foreground mb-1">
-                      <span>Max Distance</span>
-                      <span className="text-purple-600 dark:text-purple-400">{formatMaxDistance(nearbyDraft.maxDistance)}</span>
+                  <div className="sf-filter-section">
+                    <div className="flex justify-between items-center text-xs font-semibold text-gray-600 dark:text-muted-foreground mb-2">
+                      <span>Maximum distance</span>
+                      <output className="sf-filter-value">{formatMaxDistance(nearbyDraft.maxDistance)}</output>
                     </div>
                     <input
                       type="range" min="1" max={NEARBY_SLIDER_MAX} value={kmToSlider(nearbyDraft.maxDistance)}
                       onChange={(e) => setNearbyDraft(d => ({ ...d, maxDistance: sliderToKm(e.target.value) }))}
                       className="sf-glass-range w-full"
+                      style={{ '--sf-range-progress': `${((kmToSlider(nearbyDraft.maxDistance) - 1) / (NEARBY_SLIDER_MAX - 1)) * 100}%` }}
                     />
-                    <div className="flex justify-between text-[10px] text-gray-400 dark:text-muted-foreground mt-0.5">
+                    <div className="flex justify-between text-[10px] text-gray-400 dark:text-muted-foreground mt-1 px-0.5">
                       <span>1 km</span><span>50 km</span><span>∞</span>
                     </div>
                   </div>
-                  <div className="mb-4">
-                    <label className="block text-xs font-semibold text-gray-600 dark:text-muted-foreground mb-1.5">Minimum Rating</label>
+                  <div className="sf-filter-section mt-3">
+                    <label className="block text-xs font-semibold text-gray-600 dark:text-muted-foreground mb-2">Minimum rating</label>
                     <LiquidSegmentedControl
                       ariaLabel="Minimum rating"
                       equal
-                      tone="purple"
+                      tone="green"
                       value={String(nearbyDraft.minRating)}
                       onChange={rating => setNearbyDraft(d => ({ ...d, minRating: Number(rating) }))}
                       options={[0, 3, 3.5, 4, 4.5].map(rating => ({ value: String(rating), label: rating === 0 ? 'Any' : `${rating}★` }))}
                     />
                   </div>
-                  <div className="flex gap-2">
+                  <div className="grid grid-cols-[.8fr_1.2fr] gap-2 mt-4">
                     <button
                       onClick={() => setShowNearbyFilter(false)}
-                      className="flex-1 py-2 rounded-xl text-xs font-medium text-gray-500 dark:text-muted-foreground hover:bg-gray-100 dark:hover:bg-accent border border-gray-200 dark:border-border"
+                      className="sf-filter-secondary"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={() => { onNearby?.(nearbyDraft); setShowNearbyFilter(false); }}
-                      className="flex-1 py-2 rounded-xl text-xs font-medium bg-purple-600 text-white hover:bg-purple-700"
+                      className="sf-filter-primary"
                     >
                       Show Nearby
                     </button>

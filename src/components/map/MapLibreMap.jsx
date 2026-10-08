@@ -212,10 +212,10 @@ function drawRoadShield(ref, roadClass) {
     ctx2.textBaseline = 'middle';
     ctx2.fillText(euroText, CW / 2, EY + EH / 2);
 
-    return { data: ctx2.getImageData(0, 0, CW * SCALE, CH * SCALE).data, width: CW * SCALE, height: CH * SCALE };
+    return ctx2.getImageData(0, 0, CW * SCALE, CH * SCALE);
   }
 
-  return { data: ctx.getImageData(0, 0, W * SCALE, H * SCALE).data, width: W * SCALE, height: H * SCALE };
+  return ctx.getImageData(0, 0, W * SCALE, H * SCALE);
 }
 
 function addShieldImage(map, imageId) {
@@ -228,10 +228,10 @@ function addShieldImage(map, imageId) {
     const shieldText = withoutPrefix.slice(classEnd + 1);
     if (!shieldText || shieldText === 'undefined') return;
 
-    const { data, width, height } = drawRoadShield(shieldText, roadClass);
-    map.addImage(imageId, { width, height, data });
+    if (map.hasImage(imageId)) return;
+    map.addImage(imageId, drawRoadShield(shieldText, roadClass));
   } catch (e) {
-    // Silently skip
+    console.warn(`Could not create road shield image "${imageId}"`, e);
   }
 }
 
@@ -705,8 +705,7 @@ function createOnewayArrowImage() {
 
 function addOnewayArrow(map) {
   if (map.hasImage('oneway-arrow')) return;
-  const imgData = createOnewayArrowImage();
-  map.addImage('oneway-arrow', { width: 20, height: 20, data: imgData.data });
+  map.addImage('oneway-arrow', createOnewayArrowImage());
 }
 
 function registerShieldListener(map) {
