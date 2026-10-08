@@ -19,7 +19,8 @@ import {
   PhoneAuthProvider,
   PhoneMultiFactorGenerator,
   RecaptchaVerifier,
-  getMultiFactorResolver
+  getMultiFactorResolver,
+  updateProfile
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -98,9 +99,14 @@ export const loginWithEmail = async (email, password) => {
   return (await signInWithEmailAndPassword(auth, email, password)).user;
 };
  
-export const registerWithEmail = async (email, password) => {
+export const ensureAccountProfile = callFn('ensureAccountProfile');
+export const setAccountDateOfBirth = callFn('setAccountDateOfBirth');
+
+export const registerWithEmail = async (email, password, dateOfBirth, displayName = '') => {
   const { auth } = getFirebaseServices();
   const user = (await createUserWithEmailAndPassword(auth, email, password)).user;
+  if (displayName.trim()) await updateProfile(user, { displayName: displayName.trim().slice(0, 80) });
+  await setAccountDateOfBirth({ dateOfBirth });
   // Required now that firestore.rules gates all content creation on
   // `request.auth.token.email_verified == true` — without this, every new
   // account would be silently unable to add a spot or leave a review the

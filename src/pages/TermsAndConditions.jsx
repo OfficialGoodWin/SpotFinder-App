@@ -3,17 +3,17 @@ import LegalPageLayout, { LegalH2, LegalP, LegalUl, LegalStrong, LegalNote } fro
 
 export default function TermsAndConditions() {
   return (
-    <LegalPageLayout title="Terms & Conditions" lastUpdated="[DATE — fill in before publishing]">
+    <LegalPageLayout title="Terms & Conditions" lastUpdated="8 October 2026">
       <LegalNote>
-        <LegalStrong>Before publishing:</LegalStrong> fill in the bracketed business details, pick a
+        <LegalStrong>Before publishing:</LegalStrong> confirm the operator details below are correct. Pick a
         real governing law/jurisdiction, and have this reviewed by a lawyer. This draft was prepared
         from an automated review of the app's code and is not legal advice.
       </LegalNote>
 
       <LegalP>
         These Terms & Conditions ("<LegalStrong>Terms</LegalStrong>") govern your use of the SpotFinder
-        app and website (the "<LegalStrong>Service</LegalStrong>"), operated by [YOUR LEGAL ENTITY OR
-        SOLE-TRADER NAME], [REGISTERED ADDRESS] ("<LegalStrong>we</LegalStrong>", "<LegalStrong>us</LegalStrong>").
+        app and website (the "<LegalStrong>Service</LegalStrong>"), operated by Michael Neděle,
+        an individual ("<LegalStrong>we</LegalStrong>", "<LegalStrong>us</LegalStrong>"). Contact: spotfinder@icloud.com.
         By creating an account or using the Service, you agree to these Terms.
       </LegalP>
 
@@ -33,6 +33,7 @@ export default function TermsAndConditions() {
         <li>You must provide accurate information when creating an account and keep your login credentials confidential.</li>
         <li>You're responsible for all activity under your account.</li>
         <li>You must be at least 16 years old to create an account. If we learn an account belongs to a younger child, we may suspend or delete it.</li>
+        <li>You must add a valid date of birth when requested. Existing accounts receive a 30-day deadline; accounts that remain incomplete after that deadline are automatically deleted.</li>
         <li>You may delete your account at any time from Settings.</li>
       </LegalUl>
 
@@ -87,7 +88,7 @@ export default function TermsAndConditions() {
 
       <LegalH2>8. Limitation of liability</LegalH2>
       <LegalP>
-        To the maximum extent permitted by law, [YOUR LEGAL ENTITY NAME] is not liable for indirect,
+        To the maximum extent permitted by law, Michael Neděle is not liable for indirect,
         incidental, or consequential damages arising from your use of the Service. Nothing in these
         Terms limits liability that cannot be limited under applicable law (for example, liability for
         death or personal injury caused by negligence, where such a limitation isn't permitted).
@@ -118,7 +119,7 @@ export default function TermsAndConditions() {
       </LegalP>
 
       <LegalH2>12. Contact</LegalH2>
-      <LegalP>Questions about these Terms? Email [CONTACT EMAIL].</LegalP>
+      <LegalP>Questions about these Terms? Email spotfinder@icloud.com.</LegalP>
     </LegalPageLayout>
   );
 }

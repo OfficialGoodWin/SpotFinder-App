@@ -8,7 +8,7 @@
  * Dark: full dark variant, switches instantly via setStyle()
  */
 import { useEffect, useRef, useState } from 'react';
-import maplibregl from 'maplibre-gl';
+import * as maplibregl from 'maplibre-gl';
 import { Protocol } from 'pmtiles';
 import { Minus, Plus } from 'lucide-react';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -1450,7 +1450,7 @@ const addAdminMarkers = () => {
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
 
       {/* Compact map zoom control — large enough for touch without obscuring the map. */}
-      <div className="absolute right-3 top-1/2 z-20 -translate-y-1/2 overflow-hidden rounded-2xl border border-white/70 bg-white/90 text-slate-700 shadow-[0_8px_30px_rgba(15,23,42,0.18)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-100">
+      <div className="absolute bottom-24 left-3 z-20 overflow-hidden rounded-2xl border border-white/70 bg-white/90 text-slate-700 shadow-[0_8px_30px_rgba(15,23,42,0.18)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-100 sm:bottom-auto sm:left-auto sm:right-3 sm:top-1/2 sm:-translate-y-1/2">
         <button
           type="button"
           onClick={() => mapRef.current?.zoomIn({ duration: 250 })}

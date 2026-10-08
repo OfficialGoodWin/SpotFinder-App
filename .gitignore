@@ -30,3 +30,6 @@ dist-ssr
 
 .env
 serviceAccountKey.json
+
+# Local AI handoff notes; never commit this file.
+AI-README.md

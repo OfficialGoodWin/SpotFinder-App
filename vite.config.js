@@ -15,6 +15,7 @@ export default defineConfig({
   ],
   build: {
     target: ['es2015', 'edge88', 'firefox87', 'chrome87', 'safari14'],
+    sourcemap: false,
   },
   server: {
     host: '0.0.0.0',

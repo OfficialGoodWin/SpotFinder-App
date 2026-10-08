@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Mail, Lock, User, ArrowRight, ExternalLink, Smartphone } from 'lucide-react';
+import { X, Mail, Lock, User, ArrowRight, ExternalLink, Smartphone, CalendarDays } from 'lucide-react';
 import { loginWithEmail, registerWithEmail, loginWithGoogle, isRestrictedBrowser, getMfaResolverFromError, getMfaRecaptchaVerifier, clearMfaRecaptchaVerifier, startMfaSignIn, completeMfaSignIn } from '@/api/firebaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -15,6 +15,7 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [restricted, setRestricted] = useState(false);
@@ -59,7 +60,7 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
 
     setLoading(true); setError('');
     try {
-      tab === 'login' ? await loginWithEmail(email, password) : await registerWithEmail(email, password);
+      tab === 'login' ? await loginWithEmail(email, password) : await registerWithEmail(email, password, dateOfBirth, name);
       // Reset attempts on success
       loginAttempts.count = 0;
       loginAttempts.lockedUntil = 0;
@@ -93,14 +94,14 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
           'auth/invalid-credential': `${t('auth.invalidCredential')} (${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} left)`,
           'auth/too-many-requests': 'Too many requests. Your account has been temporarily locked by the server. Try again later.',
         };
-        setError(codes[err.code] || err.message || t('auth.somethingWrong'));
+        setError(codes[err.code] || t('auth.somethingWrong'));
       } else {
         const codes = {
           'auth/invalid-email': t('auth.invalidEmail'),
           'auth/email-already-in-use': t('auth.emailInUse'),
           'auth/weak-password': t('auth.weakPassword'),
         };
-        setError(codes[err.code] || err.message || t('auth.somethingWrong'));
+        setError(codes[err.code] || t('auth.somethingWrong'));
       }
     } finally { setLoading(false); }
   };
@@ -113,7 +114,7 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
       const id = await startMfaSignIn(mfaResolver, 0, verifier);
       setMfaVerificationId(id);
     } catch (err) {
-      setError(err.message || t('auth.somethingWrong'));
+      setError(t('auth.somethingWrong'));
     } finally { setMfaSending(false); }
   };
 
@@ -127,7 +128,7 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
       setMfaResolver(null); setMfaVerificationId(null); setMfaCode('');
       await checkUserAuth(); onSuccess(); onClose();
     } catch (err) {
-      setError(err.message || t('auth.somethingWrong'));
+      setError(t('auth.somethingWrong'));
     } finally { setLoading(false); }
   };
 
@@ -138,7 +139,7 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
       await loginWithGoogle(); await checkUserAuth(); onSuccess(); onClose();
     } catch (err) {
       if (err.code !== 'auth/popup-closed-by-user')
-        setError(err.message || t('auth.failedGoogle'));
+        setError(t('auth.failedGoogle'));
     } finally { setLoading(false); }
   };
 
@@ -253,6 +254,17 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
                 <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder={t('auth.namePlaceholder')}
                   className="w-full pl-12 pr-4 py-3.5 bg-gray-50 dark:bg-background border border-gray-200 dark:border-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-foreground placeholder:text-gray-400" />
               </div>
+            </div>
+          )}
+          {tab === 'register' && (
+            <div>
+              <label htmlFor="auth-date-of-birth" className="block text-sm font-medium text-gray-700 dark:text-foreground mb-1.5">Date of birth</label>
+              <div className="relative">
+                <CalendarDays className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                <input id="auth-date-of-birth" type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} required max={new Date().toISOString().slice(0, 10)}
+                  className="w-full min-h-12 pl-12 pr-4 py-3 bg-gray-50 dark:bg-background border border-gray-200 dark:border-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-foreground" />
+              </div>
+              <p className="mt-1.5 text-xs text-gray-500 dark:text-muted-foreground">You must be at least 16. This stays private and is used for age eligibility.</p>
             </div>
           )}
           <div>

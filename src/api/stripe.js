@@ -32,9 +32,14 @@ export async function createCheckoutSession(planId, userId, customerEmail, retur
   if (!STRIPE_PUBLISHABLE_KEY) throw new Error('Stripe key missing');
   if (!userId) throw new Error('Must be signed in to subscribe');
 
+  const { getFirebaseServices } = await import('./firebaseClient');
+  const { auth } = getFirebaseServices();
+  const idToken = await auth.currentUser?.getIdToken();
+  if (!idToken) throw new Error('Please sign in again to subscribe');
+
   const response = await fetch('/api/create-checkout-session', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
     // userId travels as Stripe Checkout `metadata` (set server-side in
     // create-checkout-session.js) so the webhook can attribute the paid
     // subscription back to the right Firestore user document.

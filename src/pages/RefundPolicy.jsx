@@ -3,7 +3,7 @@ import LegalPageLayout, { LegalH2, LegalP, LegalUl, LegalStrong, LegalNote } fro
 
 export default function RefundPolicy() {
   return (
-    <LegalPageLayout title="Refund Policy" lastUpdated="[DATE — fill in before publishing]">
+    <LegalPageLayout title="Refund Policy" lastUpdated="8 October 2026">
       <LegalNote>
         <LegalStrong>Before publishing:</LegalStrong> confirm this matches how you actually handle
         refund requests in Stripe, and fill in the contact email. If you also sell subscriptions
@@ -30,13 +30,13 @@ export default function RefundPolicy() {
         get a full refund of that period.
       </LegalP>
       <LegalP>
-        To withdraw, email [CONTACT EMAIL] within 14 days of your purchase with your account email and
+        To withdraw, email spotfinder@icloud.com within 14 days of your purchase with your account email and
         the date you subscribed.
       </LegalP>
 
       <LegalH2>2. Cancelling your subscription</LegalH2>
       <LegalUl>
-        <li>You can cancel auto-renewal at any time from Settings in the app, or by emailing [CONTACT EMAIL].</li>
+        <li>You can cancel auto-renewal at any time from Settings in the app, or by emailing spotfinder@icloud.com.</li>
         <li>Cancelling stops future renewals but doesn't automatically refund the current billing period — you keep access until the end of the period you already paid for.</li>
         <li>Outside the 14-day withdrawal window described above, renewal charges are generally non-refundable, except where required by law or at our discretion (e.g. accidental duplicate charges, billing errors, or extended service outages).</li>
       </LegalUl>
@@ -44,7 +44,7 @@ export default function RefundPolicy() {
       <LegalH2>3. Billing errors and duplicate charges</LegalH2>
       <LegalP>
         If you believe you were charged in error (wrong amount, duplicate charge, or charged after you
-        cancelled), contact [CONTACT EMAIL] with your receipt/transaction ID and we'll investigate and
+        cancelled), contact spotfinder@icloud.com with your receipt/transaction ID and we'll investigate and
         correct genuine errors.
       </LegalP>
 
@@ -69,7 +69,7 @@ export default function RefundPolicy() {
       </LegalP>
 
       <LegalH2>6. Contact</LegalH2>
-      <LegalP>Questions about a charge or refund? Email [CONTACT EMAIL].</LegalP>
+      <LegalP>Questions about a charge or refund? Email spotfinder@icloud.com.</LegalP>
     </LegalPageLayout>
   );
 }

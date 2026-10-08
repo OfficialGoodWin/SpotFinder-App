@@ -3,10 +3,9 @@ import LegalPageLayout, { LegalH2, LegalP, LegalUl, LegalStrong, LegalNote } fro
 
 export default function PrivacyPolicy() {
   return (
-    <LegalPageLayout title="Privacy Policy" lastUpdated="[DATE — fill in before publishing]">
+    <LegalPageLayout title="Privacy Policy" lastUpdated="8 October 2026">
       <LegalNote>
-        <LegalStrong>Before publishing:</LegalStrong> replace the bracketed placeholders below (business
-        name, address, registration number, contact email) with your real details, and have this
+        <LegalStrong>Before publishing:</LegalStrong> confirm the operator details below are correct and have this
         page reviewed by a qualified lawyer for your jurisdiction. This draft was prepared from an
         automated review of the app's code and is not legal advice.
       </LegalNote>
@@ -19,16 +18,15 @@ export default function PrivacyPolicy() {
 
       <LegalH2>1. Who we are (data controller)</LegalH2>
       <LegalP>
-        [YOUR LEGAL ENTITY OR SOLE-TRADER NAME], registered at [REGISTERED ADDRESS], [ICO/company
-        registration number if applicable], is the data controller responsible for your personal
-        data. Contact: [CONTACT EMAIL]. If you are in the EU/EEA and have concerns we haven't
+        Michael Neděle, an individual operating SpotFinder, is the data controller responsible for your personal
+        data. Contact: spotfinder@icloud.com. If you are in the EU/EEA and have concerns we haven't
         resolved, you may lodge a complaint with your local data protection authority (in Czechia:
         the Office for Personal Data Protection, uoou.gov.cz).
       </LegalP>
 
       <LegalH2>2. Data we collect</LegalH2>
       <LegalUl>
-        <li><LegalStrong>Account data:</LegalStrong> email address and password (stored securely by Firebase Authentication — we never see your plaintext password), or your Google account's name/email/profile photo if you sign in with Google. An optional display name you provide.</li>
+        <li><LegalStrong>Account data:</LegalStrong> email address, private date of birth, and password (stored securely by Firebase Authentication — we never see your plaintext password), or your Google account's name/email/profile photo if you sign in with Google. An optional display name you provide. Your date of birth is used only to confirm age eligibility and is never displayed publicly.</li>
         <li><LegalStrong>Two-factor authentication:</LegalStrong> if you enable it, your phone number, used only to send a verification code.</li>
         <li><LegalStrong>Location data:</LegalStrong> with your device's permission, your precise GPS location, used to center the map, show nearby spots, and provide turn-by-turn navigation. This is processed on your device and is not permanently stored on our servers tied to your identity beyond what's needed to show your position on the map in real time.</li>
         <li><LegalStrong>User-generated content:</LegalStrong> spots, ratings, descriptions, photos, and point-of-interest reviews you submit. These are public by design — anyone using the app can see them.</li>
@@ -72,7 +70,7 @@ export default function PrivacyPolicy() {
 
       <LegalH2>6. How long we keep your data</LegalH2>
       <LegalP>
-        Account and content data is kept for as long as your account is active. If you delete your
+        Account and content data is kept for as long as your account is active. Registered accounts that do not provide a date of birth within the displayed 30-day deadline are automatically deleted. If you delete your
         account, we delete your personal account data within a reasonable period, except where we
         must keep records for legal/tax reasons (e.g. payment records) or where content you posted
         has already been publicly shared and separated from your identity (see Section 8).
@@ -88,7 +86,7 @@ export default function PrivacyPolicy() {
         <li>Data portability</li>
         <li>Withdraw consent at any time (this won't affect processing done before withdrawal)</li>
       </LegalUl>
-      <LegalP>To exercise any of these rights, contact us at [CONTACT EMAIL]. You can also delete your account and most associated data directly from Settings.</LegalP>
+      <LegalP>To exercise any of these rights, contact us at spotfinder@icloud.com. You can also delete your account and most associated data directly from Settings.</LegalP>
 
       <LegalH2>8. Public content and spot locations</LegalH2>
       <LegalP>
@@ -101,7 +99,7 @@ export default function PrivacyPolicy() {
       <LegalH2>9. Children</LegalH2>
       <LegalP>
         SpotFinder is not directed at children under 16, and we do not knowingly collect personal data
-        from them. If you believe a child has provided us with personal data, contact us at [CONTACT EMAIL]
+        from them. If you believe a child has provided us with personal data, contact us at spotfinder@icloud.com
         and we will delete it.
       </LegalP>
 
@@ -119,7 +117,7 @@ export default function PrivacyPolicy() {
       </LegalP>
 
       <LegalH2>12. Contact</LegalH2>
-      <LegalP>Questions about this policy or your data? Email [CONTACT EMAIL].</LegalP>
+      <LegalP>Questions about this policy or your data? Email spotfinder@icloud.com.</LegalP>
     </LegalPageLayout>
   );
 }

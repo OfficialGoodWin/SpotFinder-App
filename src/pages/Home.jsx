@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-import { Plus, Settings, Crosshair, HelpCircle, Trash2, MoreHorizontal, Mountain } from 'lucide-react';
+import { Plus, Settings, Crosshair, HelpCircle, Trash2, MoreHorizontal } from 'lucide-react';
 import { getPublicSpotsInBounds, createSpot, deleteSpot, updateSpot, getAdminPOIs, getAdminClosures, getAdminERouteOverrides, getAdminRoadOverrides, getDeletedAmbientPOIs, addDeletedAmbientPOI, addSocialPost } from '@/api/firebaseClient';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
@@ -215,7 +215,7 @@ export default function Home() {
       return spot;
     } catch (err) {
       console.error('Failed to create spot:', err);
-      alert('Failed to save spot: ' + (err.message || 'unknown error'));
+      toast.error('The spot could not be saved. Check your connection and try again.');
       throw err; // re-throw so AddSpotModal's finally/loading state also resolves correctly
     }
   };
@@ -310,6 +310,7 @@ export default function Home() {
  
   return (
     <div className="relative w-full h-full" style={{ touchAction: addMode ? 'none' : undefined }}>
+      <h1 className="sr-only">SpotFinder community map</h1>
       {/* Cursor overlay in add mode */}
       {addMode && (
         <div
@@ -403,6 +404,58 @@ export default function Home() {
         onShowSubscription={() => setShowSubscription(true)}
         isSuperAdmin={isSuperAdmin}
       />
+
+      {/* Mobile map tools — a thumb-friendly vertical rail that leaves the bottom navigation clear. */}
+      <div className={`absolute left-3 top-[max(7rem,calc(env(safe-area-inset-top)+6rem))] z-[1000] sm:hidden transition-all duration-300 ${isActivelyNavigating ? '-translate-x-20 opacity-0 pointer-events-none' : ''}`}>
+        <div className="flex flex-col overflow-visible rounded-2xl border border-white/70 bg-white/90 p-1.5 text-slate-700 shadow-[0_10px_32px_rgba(15,23,42,0.2)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-100">
+          <MapLayerSwitcher activeLayer={mapLayer} onLayerChange={setMapLayer} menuPlacement="right" />
+          <div className="mx-1.5 my-1 h-px bg-slate-200/80 dark:bg-white/10" />
+          <button
+            type="button"
+            onClick={() => userPos && setFlyTo([...userPos])}
+            className="grid h-10 w-10 place-items-center rounded-xl transition-colors hover:bg-slate-100 active:scale-95 dark:hover:bg-white/10"
+            aria-label="Center on my location"
+            title="Center location"
+          >
+            <Crosshair className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setTerrainEnabled(value => !value)}
+            className={`grid h-10 w-10 place-items-center rounded-xl text-xs font-black italic transition-all active:scale-95 ${terrainEnabled ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/25' : 'hover:bg-slate-100 dark:hover:bg-white/10'}`}
+            aria-label="Toggle 3D terrain"
+            aria-pressed={terrainEnabled}
+            title="3D terrain"
+          >
+            3D
+          </button>
+          <div className="relative">
+            {showMobileMore && (
+              <>
+                <button type="button" className="fixed inset-0 z-40 cursor-default" onClick={() => setShowMobileMore(false)} aria-label="Close more menu" />
+                <div className="absolute left-full top-0 z-50 ml-3 w-52 overflow-hidden rounded-2xl border border-border/80 bg-background/95 p-1.5 shadow-2xl backdrop-blur-xl">
+                  <button type="button" onClick={() => { navigate('/faq'); setShowMobileMore(false); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium hover:bg-accent">
+                    <HelpCircle className="h-5 w-5 text-muted-foreground" /> FAQ
+                  </button>
+                  <button type="button" onClick={() => { setShowSettings(true); setShowMobileMore(false); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium hover:bg-accent">
+                    <Settings className="h-5 w-5 text-muted-foreground" /> Settings
+                  </button>
+                </div>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowMobileMore(value => !value)}
+              className={`grid h-10 w-10 place-items-center rounded-xl transition-all active:scale-95 ${showMobileMore ? 'bg-primary text-primary-foreground' : 'hover:bg-slate-100 dark:hover:bg-white/10'}`}
+              aria-label="More map options"
+              aria-expanded={showMobileMore}
+              title="More"
+            >
+              <MoreHorizontal className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Nearby Spots panel (distance + rating filtered) */}
       {showNearbySpots && (
@@ -506,69 +559,7 @@ export default function Home() {
             )}
           </div>
 
-          {/* Mobile: keep the map clear with only the three essential controls. */}
-          <div className="ml-auto flex items-center gap-1.5 sm:hidden">
-            <MapLayerSwitcher activeLayer={mapLayer} onLayerChange={setMapLayer} />
-            <button
-              type="button"
-              onClick={() => userPos && setFlyTo([...userPos])}
-              className="grid h-10 w-10 place-items-center rounded-xl bg-gray-100 text-gray-600 transition-all active:scale-95 dark:bg-accent/60 dark:text-foreground"
-              aria-label="Center on my location"
-              title="Center location"
-            >
-              <Crosshair className="h-5 w-5" />
-            </button>
-            <div className="relative">
-              {showMobileMore && (
-                <>
-                  <button
-                    type="button"
-                    className="fixed inset-0 z-40 cursor-default"
-                    onClick={() => setShowMobileMore(false)}
-                    aria-label="Close more menu"
-                  />
-                  <div className="absolute bottom-full right-0 z-50 mb-3 w-52 overflow-hidden rounded-2xl border border-border/80 bg-background/95 p-1.5 shadow-2xl backdrop-blur-xl">
-                    <button
-                      type="button"
-                      onClick={() => { navigate('/faq'); setShowMobileMore(false); }}
-                      className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium hover:bg-accent"
-                    >
-                      <HelpCircle className="h-5 w-5 text-muted-foreground" />
-                      FAQ
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setShowSettings(true); setShowMobileMore(false); }}
-                      className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium hover:bg-accent"
-                    >
-                      <Settings className="h-5 w-5 text-muted-foreground" />
-                      Settings
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setTerrainEnabled(value => !value); setShowMobileMore(false); }}
-                      className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium hover:bg-accent"
-                      aria-pressed={terrainEnabled}
-                    >
-                      <Mountain className={`h-5 w-5 ${terrainEnabled ? 'text-emerald-600' : 'text-muted-foreground'}`} />
-                      <span className="flex-1">3D terrain</span>
-                      <span className={`h-2.5 w-2.5 rounded-full ${terrainEnabled ? 'bg-emerald-500' : 'bg-muted'}`} />
-                    </button>
-                  </div>
-                </>
-              )}
-              <button
-                type="button"
-                onClick={() => setShowMobileMore(value => !value)}
-                className={`grid h-10 w-10 place-items-center rounded-xl transition-all active:scale-95 ${showMobileMore ? 'bg-primary text-primary-foreground' : 'bg-gray-100 text-gray-600 dark:bg-accent/60 dark:text-foreground'}`}
-                aria-label="More map options"
-                aria-expanded={showMobileMore}
-                title="More"
-              >
-                <MoreHorizontal className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
+          <div className="flex-1 sm:hidden" aria-hidden="true" />
         </div>
       </div>
 

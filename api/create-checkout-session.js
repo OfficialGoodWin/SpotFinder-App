@@ -10,6 +10,7 @@
  */
 
 import Stripe from 'stripe';
+import { verifyRequestAuth } from './_firebaseAdmin.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2024-06-20',
@@ -40,7 +41,7 @@ export default async function handler(req, res) {
   const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : (origin.startsWith('http://localhost') ? origin : 'https://spotfinder.cz');
   res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Vary', 'Origin');
 
   // Rate limiting
@@ -62,7 +63,12 @@ export default async function handler(req, res) {
     return res.status(500).json({ message: 'STRIPE_SECRET_KEY is not configured on the server.' });
   }
 
-  const { priceId, customerEmail, userId, plan, successUrl, cancelUrl } = req.body || {};
+  const { priceId, customerEmail, userId, plan } = req.body || {};
+
+  const decoded = await verifyRequestAuth({ headers: new Headers({ authorization: req.headers.authorization || '' }) });
+  if (!decoded || decoded.uid !== userId) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
 
   if (!priceId) {
     return res.status(400).json({ message: 'priceId is required' });
@@ -79,8 +85,8 @@ export default async function handler(req, res) {
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: successUrl || `${req.headers.origin}/?subscribed=success`,
-      cancel_url:  cancelUrl  || `${req.headers.origin}/?subscribed=cancel`,
+      success_url: `${allowedOrigin}/?subscribed=success`,
+      cancel_url: `${allowedOrigin}/?subscribed=cancel`,
       // Collect billing address for EU VAT compliance
       billing_address_collection: 'auto',
       // Allow promotional codes
@@ -98,7 +104,7 @@ export default async function handler(req, res) {
     const session = await stripe.checkout.sessions.create(sessionParams);
     return res.status(200).json({ sessionId: session.id, url: session.url });
   } catch (err) {
-    console.error('[Stripe] Checkout session error:', err.message);
-    return res.status(500).json({ message: err.message });
+    console.error('[Stripe] Checkout session error:', err);
+    return res.status(500).json({ message: 'Unable to start checkout. Please try again.' });
   }
 }

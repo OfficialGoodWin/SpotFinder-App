@@ -239,3 +239,17 @@
 .dark .sf-discovery-marker__card { background: rgb(15 23 42 / .96); box-shadow: 0 5px 16px rgb(0 0 0 / .48), inset 0 1px 0 rgb(255 255 255 / .1); }
 .dark .sf-discovery-marker__fallback { color: #bbf7d0; background: linear-gradient(145deg, rgb(20 83 45 / .96), rgb(6 78 59 / .94)); }.dark .sf-discovery-marker__fallback span { color: #dcfce7; }
 @media (prefers-reduced-motion: reduce) { .sf-discovery-marker__motion,.sf-discovery-marker__label { transition-duration: .01ms; }.sf-discovery-marker:hover .sf-discovery-marker__motion,.sf-discovery-marker:focus-visible .sf-discovery-marker__motion { transform: none; } }
+html, body, #root {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+@media (max-width: 640px) and (pointer: coarse) {
+  button, a, input, select, textarea {
+    touch-action: manipulation;
+  }
+
+  input, select, textarea {
+    font-size: 16px;
+  }
+}

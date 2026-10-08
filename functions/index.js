@@ -16,6 +16,7 @@
 
 const functions = require('firebase-functions/v1');
 const { initializeApp } = require('firebase-admin/app');
+const { getAuth } = require('firebase-admin/auth');
 const { getFirestore } = require('firebase-admin/firestore');
 const { getStorage } = require('firebase-admin/storage');
 const nodemailer = require('nodemailer');
@@ -25,8 +26,92 @@ const { defineString } = require('firebase-functions/params');
 const { validateSocialPostUrl, INVALID_SOCIAL_URL_MESSAGE } = require('./socialUrlPolicy');
 initializeApp();
 const db = getFirestore();
+const adminAuth = getAuth();
 const RECAPTCHA_SITE_KEY = defineString('RECAPTCHA_SITE_KEY');
 const googleAuth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
+
+const DOB_GRACE_DAYS = 30;
+
+function validateBirthDate(value) {
+  const raw = String(value || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+  const date = new Date(`${raw}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== raw) return null;
+  const now = new Date();
+  let age = now.getUTCFullYear() - date.getUTCFullYear();
+  const beforeBirthday = now.getUTCMonth() < date.getUTCMonth()
+    || (now.getUTCMonth() === date.getUTCMonth() && now.getUTCDate() < date.getUTCDate());
+  if (beforeBirthday) age -= 1;
+  return age >= 16 && age <= 120 ? raw : null;
+}
+
+// Creates the private profile metadata used by the DOB reminder. Anonymous
+// guest sessions are intentionally excluded and remain able to submit spots.
+exports.ensureAccountProfile = functions.https.onCall(async (_data, context) => {
+  if (!context.auth || context.auth.token.firebase?.sign_in_provider === 'anonymous') {
+    throw new functions.https.HttpsError('unauthenticated', 'A registered account is required.');
+  }
+  const ref = db.collection('users').doc(context.auth.uid);
+  const snap = await ref.get();
+  const current = snap.data() || {};
+  if (!current.dob_deadline && !current.date_of_birth) {
+    const deadline = new Date(Date.now() + DOB_GRACE_DAYS * 86400000).toISOString();
+    await ref.set({ dob_deadline: deadline, dob_required: true }, { merge: true });
+    current.dob_deadline = deadline;
+  }
+  return {
+    hasDateOfBirth: Boolean(current.date_of_birth),
+    deadline: current.dob_deadline || null,
+  };
+});
+
+exports.setAccountDateOfBirth = functions.https.onCall(async (data, context) => {
+  if (!context.auth || context.auth.token.firebase?.sign_in_provider === 'anonymous') {
+    throw new functions.https.HttpsError('unauthenticated', 'A registered account is required.');
+  }
+  const dateOfBirth = validateBirthDate(data?.dateOfBirth);
+  if (!dateOfBirth) {
+    throw new functions.https.HttpsError('invalid-argument', 'Enter a valid date of birth. You must be at least 16.');
+  }
+  await db.collection('users').doc(context.auth.uid).set({
+    date_of_birth: dateOfBirth,
+    dob_required: false,
+    dob_completed_at: new Date().toISOString(),
+  }, { merge: true });
+  return { success: true };
+});
+
+// Daily enforcement. The first run gives every existing registered account
+// a full 30-day grace period; later runs remove accounts that ignored it.
+exports.enforceDateOfBirthDeadline = functions.pubsub.schedule('every day 03:15')
+  .timeZone('Europe/Prague')
+  .onRun(async () => {
+    let pageToken;
+    const now = Date.now();
+    do {
+      const page = await adminAuth.listUsers(1000, pageToken);
+      for (const account of page.users) {
+        if (account.providerData.length === 0) continue; // anonymous account
+        const ref = db.collection('users').doc(account.uid);
+        const snap = await ref.get();
+        const profile = snap.data() || {};
+        if (profile.date_of_birth) continue;
+        if (!profile.dob_deadline) {
+          await ref.set({
+            dob_required: true,
+            dob_deadline: new Date(now + DOB_GRACE_DAYS * 86400000).toISOString(),
+          }, { merge: true });
+          continue;
+        }
+        if (Date.parse(profile.dob_deadline) <= now) {
+          await adminAuth.deleteUser(account.uid);
+          await ref.delete();
+        }
+      }
+      pageToken = page.pageToken;
+    } while (pageToken);
+    return null;
+  });
 
 // ─── Feedback email notifications ──────────────────────────────────────────
 // The feedback form in FAQ.jsx was only ever writing to Firestore — nothing

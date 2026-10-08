@@ -4,7 +4,7 @@ import { reopenCookieSettings } from '@/components/CookieConsentBanner';
 
 export default function CookiePolicy() {
   return (
-    <LegalPageLayout title="Cookie Policy" lastUpdated="[DATE — fill in before publishing]">
+    <LegalPageLayout title="Cookie Policy" lastUpdated="8 October 2026">
       <LegalNote>
         <LegalStrong>Before publishing:</LegalStrong> confirm this list matches what's actually
         deployed (add/remove rows if you change providers), and fill in the contact details below.
@@ -65,7 +65,7 @@ export default function CookiePolicy() {
       </LegalP>
 
       <LegalH2>6. Contact</LegalH2>
-      <LegalP>Questions about our use of cookies? Email [CONTACT EMAIL].</LegalP>
+      <LegalP>Questions about our use of cookies? Email spotfinder@icloud.com.</LegalP>
     </LegalPageLayout>
   );
 }

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Layers } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 
-export default function MapLayerSwitcher({ activeLayer, onLayerChange }) {
+export default function MapLayerSwitcher({ activeLayer, onLayerChange, menuPlacement = 'top' }) {
   const [open, setOpen] = useState(false);
   const { t } = useLanguage();
 
@@ -20,7 +20,9 @@ export default function MapLayerSwitcher({ activeLayer, onLayerChange }) {
         <>
           {/* Backdrop to close */}
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute bottom-full left-0 mb-3 rounded-xl shadow-xl overflow-hidden border z-50 min-w-[130px] bg-white dark:bg-card border-gray-200 dark:border-border">
+          <div className={`absolute z-50 min-w-[130px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-border dark:bg-card ${
+            menuPlacement === 'right' ? 'left-full top-0 ml-3' : 'bottom-full left-0 mb-3'
+          }`}>
             {LAYERS.map(l => (
               <button key={l.id} onClick={() => { onLayerChange(l.id); setOpen(false); }}
                 className={`block w-full px-4 py-2.5 text-sm text-left font-medium transition-colors
