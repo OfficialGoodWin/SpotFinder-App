@@ -324,11 +324,12 @@ function getMapStyle(isDark, mapLayer) {
 // Keep roads at a stable real-world scale after zoom 18. When OpenStreetMap
 // includes `lanes`, the high-zoom carriageway width reflects that lane count.
 function withHighZoomRoadGeometry(style) {
-  const cloned = { ...style, layers: style.layers.map(layer => ({
-    ...layer,
-    layout: layer.layout ? { ...layer.layout } : layer.layout,
-    paint: layer.paint ? { ...layer.paint } : layer.paint,
-  })) };
+  const cloned = { ...style, layers: style.layers.map(layer => {
+    const clonedLayer = { ...layer };
+    if (layer.layout) clonedLayer.layout = { ...layer.layout };
+    if (layer.paint) clonedLayer.paint = { ...layer.paint };
+    return clonedLayer;
+  }) };
   const laneCount = ['min', 8, ['max', 1, ['to-number', ['get', 'lanes'], 1]]];
 
   for (const layer of cloned.layers) {
