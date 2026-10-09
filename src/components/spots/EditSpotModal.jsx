@@ -5,6 +5,8 @@ import LiquidSegmentedControl from '../ui/LiquidSegmentedControl';
 import StarRating from './StarRating';
 import LabeledRatingScale from './LabeledRatingScale';
 import { submitCategoryRatings } from '@/api/firebaseClient';
+import { toast } from 'sonner';
+import { IMAGE_ACCEPT, validateImageFileMetadata } from '@/lib/imageUploadValidation';
 
 const AVAILABLE_TAGS = [
   { id: 'Viewpoint', emoji: '🏞️' },
@@ -46,6 +48,8 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      try { validateImageFileMetadata(file); }
+      catch (error) { toast.error(error.message); e.target.value = ''; return; }
       setImageFile(file);
       setImagePreview(URL.createObjectURL(file));
     }
@@ -61,7 +65,9 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
         image_url = await uploadSpotImage(imageFile);
         image_urls = [image_url, ...image_urls.slice(1)];
       } catch (e) {
-        image_url = imagePreview;
+        toast.error(e?.message || 'The photo could not be uploaded.');
+        setLoading(false);
+        return;
       }
     } else if (!imagePreview) {
       image_url = null;
@@ -218,7 +224,7 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
               <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-border rounded-2xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-accent transition-colors focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-400">
                 <Camera className="w-8 h-8 text-gray-400 dark:text-muted-foreground mb-1" />
                 <span className="text-sm text-gray-500 dark:text-muted-foreground">{t('addSpot.photoHint')}</span>
-                <input type="file" accept="image/*" onChange={handleImageChange} className="sr-only" />
+                <input type="file" accept={IMAGE_ACCEPT} onChange={handleImageChange} className="sr-only" />
               </label>
             )}
           </div>

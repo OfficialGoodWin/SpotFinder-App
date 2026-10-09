@@ -25,7 +25,8 @@ service cloud.firestore {
     match /spots/{spotId} {
       allow read: if true;
 
-      allow create: if isAuth()
+      // Direct creates are disabled; submitSpot performs authoritative checks.
+      allow create: if false && isAuth()
         && strLen(request.resource.data.title, 100)
         && strLen(request.resource.data.description, 2000)
         // Never trust a client-supplied moderation state on create.

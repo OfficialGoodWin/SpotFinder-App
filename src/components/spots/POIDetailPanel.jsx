@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { useLanguage } from '@/lib/LanguageContext';
 import { iconGlyphSVG } from '@/lib/mapIcons';
 import ReportDialog from '@/components/moderation/ReportDialog';
+import { IMAGE_ACCEPT, validateImageFileMetadata } from '@/lib/imageUploadValidation';
 
 const SocialPostsSection = React.lazy(() => import('@/components/social/SocialPostsSection'));
 
@@ -723,12 +724,14 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    try { validateImageFileMetadata(file); }
+    catch (error) { toast.error(error.message); e.target.value = ''; return; }
     const poiId = makePOIId(poi.lat, poi.lon, poi.name);
     try {
       const dataUrl = await uploadSpotImage(file);
       await addPOIPhoto(poiId, dataUrl, user.email);
       setSfPhotos(prev => [{ id: Date.now(), image: dataUrl, created_by: user.email }, ...prev]);
-    } catch (err) { console.error('Photo upload failed:', err); }
+    } catch (err) { console.error('Photo upload failed:', err); toast.error(err?.message || 'The photo could not be uploaded.'); }
     e.target.value = '';
   };
 
@@ -785,7 +788,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
 
   return (
     <>
-      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+      <input ref={fileInputRef} type="file" accept={IMAGE_ACCEPT} className="hidden" onChange={handleFileChange} />
 
       {expanded
         ? <FullSheet {...sharedProps} onSubmitRating={handleSubmitRating} />

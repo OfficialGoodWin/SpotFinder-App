@@ -69,7 +69,6 @@ export default function Home() {
   const [selectedPOI, setSelectedPOI] = useState(null);
   const [selectedPOIDirectCat, setSelectedPOIDirectCat] = useState(null);
   const [poiLoading, setPoiLoading] = useState(false);
-  const fitCategoryResultsRef = useRef(false);
 
   // ── Deleted ambient POIs (superadmin blocklist) ────────────────────────────
   const [deletedAmbientPOIIds, setDeletedAmbientPOIIds] = useState([]);
@@ -364,11 +363,6 @@ export default function Home() {
         }}
         onPOIsLoaded={(pois) => {
           setCurrentPOIs(pois);
-          if (fitCategoryResultsRef.current && pois.length) {
-            fitCategoryResultsRef.current = false;
-            setFitBoundsData(pois.map(poi => [poi.lat, poi.lon]));
-            setTimeout(() => setFitBoundsData(null), 1200);
-          }
         }}
         onLoadingChange={(loading) => setPoiLoading(loading)}
         navTarget={navTarget}
@@ -402,13 +396,21 @@ export default function Home() {
           startNavTo(destination);
         }}
         onSelectCategory={(category) => {
-          fitCategoryResultsRef.current = true;
+          if (!userPos) {
+            alert(t('search.enableLocation') || 'Enable location to search nearby places');
+            return;
+          }
           setSelectedPOICategory(category);
           setShowPOIPanel(true);
           if (mapRef.current) {
-            const center = mapRef.current.getCenter();
-            const zoom   = mapRef.current.getZoom();
-            if (zoom < 13) mapRef.current.flyTo({ center, zoom: 13, duration: 800 });
+            const [lat, lng] = userPos;
+            const radiusKm = 20;
+            const latDelta = radiusKm / 111.32;
+            const lngDelta = radiusKm / (111.32 * Math.max(0.2, Math.cos(lat * Math.PI / 180)));
+            mapRef.current.fitBounds(
+              [[lng - lngDelta, lat - latDelta], [lng + lngDelta, lat + latDelta]],
+              { padding: { top: 72, right: 36, bottom: 72, left: 36 }, duration: 900 }
+            );
           }
         }}
       />

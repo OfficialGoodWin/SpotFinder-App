@@ -11,6 +11,7 @@ import { moderateSubmission } from '@/lib/moderation';
 import { findNearbyPoi } from '@/lib/nearbyPoi';
 import { toast } from 'sonner';
 import LiquidSegmentedControl from '../ui/LiquidSegmentedControl';
+import { IMAGE_ACCEPT, validateImageFileMetadata } from '@/lib/imageUploadValidation';
 
 // Category tags per spec — separate from the existing rating-group `spotType`.
 // A spot can carry several of these. Display uses an emoji + translated label
@@ -81,7 +82,10 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
 
   const handleImageChange = (e) => {
     const remaining = 3 - imageFiles.length;
-    const selected = Array.from(e.target.files || []).filter(file => file.type.startsWith('image/'));
+    const selected = Array.from(e.target.files || []).filter(file => {
+      try { validateImageFileMetadata(file); return true; }
+      catch (error) { toast.error(error.message); return false; }
+    });
     if (!remaining || !selected.length) return;
     const accepted = selected.slice(0, remaining);
     setImageFiles(current => [...current, ...accepted]);
@@ -441,7 +445,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
                 <Camera className="w-8 h-8 text-gray-400 dark:text-muted-foreground mb-1" />
                 <span className="text-sm text-gray-500 dark:text-muted-foreground">Add up to {3 - imageFiles.length} more photo{3 - imageFiles.length === 1 ? '' : 's'}</span>
                 <span className="mt-1 text-xs text-gray-400">Choose several at once or add them one by one</span>
-                <input type="file" accept="image/*" multiple onChange={handleImageChange} className="sr-only" />
+                <input type="file" accept={IMAGE_ACCEPT} multiple onChange={handleImageChange} className="sr-only" />
               </label>
             )}
           </div>

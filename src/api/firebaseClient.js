@@ -41,7 +41,7 @@ import {
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { encodeGeohash } from '@/lib/geohash.js';
+import { validateImageDimensions, validateImageFile } from '@/lib/imageUploadValidation';
 import { firebaseConfig } from './firebaseConfig';
 import { getRecaptchaToken } from '@/lib/recaptcha';
 
@@ -253,7 +253,7 @@ export const uploadSpotImage = async (file) => {
   const { auth, storage } = getFirebaseServices();
   const uid = auth.currentUser?.uid;
   if (!uid) throw new Error('You must be signed in to upload a photo.');
-  if (!file?.type?.startsWith('image/')) throw new Error('Only image files are allowed.');
+  await validateImageFile(file);
 
   const blob = await new Promise((resolve, reject) => {
     const MAX_W = 1200, MAX_H = 1200, QUALITY = 0.78;
@@ -264,6 +264,12 @@ export const uploadSpotImage = async (file) => {
       img.onerror = reject;
       img.onload = () => {
         let { width, height } = img;
+        try {
+          validateImageDimensions(width, height);
+        } catch (error) {
+          reject(error);
+          return;
+        }
         if (width > MAX_W || height > MAX_H) {
           const ratio = Math.min(MAX_W / width, MAX_H / height);
           width = Math.round(width * ratio);
@@ -271,13 +277,20 @@ export const uploadSpotImage = async (file) => {
         }
         const canvas = document.createElement('canvas');
         canvas.width = width; canvas.height = height;
-        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        const context = canvas.getContext('2d');
+        if (!context) {
+          reject(new Error('Image processing is unavailable in this browser.'));
+          return;
+        }
+        context.drawImage(img, 0, 0, width, height);
         canvas.toBlob(result => result ? resolve(result) : reject(new Error('Image encoding failed')), 'image/jpeg', QUALITY);
       };
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
   });
+
+  if (blob.size > 5 * 1024 * 1024) throw new Error('The processed image is too large to upload.');
 
   const id = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const path = `community/${uid}/${id}.jpg`;
@@ -401,40 +414,8 @@ export const getUserSpots = async (userEmail, maxCount = 50) => {
   return (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
 };
  
-// A submitter needs this many previously-published spots before new submissions
-// skip the pending_trust review tier (see spec: moderation & quality control).
-const TRUSTED_SUBMITTER_THRESHOLD = 3;
-
-export const getApprovedSpotCount = async (userEmail) => {
-  if (!userEmail || userEmail === 'anonymous') return 0;
-  const { db } = getFirebaseServices();
-  const q = query(
-    collection(db, SPOTS_COLLECTION),
-    where('created_by', '==', userEmail),
-    where('status', '==', 'published')
-  );
-  return (await getDocs(q)).size;
-};
-
 export const createSpot = async (spotData) => {
-  const { db } = getFirebaseServices();
-  const approvedCount = await getApprovedSpotCount(spotData.created_by);
-  const status = approvedCount >= TRUSTED_SUBMITTER_THRESHOLD ? 'published' : 'pending_trust';
-
-  const data = {
-    ...spotData,
-    status,                       // 'pending_trust' | 'published' | 'flagged' | 'hidden' | 'rejected'
-    quality_score: 0,
-    upvote_count: 0,
-    downvote_count: 0,
-    likes_count: 0,
-    saves_count: 0,
-    flag_count: 0,
-    geohash: encodeGeohash(Number(spotData.lat), Number(spotData.lng), 9),
-    created_date: new Date().toISOString(),
-  };
-  const docRef = await addDoc(collection(db, SPOTS_COLLECTION), data);
-  return { id: docRef.id, ...data };
+  return callFn('submitSpot')(spotData);
 };
 
 // Duplicate detection disabled for now (requires geohash utils)

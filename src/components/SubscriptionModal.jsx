@@ -92,10 +92,18 @@ async function redirectToCheckout(priceId, userEmail, userId, planId) {
     return;
   }
 
-  // Call your backend to create a Checkout Session
+  const { getFirebaseServices } = await import('@/api/firebaseClient');
+  const idToken = await getFirebaseServices().auth.currentUser?.getIdToken();
+  if (!idToken) {
+    alert('Please sign in again before subscribing.');
+    return;
+  }
+
+  // The server validates both the Firebase identity and the selected Stripe
+  // price; the client-provided plan label is display-only.
   const res = await fetch('/api/create-checkout-session', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
     body: JSON.stringify({
       priceId,
       customerEmail: userEmail || undefined,
@@ -105,8 +113,6 @@ async function redirectToCheckout(priceId, userEmail, userId, planId) {
       // actually unlocked anything.
       userId,
       plan: planId,
-      successUrl: `${window.location.origin}/?subscribed=success`,
-      cancelUrl:  `${window.location.origin}/?subscribed=cancel`,
     }),
   });
 

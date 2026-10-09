@@ -273,6 +273,97 @@ async function checkServerRateLimit(uid, action, max, windowMs) {
   });
 }
 
+function encodeGeohash(latitude, longitude, precision = 9) {
+  const alphabet = '0123456789bcdefghjkmnpqrstuvwxyz';
+  let latRange = [-90, 90], lngRange = [-180, 180], hash = '', bit = 0, value = 0, even = true;
+  while (hash.length < precision) {
+    const range = even ? lngRange : latRange;
+    const coordinate = even ? longitude : latitude;
+    const midpoint = (range[0] + range[1]) / 2;
+    if (coordinate >= midpoint) { value = (value << 1) | 1; range[0] = midpoint; }
+    else { value <<= 1; range[1] = midpoint; }
+    even = !even;
+    bit += 1;
+    if (bit === 5) { hash += alphabet[value]; bit = 0; value = 0; }
+  }
+  return hash;
+}
+
+function cleanString(value, maxLength) {
+  return String(value || '').replace(/[\u0000-\u001F\u007F]/g, ' ').trim().slice(0, maxLength);
+}
+
+function isManagedImageUrl(value, uid) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:'
+      && url.hostname === 'firebasestorage.googleapis.com'
+      && decodeURIComponent(url.pathname).includes(`/community/${uid}/`);
+  } catch {
+    return false;
+  }
+}
+
+// Authoritative spot-creation boundary. Direct Firestore creates are denied,
+// so callers cannot bypass ownership, aggregate, content, or rate checks.
+exports.submitSpot = functions.runWith({ secrets: ['ANTI_SPAM_IP_SALT'] }).https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in to add a spot.');
+  const input = data || {};
+  const uid = context.auth.uid;
+  const lat = Number(input.lat), lng = Number(input.lng);
+  const description = cleanString(input.description, 2000);
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lng) || lng < -180 || lng > 180) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid spot coordinates.');
+  }
+  if (!description) throw new functions.https.HttpsError('invalid-argument', 'Description is required.');
+
+  const ipHash = hashIp(getRequestIp(context));
+  const [userAllowed, ipAllowed] = await Promise.all([
+    checkServerRateLimit(uid, 'add_spot', 10, 24 * 60 * 60 * 1000),
+    checkIpRateLimit(ipHash, 'add_spot', 20, 24 * 60 * 60 * 1000),
+  ]);
+  if (!userAllowed || !ipAllowed) {
+    throw new functions.https.HttpsError('resource-exhausted', 'Too many spots added today. Try again later.');
+  }
+
+  const spam = spamScore(description);
+  if (spam.score >= 5) throw new functions.https.HttpsError('invalid-argument', 'The description appears to be spam.');
+  const published = await db.collection('spots')
+    .where('created_by_uid', '==', uid).where('status', '==', 'published').limit(3).get();
+  const status = context.auth.token.email_verified === true && published.size >= 3 ? 'published' : 'pending_trust';
+  const imageUrls = (Array.isArray(input.image_urls) ? input.image_urls : [])
+    .filter(value => typeof value === 'string' && isManagedImageUrl(value, uid)).slice(0, 3);
+  const ratingValue = Number(input.rating);
+  const initialRating = Number.isFinite(ratingValue) && ratingValue >= 1 && ratingValue <= 5 ? ratingValue : 0;
+  const allowedOption = (value, allowed, fallback) => allowed.includes(value) ? value : fallback;
+  const list = (value, maxItems, maxLength) => Array.isArray(value)
+    ? value.map(item => cleanString(item, maxLength)).filter(Boolean).slice(0, maxItems) : [];
+  const poiMatch = input.poi_match && JSON.stringify(input.poi_match).length <= 5000 ? input.poi_match : null;
+  const spot = {
+    lat, lng, spot_type: 'general',
+    title: cleanString(input.title, 100) || 'Spot', description,
+    image_url: imageUrls[0] || null, image_urls: imageUrls, is_public: true,
+    created_by: context.auth.token.email || 'anonymous',
+    created_by_name: cleanString(input.created_by_name, 100) || 'Anonymous', created_by_uid: uid,
+    tags: list(input.tags, 10, 40),
+    cost: allowedOption(input.cost, ['free', 'paid', 'donation'], 'free'),
+    access_difficulty: allowedOption(input.access_difficulty, ['easy', 'moderate', 'hard'], 'easy'),
+    parking: allowedOption(input.parking, ['yes', 'no', 'street', 'paid'], 'no'),
+    best_time: list(input.best_time, 5, 30), directions: cleanString(input.directions, 1000), poi_match: poiMatch,
+    status, needs_review: spam.score > 0, quality_score: 0,
+    upvote_count: 0, downvote_count: 0, likes_count: 0, saves_count: 0, flag_count: 0,
+    rating: initialRating, rating_count: initialRating ? 1 : 0, rating_schema: 2,
+    geohash: encodeGeohash(lat, lng), created_date: new Date().toISOString(),
+  };
+  for (const field of ['access', 'condition', 'safety', 'crowdedness']) {
+    const score = Number(input[`${field}_rating`]);
+    spot[`${field}_rating`] = Number.isFinite(score) && score >= 1 && score <= 5 ? score : 0;
+    spot[`${field}_rating_count`] = spot[`${field}_rating`] ? 1 : 0;
+  }
+  const ref = await db.collection('spots').add(spot);
+  return { id: ref.id, ...spot };
+});
+
 // Best-effort caller identity: Firestore triggers don't carry the writer's
 // source IP, so IP-based bans (ip_bans collection) can only be enforced on
 // requests that pass through an HTTPS callable/endpoint (e.g. put the
@@ -577,6 +668,9 @@ exports.adminDeleteSpot = functions.https.onCall(async (data, context) => {
 });
 
 exports.setAdminClaim = require('./setAdminClaim').setAdminClaim;
+// Keep the already-deployed migration callable in the manifest so routine
+// deployments do not attempt to delete it implicitly.
+exports.updateSuperadminEmail = require('./updateSuperadminEmail').updateSuperadminEmail;
 // ─── Unified content reports (spots, dataset POIs, community POI photos) ───
 const REPORT_REASONS = {
   spot: new Set(['wrong_info','wrong_location','closed_or_missing','duplicate','inappropriate','spam_scam','other_safety']),

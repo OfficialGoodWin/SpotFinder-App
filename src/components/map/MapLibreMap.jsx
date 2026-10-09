@@ -310,10 +310,71 @@ function ensureProtocols() {
 // ── Style selector ────────────────────────────────────────────────────────────
 function getMapStyle(isDark, mapLayer) {
   // If a special layer is selected, use that, otherwise use dark/light
-  if (mapLayer === 'outdoor') return outdoorStyle;
-  if (mapLayer === 'winter') return winterStyle;
+  let selectedStyle;
+  if (mapLayer === 'outdoor') selectedStyle = outdoorStyle;
+  else if (mapLayer === 'winter') selectedStyle = winterStyle;
   // For 'basic', 'aerial', 'traffic' — use light/dark base
-  return isDark ? darkStyle : lightStyle;
+  else selectedStyle = isDark ? darkStyle : lightStyle;
+  return withHighZoomRoadGeometry(selectedStyle);
+}
+
+// Keep roads at a stable real-world scale after zoom 18. When OpenStreetMap
+// includes `lanes`, the high-zoom carriageway width reflects that lane count.
+function withHighZoomRoadGeometry(style) {
+  const cloned = { ...style, layers: style.layers.map(layer => ({
+    ...layer,
+    paint: layer.paint ? { ...layer.paint } : layer.paint,
+  })) };
+  const laneCount = ['min', 8, ['max', 1, ['to-number', ['get', 'lanes'], 1]]];
+
+  for (const layer of cloned.layers) {
+    if (layer.type !== 'line' || layer['source-layer'] !== 'transportation' || !layer.paint) continue;
+    const width = layer.paint['line-width'];
+    const isRoadSurface = /^r-(motorway|trunk|primary|secondary|tertiary|local|street)/.test(layer.id);
+    const isRoadCasing = /^rc-(motorway|trunk|primary|secondary|tertiary|local|street)/.test(layer.id);
+
+    if ((isRoadSurface || isRoadCasing) && Array.isArray(width)) {
+      const lastWidth = Number(width[width.length - 1]);
+      if (Number.isFinite(lastWidth)) {
+        const laneWidthAt18 = ['*', laneCount, 6];
+        const measuredAt18 = isRoadCasing ? ['+', laneWidthAt18, 3] : laneWidthAt18;
+        const at18 = ['case', ['has', 'lanes'], ['max', lastWidth, measuredAt18], lastWidth];
+        layer.paint['line-width'] = [...width.slice(0, -1), at18,
+          20, ['*', at18, 4], 22, ['*', at18, 16]];
+      }
+    }
+
+  }
+
+  // Replace theme-specific approximations with one boundary per real lane gap:
+  // 2 lanes => 1 divider, 3 lanes => 2 dividers, and so on (up to 8 lanes).
+  cloned.layers = cloned.layers.filter(layer => !layer.id.startsWith('lane-div-'));
+  const laneLabelIndex = cloned.layers.findIndex(layer => layer.id === 'lane-count-label');
+  const insertAt = laneLabelIndex >= 0 ? laneLabelIndex : cloned.layers.findIndex(layer => layer.id.startsWith('shield-'));
+  const dividers = Array.from({ length: 7 }, (_, index) => {
+    const boundary = index + 1;
+    const relativeOffset = ['-', boundary, ['/', laneCount, 2]];
+    return {
+      id: `lane-divider-${boundary}`,
+      type: 'line',
+      source: 'v',
+      'source-layer': 'transportation',
+      filter: ['all', ['has', 'lanes'], ['>=', 'lanes', boundary + 1], ['!=', 'brunnel', 'tunnel']],
+      minzoom: 16,
+      layout: { 'line-join': 'round', 'line-cap': 'butt' },
+      paint: {
+        'line-color': '#ffffff',
+        'line-opacity': 0.62,
+        'line-width': ['interpolate', ['linear'], ['zoom'], 16, 0.5, 18, 1, 20, 1.8, 22, 3],
+        'line-offset': ['interpolate', ['exponential', 2], ['zoom'],
+          16, ['*', relativeOffset, 1.5], 18, ['*', relativeOffset, 6],
+          20, ['*', relativeOffset, 24], 22, ['*', relativeOffset, 96]],
+        'line-dasharray': [6, 5],
+      },
+    };
+  });
+  cloned.layers.splice(insertAt >= 0 ? insertAt : cloned.layers.length, 0, ...dividers);
+  return cloned;
 }
 
 // ── 3D terrain (free Terrarium DEM tiles, no API key required) ────────────────
@@ -766,6 +827,7 @@ export default function MapLibreMap({
   const markers = useRef({ spots: new Map(), ambient: new Map(), pois: new Map(), user: null });
   const routeAdded = useRef(false);
   const poiAbort = useRef(null);
+  const categoryPoiAbort = useRef(null);
   const poiTimer = useRef(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [mapZoom, setMapZoom] = useState(13);
@@ -1068,45 +1130,53 @@ export default function MapLibreMap({
     if (!map) return;
     const m = markers.current.pois;
     const clear = () => { m.forEach(x => x.remove()); m.clear(); };
-    if (!selectedPOICategory) { clear(); onPOIsLoaded?.([]); return; }
+    if (!selectedPOICategory || !userPos) { clear(); onPOIsLoaded?.([]); return; }
 
     const load = async () => {
       const zoom = map.getZoom();
-      const b = map.getBounds();
-      const s = b.getSouth(), n = b.getNorth(), w = b.getWest(), e = b.getEast();
-      const limit = zoom >= 16 ? 200 : zoom >= 14 ? 100 : 50;
+      const [lat, lon] = userPos;
+      const radiusMeters = 20_000;
+      categoryPoiAbort.current?.abort();
+      const controller = new AbortController();
+      categoryPoiAbort.current = controller;
       onLoadingChange?.(true);
       try {
         if (!GEOAPIFY_KEY) { onLoadingChange?.(false); return; }
         const cat = selectedPOICategory.geoapifyCategory || 'leisure';
-        const res = await fetch(`https://api.geoapify.com/v2/places?categories=${encodeURIComponent(cat)}&filter=rect:${w},${s},${e},${n}&limit=${limit}&lang=${encodeURIComponent(language)}&apiKey=${GEOAPIFY_KEY}`);
+        const res = await fetch(`https://api.geoapify.com/v2/places?categories=${encodeURIComponent(cat)}&filter=circle:${lon},${lat},${radiusMeters}&bias=proximity:${lon},${lat}&limit=500&lang=${encodeURIComponent(language)}&apiKey=${GEOAPIFY_KEY}`, { signal: controller.signal });
         if (!res.ok) throw new Error(`${res.status}`);
         const data = await res.json();
+        if (controller.signal.aborted) return;
         clear();
         const pois = [];
         for (const feat of data.features || []) {
-          const [lon, lat] = feat.geometry?.coordinates || [];
-          if (!lat || !lon) continue;
+          const [poiLon, poiLat] = feat.geometry?.coordinates || [];
+          if (!Number.isFinite(poiLat) || !Number.isFinite(poiLon)) continue;
+          const dLat = (poiLat - lat) * Math.PI / 180;
+          const dLon = (poiLon - lon) * Math.PI / 180;
+          const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat * Math.PI / 180) * Math.cos(poiLat * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+          if (6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) > 20) continue;
           const p = feat.properties || {};
-          const poi = { id: p.place_id || `${lat}-${lon}`, lat, lon, name: p.name || selectedPOICategory.name, address: p.address_line2 || '', tags: {} };
+          const poi = { id: p.place_id || `${poiLat}-${poiLon}`, lat: poiLat, lon: poiLon, name: p.name || selectedPOICategory.name, address: p.address_line2 || '', tags: {} };
           pois.push(poi);
           const size = zoom >= 16 ? 46 : zoom >= 14 ? 40 : 34;
           const el = makeDot(selectedPOICategory.key, selectedPOICategory.color, size, zoom >= 14 ? poi.name : '');
-          const mk = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([lon, lat]).addTo(map);
+          const mk = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([poiLon, poiLat]).addTo(map);
           el.addEventListener('click', e => { e.stopPropagation(); onSelectPOI?.(poi); });
           m.set(poi.id, mk);
         }
         onPOIsLoaded?.(pois);
-      } catch (e) { console.warn('Category POI error:', e.message); }
-      onLoadingChange?.(false);
+      } catch (e) {
+        if (e?.name !== 'AbortError') console.warn('Category POI error:', e.message);
+      } finally {
+        if (!controller.signal.aborted) onLoadingChange?.(false);
+      }
     };
 
     clearTimeout(poiTimer.current);
     poiTimer.current = setTimeout(load, 300);
-    const onMove = () => { clearTimeout(poiTimer.current); poiTimer.current = setTimeout(load, 500); };
-    map.on('moveend', onMove); map.on('zoomend', onMove);
-    return () => { map.off('moveend', onMove); map.off('zoomend', onMove); };
-  }, [selectedPOICategory, language]);
+    return () => { clearTimeout(poiTimer.current); categoryPoiAbort.current?.abort(); };
+  }, [selectedPOICategory, language, userPos]);
 
   // ── Route overlay ──────────────────────────────────────────────────────────
   useEffect(() => {

@@ -28,6 +28,14 @@
       ]
     },
     {
+      "collectionGroup": "spots",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "created_by_uid", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "flags",
       "queryScope": "COLLECTION",
       "fields": [

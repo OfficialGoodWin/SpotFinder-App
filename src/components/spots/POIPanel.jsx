@@ -164,7 +164,7 @@ function MobileSheet({ children, header, onClose, bottomOffset }) {
 }
 
 export default function POIPanel({ pois, category, userPos, loading, onFlyTo, onNavigate, onSelect, onClose }) {
-  const { language } = useLanguage();
+  const { t, language } = useLanguage();
 
   const sortedPOIs = useMemo(() => {
     if (!userPos || !pois) return pois || [];
