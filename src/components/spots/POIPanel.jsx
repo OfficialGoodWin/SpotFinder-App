@@ -72,7 +72,7 @@ function POIRow({ poi, category, onFlyTo, onNavigate, onSelect, onClose }) {
   );
 }
 
-function MobileSheet({ children, header, onClose, bottomOffset }) {
+function MobileSheet({ children, header, onClose, closeLabel, bottomOffset }) {
   const [snap, setSnap] = useState('full');
   const [dragY, setDragY] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -151,7 +151,7 @@ function MobileSheet({ children, header, onClose, bottomOffset }) {
         >
           <div className="absolute left-1/2 top-3 -translate-x-1/2 w-10 h-1 rounded-full bg-gray-300 dark:bg-border" />
           <div className="w-full">{header}</div>
-          <button onClick={onClose} aria-label={t('common.close')} className="absolute right-4 w-8 h-8 rounded-full bg-gray-100 dark:bg-accent flex items-center justify-center">
+          <button onClick={onClose} aria-label={closeLabel} className="absolute right-4 w-8 h-8 rounded-full bg-gray-100 dark:bg-accent flex items-center justify-center">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -207,7 +207,7 @@ export default function POIPanel({ pois, category, userPos, loading, onFlyTo, on
     <>
       {/* ── MOBILE ── */}
       <div className="md:hidden">
-        <MobileSheet header={header} onClose={onClose} bottomOffset={56}>
+        <MobileSheet header={header} onClose={onClose} closeLabel={t('common.close')} bottomOffset={56}>
           {listContent}
         </MobileSheet>
       </div>
