@@ -532,7 +532,7 @@ function makeSpotDom(spot) {
   el.setAttribute('role', 'button');
   el.setAttribute('tabindex', '0');
   el.setAttribute('aria-label', `Open ${spot.title || 'community spot'}`);
-  el.style.cssText = `width:${photoUrl ? 116 : 96}px;height:${photoUrl ? 102 : 92}px;cursor:pointer;`;
+  el.style.cssText = `width:${photoUrl ? 116 : 96}px;height:${photoUrl ? 98 : 88}px;cursor:pointer;`;
   const root = createRoot(el);
   root.render(photoUrl
     ? <SpotMarkerThumbnail spot={spot} imageUrl={photoUrl} />

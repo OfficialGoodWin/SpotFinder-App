@@ -220,8 +220,7 @@ export default function Home() {
       return spot;
     } catch (err) {
       console.error('Failed to create spot:', err);
-      toast.error('The spot could not be saved. Check your connection and try again.');
-      throw err; // re-throw so AddSpotModal's finally/loading state also resolves correctly
+      throw err; // AddSpotModal maps this to its inline, field-associated error UI.
     }
   };
 

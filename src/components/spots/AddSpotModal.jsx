@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X, Camera, MapPin, Mic, Loader2 } from 'lucide-react';
+import { X, Camera, MapPin, Mic, Loader2, AlertCircle } from 'lucide-react';
 import StarRating from './StarRating';
 import LabeledRatingScale from './LabeledRatingScale';
 import AdBanner from '../AdBanner';
@@ -63,6 +63,8 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   const [micError, setMicError] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [socialUrl, setSocialUrl] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [submitError, setSubmitError] = useState('');
 
   // ── New fields per submission spec ──────────────────────────────────────────
   const [tags, setTags] = useState([]);
@@ -79,6 +81,15 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
 
   const recognitionRef = useRef(null);
   const committedRef = useRef(''); // tracks already-committed final transcript
+  const descriptionRef = useRef(null);
+  const errorSummaryRef = useRef(null);
+
+  const focusError = (fieldRef = errorSummaryRef) => {
+    requestAnimationFrame(() => {
+      fieldRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      fieldRef.current?.focus({ preventScroll: true });
+    });
+  };
 
   const handleImageChange = (e) => {
     const remaining = 3 - imageFiles.length;
@@ -181,6 +192,16 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   };
 
   const handleSave = async () => {
+    setSubmitError('');
+    if (!description.trim()) {
+      const message = t('addSpot.descriptionRequired');
+      setFieldErrors(current => ({ ...current, description: message }));
+      setSubmitError(message);
+      focusError(descriptionRef);
+      return;
+    }
+    setFieldErrors(current => ({ ...current, description: '' }));
+
     const socialValidation = socialUrl ? validateSocialPostUrl(socialUrl) : null;
     if (socialUrl && !socialValidation?.ok) {
       toast.error(INVALID_SOCIAL_URL_MESSAGE);
@@ -276,6 +297,18 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
       await onSave(baseData, socialValidation?.canonicalUrl || '');
     } catch (err) {
       console.error('Save failed:', err);
+      const rawMessage = String(err?.message || '');
+      const isDescriptionError = /description is required/i.test(rawMessage);
+      const message = isDescriptionError
+        ? t('addSpot.descriptionRequired')
+        : rawMessage.replace(/^Firebase:\s*/i, '').replace(/\s*\[\d{3}\]\s*$/, '') || t('addSpot.saveErrorMessage');
+      setSubmitError(message);
+      if (isDescriptionError) {
+        setFieldErrors(current => ({ ...current, description: message }));
+        focusError(descriptionRef);
+      } else {
+        focusError(errorSummaryRef);
+      }
     } finally {
       setLoading(false);
     }
@@ -295,10 +328,31 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
         </div>
 
         <div className="px-6 py-4 space-y-5">
+          {submitError && (
+            <div
+              ref={errorSummaryRef}
+              role="alert"
+              aria-live="assertive"
+              tabIndex={-1}
+              className="relative flex gap-3 rounded-2xl border border-red-200 bg-red-50/95 p-4 pr-11 text-red-950 shadow-[0_10px_30px_rgba(185,28,28,.10)] outline-none backdrop-blur-xl focus:ring-2 focus:ring-red-400 dark:border-red-900/70 dark:bg-red-950/45 dark:text-red-100"
+            >
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-red-100 text-red-600 dark:bg-red-900/70 dark:text-red-300">
+                <AlertCircle className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 pt-0.5">
+                <p className="text-sm font-bold">{t('addSpot.saveErrorTitle')}</p>
+                <p className="mt-1 text-xs leading-5 text-red-700 dark:text-red-200">{submitError}</p>
+              </div>
+              <button type="button" onClick={() => setSubmitError('')} aria-label={t('common.close')} className="absolute right-2.5 top-2.5 rounded-full p-1.5 text-red-500 transition hover:bg-red-100 dark:hover:bg-red-900/60">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
           {/* Description + voice */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-sm font-semibold text-gray-600 dark:text-foreground">{t('addSpot.description')}</label>
+              <label htmlFor="new-spot-description" className="text-sm font-semibold text-gray-600 dark:text-foreground">{t('addSpot.description')} <span className="text-red-500" aria-hidden="true">*</span></label>
               <button
                 type="button"
                 onClick={toggleVoice}
@@ -317,14 +371,35 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
               <p className="text-xs text-red-500 dark:text-red-400 mb-1 px-1">{micError}</p>
             )}
             <textarea
+              ref={descriptionRef}
+              id="new-spot-description"
               value={description}
-              onChange={e => setDescription(e.target.value)}
+              onChange={e => {
+                setDescription(e.target.value);
+                if (fieldErrors.description && e.target.value.trim()) {
+                  setFieldErrors(current => ({ ...current, description: '' }));
+                  setSubmitError('');
+                }
+              }}
+              onBlur={() => {
+                if (!description.trim()) setFieldErrors(current => ({ ...current, description: t('addSpot.descriptionRequired') }));
+              }}
+              aria-invalid={Boolean(fieldErrors.description)}
+              aria-describedby={fieldErrors.description ? 'new-spot-description-error' : undefined}
               placeholder={t('addSpot.descPlaceholder')}
               rows={3}
               className={`w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-background text-gray-900 dark:text-foreground focus:outline-none focus:ring-2 focus:ring-blue-300 text-sm resize-none transition-colors ${
-                listening ? 'border-red-300 dark:border-red-600' : 'border-gray-200 dark:border-border'
+                fieldErrors.description
+                  ? 'border-red-400 bg-red-50/40 focus:ring-red-300 dark:border-red-700 dark:bg-red-950/20'
+                  : listening ? 'border-red-300 dark:border-red-600' : 'border-gray-200 dark:border-border'
               }`}
             />
+            {fieldErrors.description && (
+              <p id="new-spot-description-error" className="mt-1.5 flex items-center gap-1.5 px-1 text-xs font-semibold text-red-600 dark:text-red-400">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                {fieldErrors.description}
+              </p>
+            )}
             {interimText && (
               <p className="mt-1 text-xs text-red-500 dark:text-red-400 italic px-1">
                 {interimText}…

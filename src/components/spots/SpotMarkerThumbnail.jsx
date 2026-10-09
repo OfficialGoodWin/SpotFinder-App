@@ -1,12 +1,17 @@
 import React from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Image as ImageIcon, Play, Star } from 'lucide-react';
+import { Footprints, Image as ImageIcon, Play, Star } from 'lucide-react';
 import { getSpotMarkerTheme, getSpotRating } from './spotMarkerTheme';
+
+const ACCESS_STYLE = {
+  easy: { label: 'Easy walk', className: 'bg-emerald-400 text-emerald-950' },
+  moderate: { label: 'Short hike', className: 'bg-orange-400 text-orange-950' },
+  hard: { label: 'Challenging hike', className: 'bg-rose-400 text-rose-950' },
+};
 
 export default function SpotMarkerThumbnail({
   spot,
   category = spot?.tags?.[0],
-  label = spot?.title || 'Secret spot',
   imageUrl = spot?.image_url,
   hasVideo = Boolean(spot?.has_social || spot?.video_url),
   className = '',
@@ -14,10 +19,11 @@ export default function SpotMarkerThumbnail({
   const theme = getSpotMarkerTheme(category);
   const rating = getSpotRating(spot);
   const reduceMotion = useReducedMotion();
+  const access = ACCESS_STYLE[spot?.access_difficulty];
 
   return (
     <motion.div
-      className={`sf-premium-marker group relative h-[102px] w-[116px] select-none ${className}`}
+      className={`sf-premium-marker group relative h-[98px] w-[116px] select-none ${className}`}
       initial={reduceMotion ? false : { opacity: 0, y: 7, scale: 0.9 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       whileHover={reduceMotion ? undefined : { y: -5, scale: 1.08 }}
@@ -37,10 +43,15 @@ export default function SpotMarkerThumbnail({
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/10 to-white/10" />
-        <div className="absolute inset-x-2 bottom-2 flex items-center justify-between gap-1.5">
-          <span className="max-w-[70px] truncate rounded-full border border-white/25 bg-black/35 px-2 py-1 text-[9px] font-extrabold leading-none text-white shadow-sm backdrop-blur-lg">
+        <div className="absolute inset-x-2 bottom-2 flex items-center gap-1">
+          <span className="min-w-0 flex-1 truncate rounded-full border border-white/25 bg-black/35 px-2 py-1 text-[9px] font-extrabold leading-none text-white shadow-sm backdrop-blur-lg">
             #{theme.label.replace(/\s/g, '')}
           </span>
+          {access && (
+            <span className={`grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border border-white/35 shadow-sm ${access.className}`} title={access.label} aria-label={access.label}>
+              <Footprints className="h-2.5 w-2.5" strokeWidth={2.5} />
+            </span>
+          )}
           <span className="flex items-center gap-0.5 rounded-full border border-white/25 bg-black/40 px-1.5 py-1 text-[9px] font-extrabold leading-none text-white backdrop-blur-lg">
             {rating !== 'New' && <Star className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />}
             {rating}
@@ -57,9 +68,6 @@ export default function SpotMarkerThumbnail({
         className="absolute left-1/2 top-[74px] h-[17px] w-[17px] -translate-x-1/2 rotate-45 rounded-[4px] border-b-2 border-r-2 border-white/80"
         style={{ background: theme.accent, borderColor: `${theme.accent}cc`, boxShadow: `5px 5px 14px ${theme.glow}` }}
       />
-      <div className="sf-premium-marker__label absolute left-1/2 top-[94px] max-w-[170px] -translate-x-1/2 truncate rounded-full border border-white/25 bg-slate-950/86 px-2.5 py-1 font-sans text-[11px] font-bold leading-none tracking-[-0.01em] text-white shadow-[0_5px_16px_rgba(15,23,42,.34)] backdrop-blur-xl">
-        {label}
-      </div>
     </motion.div>
   );
 }

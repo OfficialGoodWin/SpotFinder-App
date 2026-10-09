@@ -3,9 +3,9 @@ import SpotMarkerIcon from './SpotMarkerIcon';
 import SpotMarkerThumbnail from './SpotMarkerThumbnail';
 
 const PREVIEWS = [
-  { id: 'sunset', title: 'Golden Hour Ridge', tags: ['Sunset'], rating: 4.9, rating_count: 142, has_social: true },
-  { id: 'waterfall', title: 'Hidden Cascade', tags: ['Waterfall'], rating: 4.8, rating_count: 89, has_social: true },
-  { id: 'cafe', title: 'Backstreet Brew', tags: ['SecretCafe'], rating: 4.7, rating_count: 64, has_social: true },
+  { id: 'sunset', title: 'Golden Hour Ridge', tags: ['Sunset'], rating: 4.9, rating_count: 142, access_difficulty: 'moderate', has_social: true },
+  { id: 'waterfall', title: 'Hidden Cascade', tags: ['Waterfall'], rating: 4.8, rating_count: 89, access_difficulty: 'hard', has_social: true },
+  { id: 'cafe', title: 'Backstreet Brew', tags: ['SecretCafe'], rating: 4.7, rating_count: 64, access_difficulty: 'easy', has_social: true },
 ];
 
 export default function SpotMarkerPreviewGrid({ thumbnails = {} }) {
