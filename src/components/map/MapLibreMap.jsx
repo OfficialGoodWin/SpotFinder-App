@@ -8,6 +8,7 @@
  * Dark: full dark variant, switches instantly via setStyle()
  */
 import { useEffect, useRef, useState } from 'react';
+import { createRoot } from 'react-dom/client';
 import * as maplibregl from 'maplibre-gl';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { Protocol } from 'pmtiles';
@@ -17,6 +18,8 @@ import { lightStyle, darkStyle, outdoorStyle, winterStyle } from '../../lib/mapS
 import { AMBIENT_CATEGORIES } from '../../lib/ambientCategories.js';
 import { badgeSVG, iconGlyphSVG } from '../../lib/mapIcons.js';
 import { useLanguage } from '@/lib/LanguageContext';
+import SpotMarkerIcon from '@/components/spots/SpotMarkerIcon';
+import SpotMarkerThumbnail from '@/components/spots/SpotMarkerThumbnail';
 
 // MapLibre v6 publishes its worker as a separate module. Importing it as a URL
 // makes Vite emit the file instead of leaving a broken package-relative URL.
@@ -323,6 +326,7 @@ function getMapStyle(isDark, mapLayer) {
 function withHighZoomRoadGeometry(style) {
   const cloned = { ...style, layers: style.layers.map(layer => ({
     ...layer,
+    layout: layer.layout ? { ...layer.layout } : layer.layout,
     paint: layer.paint ? { ...layer.paint } : layer.paint,
   })) };
   const laneCount = ['min', 8, ['max', 1, ['to-number', ['get', 'lanes'], 1]]];
@@ -344,6 +348,38 @@ function withHighZoomRoadGeometry(style) {
       }
     }
 
+  }
+
+  const isDarkTheme = /dark/i.test(cloned.name || '');
+  const pedestrianIndex = cloned.layers.findIndex(layer => layer.id === 'r-path');
+  if (pedestrianIndex >= 0) {
+    const pedestrian = cloned.layers[pedestrianIndex];
+    pedestrian.minzoom = 15;
+    pedestrian.paint['line-color'] = isDarkTheme ? '#b3a58d' : '#d8d1c3';
+    pedestrian.paint['line-opacity'] = 1;
+    pedestrian.paint['line-width'] = ['interpolate', ['exponential', 2], ['zoom'],
+      15, 1, 18, 3, 20, 12, 22, 48];
+    pedestrian.paint['line-dasharray'] = [2.5, 1.5];
+    cloned.layers.splice(pedestrianIndex, 0, {
+      ...pedestrian,
+      id: 'r-path-casing',
+      paint: {
+        'line-color': isDarkTheme ? '#544b3f' : '#9f9584',
+        'line-opacity': 0.9,
+        'line-width': ['interpolate', ['exponential', 2], ['zoom'],
+          15, 2, 18, 5, 20, 16, 22, 56],
+      },
+    });
+  }
+
+  for (const layer of cloned.layers) {
+    if (layer.type !== 'symbol' || layer['source-layer'] !== 'transportation_name') continue;
+    if (!['lbl-primary', 'lbl-street'].includes(layer.id)) continue;
+    layer.layout['text-size'] = ['interpolate', ['linear'], ['zoom'],
+      13, 11, 16, 13, 18, 15, 20, 21, 22, 30];
+    layer.layout['symbol-spacing'] = 180;
+    layer.layout['text-letter-spacing'] = 0.02;
+    layer.paint['text-halo-width'] = ['interpolate', ['linear'], ['zoom'], 13, 1.5, 18, 2, 22, 3];
   }
 
   // Replace theme-specific approximations with one boundary per real lane gap:
@@ -481,40 +517,7 @@ function makeDot(catKey, color, size = 28, label = '') {
   return el;
 }
 
-// ── Discovery spot marker: equal-weight photo and category variants ──────────
-const SPOT_TAG_ICON_KEY = {
-  Viewpoint: 'viewpoint', SecretCafe: 'cafe', Sunset: 'sunset', Sunrise: 'sunrise', PhotoSpot: 'speedcamera',
-  Waterfall: 'waterfall', Hike: 'hike', SwimSpot: 'swim', Ruin: 'heritage', UrbanExplore: 'urbanexplore',
-  Mountain: 'mountain',
-};
-const COST_RING_COLOR = { free: '#22c55e', paid: '#f59e0b', donation: '#f59e0b' };
-const DIFFICULTY_DOT_COLOR = { easy: '#22c55e', moderate: '#eab308', hard: '#ef4444' };
-
-const TRUSTED_DISCOVERY_STATES = new Set(['spotfinder_pick', 'highly_rated', 'popular', 'hidden_gem', 'new', 'visited']);
-const DISCOVERY_STATE_LABEL = { spotfinder_pick: 'SpotFinder Pick', highly_rated: 'Highly Rated', popular: 'Popular', hidden_gem: 'Hidden Gem', new: 'New', visited: 'Visited' };
-
-function discoveryTeaser(spot, trustedState = '') {
-  if (trustedState) return DISCOVERY_STATE_LABEL[trustedState] || '';
-  const elevation = Number(spot.elevation ?? spot.ele);
-  if (Number.isFinite(elevation) && elevation >= -500 && elevation <= 9000) return `${Math.round(elevation)} m`;
-  const rating = Number(spot.rating);
-  const ratingCount = Number(spot.rating_count);
-  if (ratingCount > 0 && Number.isFinite(rating) && rating >= 1 && rating <= 5) return `★ ${rating.toFixed(1)}`;
-  const likes = Number(spot.likes_count);
-  if (Number.isInteger(likes) && likes > 0) return `${likes} like${likes === 1 ? '' : 's'}`;
-  return '';
-}
-
 function makeSpotDom(spot) {
-  const primaryTag = spot.tags?.[0];
-  const iconKey = SPOT_TAG_ICON_KEY[primaryTag] || 'custom';
-  const icon = iconGlyphSVG(iconKey, 24, '#15803d');
-  const badgeIcon = iconGlyphSVG(iconKey, 13, 'white');
-  const accentColor = '#16a34a';
-  const costColor = COST_RING_COLOR[spot.cost] || accentColor;
-  const diffColor = DIFFICULTY_DOT_COLOR[spot.access_difficulty];
-  const discoveryState = TRUSTED_DISCOVERY_STATES.has(spot.discovery_state) ? spot.discovery_state : '';
-  const teaser = discoveryTeaser(spot, discoveryState);
   const photoUrl = typeof spot.image_url === 'string' && /^https:\/\//i.test(spot.image_url) ? spot.image_url : '';
 
   const el = document.createElement('div');
@@ -525,34 +528,15 @@ function makeSpotDom(spot) {
   // a stylesheet class rule), which is what caused markers to drift or
   // freeze during zoom instead of tracking their real lng/lat.
   el.className = 'sf-discovery-marker';
-  el.dataset.discoveryState = discoveryState;
   el.setAttribute('role', 'button');
   el.setAttribute('tabindex', '0');
   el.setAttribute('aria-label', `Open ${spot.title || 'community spot'}`);
-  el.style.cssText = 'width:92px;height:82px;cursor:pointer;';
-
-  const photoOrFallback = photoUrl
-    ? `<img src="${escapeHtml(photoUrl)}" alt="" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block;" />`
-    : `<div class="sf-discovery-marker__fallback">${icon}${teaser ? `<span>${escapeHtml(teaser)}</span>` : ''}</div>`;
-
-  // Inner wrapper carries `position:relative` instead, so the badge/dot
-  // overlays below still anchor correctly without touching the outer
-  // element MapLibre positions.
-  el.innerHTML = `
-    <div class="sf-discovery-marker__motion">
-      <div class="sf-discovery-marker__card">
-        ${photoOrFallback}
-      </div>
-      <div class="sf-discovery-marker__stem"></div><div class="sf-discovery-marker__tip"></div>
-      <div class="sf-discovery-marker__badge" style="background:${accentColor};">
-        ${badgeIcon}
-      </div>
-      ${spot.has_social ? '<div class="sf-discovery-marker__social" aria-hidden="true"><span></span></div>' : ''}
-      ${diffColor ? `<div class="sf-discovery-marker__difficulty" style="background:${diffColor};"></div>` : ''}
-      ${spot.cost && spot.cost !== 'free' ? `<div class="sf-discovery-marker__cost" style="background:${costColor};"></div>` : ''}
-      <div class="sf-discovery-marker__label">${escapeHtml(spot.title || '')}</div>
-    </div>
-  `;
+  el.style.cssText = `width:${photoUrl ? 116 : 96}px;height:${photoUrl ? 102 : 92}px;cursor:pointer;`;
+  const root = createRoot(el);
+  root.render(photoUrl
+    ? <SpotMarkerThumbnail spot={spot} imageUrl={photoUrl} />
+    : <SpotMarkerIcon spot={spot} />);
+  el.__spotMarkerRoot = root;
   const select = () => {
     document.querySelectorAll('.sf-discovery-marker.is-selected').forEach(marker => marker.classList.remove('is-selected'));
     el.classList.add('is-selected');
@@ -562,6 +546,11 @@ function makeSpotDom(spot) {
     if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); select(); el.click(); }
   });
   return el;
+}
+
+function removeSpotMarker(marker) {
+  marker?.getElement?.().__spotMarkerRoot?.unmount();
+  marker?.remove();
 }
 
 // ── Pre-baked ambient POI tiles ───────────────────────────────────────────────
@@ -966,6 +955,8 @@ export default function MapLibreMap({
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
       map.off('zoom', syncZoom);
+      markers.current.spots.forEach(removeSpotMarker);
+      markers.current.spots.clear();
       map.remove();
       mapRef.current = null;
     };
@@ -1024,9 +1015,9 @@ export default function MapLibreMap({
     const map = mapRef.current;
     if (!map) return;
     const m = markers.current.spots;
-    if (!showSpots) { m.forEach(x => x.remove()); m.clear(); return; }
+    if (!showSpots) { m.forEach(removeSpotMarker); m.clear(); return; }
     const ids = new Set(spots.map(s => s.id));
-    m.forEach((x, id) => { if (!ids.has(id)) { x.remove(); m.delete(id); } });
+    m.forEach((x, id) => { if (!ids.has(id)) { removeSpotMarker(x); m.delete(id); } });
     for (const spot of spots) {
       if (m.has(spot.id)) continue;
       const el = makeSpotDom(spot);

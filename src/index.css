@@ -407,6 +407,13 @@
 .dark .sf-discovery-marker__card { background: rgb(15 23 42 / .96); box-shadow: 0 5px 16px rgb(0 0 0 / .48), inset 0 1px 0 rgb(255 255 255 / .1); }
 .dark .sf-discovery-marker__fallback { color: #bbf7d0; background: linear-gradient(145deg, rgb(20 83 45 / .96), rgb(6 78 59 / .94)); }.dark .sf-discovery-marker__fallback span { color: #dcfce7; }
 @media (prefers-reduced-motion: reduce) { .sf-discovery-marker__motion,.sf-discovery-marker__label { transition-duration: .01ms; }.sf-discovery-marker:hover .sf-discovery-marker__motion,.sf-discovery-marker:focus-visible .sf-discovery-marker__motion { transform: none; } }
+
+/* Premium React/Framer map markers. Keep MapLibre's outer marker positioning
+   untouched; all visual transforms live on the mounted inner component. */
+.sf-discovery-marker:focus-visible { border-radius: 24px; outline: 3px solid rgb(255 255 255 / .95); outline-offset: 4px; }
+.sf-discovery-marker.is-selected .sf-premium-marker__card { box-shadow: 0 0 0 4px rgb(255 255 255 / .9), 0 0 0 7px var(--marker-accent), 0 14px 38px var(--marker-glow) !important; }
+.sf-discovery-marker.is-selected .sf-premium-marker__label { background: rgb(2 6 23 / .96); transform: translateX(-50%) scale(1.04); }
+.maplibregl-marker .sf-premium-marker { font-family: Inter, Outfit, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 @keyframes sf-menu-enter {
   from { opacity: 0; transform: translateY(-8px) scale(.975); filter: blur(3px); }
   to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
