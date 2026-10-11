@@ -10,7 +10,7 @@ export default function Layout({ children, currentPageName }) {
 
   if (isMapPage) {
     return (
-      <div style={{ height: '100dvh', width: '100vw', overflow: 'hidden', position: 'fixed', top: 0, left: 0 }}>
+      <div className="sf-app-viewport" style={{ width: '100vw', overflow: 'hidden', position: 'fixed', top: 0, left: 0 }}>
         <StatusBanner />
         {children}
         <CookieConsentBanner />
@@ -20,7 +20,7 @@ export default function Layout({ children, currentPageName }) {
 
   // Non-map pages: let the browser handle scrolling normally
   return (
-    <div style={{ minHeight: '100dvh', width: '100%', overflowX: 'hidden' }}>
+    <div className="sf-page-viewport" style={{ width: '100%', overflowX: 'hidden' }}>
       <StatusBanner />
       {children}
       <CookieConsentBanner />

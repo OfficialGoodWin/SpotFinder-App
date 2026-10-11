@@ -435,6 +435,19 @@ html, body, #root {
   overflow-x: hidden;
 }
 
+/* `vh` keeps older embedded Chromium/WebKit browsers usable; modern browsers
+   override it with the dynamic viewport unit so mobile browser chrome is
+   handled accurately. */
+.sf-app-viewport {
+  height: 100vh;
+  height: 100dvh;
+}
+
+.sf-page-viewport {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
 @media (max-width: 640px) and (pointer: coarse) {
   button, a, input, select, textarea {
     touch-action: manipulation;

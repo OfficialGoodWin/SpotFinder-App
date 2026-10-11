@@ -45,6 +45,7 @@ import { validateImageDimensions, validateImageFile } from '@/lib/imageUploadVal
 import { firebaseConfig } from './firebaseConfig';
 import { getRecaptchaToken } from '@/lib/recaptcha';
 import { filterAndSortNearbySpots, normalizeLatLng } from '@/lib/spotDiscovery';
+import { applyReviewedLegacyIdentity } from '@/lib/reviewedLegacySpots';
 
 let app, auth, db, functionsInstance, storage;
 try {
@@ -316,6 +317,7 @@ export const isIPBanned = async (ipAddress) => {
  
 const SPOTS_COLLECTION = 'spots';
 const RATINGS_COLLECTION = 'ratings';
+const spotFromSnapshot = snapshot => applyReviewedLegacyIdentity({ id: snapshot.id, ...snapshot.data() });
 
 // Public feedback is deliberately routed through a callable function. This
 // lets the server verify reCAPTCHA and apply IP + anonymous-session limits
@@ -342,7 +344,7 @@ export const getPublicSpots = async (maxCount = 200) => {
     orderBy('created_date', 'desc'),
     limit(maxCount)
   );
-  return (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
+  return (await getDocs(q)).docs.map(spotFromSnapshot);
 };
 
 // Scalable viewport query: only fetch spots currently inside the map bounds.
@@ -370,7 +372,7 @@ export const getPublicSpotsInBounds = async ({ south, west, north, east }, maxCo
     return getDocs(query(collection(db, SPOTS_COLLECTION), ...clauses, limit(maxCount)));
   }));
   const unique = new Map();
-  snapshots.forEach(snapshot => snapshot.docs.forEach(d => unique.set(d.id, { id: d.id, ...d.data() })));
+  snapshots.forEach(snapshot => snapshot.docs.forEach(d => unique.set(d.id, spotFromSnapshot(d))));
   const rows = [...unique.values()].slice(0, maxCount);
   return rows.sort((a, b) => String(b.created_date || '').localeCompare(String(a.created_date || '')));
 };
@@ -380,7 +382,7 @@ export const getPublicSpotById = async (spotId) => {
   const { db } = getFirebaseServices();
   const snapshot = await getDoc(doc(db, SPOTS_COLLECTION, String(spotId)));
   if (!snapshot.exists()) return null;
-  const spot = { id: snapshot.id, ...snapshot.data() };
+  const spot = spotFromSnapshot(snapshot);
   return spot.is_public && ['published', 'pending_trust'].includes(spot.status) ? spot : null;
 };
 
@@ -412,7 +414,7 @@ export const getUserSpots = async (userEmail, maxCount = 50, userId = '') => {
   const requests = [getDocs(query(collection(db, SPOTS_COLLECTION), where('created_by', '==', userEmail), orderBy('created_date', 'desc'), limit(maxCount)))];
   if (userId) requests.push(getDocs(query(collection(db, SPOTS_COLLECTION), where('created_by_uid', '==', userId), limit(maxCount))));
   const unique = new Map();
-  (await Promise.all(requests)).forEach(snapshot => snapshot.docs.forEach(d => unique.set(d.id, { id: d.id, ...d.data() })));
+  (await Promise.all(requests)).forEach(snapshot => snapshot.docs.forEach(d => unique.set(d.id, spotFromSnapshot(d))));
   return [...unique.values()]
     .sort((a, b) => String(b.created_date || '').localeCompare(String(a.created_date || '')))
     .slice(0, maxCount);
@@ -653,7 +655,7 @@ async function getSpotsForRelations(collectionName, uid, maxCount = 100) {
   for (let offset = 0; offset < ids.length; offset += 30) {
     const batchIds = ids.slice(offset, offset + 30);
     const batch = await getDocs(query(collection(db, SPOTS_COLLECTION), where(documentId(), 'in', batchIds)));
-    batch.docs.forEach(snap => spotsById.set(snap.id, { id: snap.id, ...snap.data() }));
+    batch.docs.forEach(snap => spotsById.set(snap.id, spotFromSnapshot(snap)));
   }
   const relationDates = new Map(rels.map(relation => [relation.spot_id, relation.created_date || null]));
   return ids.map(id => {

@@ -15,6 +15,7 @@ import { initializeApp, applicationDefault } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { writeFile, readFile } from 'node:fs/promises';
 import { resolveSpotTitle, isMeaningfulSpotTitle } from '../../src/lib/spotPresentation.js';
+import { applyReviewedLegacyIdentity } from '../../src/lib/reviewedLegacySpots.js';
 
 const args = new Set(process.argv.slice(2));
 const apply = args.has('--apply');
@@ -44,16 +45,25 @@ async function run() {
   const review = [];
   const changes = [];
   for (const doc of snapshot.docs) {
-    const spot = doc.data();
-    if (isMeaningfulSpotTitle(spot.title) || isMeaningfulSpotTitle(spot.resolved_title)) continue;
-    const resolution = resolveSpotTitle(spot);
+    const rawSpot = { id: doc.id, ...doc.data() };
+    if (isMeaningfulSpotTitle(rawSpot.title) || isMeaningfulSpotTitle(rawSpot.resolved_title)) continue;
+    const spot = applyReviewedLegacyIdentity(rawSpot);
+    const resolution = spot.resolved_title_source === 'reviewed_osm_coordinate_match'
+      ? { title: spot.resolved_title, source: spot.resolved_title_source, confidence: spot.resolved_title_confidence }
+      : resolveSpotTitle(spot);
     const row = { id: doc.id, currentTitle: spot.title || null, ...resolution, poiMatch: spot.poi_match || null };
     if (resolution.confidence !== 'high') { review.push(row); continue; }
-    changes.push({ id: doc.id, resolution, previous: {
-      resolved_title: Object.prototype.hasOwnProperty.call(spot, 'resolved_title') ? spot.resolved_title : '__MISSING__',
-      resolved_title_source: Object.prototype.hasOwnProperty.call(spot, 'resolved_title_source') ? spot.resolved_title_source : '__MISSING__',
-      resolved_title_confidence: Object.prototype.hasOwnProperty.call(spot, 'resolved_title_confidence') ? spot.resolved_title_confidence : '__MISSING__',
-    } });
+    const presentation = {
+      resolved_title: resolution.title,
+      resolved_title_source: resolution.source,
+      resolved_title_confidence: resolution.confidence,
+      ...(spot.resolved_category ? { resolved_category: spot.resolved_category } : {}),
+      ...(spot.locality && !rawSpot.locality ? { locality: spot.locality } : {}),
+      ...(spot.identity_evidence ? { identity_evidence: spot.identity_evidence } : {}),
+    };
+    changes.push({ id: doc.id, resolution, presentation, previous: Object.fromEntries(
+      Object.keys(presentation).map(key => [key, Object.prototype.hasOwnProperty.call(rawSpot, key) ? rawSpot[key] : '__MISSING__'])
+    ) });
   }
   await writeFile(reportPath, JSON.stringify({ generatedAt: new Date().toISOString(), dryRun: !apply, highConfidence: changes.map(({ previous, ...row }) => row), review }, null, 2));
   console.log(`${snapshot.size} spots scanned; ${changes.length} high-confidence changes; ${review.length} require review.`);
@@ -63,11 +73,7 @@ async function run() {
   await writeFile(rollbackPath, JSON.stringify({ generatedAt: new Date().toISOString(), rows: changes.map(({ id, previous }) => ({ id, previous })) }, null, 2));
   let batch = db.batch(), count = 0;
   for (const change of changes) {
-    batch.update(db.collection('spots').doc(change.id), {
-      resolved_title: change.resolution.title,
-      resolved_title_source: change.resolution.source,
-      resolved_title_confidence: change.resolution.confidence,
-    });
+    batch.update(db.collection('spots').doc(change.id), change.presentation);
     if (++count % 400 === 0) { await batch.commit(); batch = db.batch(); }
   }
   if (count % 400) await batch.commit();

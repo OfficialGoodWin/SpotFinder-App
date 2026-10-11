@@ -10,7 +10,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import * as maplibregl from 'maplibre-gl';
-import { getSpotDisplayName } from '@/lib/spotPresentation';
+import { getSpotDisplayName, getSpotImageInfo } from '@/lib/spotPresentation';
+import { getSpotCameraOptions } from '@/lib/mapSpotFocus';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { Protocol } from 'pmtiles';
 import { Minus, Plus } from 'lucide-react';
@@ -520,7 +521,7 @@ function makeDot(catKey, color, size = 28, label = '') {
 }
 
 function makeSpotDom(spot, language = 'en') {
-  const photoUrl = typeof spot.image_url === 'string' && /^https:\/\//i.test(spot.image_url) ? spot.image_url : '';
+  const photoUrl = getSpotImageInfo(spot)?.url || '';
 
   const el = document.createElement('div');
   // IMPORTANT: don't set `position` here — MapLibre's own CSS class
@@ -791,7 +792,7 @@ function reRegisterShieldListener(map, getTerrainEnabled) {
 
 
 export default function MapLibreMap({
-  center, flyTo, fitBoundsData, zoomToArea, setMapRef,
+  center, flyTo, spotFocus, selectedSpotId, fitBoundsData, zoomToArea, setMapRef,
   addMode, onMapClick,
   spots, showSpots, onSelectSpot,
   userPos, userAccuracy,
@@ -998,6 +999,24 @@ export default function MapLibreMap({
     mapRef.current.flyTo({ center: [flyTo[1], flyTo[0]], zoom: 15, duration: 1000 });
   }, [flyTo]);
 
+  // One camera path for community spots opened from markers, lists, search,
+  // and shared links. Keeping this separate from generic place searches lets
+  // the detail sheet offset the marker without changing other map actions.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!spotFocus || !map) return;
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+    const options = getSpotCameraOptions(spotFocus, {
+      viewportWidth: map.getContainer().clientWidth || window.innerWidth,
+      viewportHeight: map.getContainer().clientHeight || window.innerHeight,
+      currentZoom: map.getZoom(),
+      reducedMotion,
+    });
+    if (!options) return;
+    if (reducedMotion) map.jumpTo(options);
+    else map.easeTo(options);
+  }, [spotFocus]);
+
   // ── fitBounds ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!fitBoundsData?.length || !mapRef.current) return;
@@ -1035,12 +1054,19 @@ export default function MapLibreMap({
       if (existing?.__spotSignature === signature) continue;
       if (existing) removeSpotMarker(existing);
       const el = makeSpotDom(spot, language);
+      el.classList.toggle('is-selected', String(selectedSpotId || '') === String(spot.id));
       const mk = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([spot.lng, spot.lat]).addTo(map);
       el.addEventListener('click', e => { e.stopPropagation(); onSelectSpot?.(spot); });
       mk.__spotSignature = signature;
       m.set(spot.id, mk);
     }
-  }, [language, onSelectSpot, spots, showSpots]);
+  }, [language, onSelectSpot, selectedSpotId, spots, showSpots]);
+
+  useEffect(() => {
+    markers.current.spots.forEach((marker, id) => {
+      marker.getElement()?.classList.toggle('is-selected', String(selectedSpotId || '') === String(id));
+    });
+  }, [selectedSpotId]);
 
   // ── User location ──────────────────────────────────────────────────────────
   useEffect(() => {

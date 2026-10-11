@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  getSpotDisplayName, getSpotImageInfo, getSpotLocationLabel, getVerifiedSpotCategory,
-  isMeaningfulSpotTitle, resolveSpotTitle,
+  getSpotDisplayName, getSpotImageInfo, getSpotImagePresentation, getSpotLocationLabel,
+  getVerifiedSpotCategory, isMeaningfulSpotTitle, isUsableSpotImageUrl, resolveSpotTitle,
+  spotMatchesSearch,
 } from '../src/lib/spotPresentation.js';
+import { applyReviewedLegacyIdentity } from '../src/lib/reviewedLegacySpots.js';
 
 test('keeps a meaningful user-provided title', () => {
   assert.equal(getSpotDisplayName({ title: 'Devil’s Bridge', tags: ['Viewpoint'] }), 'Devil’s Bridge');
@@ -58,4 +60,38 @@ test('missing or invalid imagery produces no documentary image claim', () => {
     permissionBasis: 'uploader_attestation', attribution: null, sourceUrl: null,
     locationMatchConfidence: 'user_placed', needsReview: false,
   });
+});
+
+test('reviewed legacy identities repair known generic records without replacing real names', () => {
+  const hlavatice = applyReviewedLegacyIdentity({ id: 'K20qivFHwrGzBgBoYZW2', title: 'Spot', tags: ['Viewpoint'] });
+  assert.equal(getSpotDisplayName(hlavatice), 'Hlavatice');
+  assert.equal(hlavatice.locality, 'Turnov');
+  assert.equal(hlavatice.identity_evidence.distance_m, 2);
+  assert.equal(applyReviewedLegacyIdentity({ id: 'K20qivFHwrGzBgBoYZW2', title: 'My own tower' }).title, 'My own tower');
+  assert.equal(getSpotDisplayName(applyReviewedLegacyIdentity({ id: 'unknown', title: 'Spot', spot_type: 'general' })), 'Unnamed place');
+  assert.equal(spotMatchesSearch(hlavatice, 'Hlavatice'), true);
+  assert.equal(spotMatchesSearch(hlavatice, 'Turnov'), true);
+  for (const [id, expected] of Object.entries({
+    AIyFTk1eTE7gD5INyomX: 'Blejski grad',
+    N9TILMoRCl4dN5Ah7plP: 'Zugspitze',
+    REfS8qWjqf1HSaRIoSju: 'Schloss Neuschwanstein',
+    T0yooHmhTpf4xS0NjAXm: 'Zamek w Malborku',
+    YfzdxI4GvZqCGDdR4BnG: 'Pyramidenkogel',
+  })) assert.equal(getSpotDisplayName(applyReviewedLegacyIdentity({ id, title: 'Unnamed spot' })), expected);
+});
+
+test('legacy raster data images render while unsafe or oversized data URLs fall back', () => {
+  const jpeg = `data:image/jpeg;base64,${'a'.repeat(128)}`;
+  assert.equal(isUsableSpotImageUrl(jpeg), true);
+  assert.equal(isUsableSpotImageUrl('data:image/svg+xml;base64,PHN2Zz4='), false);
+  assert.equal(isUsableSpotImageUrl('javascript:alert(1)'), false);
+  assert.equal(isUsableSpotImageUrl(`data:image/jpeg;base64,${'a'.repeat(2 * 1024 * 1024)}`), false);
+  assert.deepEqual(getSpotImageInfo({ image_url: jpeg }), {
+    url: jpeg, source: 'legacy_embedded_upload', creator: null, permissionBasis: null,
+    attribution: null, sourceUrl: null, locationMatchConfidence: 'unreviewed', needsReview: true,
+  });
+  assert.equal(getSpotImagePresentation({ image_url: jpeg }).kind, 'image');
+  assert.deepEqual(getSpotImagePresentation({ image_url: jpeg }, { loadFailed: true }), { kind: 'fallback', reason: 'load-error' });
+  assert.deepEqual(getSpotImagePresentation({}), { kind: 'fallback', reason: 'missing' });
+  assert.deepEqual(getSpotImagePresentation({ image_url: 'broken-url' }), { kind: 'fallback', reason: 'invalid' });
 });

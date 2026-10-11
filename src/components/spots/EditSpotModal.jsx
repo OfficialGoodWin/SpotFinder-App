@@ -7,6 +7,7 @@ import LabeledRatingScale from './LabeledRatingScale';
 import { submitCategoryRatings } from '@/api/firebaseClient';
 import { toast } from 'sonner';
 import { IMAGE_ACCEPT, validateImageFileMetadata } from '@/lib/imageUploadValidation';
+import { getSpotDisplayName, isMeaningfulSpotTitle } from '@/lib/spotPresentation';
 
 const AVAILABLE_TAGS = [
   { id: 'Viewpoint', emoji: '🏞️' },
@@ -28,7 +29,9 @@ const toKeySuffix = (opt) => opt.split('_').map(w => w[0].toUpperCase() + w.slic
 
 export default function EditSpotModal({ spot, user, onClose, onSave }) {
   const { t } = useLanguage();
-  const [title, setTitle] = useState(spot.title === 'Spot' ? '' : (spot.title || ''));
+  const [title, setTitle] = useState(isMeaningfulSpotTitle(spot.title) ? spot.title : (
+    isMeaningfulSpotTitle(getSpotDisplayName(spot)) ? getSpotDisplayName(spot) : ''
+  ));
   const [description, setDescription] = useState(spot.description || '');
   const [imageFile, setImageFile] = useState(null);
   const existingImageUrls = Array.isArray(spot.image_urls) && spot.image_urls.length ? spot.image_urls : [spot.image_url].filter(Boolean);
@@ -57,7 +60,7 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
   };
 
   const handleSave = async () => {
-    if (!title.trim() || title.trim().toLocaleLowerCase() === 'spot') {
+    if (!isMeaningfulSpotTitle(title)) {
       toast.error('Give this place a specific, recognizable name.');
       return;
     }

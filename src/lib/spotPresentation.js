@@ -47,6 +47,9 @@ function verifiedWikidataLabel(poi, language = 'en') {
 }
 
 export function getVerifiedSpotCategory(spot = {}) {
+  if (['castle', 'viewpoint', 'mountain', 'historic site', 'historic ruin', 'waterfall'].includes(spot.resolved_category)) {
+    return spot.resolved_category;
+  }
   const poi = associatedPoi(spot) || {};
   const reliablePoi = poi.match_confidence !== 'review';
   const tags = { ...(spot.osm_tags || {}), ...(reliablePoi ? poi.tags || {} : {}) };
@@ -92,6 +95,15 @@ export function getSpotDisplayName(spot = {}, language = 'en') {
   return resolveSpotTitle(spot, language).title;
 }
 
+export function spotMatchesSearch(spot = {}, query = '', language = 'en') {
+  const needle = cleanText(query).replace(/^#/, '').toLocaleLowerCase();
+  if (!needle) return true;
+  return [
+    getSpotDisplayName(spot, language), spot.description, getSpotLocationLabel(spot),
+    ...(Array.isArray(spot.tags) ? spot.tags : []),
+  ].some(value => cleanText(value).toLocaleLowerCase().includes(needle));
+}
+
 const looksLikeCoordinates = (value) => /^\s*-?\d{1,2}(?:\.\d+)?\s*[,;/]\s*-?\d{1,3}(?:\.\d+)?\s*$/.test(String(value || ''));
 
 export function getSpotLocationLabel(spot = {}, coordinatePrecision = 4) {
@@ -109,18 +121,27 @@ export function getSpotLocationLabel(spot = {}, coordinatePrecision = 4) {
     : 'Location unavailable';
 }
 
+const MAX_EMBEDDED_IMAGE_LENGTH = 2 * 1024 * 1024;
+
+export function isUsableSpotImageUrl(value) {
+  if (typeof value !== 'string' || !value) return false;
+  if (/^data:image\/(?:jpeg|png|webp);base64,/i.test(value)) {
+    return value.length <= MAX_EMBEDDED_IMAGE_LENGTH;
+  }
+  try { return new URL(value).protocol === 'https:'; } catch { return false; }
+}
+
 export function getSpotImageInfo(spot = {}) {
   const candidates = [...(Array.isArray(spot.image_urls) ? spot.image_urls : []), spot.image_url].filter(Boolean);
-  const url = candidates.find(value => {
-    try { return new URL(value).protocol === 'https:'; } catch { return false; }
-  });
+  const url = candidates.find(isUsableSpotImageUrl);
   if (!url) return null;
+  const embedded = url.startsWith('data:');
   const metadata = Array.isArray(spot.photo_metadata)
     ? spot.photo_metadata.find(item => item?.url === url) || null
     : null;
   return {
     url,
-    source: metadata?.source || 'legacy_unknown',
+    source: metadata?.source || (embedded ? 'legacy_embedded_upload' : 'legacy_unknown'),
     creator: metadata?.creator || null,
     permissionBasis: metadata?.permission_basis || null,
     attribution: metadata?.attribution || null,
@@ -128,5 +149,13 @@ export function getSpotImageInfo(spot = {}) {
     locationMatchConfidence: metadata?.location_match_confidence || 'unreviewed',
     needsReview: !metadata || metadata.location_match_confidence === 'unverified',
   };
+}
+
+export function getSpotImagePresentation(spot = {}, { src, loadFailed = false } = {}) {
+  if (loadFailed) return { kind: 'fallback', reason: 'load-error' };
+  const hasCandidate = Boolean(src || spot?.image_url || spot?.image_urls?.length);
+  const imageInfo = src && isUsableSpotImageUrl(src) ? { url: src } : getSpotImageInfo(spot);
+  if (imageInfo) return { kind: 'image', imageInfo };
+  return { kind: 'fallback', reason: hasCandidate ? 'invalid' : 'missing' };
 }
 

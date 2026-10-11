@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Castle, ImageOff, Landmark, MapPin, Mountain } from 'lucide-react';
-import { getSpotImageInfo, getVerifiedSpotCategory } from '@/lib/spotPresentation';
+import { getSpotImagePresentation, getVerifiedSpotCategory } from '@/lib/spotPresentation';
 
 function fallbackFor(spot) {
   const category = getVerifiedSpotCategory(spot);
@@ -11,9 +11,10 @@ function fallbackFor(spot) {
 }
 
 export default function SpotImage({ spot, src, alt = '', className = '', fallbackClassName = '' }) {
-  const image = src ? { url: src } : getSpotImageInfo(spot);
   const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [image?.url]);
+  const presentation = getSpotImagePresentation(spot, { src, loadFailed: failed });
+  const image = presentation.kind === 'image' ? presentation.imageInfo : null;
+  useEffect(() => setFailed(false), [src, spot?.image_url]);
 
   if (image?.url && !failed) {
     return <img src={image.url} alt={alt} loading="lazy" decoding="async" className={className} onError={() => setFailed(true)} />;

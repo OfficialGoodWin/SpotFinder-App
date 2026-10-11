@@ -6,7 +6,7 @@ import { iconGlyphSVG } from '@/lib/mapIcons';
 import { searchPlaces } from '@/lib/placeSearch';
 import { NEARBY_DEFAULT_KM, NEARBY_SLIDER_MAX, sliderToKm, kmToSlider, formatMaxDistance } from '@/lib/nearbyFilters';
 import LiquidSegmentedControl from '@/components/ui/LiquidSegmentedControl';
-import { getSpotDisplayName } from '@/lib/spotPresentation';
+import { getSpotDisplayName, spotMatchesSearch } from '@/lib/spotPresentation';
 import { toast } from 'sonner';
 
 
@@ -67,13 +67,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
     setPoiCategories(filterCategories(query, language));
 
     // Search spots by title, description, and hashtag tags (e.g. "#viewpoint")
-    const q = query.toLowerCase().replace(/^#/, '');
-    const matched = (spots || []).filter(s => {
-      if (s.title?.toLowerCase().includes(q)) return true;
-      if (s.description?.toLowerCase().includes(q)) return true;
-      if ((s.tags || []).some(tag => String(tag).toLowerCase().includes(q))) return true;
-      return false;
-    }).slice(0, 5);
+    const matched = (spots || []).filter(spot => spotMatchesSearch(spot, query, language)).slice(0, 5);
     setSpotResults(matched);
 
     clearTimeout(debounce.current);

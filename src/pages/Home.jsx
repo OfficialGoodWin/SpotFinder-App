@@ -14,7 +14,7 @@ import MapLibreMap from '../components/map/MapLibreMap';
 import ProfileMenu from '../components/ProfileMenu';
 import WelcomeDiscoveryCard from '../components/WelcomeDiscoveryCard';
 import { getSpotDisplayName } from '@/lib/spotPresentation';
-import { createSpotSelection } from '@/lib/spotDiscovery';
+import { useSpotOpenFocus } from '@/hooks/useSpotOpenFocus';
 
 const SubscriptionModal = React.lazy(() => import('../components/SubscriptionModal'));
 const SuperAdminEditor = React.lazy(() => import('../components/map/SuperAdminEditor'));
@@ -43,6 +43,8 @@ export default function Home() {
   const [addMode, setAddMode] = useState(false);
   const [pendingLatlng, setPendingLatlng] = useState(null);
   const [selectedSpot, setSelectedSpot] = useState(null);
+  const { closeSpot, openSpot, spotFocus } = useSpotOpenFocus({ selectedSpot, setSelectedSpot });
+  const openMarkerSpot = useCallback((spot) => openSpot(spot, { source: 'marker' }), [openSpot]);
   const [editingSpot, setEditingSpot] = useState(null);
   const [navTarget, setNavTarget] = useState(null);
   const [isActivelyNavigating, setIsActivelyNavigating] = useState(false);
@@ -238,23 +240,21 @@ export default function Home() {
     getPublicSpotById(spotId).then(found => {
       if (!found) return;
       setSpots(current => current.some(item => item.id === found.id) ? current : [...current, found]);
-      setSelectedSpot(found);
-      setFlyTo([found.lat, found.lng]);
-      setTimeout(() => setFlyTo(null), 1200);
+      openSpot(found, { source: 'shared-link' });
     }).catch(error => console.error('Could not open shared spot:', error));
-  }, []);  
+  }, [openSpot]);  
  
   const handleDeleteSpot = async (spot) => {
     await deleteSpot(spot.id);
     setSpots(prev => prev.filter(s => s.id !== spot.id));
-    setSelectedSpot(null);
+    closeSpot();
   };
 
   const handleEditSpot = async (updatedSpot) => {
     await updateSpot(updatedSpot.id, updatedSpot);
     setSpots(prev => prev.map(s => s.id === updatedSpot.id ? updatedSpot : s));
     setEditingSpot(null);
-    setSelectedSpot(null);
+    closeSpot();
   };
  
   const handleNavigate = async (spot) => {
@@ -262,21 +262,13 @@ export default function Home() {
     if (!position) return toast.error(t('home.locationUnavailable'));
     setNavFrom({ lat: position[0], lng: position[1] });
     setNavTarget({ lat: spot.lat, lng: spot.lng, label: getSpotDisplayName(spot, language) });
-    setSelectedSpot(null);
+    closeSpot();
   };
  
   const handleSearchSelect = ({ lat, lng, label }) => {
     setFlyTo([lat, lng]);
     setTimeout(() => setFlyTo(null), 1000);
   };
-
-  const selectSpotFromList = useCallback((spot) => {
-    const selection = createSpotSelection(spot);
-    if (!selection) return;
-    setSelectedSpot(selection.spot);
-    setFlyTo(selection.position);
-    window.setTimeout(() => setFlyTo(null), 1000);
-  }, []);
 
   const openNearby = useCallback(async (filters) => {
     const position = userPos || await requestLocation();
@@ -349,6 +341,8 @@ export default function Home() {
       <MapLibreMap
         center={mapCenter}
         flyTo={flyTo}
+        spotFocus={spotFocus}
+        selectedSpotId={selectedSpot?.id}
         fitBoundsData={fitBoundsData}
         zoomToArea={zoomToArea}
         setMapRef={handleMapReady}
@@ -356,7 +350,7 @@ export default function Home() {
         onMapClick={handleMapClick}
         spots={spots}
         showSpots={showSpots}
-        onSelectSpot={setSelectedSpot}
+        onSelectSpot={openMarkerSpot}
         userPos={userPos}
         userAccuracy={userAccuracy}
         selectedPOICategory={selectedPOICategory}
@@ -396,11 +390,7 @@ export default function Home() {
         userPos={userPos}
         onNearby={openNearby}
         onRequestLocation={requestLocation}
-        onSelectSpot={(spot) => {
-          setSelectedSpot(spot);
-          setFlyTo([spot.lat, spot.lng]);
-          setTimeout(() => setFlyTo(null), 1000);
-        }}
+        onSelectSpot={(spot) => openSpot(spot, { source: 'search' })}
         onNavigate={startNavTo}
         onSelectCategory={async (category) => {
           const position = userPos || await requestLocation();
@@ -494,7 +484,7 @@ export default function Home() {
           loading={nearbyLoading}
           initialFilters={nearbyFilters}
           onFiltersChange={openNearby}
-          onSelectSpot={selectSpotFromList}
+          onSelectSpot={(spot) => openSpot(spot, { source: 'nearby' })}
           onNavigate={(spot) => handleNavigate(spot)}
           onClose={() => setShowNearbySpots(false)}
         />
@@ -605,9 +595,9 @@ export default function Home() {
           spot={selectedSpot}
           user={user}
           isAdmin={isAdmin}
-          onClose={() => setSelectedSpot(null)}
+          onClose={closeSpot}
           onNavigate={handleNavigate}
-          onEdit={() => { setEditingSpot(selectedSpot); setSelectedSpot(null); }}
+          onEdit={() => { setEditingSpot(selectedSpot); closeSpot(); }}
           onDelete={() => handleDeleteSpot(selectedSpot)}
           onShowAuth={() => setShowAuth(true)}
           onSpotUpdate={(updated) => {
@@ -656,7 +646,7 @@ export default function Home() {
         <MySpotsPanel
           user={user}
           onClose={() => setShowMySpots(false)}
-          onSelectSpot={selectSpotFromList}
+          onSelectSpot={(spot) => openSpot(spot, { source: 'my-spots' })}
         />
       )}
 
