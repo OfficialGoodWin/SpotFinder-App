@@ -30,6 +30,8 @@ dist-ssr
 
 .env
 serviceAccountKey.json
+spot-presentation-review-*.json
+spot-presentation-rollback-*.json
 
 # Local AI handoff notes; never commit this file.
 AI-README.md

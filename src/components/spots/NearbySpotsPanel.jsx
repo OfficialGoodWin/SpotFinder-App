@@ -1,23 +1,19 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Navigation, X, SlidersHorizontal } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import NearbySpotsFilterModal from './NearbySpotsFilterModal';
 import { NEARBY_DEFAULT_KM, isDefaultNearbyFilters } from '@/lib/nearbyFilters';
 import { getSpotDisplayName, getSpotLocationLabel } from '@/lib/spotPresentation';
+import { filterAndSortNearbySpots, getSpotRating } from '@/lib/spotDiscovery';
+import SmoothSelect from '../ui/SmoothSelect';
 
-function haversineKm([lat1, lng1], [lat2, lng2]) {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+const RESULT_PAGE_SIZE = 20;
 
 const TYPE_EMOJI = { parking: '🅿️', food: '🍽️', toilet: '🚽' };
 const TYPE_LABEL = { parking: 'Parking', food: 'Food', toilet: 'Toilet', general: 'Spot' };
 
 function StarRow({ rating }) {
-  if (!rating) return <span className="text-xs text-muted-foreground">–</span>;
+  if (rating === null) return <span className="text-xs text-muted-foreground">Unrated</span>;
   return (
     <span className="flex items-center gap-0.5">
       {[1, 2, 3, 4, 5].map(i => (
@@ -31,7 +27,7 @@ function StarRow({ rating }) {
   );
 }
 
-function SpotRow({ spot, onSelectSpot, onNavigate, onClose }) {
+function SpotRow({ spot, onSelectSpot, onNavigate, onClose, language }) {
   return (
     <div
       className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 dark:border-border/40 hover:bg-gray-50 dark:hover:bg-accent/60 active:bg-gray-100 dark:active:bg-accent transition-colors cursor-pointer"
@@ -40,7 +36,7 @@ function SpotRow({ spot, onSelectSpot, onNavigate, onClose }) {
       <span className="text-xl flex-shrink-0 w-7 text-center">{TYPE_EMOJI[spot.spot_type] || '📍'}</span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <p className="text-sm font-semibold text-foreground truncate">{getSpotDisplayName(spot)}</p>
+          <p className="text-sm font-semibold text-foreground truncate">{getSpotDisplayName(spot, language)}</p>
           {spot.spot_type && (
             <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-accent text-gray-500 dark:text-muted-foreground flex-shrink-0">
               {TYPE_LABEL[spot.spot_type] || spot.spot_type}
@@ -52,7 +48,7 @@ function SpotRow({ spot, onSelectSpot, onNavigate, onClose }) {
         )}
         <p className="mt-0.5 truncate text-xs text-muted-foreground">{getSpotLocationLabel(spot)}</p>
         <div className="mt-0.5">
-          <StarRow rating={spot.rating} />
+          <StarRow rating={getSpotRating(spot)} />
         </div>
       </div>
       {spot._km != null && (
@@ -80,34 +76,31 @@ function SpotRow({ spot, onSelectSpot, onNavigate, onClose }) {
 }
 
 export default function NearbySpotsPanel({ spots, userPos, loading = false, onSelectSpot, onNavigate, onClose, initialFilters, onFiltersChange }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [filters, setFilters] = useState(initialFilters || { maxDistance: NEARBY_DEFAULT_KM, minRating: 0 });
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [sort, setSort] = useState('distance');
+  const [visibleCount, setVisibleCount] = useState(RESULT_PAGE_SIZE);
 
   const nearby = useMemo(() => {
-    const withDist = (spots || []).map(s => ({
-      ...s,
-      _km: userPos ? haversineKm(userPos, [s.lat, s.lng]) : null,
-    }));
+    return filterAndSortNearbySpots(spots, {
+      origin: userPos,
+      maxDistance: filters.maxDistance,
+      minRating: filters.minRating,
+      sort,
+    });
+  }, [spots, userPos, filters, sort]);
+  const visibleNearby = nearby.slice(0, visibleCount);
+  const resultCountLabel = nearby.length >= 500 ? '500+' : String(nearby.length);
 
-    return withDist
-      .filter(s => {
-        const ratingNum = s.rating || 0;
-        if (ratingNum < filters.minRating) return false;
-        // Distance filter only applies when we know the user's location
-        if (userPos && s._km != null && s._km > filters.maxDistance) return false;
-        return true;
-      })
-      .sort((a, b) => (a._km ?? Infinity) - (b._km ?? Infinity))
-      .slice(0, 20);
-  }, [spots, userPos, filters]);
+  useEffect(() => setVisibleCount(RESULT_PAGE_SIZE), [filters.maxDistance, filters.minRating, sort]);
 
   const header = (
     <div className="flex items-center justify-between px-4 py-2.5">
       <span className="text-sm font-bold text-foreground">
         {t('spotsPanel.nearby') || 'Nearby Spots'}
         {!userPos && <span className="font-normal text-muted-foreground"> · no location</span>}
-        <span className="font-normal text-muted-foreground ml-1">({nearby.length})</span>
+        <span className="font-normal text-muted-foreground ml-1">({resultCountLabel})</span>
       </span>
       <div className="flex items-center gap-1.5">
         <button
@@ -134,6 +127,22 @@ export default function NearbySpotsPanel({ spots, userPos, loading = false, onSe
 
   const listContent = (
     <>
+      {!loading && nearby.length > 1 && (
+        <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-2 dark:border-border/50">
+          <span className="text-xs text-muted-foreground">Showing {Math.min(visibleCount, nearby.length)} of {resultCountLabel}</span>
+          <SmoothSelect
+            value={sort}
+            onChange={setSort}
+            ariaLabel="Sort nearby spots"
+            className="max-w-[10rem]"
+            options={[
+              { value: 'distance', label: 'Nearest' },
+              { value: 'rating', label: 'Highest rated' },
+              { value: 'newest', label: 'Newest' },
+            ]}
+          />
+        </div>
+      )}
       {loading && (
         <div className="flex items-center justify-center gap-2 py-10 text-sm font-medium text-emerald-600 dark:text-emerald-400">
           <span className="h-5 w-5 animate-spin rounded-full border-2 border-emerald-500/25 border-t-emerald-500" />
@@ -145,9 +154,16 @@ export default function NearbySpotsPanel({ spots, userPos, loading = false, onSe
           {t('spotsPanel.noSpots') || 'No spots match your filters.'}
         </p>
       )}
-      {!loading && nearby.map(spot => (
-        <SpotRow key={spot.id} spot={spot} onSelectSpot={onSelectSpot} onNavigate={onNavigate} onClose={onClose} />
+      {!loading && visibleNearby.map(spot => (
+        <SpotRow key={spot.id} spot={spot} onSelectSpot={onSelectSpot} onNavigate={onNavigate} onClose={onClose} language={language} />
       ))}
+      {!loading && visibleCount < nearby.length && (
+        <div className="p-4 text-center">
+          <button type="button" onClick={() => setVisibleCount(count => count + RESULT_PAGE_SIZE)} className="min-h-11 rounded-xl border border-gray-200 px-4 text-sm font-semibold hover:bg-gray-50 dark:border-border dark:hover:bg-accent">
+            Show more
+          </button>
+        </div>
+      )}
       <div style={{ height: 16 }} />
     </>
   );

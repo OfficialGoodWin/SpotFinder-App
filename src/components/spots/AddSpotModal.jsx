@@ -70,9 +70,9 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
 
   // ── New fields per submission spec ──────────────────────────────────────────
   const [tags, setTags] = useState([]);
-  const [cost, setCost] = useState('free');
-  const [accessDifficulty, setAccessDifficulty] = useState('easy');
-  const [parking, setParking] = useState('yes');
+  const [cost, setCost] = useState('');
+  const [accessDifficulty, setAccessDifficulty] = useState('');
+  const [parking, setParking] = useState('');
   const [bestTime, setBestTime] = useState([]);
   const [directions, setDirections] = useState('');
 
@@ -96,6 +96,10 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
       setTitle(draft.title || '');
       setDescription(draft.description || '');
       setTags(Array.isArray(draft.tags) ? draft.tags : []);
+      setCost(draft.cost || '');
+      setAccessDifficulty(draft.accessDifficulty || '');
+      setParking(draft.parking || '');
+      setBestTime(Array.isArray(draft.bestTime) ? draft.bestTime : []);
       setDirections(draft.directions || '');
       setSocialUrl(draft.socialUrl || '');
     } catch { /* An invalid draft should never block contribution. */ }
@@ -103,11 +107,11 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      try { sessionStorage.setItem(draftKey, JSON.stringify({ title, description, tags, directions, socialUrl })); }
+      try { sessionStorage.setItem(draftKey, JSON.stringify({ title, description, tags, cost, accessDifficulty, parking, bestTime, directions, socialUrl })); }
       catch { /* Storage may be unavailable in private browsing. */ }
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [description, directions, draftKey, socialUrl, tags, title]);
+  }, [accessDifficulty, bestTime, cost, description, directions, draftKey, parking, socialUrl, tags, title]);
 
   useEffect(() => () => recognitionRef.current?.stop(), []);
 

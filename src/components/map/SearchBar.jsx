@@ -7,6 +7,7 @@ import { searchPlaces } from '@/lib/placeSearch';
 import { NEARBY_DEFAULT_KM, NEARBY_SLIDER_MAX, sliderToKm, kmToSlider, formatMaxDistance } from '@/lib/nearbyFilters';
 import LiquidSegmentedControl from '@/components/ui/LiquidSegmentedControl';
 import { getSpotDisplayName } from '@/lib/spotPresentation';
+import { toast } from 'sonner';
 
 
 const LANG_TO_BCP47 = {
@@ -15,7 +16,7 @@ const LANG_TO_BCP47 = {
   ro: 'ro-RO', es: 'es-ES', bg: 'bg-BG',
 };
 
-export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCategory, spots = [], onSelectSpot, userPos, onNearby }) {
+export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCategory, spots = [], onSelectSpot, userPos, onNearby, onRequestLocation }) {
   const { t, language } = useLanguage();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
@@ -188,8 +189,13 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
           {/* Nearby spots — opens a quick filter popover on click */}
           <div className="relative">
             <button
-              onClick={() => {
-                if (!userPos) { alert(t('search.enableLocation') || 'Enable location to find nearby spots'); return; }
+              onClick={async () => {
+                if (!userPos) {
+                  const position = await onRequestLocation?.();
+                  if (!position) toast.error(t('home.locationRequestFailed', 'Location is unavailable. Check browser permissions or search the map instead.'));
+                  else setShowNearbyFilter(true);
+                  return;
+                }
                 setShowNearbyFilter(v => !v);
               }}
               className={`px-2 py-1.5 rounded-lg flex-shrink-0 transition-all active:scale-95 ${
@@ -327,15 +333,15 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
             {spotResults.map((spot, i) => (
               <div key={`spot-${i}`} className="flex items-center hover:bg-gray-50 dark:hover:bg-accent transition-colors">
                 <button
-                  onMouseDown={e => { e.preventDefault(); onSelectSpot?.(spot); setQuery(getSpotDisplayName(spot)); closeDropdown(); }}
-                  onTouchEnd={e => { e.preventDefault(); onSelectSpot?.(spot); setQuery(getSpotDisplayName(spot)); closeDropdown(); }}
+                  onMouseDown={e => { e.preventDefault(); onSelectSpot?.(spot); setQuery(getSpotDisplayName(spot, language)); closeDropdown(); }}
+                  onTouchEnd={e => { e.preventDefault(); onSelectSpot?.(spot); setQuery(getSpotDisplayName(spot, language)); closeDropdown(); }}
                   className="flex-1 text-left px-4 py-2.5 flex items-center gap-3"
                 >
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-green-100 dark:bg-green-900/30">
                     <span className="text-lg">📍</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 dark:text-foreground truncate">{getSpotDisplayName(spot)}</p>
+                    <p className="text-sm font-medium text-gray-800 dark:text-foreground truncate">{getSpotDisplayName(spot, language)}</p>
                     {spot.description && (
                       <p className="text-xs text-gray-400 dark:text-muted-foreground truncate">{spot.description}</p>
                     )}

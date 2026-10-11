@@ -6,6 +6,20 @@ const LanguageContext = createContext();
 const COOKIE_NAME = 'spotfinder_language';
 const DEFAULT_LANGUAGE = 'en';
 
+const normalizeLanguage = (candidate) => {
+  const shortCode = String(candidate || '').trim().toLowerCase().split(/[-_]/)[0];
+  return Object.prototype.hasOwnProperty.call(translations, shortCode) ? shortCode : DEFAULT_LANGUAGE;
+};
+
+const readTranslation = (language, key) => {
+  let value = translations[language];
+  for (const part of key.split('.')) {
+    if (!value || typeof value !== 'object' || !(part in value)) return undefined;
+    value = value[part];
+  }
+  return value;
+};
+
 // Helper functions for cookie management
 const getCookie = (name) => {
   const value = `; ${document.cookie}`;
@@ -25,27 +39,24 @@ export function LanguageProvider({ children }) {
   const [language, setLanguageState] = useState(() => {
     // Try to get language from cookie, fallback to default
     const savedLang = getCookie(COOKIE_NAME);
-    return savedLang || DEFAULT_LANGUAGE;
+    return normalizeLanguage(savedLang);
   });
 
   const setLanguage = (lang) => {
-    setLanguageState(lang);
-    setCookie(COOKIE_NAME, lang);
+    const normalized = normalizeLanguage(lang);
+    setLanguageState(normalized);
+    setCookie(COOKIE_NAME, normalized);
   };
 
-  const t = (key) => {
-    const keys = key.split('.');
-    let value = translations[language];
-    
-    for (const k of keys) {
-      if (value && typeof value === 'object') {
-        value = value[k];
-      } else {
-        return key; // Return key if translation not found
-      }
-    }
-    
-    return value || key;
+  const t = (key, fallback) => {
+    const localized = readTranslation(language, key);
+    if (localized !== undefined && localized !== null && localized !== '') return localized;
+
+    // Individual locale dictionaries can lag behind a new UI string. Falling
+    // back to English keeps internal translation keys out of the interface.
+    const english = readTranslation(DEFAULT_LANGUAGE, key);
+    if (english !== undefined && english !== null && english !== '') return english;
+    return fallback || key;
   };
 
   return (

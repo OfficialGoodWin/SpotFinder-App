@@ -28,6 +28,7 @@ function commonsImage(tags) {
 }
 
 const TAG_KEYS = [
+  'name', 'name:en', 'name:cs', 'name:de', 'name:pl', 'name:sk',
   'website', 'contact:website', 'phone', 'contact:phone', 'email', 'contact:email',
   'opening_hours', 'description', 'wikipedia', 'wikidata', 'wikimedia_commons',
   'brand', 'operator', 'tourism', 'amenity', 'historic', 'leisure', 'natural',
@@ -97,15 +98,28 @@ export async function findNearbyPoi(lat, lon, language = 'en') {
 
   const tags = normalizedTags(properties);
   const image = commonsImage(tags);
+  const locality = text(
+    properties.city || properties.town || properties.village || properties.municipality
+      || properties.county || properties.state,
+    160,
+  );
+  const names = Object.fromEntries(Object.entries(tags)
+    .filter(([key, value]) => key.startsWith('name:') && value)
+    .map(([key, value]) => [key.slice(5), value]));
   return {
     place_id: text(properties.place_id, 250),
     name: text(properties.name, 150),
+    names,
     address: text(properties.formatted || properties.address_line1, 300),
+    locality,
     distance_m: Math.round(nearest.distance),
     lat: nearest.poiLat,
     lon: nearest.poiLon,
     categories: Array.isArray(properties.categories) ? properties.categories.filter(value => typeof value === 'string').slice(0, 20) : [],
     tags,
+    source: 'geoapify',
+    match_method: 'nearest_named_poi',
+    match_confidence: nearest.distance <= 15 ? 'high' : 'review',
     image_url: image?.url || null,
     image_credit: image?.credit || null,
   };

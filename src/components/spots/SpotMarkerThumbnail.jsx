@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Footprints, Image as ImageIcon, Play, Star } from 'lucide-react';
 import { getSpotMarkerTheme, getSpotRating } from './spotMarkerTheme';
@@ -20,6 +20,8 @@ export default function SpotMarkerThumbnail({
   const rating = getSpotRating(spot);
   const reduceMotion = useReducedMotion();
   const access = ACCESS_STYLE[spot?.access_difficulty];
+  const [imageFailed, setImageFailed] = useState(false);
+  useEffect(() => setImageFailed(false), [imageUrl]);
 
   return (
     <motion.div
@@ -35,8 +37,8 @@ export default function SpotMarkerThumbnail({
         className="sf-premium-marker__card absolute left-1/2 top-0 h-[82px] w-[108px] -translate-x-1/2 overflow-hidden rounded-[22px] border-2 bg-slate-200/80 backdrop-blur-xl"
         style={{ borderColor: `${theme.accent}bb`, boxShadow: `0 12px 34px ${theme.glow}, inset 0 1px 0 rgba(255,255,255,.65)` }}
       >
-        {imageUrl ? (
-          <img src={imageUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" />
+        {imageUrl && !imageFailed ? (
+          <img src={imageUrl} alt="" loading="lazy" decoding="async" onError={() => setImageFailed(true)} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" />
         ) : (
           <div className="grid h-full w-full place-items-center" style={{ background: theme.gradient }}>
             <ImageIcon className="h-7 w-7" style={{ color: theme.accentStrong }} />

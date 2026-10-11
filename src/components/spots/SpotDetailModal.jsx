@@ -8,6 +8,7 @@ import ReportDialog from '@/components/moderation/ReportDialog';
 import NavigationProviderSheet from '@/components/navigation/NavigationProviderSheet';
 import { localizedShareMessage, reversePlaceContext } from '@/lib/placeContext';
 import { getSpotDisplayName, getSpotLocationLabel } from '@/lib/spotPresentation';
+import SpotImage from './SpotImage';
 
 const SocialPostsSection = React.lazy(() => import('@/components/social/SocialPostsSection'));
 
@@ -20,7 +21,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
   const [social, setSocial] = useState({ liked: false, saved: false, likesCount: spot.likes_count || 0, savesCount: spot.saves_count || 0 });
   const [socialBusy, setSocialBusy] = useState('');
   const [showNavigationProviders, setShowNavigationProviders] = useState(false);
-  const displayName = getSpotDisplayName(localSpot);
+  const displayName = getSpotDisplayName(localSpot, language);
   const creatorName = localSpot.created_by_name || (String(localSpot.created_by || '').includes('@') ? 'Community contributor' : localSpot.created_by) || 'Community contributor';
 
   useEffect(() => {
@@ -152,12 +153,14 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
     ? localSpot.image_urls
     : [localSpot.image_url]).filter(Boolean);
   const poiMatch = localSpot.poi_match?.name ? localSpot.poi_match : null;
-  const detailPhotos = [
-    ...uploadedPhotos.map(url => ({ url, source: 'community', metadata: localSpot.photo_metadata?.find?.(item => item.url === url) })),
-    ...(poiMatch?.image_url && !uploadedPhotos.includes(poiMatch.image_url)
-      ? [{ url: poiMatch.image_url, source: 'poi', credit: poiMatch.image_credit }]
-      : []),
-  ];
+  // Only community uploads are documentary spot photos here. A nearby POI
+  // image is not promoted into the gallery unless its identity and full
+  // licence metadata have been independently reviewed.
+  const detailPhotos = uploadedPhotos.map(url => ({
+    url,
+    source: 'community',
+    metadata: localSpot.photo_metadata?.find?.(item => item.url === url),
+  }));
   const poiWebsite = poiMatch?.tags?.website || poiMatch?.tags?.['contact:website'];
 
   return (
@@ -189,27 +192,23 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
         </div>
 
         <div className="px-6 py-4 space-y-4">
-          {/* Community photos plus a safely attributed POI reference image, when available. */}
-          {detailPhotos.length > 0 && (
+          {/* Community photos, or an honest category fallback when unavailable. */}
+          {detailPhotos.length > 0 ? (
             <div className="space-y-2">
               <div className="relative overflow-hidden rounded-2xl">
-                <img src={detailPhotos[0].url} alt={displayName} loading="lazy" decoding="async" className="h-52 w-full object-cover" />
-                {detailPhotos[0].source === 'poi' && (
-                  <span className="absolute bottom-2 left-2 rounded-full bg-black/65 px-2.5 py-1 text-[10px] font-medium text-white backdrop-blur-sm">{detailPhotos[0].credit || 'POI reference photo'}</span>
-                )}
+                <SpotImage spot={localSpot} src={detailPhotos[0].url} alt={displayName} className="h-52 w-full object-cover" fallbackClassName="h-52" />
               </div>
               {detailPhotos.length > 1 && (
                 <div className="grid grid-cols-3 gap-2">
                   {detailPhotos.slice(1).map((photo, index) => (
                     <div key={`${photo.url}-${index}`} className="relative aspect-square overflow-hidden rounded-xl">
-                      <img src={photo.url} alt={`${displayName} photo ${index + 2}`} loading="lazy" decoding="async" className="h-full w-full object-cover" />
-                      {photo.source === 'poi' && <span className="absolute bottom-1 left-1 rounded bg-black/65 px-1.5 py-0.5 text-[9px] text-white">POI</span>}
+                      <SpotImage spot={localSpot} src={photo.url} alt={`${displayName} photo ${index + 2}`} className="h-full w-full object-cover" />
                     </div>
                   ))}
                 </div>
               )}
             </div>
-          )}
+          ) : <div className="h-44 overflow-hidden rounded-2xl"><SpotImage spot={localSpot} /></div>}
 
           {/* Description */}
           {localSpot.description && (

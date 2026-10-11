@@ -44,6 +44,7 @@ import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'fire
 import { validateImageDimensions, validateImageFile } from '@/lib/imageUploadValidation';
 import { firebaseConfig } from './firebaseConfig';
 import { getRecaptchaToken } from '@/lib/recaptcha';
+import { filterAndSortNearbySpots, normalizeLatLng } from '@/lib/spotDiscovery';
 
 let app, auth, db, functionsInstance, storage;
 try {
@@ -349,20 +350,28 @@ export const getPublicSpots = async (maxCount = 200) => {
 // while applying multiple latitude/longitude range filters.
 export const getPublicSpotsInBounds = async ({ south, west, north, east }, maxCount = 500) => {
   const { db } = getFirebaseServices();
-  const clauses = [
+  const baseClauses = [
     where('is_public', '==', true),
     where('status', 'in', ['published', 'pending_trust']),
     where('lat', '>=', Number(south)),
     where('lat', '<=', Number(north)),
   ];
 
-  // The app is Czech-focused; still handle a world-wrapped viewport defensively.
-  if (Number(east) - Number(west) < 360) {
-    clauses.push(where('lng', '>=', Number(west)), where('lng', '<=', Number(east)));
+  const westNumber = Number(west), eastNumber = Number(east);
+  let longitudeRanges = [[null, null]];
+  if (eastNumber - westNumber < 360) {
+    if (westNumber < -180) longitudeRanges = [[westNumber + 360, 180], [-180, eastNumber]];
+    else if (eastNumber > 180) longitudeRanges = [[westNumber, 180], [-180, eastNumber - 360]];
+    else longitudeRanges = [[westNumber, eastNumber]];
   }
-
-  const q = query(collection(db, SPOTS_COLLECTION), ...clauses, limit(maxCount));
-  const rows = (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
+  const snapshots = await Promise.all(longitudeRanges.map(([rangeWest, rangeEast]) => {
+    const clauses = [...baseClauses];
+    if (rangeWest !== null) clauses.push(where('lng', '>=', rangeWest), where('lng', '<=', rangeEast));
+    return getDocs(query(collection(db, SPOTS_COLLECTION), ...clauses, limit(maxCount)));
+  }));
+  const unique = new Map();
+  snapshots.forEach(snapshot => snapshot.docs.forEach(d => unique.set(d.id, { id: d.id, ...d.data() })));
+  const rows = [...unique.values()].slice(0, maxCount);
   return rows.sort((a, b) => String(b.created_date || '').localeCompare(String(a.created_date || '')));
 };
 
@@ -375,20 +384,12 @@ export const getPublicSpotById = async (spotId) => {
   return spot.is_public && ['published', 'pending_trust'].includes(spot.status) ? spot : null;
 };
 
-const distanceKm = (origin, spot) => {
-  const toRad = value => value * Math.PI / 180;
-  const dLat = toRad(Number(spot.lat) - origin[0]);
-  const dLng = toRad(Number(spot.lng) - origin[1]);
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(origin[0])) * Math.cos(toRad(Number(spot.lat))) * Math.sin(dLng / 2) ** 2;
-  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-};
-
 // Nearby discovery is independent from the visible viewport. For an unlimited
 // search, expand progressively and stop as soon as the nearest 20 are known.
-export const getPublicSpotsNear = async (origin, maxDistance = Infinity, targetCount = 20) => {
-  const lat = Number(origin?.[0]);
-  const lng = Number(origin?.[1]);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return [];
+export const getPublicSpotsNear = async (origin, maxDistance = Infinity, targetCount = 100, minRating = 0) => {
+  const normalized = normalizeLatLng(origin);
+  if (!normalized) return [];
+  const [lat, lng] = normalized;
   const radii = Number.isFinite(maxDistance) ? [Math.max(1, maxDistance)] : [25, 100, 400, 1600, 5000];
   const found = new Map();
   for (const radius of radii) {
@@ -401,17 +402,20 @@ export const getPublicSpotsNear = async (origin, maxDistance = Infinity, targetC
     rows.forEach(row => found.set(row.id, row));
     if (Number.isFinite(maxDistance) || found.size >= targetCount) break;
   }
-  return [...found.values()]
-    .map(spot => ({ ...spot, _km: distanceKm([lat, lng], spot) }))
-    .filter(spot => !Number.isFinite(maxDistance) || spot._km <= maxDistance)
-    .sort((a, b) => a._km - b._km)
-    .slice(0, targetCount);
+  return filterAndSortNearbySpots([...found.values()], {
+    origin: [lat, lng], maxDistance, minRating, sort: 'distance',
+  }).slice(0, targetCount);
 };
  
-export const getUserSpots = async (userEmail, maxCount = 50) => {
+export const getUserSpots = async (userEmail, maxCount = 50, userId = '') => {
   const { db } = getFirebaseServices();
-  const q = query(collection(db, SPOTS_COLLECTION), where('created_by', '==', userEmail), orderBy('created_date', 'desc'), limit(maxCount));
-  return (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
+  const requests = [getDocs(query(collection(db, SPOTS_COLLECTION), where('created_by', '==', userEmail), orderBy('created_date', 'desc'), limit(maxCount)))];
+  if (userId) requests.push(getDocs(query(collection(db, SPOTS_COLLECTION), where('created_by_uid', '==', userId), limit(maxCount))));
+  const unique = new Map();
+  (await Promise.all(requests)).forEach(snapshot => snapshot.docs.forEach(d => unique.set(d.id, { id: d.id, ...d.data() })));
+  return [...unique.values()]
+    .sort((a, b) => String(b.created_date || '').localeCompare(String(a.created_date || '')))
+    .slice(0, maxCount);
 };
  
 export const createSpot = async (spotData) => {
@@ -651,7 +655,11 @@ async function getSpotsForRelations(collectionName, uid, maxCount = 100) {
     const batch = await getDocs(query(collection(db, SPOTS_COLLECTION), where(documentId(), 'in', batchIds)));
     batch.docs.forEach(snap => spotsById.set(snap.id, { id: snap.id, ...snap.data() }));
   }
-  return ids.map(id => spotsById.get(id)).filter(Boolean);
+  const relationDates = new Map(rels.map(relation => [relation.spot_id, relation.created_date || null]));
+  return ids.map(id => {
+    const spot = spotsById.get(id);
+    return spot ? { ...spot, _relation_created_date: relationDates.get(id) } : null;
+  }).filter(Boolean);
 }
 
 export const getSavedSpots = (uid, maxCount = 100) => getSpotsForRelations(SPOT_SAVES_COLLECTION, uid, maxCount);

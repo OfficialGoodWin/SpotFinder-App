@@ -14,6 +14,7 @@ import MapLibreMap from '../components/map/MapLibreMap';
 import ProfileMenu from '../components/ProfileMenu';
 import WelcomeDiscoveryCard from '../components/WelcomeDiscoveryCard';
 import { getSpotDisplayName } from '@/lib/spotPresentation';
+import { createSpotSelection } from '@/lib/spotDiscovery';
 
 const SubscriptionModal = React.lazy(() => import('../components/SubscriptionModal'));
 const SuperAdminEditor = React.lazy(() => import('../components/map/SuperAdminEditor'));
@@ -260,7 +261,7 @@ export default function Home() {
     const position = userPos || await requestLocation();
     if (!position) return toast.error(t('home.locationUnavailable'));
     setNavFrom({ lat: position[0], lng: position[1] });
-    setNavTarget({ lat: spot.lat, lng: spot.lng, label: getSpotDisplayName(spot) });
+    setNavTarget({ lat: spot.lat, lng: spot.lng, label: getSpotDisplayName(spot, language) });
     setSelectedSpot(null);
   };
  
@@ -269,6 +270,14 @@ export default function Home() {
     setTimeout(() => setFlyTo(null), 1000);
   };
 
+  const selectSpotFromList = useCallback((spot) => {
+    const selection = createSpotSelection(spot);
+    if (!selection) return;
+    setSelectedSpot(selection.spot);
+    setFlyTo(selection.position);
+    window.setTimeout(() => setFlyTo(null), 1000);
+  }, []);
+
   const openNearby = useCallback(async (filters) => {
     const position = userPos || await requestLocation();
     if (!position) return;
@@ -276,7 +285,10 @@ export default function Home() {
     setShowNearbySpots(true);
     setNearbyLoading(true);
     try {
-      const rows = await getPublicSpotsNear(position, filters.maxDistance, 20);
+      // Fetch the bounded candidate set before paginating in the panel. Rating
+      // filtering inside the data layer prevents nearer unrated rows from
+      // crowding qualifying results out of the result limit.
+      const rows = await getPublicSpotsNear(position, filters.maxDistance, 500, filters.minRating);
       setNearbySpots(rows);
     } catch (error) {
       console.error('Failed to load nearby spots:', error);
@@ -285,21 +297,6 @@ export default function Home() {
       setNearbyLoading(false);
     }
   }, [requestLocation, userPos]);
- 
-  const showNearby = () => {
-    if (!userPos) return alert(t('home.enableLocation'));
-    const nearby = spots
-      .map(s => ({
-        ...s,
-        dist: Math.hypot(s.lat - userPos[0], s.lng - userPos[1])
-      }))
-      .sort((a, b) => a.dist - b.dist)
-      .slice(0, 1);
-    if (nearby.length > 0) {
-      setFlyTo([nearby[0].lat, nearby[0].lng]);
-      setTimeout(() => { setSelectedSpot(nearby[0]); setFlyTo(null); }, 800);
-    }
-  };
  
   const handleSignOut = async () => {
     await logout();
@@ -315,9 +312,10 @@ export default function Home() {
   };
  
   // Stable nav start — set both target and snapshot from-position together
-  const startNavTo = (destination) => {
-    if (!userPos) return alert(t('home.locationUnavailable'));
-    setNavFrom({ lat: userPos[0], lng: userPos[1] });
+  const startNavTo = async (destination) => {
+    const position = userPos || await requestLocation();
+    if (!position) return toast.error(t('home.locationRequestFailed', 'Location is unavailable. Check browser permissions or search the map instead.'));
+    setNavFrom({ lat: position[0], lng: position[1] });
     setNavTarget(destination);
   };
 
@@ -397,24 +395,20 @@ export default function Home() {
         spots={spots}
         userPos={userPos}
         onNearby={openNearby}
+        onRequestLocation={requestLocation}
         onSelectSpot={(spot) => {
           setSelectedSpot(spot);
           setFlyTo([spot.lat, spot.lng]);
           setTimeout(() => setFlyTo(null), 1000);
         }}
-        onNavigate={(destination) => {
-          if (!userPos) return alert(t('home.locationUnavailable'));
-          startNavTo(destination);
-        }}
-        onSelectCategory={(category) => {
-          if (!userPos) {
-            alert(t('search.enableLocation') || 'Enable location to search nearby places');
-            return;
-          }
+        onNavigate={startNavTo}
+        onSelectCategory={async (category) => {
+          const position = userPos || await requestLocation();
+          if (!position) return toast.error(t('home.locationRequestFailed', 'Location is unavailable. Check browser permissions or search the map instead.'));
           setSelectedPOICategory(category);
           setShowPOIPanel(true);
           if (mapRef.current) {
-            const [lat, lng] = userPos;
+            const [lat, lng] = position;
             const radiusKm = 20;
             const latDelta = radiusKm / 111.32;
             const lngDelta = radiusKm / (111.32 * Math.max(0.2, Math.cos(lat * Math.PI / 180)));
@@ -500,11 +494,7 @@ export default function Home() {
           loading={nearbyLoading}
           initialFilters={nearbyFilters}
           onFiltersChange={openNearby}
-          onSelectSpot={(spot) => {
-            setSelectedSpot(spot);
-            setFlyTo([spot.lat, spot.lng]);
-            setTimeout(() => setFlyTo(null), 1000);
-          }}
+          onSelectSpot={selectSpotFromList}
           onNavigate={(spot) => handleNavigate(spot)}
           onClose={() => setShowNearbySpots(false)}
         />
@@ -666,7 +656,7 @@ export default function Home() {
         <MySpotsPanel
           user={user}
           onClose={() => setShowMySpots(false)}
-          onFlyTo={(pos) => setFlyTo(pos)}
+          onSelectSpot={selectSpotFromList}
         />
       )}
 
@@ -677,10 +667,7 @@ export default function Home() {
           userPos={userPos}
           loading={poiLoading}
           onFlyTo={(pos) => setFlyTo(pos)}
-          onNavigate={(poi) => {
-            if (!userPos) return alert(t('home.locationUnavailable'));
-            startNavTo({ lat: poi.lat, lng: poi.lon, label: poi.name });
-          }}
+          onNavigate={(poi) => startNavTo({ lat: poi.lat, lng: poi.lon, label: poi.name })}
           onSelect={(poi) => setSelectedPOI(poi)}
           onClose={() => { setShowPOIPanel(false); setSelectedPOICategory(null); setSelectedPOI(null); }}
         />
@@ -693,10 +680,7 @@ export default function Home() {
           user={user}
           isSuperAdmin={isSuperAdmin}
           onClose={() => { setSelectedPOI(null); setSelectedPOIDirectCat(null); if (!showPOIPanel) setSelectedPOICategory(null); }}
-          onNavigate={(destination) => {
-            if (!userPos) return alert(t('home.locationUnavailable'));
-            startNavTo(destination);
-          }}
+          onNavigate={startNavTo}
           onBlockPOI={handleBlockAmbientPOI}
         />
       )}

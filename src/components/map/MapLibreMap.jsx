@@ -519,7 +519,7 @@ function makeDot(catKey, color, size = 28, label = '') {
   return el;
 }
 
-function makeSpotDom(spot) {
+function makeSpotDom(spot, language = 'en') {
   const photoUrl = typeof spot.image_url === 'string' && /^https:\/\//i.test(spot.image_url) ? spot.image_url : '';
 
   const el = document.createElement('div');
@@ -532,7 +532,7 @@ function makeSpotDom(spot) {
   el.className = 'sf-discovery-marker';
   el.setAttribute('role', 'button');
   el.setAttribute('tabindex', '0');
-  el.setAttribute('aria-label', `Open ${getSpotDisplayName(spot)}`);
+  el.setAttribute('aria-label', `Open ${getSpotDisplayName(spot, language)}`);
   el.style.cssText = `width:${photoUrl ? 116 : 96}px;height:${photoUrl ? 98 : 88}px;cursor:pointer;`;
   const root = createRoot(el);
   root.render(photoUrl
@@ -673,9 +673,10 @@ function addAmbientVectorLayer(map) {
         filter: ['in', ['get', 'cat'], ['literal', cats.map(c => c.key)]],
         layout: {
           'icon-image': iconExpr,
-          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.7, 15, 0.85, 18, 1.0], // ≈31px → 37px → 44px
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.58, 15, 0.74, 18, 0.9],
           'icon-allow-overlap': false,
-          'icon-padding': 4,
+          'icon-ignore-placement': false,
+          'icon-padding': 7,
           'symbol-sort-key': sortExpr,
           // Names only once zoomed in; `text-optional` drops the label (not the icon) if it collides.
           // Name sits directly below the icon (Mapy.cz style), from z14 up.
@@ -688,6 +689,9 @@ function addAmbientVectorLayer(map) {
           'text-optional': true,
         },
         paint: {
+          // Ambient geography remains available but visually secondary to the
+          // larger, full-opacity community discovery markers.
+          'icon-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.72, 16, 0.84, 18, 0.92],
           'text-color': '#1f2937',
           'text-halo-color': '#ffffff',
           'text-halo-width': 1.6,
@@ -1018,16 +1022,25 @@ export default function MapLibreMap({
     if (!map) return;
     const m = markers.current.spots;
     if (!showSpots) { m.forEach(removeSpotMarker); m.clear(); return; }
-    const ids = new Set(spots.map(s => s.id));
+    const ids = new Set(spots.map(s => s.id).filter(Boolean));
     m.forEach((x, id) => { if (!ids.has(id)) { removeSpotMarker(x); m.delete(id); } });
     for (const spot of spots) {
-      if (m.has(spot.id)) continue;
-      const el = makeSpotDom(spot);
+      if (!spot.id || !Number.isFinite(Number(spot.lat)) || !Number.isFinite(Number(spot.lng))) continue;
+      const signature = JSON.stringify([
+        Number(spot.lat), Number(spot.lng), getSpotDisplayName(spot, language), spot.image_url || '',
+        spot.rating || 0, spot.rating_count || 0, spot.access_difficulty || '',
+        Array.isArray(spot.tags) ? spot.tags : [], Boolean(spot.has_social || spot.video_url),
+      ]);
+      const existing = m.get(spot.id);
+      if (existing?.__spotSignature === signature) continue;
+      if (existing) removeSpotMarker(existing);
+      const el = makeSpotDom(spot, language);
       const mk = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([spot.lng, spot.lat]).addTo(map);
       el.addEventListener('click', e => { e.stopPropagation(); onSelectSpot?.(spot); });
+      mk.__spotSignature = signature;
       m.set(spot.id, mk);
     }
-  }, [spots, showSpots]);
+  }, [language, onSelectSpot, spots, showSpots]);
 
   // ── User location ──────────────────────────────────────────────────────────
   useEffect(() => {

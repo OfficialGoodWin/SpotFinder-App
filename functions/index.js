@@ -304,6 +304,55 @@ function isManagedImageUrl(value, uid) {
   }
 }
 
+function sanitizePoiMatch(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const tagsInput = value.tags && typeof value.tags === 'object' && !Array.isArray(value.tags) ? value.tags : {};
+  const allowedTagKeys = [
+    'name', 'name:en', 'name:cs', 'name:de', 'name:pl', 'name:sk', 'historic', 'castle_type',
+    'tourism', 'natural', 'amenity', 'leisure', 'wikidata', 'wikimedia_commons',
+  ];
+  const tags = Object.fromEntries(allowedTagKeys
+    .filter(key => tagsInput[key])
+    .map(key => [key, cleanString(tagsInput[key], 200)]));
+  const distance = Number(value.distance_m);
+  const lat = Number(value.lat), lon = Number(value.lon ?? value.lng);
+  return {
+    place_id: cleanString(value.place_id, 250),
+    name: cleanString(value.name, 150),
+    names: value.names && typeof value.names === 'object' ? Object.fromEntries(Object.entries(value.names)
+      .slice(0, 8).map(([key, label]) => [cleanString(key, 10), cleanString(label, 150)])) : {},
+    address: cleanString(value.address, 300),
+    locality: cleanString(value.locality, 160),
+    distance_m: Number.isFinite(distance) && distance >= 0 && distance <= 1000 ? Math.round(distance) : null,
+    lat: Number.isFinite(lat) ? lat : null,
+    lon: Number.isFinite(lon) ? lon : null,
+    categories: Array.isArray(value.categories) ? value.categories.map(item => cleanString(item, 100)).filter(Boolean).slice(0, 20) : [],
+    tags,
+    source: value.source === 'geoapify' ? 'geoapify' : 'legacy',
+    match_method: cleanString(value.match_method, 40),
+    match_confidence: ['high', 'review'].includes(value.match_confidence) ? value.match_confidence : 'review',
+  };
+}
+
+function deriveSpotCategory(input, poiMatch) {
+  const reliablePoi = poiMatch?.match_confidence === 'high';
+  const tags = reliablePoi ? poiMatch?.tags || {} : {};
+  const categories = reliablePoi ? (poiMatch?.categories || []).map(value => String(value).toLowerCase()) : [];
+  const historic = String(tags.historic || '').toLowerCase();
+  if (historic === 'castle' || tags.castle_type || categories.some(value => value.includes('heritage.castle'))) return 'castle';
+  if (['ruins', 'archaeological_site'].includes(historic) || categories.some(value => /ruins|archaeological/.test(value))) return 'historic ruin';
+  if (historic || categories.some(value => value.startsWith('heritage'))) return 'historic site';
+  if (tags.tourism === 'viewpoint' || categories.some(value => value.includes('viewpoint'))) return 'viewpoint';
+  if (tags.natural === 'waterfall' || categories.some(value => value.includes('waterfall'))) return 'waterfall';
+  const fallbackCategories = {
+    Viewpoint: 'viewpoint', SecretCafe: 'café', Sunset: 'sunset spot', Sunrise: 'sunrise spot',
+    PhotoSpot: 'photo spot', Waterfall: 'waterfall', Hike: 'hiking spot', SwimSpot: 'swimming spot',
+    Ruin: 'historic ruin', UrbanExplore: 'urban discovery', Mountain: 'mountain spot',
+  };
+  const fallbackTag = Array.isArray(input.tags) ? input.tags.find(tag => fallbackCategories[tag]) : null;
+  return fallbackCategories[fallbackTag] || null;
+}
+
 // Authoritative spot-creation boundary. Direct Firestore creates are denied,
 // so callers cannot bypass ownership, aggregate, content, or rate checks.
 exports.submitSpot = functions.runWith({ secrets: ['ANTI_SPAM_IP_SALT'] }).https.onCall(async (data, context) => {
@@ -313,17 +362,15 @@ exports.submitSpot = functions.runWith({ secrets: ['ANTI_SPAM_IP_SALT'] }).https
   const lat = Number(input.lat), lng = Number(input.lng);
   const rawTitle = cleanString(input.title, 100);
   const genericTitles = ['spot', 'place', 'location', 'point', 'poi'];
-  const fallbackCategories = {
-    Viewpoint: 'viewpoint', SecretCafe: 'café', Sunset: 'sunset spot', Sunrise: 'sunrise spot',
-    PhotoSpot: 'photo spot', Waterfall: 'waterfall', Hike: 'hiking spot', SwimSpot: 'swimming spot',
-    Ruin: 'historic ruin', UrbanExplore: 'urban discovery', Mountain: 'mountain spot',
-  };
-  const fallbackTag = Array.isArray(input.tags) ? input.tags.find(tag => fallbackCategories[tag]) : null;
+  const poiMatch = sanitizePoiMatch(input.poi_match);
+  const fallbackCategory = deriveSpotCategory(input, poiMatch);
   // Older installed clients submitted the literal title "Spot". Keep them
   // compatible while ensuring they no longer create misleading generic names.
-  const title = rawTitle && !genericTitles.includes(rawTitle.toLowerCase())
+  const titleIsGeneric = !rawTitle || genericTitles.includes(rawTitle.toLowerCase()) || /^unnamed(?:\s+.+)?$/i.test(rawTitle);
+  const matchedName = poiMatch?.match_confidence === 'high' ? cleanString(poiMatch?.name, 100) : '';
+  const title = !titleIsGeneric
     ? rawTitle
-    : `Unnamed ${fallbackCategories[fallbackTag] || 'place'}`;
+    : matchedName || `Unnamed ${fallbackCategory || 'place'}`;
   const description = cleanString(input.description, 2000);
   if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lng) || lng < -180 || lng > 180) {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid spot coordinates.');
@@ -349,12 +396,17 @@ exports.submitSpot = functions.runWith({ secrets: ['ANTI_SPAM_IP_SALT'] }).https
     .filter(value => typeof value === 'string' && isManagedImageUrl(value, uid)).slice(0, 3);
   const ratingValue = Number(input.rating);
   const initialRating = Number.isFinite(ratingValue) && ratingValue >= 1 && ratingValue <= 5 ? ratingValue : 0;
-  const allowedOption = (value, allowed, fallback) => allowed.includes(value) ? value : fallback;
+  const allowedOption = (value, allowed) => allowed.includes(value) ? value : null;
   const list = (value, maxItems, maxLength) => Array.isArray(value)
     ? value.map(item => cleanString(item, maxLength)).filter(Boolean).slice(0, maxItems) : [];
-  const poiMatch = input.poi_match && JSON.stringify(input.poi_match).length <= 5000 ? input.poi_match : null;
   const spot = {
-    lat, lng, spot_type: 'general',
+    lat, lng, spot_type: fallbackCategory === 'castle'
+      ? 'castle'
+      : fallbackCategory?.startsWith('historic')
+        ? 'historic'
+        : fallbackCategory === 'viewpoint'
+          ? 'viewpoint'
+          : ['general', 'viewpoint', 'castle', 'historic'].includes(input.spot_type) ? input.spot_type : 'general',
     title, description,
     image_url: imageUrls[0] || null, image_urls: imageUrls, is_public: true,
     photo_metadata: imageUrls.map(url => ({
@@ -370,9 +422,9 @@ exports.submitSpot = functions.runWith({ secrets: ['ANTI_SPAM_IP_SALT'] }).https
     created_by_name: cleanString(input.created_by_name, 100) || 'Anonymous', created_by_uid: uid,
     submission_attestation: { accepted: submissionAttested, version: submissionAttested ? '0.5.6' : 'legacy' },
     tags: list(input.tags, 10, 40),
-    cost: allowedOption(input.cost, ['free', 'paid', 'donation'], 'free'),
-    access_difficulty: allowedOption(input.access_difficulty, ['easy', 'moderate', 'hard'], 'easy'),
-    parking: allowedOption(input.parking, ['yes', 'no', 'street', 'paid'], 'no'),
+    cost: allowedOption(input.cost, ['free', 'paid', 'donation']),
+    access_difficulty: allowedOption(input.access_difficulty, ['easy', 'moderate', 'hard']),
+    parking: allowedOption(input.parking, ['yes', 'no', 'street', 'paid']),
     best_time: list(input.best_time, 5, 30), directions: cleanString(input.directions, 1000), poi_match: poiMatch,
     status, needs_review: spam.score > 0, quality_score: 0,
     upvote_count: 0, downvote_count: 0, likes_count: 0, saves_count: 0, flag_count: 0,

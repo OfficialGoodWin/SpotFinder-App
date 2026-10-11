@@ -12,6 +12,9 @@ import {
 import LiquidSegmentedControl from '../ui/LiquidSegmentedControl';
 import SmoothSelect from '../ui/SmoothSelect';
 import { getSpotDisplayName, getSpotLocationLabel } from '@/lib/spotPresentation';
+import SpotImage from './SpotImage';
+import { sortSpotCollection } from '@/lib/spotDiscovery';
+import { useLanguage } from '@/lib/LanguageContext';
 
 const TABS = [
   { id: 'saved', label: 'Saved', icon: Bookmark },
@@ -33,13 +36,8 @@ const EMPTY_COPY = {
   liked: ['No liked spots yet', 'Like a spot and it will appear here.'],
 };
 
-const timestamp = (spot) => {
-  const value = spot.created_date || spot.created_at;
-  const parsed = value?.toDate?.() || (value ? new Date(value) : null);
-  return parsed && !Number.isNaN(parsed.getTime()) ? parsed.getTime() : 0;
-};
-
-export default function MySpotsPanel({ user, onClose, onFlyTo }) {
+export default function MySpotsPanel({ user, onClose, onSelectSpot }) {
+  const { language } = useLanguage();
   const [tab, setTab] = useState('saved');
   const [data, setData] = useState({ saved: null, created: null, liked: null });
   const [loading, setLoading] = useState({ saved: false, created: false, liked: false });
@@ -56,7 +54,7 @@ export default function MySpotsPanel({ user, onClose, onFlyTo }) {
       let rows;
       if (tabId === 'saved') rows = await getSavedSpots(user.id, 100);
       else if (tabId === 'liked') rows = await getLikedSpots(user.id, 100);
-      else rows = await getUserSpots(user.email, 100);
+      else rows = await getUserSpots(user.email, 100, user.id);
       setData(current => ({ ...current, [tabId]: rows }));
     } catch (error) {
       console.error(`My Spots ${tabId} load failed`, error);
@@ -73,16 +71,10 @@ export default function MySpotsPanel({ user, onClose, onFlyTo }) {
   const visibleSpots = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
     const filtered = (data[tab] || []).filter(spot => !normalized ||
-      [getSpotDisplayName(spot), spot.description, getSpotLocationLabel(spot)].some(value =>
+      [getSpotDisplayName(spot, language), spot.description, getSpotLocationLabel(spot)].some(value =>
         String(value || '').toLocaleLowerCase().includes(normalized)));
-    return [...filtered].sort((a, b) => {
-      if (sort === 'oldest') return timestamp(a) - timestamp(b);
-      if (sort === 'rating') return Number(b.rating || 0) - Number(a.rating || 0);
-      if (sort === 'liked') return Number(b.likes_count || 0) - Number(a.likes_count || 0);
-      if (sort === 'alphabetical') return getSpotDisplayName(a).localeCompare(getSpotDisplayName(b));
-      return timestamp(b) - timestamp(a);
-    });
-  }, [data, query, sort, tab]);
+    return sortSpotCollection(filtered, sort, { relationFirst: tab !== 'created', getTitle: spot => getSpotDisplayName(spot, language) });
+  }, [data, language, query, sort, tab]);
 
   const selectTab = (nextTab) => {
     setTab(nextTab);
@@ -167,10 +159,10 @@ export default function MySpotsPanel({ user, onClose, onFlyTo }) {
                 <article key={spot.id} className="group rounded-2xl border border-gray-200/80 dark:border-border bg-white/80 dark:bg-white/[0.03] overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-[transform,box-shadow] duration-200">
                   <div className="flex min-h-[124px]">
                     <div className="w-28 sm:w-32 bg-gray-100 dark:bg-accent shrink-0 overflow-hidden">
-                      {spot.image_url ? <img src={spot.image_url} alt="" loading="lazy" decoding="async" width="256" height="256" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" /> : <div className="w-full h-full grid place-items-center"><MapPin className="w-7 h-7 text-gray-300" /></div>}
+                      <SpotImage spot={spot} alt="" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
                     </div>
                     <div className="p-3 min-w-0 flex-1 flex flex-col">
-                      <h3 className="font-semibold truncate text-gray-900 dark:text-foreground">{getSpotDisplayName(spot)}</h3>
+                      <h3 className="font-semibold truncate text-gray-900 dark:text-foreground">{getSpotDisplayName(spot, language)}</h3>
                       <p className="text-xs text-gray-500 dark:text-muted-foreground truncate mt-1 flex items-center gap-1"><MapPin className="w-3.5 h-3.5 shrink-0" />{getSpotLocationLabel(spot)}</p>
                       <p className="text-xs text-gray-500 dark:text-muted-foreground line-clamp-2 mt-1.5 flex-1">{spot.description || 'No description'}</p>
                       {(spot.rating_count > 0 || spot.likes_count > 0 || spot.saves_count > 0) && <div className="flex items-center gap-3 text-xs text-gray-500 mt-2" aria-label="Spot statistics">
@@ -181,8 +173,8 @@ export default function MySpotsPanel({ user, onClose, onFlyTo }) {
                     </div>
                   </div>
                   <div className="border-t border-gray-100 dark:border-border flex">
-                    <button onClick={() => { onFlyTo([spot.lat, spot.lng]); onClose(); }} className="flex-1 min-h-11 text-sm font-semibold flex items-center justify-center gap-1.5 hover:bg-gray-50 dark:hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-green-500"><Eye className="w-4 h-4" />View on map</button>
-                    {tab === 'created' && <button onClick={() => handleDelete(spot.id)} disabled={Boolean(deletingId)} className="w-12 min-h-11 grid place-items-center text-red-500 border-l border-gray-100 dark:border-border hover:bg-red-50 dark:hover:bg-red-950/20 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-red-500" aria-label={`Delete ${getSpotDisplayName(spot)}`}><Trash2 className="w-4 h-4" /></button>}
+                    <button onClick={() => { onSelectSpot?.(spot); onClose(); }} className="flex-1 min-h-11 text-sm font-semibold flex items-center justify-center gap-1.5 hover:bg-gray-50 dark:hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-green-500"><Eye className="w-4 h-4" />Open spot</button>
+                    {tab === 'created' && <button onClick={() => handleDelete(spot.id)} disabled={Boolean(deletingId)} className="w-12 min-h-11 grid place-items-center text-red-500 border-l border-gray-100 dark:border-border hover:bg-red-50 dark:hover:bg-red-950/20 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-red-500" aria-label={`Delete ${getSpotDisplayName(spot, language)}`}><Trash2 className="w-4 h-4" /></button>}
                   </div>
                 </article>
               ))}
