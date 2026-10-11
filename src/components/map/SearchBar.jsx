@@ -6,6 +6,7 @@ import { iconGlyphSVG } from '@/lib/mapIcons';
 import { searchPlaces } from '@/lib/placeSearch';
 import { NEARBY_DEFAULT_KM, NEARBY_SLIDER_MAX, sliderToKm, kmToSlider, formatMaxDistance } from '@/lib/nearbyFilters';
 import LiquidSegmentedControl from '@/components/ui/LiquidSegmentedControl';
+import { getSpotDisplayName } from '@/lib/spotPresentation';
 
 
 const LANG_TO_BCP47 = {
@@ -326,15 +327,15 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
             {spotResults.map((spot, i) => (
               <div key={`spot-${i}`} className="flex items-center hover:bg-gray-50 dark:hover:bg-accent transition-colors">
                 <button
-                  onMouseDown={e => { e.preventDefault(); onSelectSpot?.(spot); setQuery(spot.title || ''); closeDropdown(); }}
-                  onTouchEnd={e => { e.preventDefault(); onSelectSpot?.(spot); setQuery(spot.title || ''); closeDropdown(); }}
+                  onMouseDown={e => { e.preventDefault(); onSelectSpot?.(spot); setQuery(getSpotDisplayName(spot)); closeDropdown(); }}
+                  onTouchEnd={e => { e.preventDefault(); onSelectSpot?.(spot); setQuery(getSpotDisplayName(spot)); closeDropdown(); }}
                   className="flex-1 text-left px-4 py-2.5 flex items-center gap-3"
                 >
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-green-100 dark:bg-green-900/30">
                     <span className="text-lg">📍</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 dark:text-foreground truncate">{spot.title || 'Spot'}</p>
+                    <p className="text-sm font-medium text-gray-800 dark:text-foreground truncate">{getSpotDisplayName(spot)}</p>
                     {spot.description && (
                       <p className="text-xs text-gray-400 dark:text-muted-foreground truncate">{spot.description}</p>
                     )}

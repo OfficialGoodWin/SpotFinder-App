@@ -11,6 +11,7 @@ import {
 } from '@/api/firebaseClient';
 import LiquidSegmentedControl from '../ui/LiquidSegmentedControl';
 import SmoothSelect from '../ui/SmoothSelect';
+import { getSpotDisplayName, getSpotLocationLabel } from '@/lib/spotPresentation';
 
 const TABS = [
   { id: 'saved', label: 'Saved', icon: Bookmark },
@@ -37,12 +38,6 @@ const timestamp = (spot) => {
   const parsed = value?.toDate?.() || (value ? new Date(value) : null);
   return parsed && !Number.isNaN(parsed.getTime()) ? parsed.getTime() : 0;
 };
-
-const locationLabel = (spot) =>
-  spot.location || spot.address || spot.city || spot.region ||
-  (Number.isFinite(Number(spot.lat)) && Number.isFinite(Number(spot.lng))
-    ? `${Number(spot.lat).toFixed(3)}, ${Number(spot.lng).toFixed(3)}`
-    : 'Location unavailable');
 
 export default function MySpotsPanel({ user, onClose, onFlyTo }) {
   const [tab, setTab] = useState('saved');
@@ -78,13 +73,13 @@ export default function MySpotsPanel({ user, onClose, onFlyTo }) {
   const visibleSpots = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
     const filtered = (data[tab] || []).filter(spot => !normalized ||
-      [spot.title, spot.description, locationLabel(spot)].some(value =>
+      [getSpotDisplayName(spot), spot.description, getSpotLocationLabel(spot)].some(value =>
         String(value || '').toLocaleLowerCase().includes(normalized)));
     return [...filtered].sort((a, b) => {
       if (sort === 'oldest') return timestamp(a) - timestamp(b);
       if (sort === 'rating') return Number(b.rating || 0) - Number(a.rating || 0);
       if (sort === 'liked') return Number(b.likes_count || 0) - Number(a.likes_count || 0);
-      if (sort === 'alphabetical') return String(a.title || '').localeCompare(String(b.title || ''));
+      if (sort === 'alphabetical') return getSpotDisplayName(a).localeCompare(getSpotDisplayName(b));
       return timestamp(b) - timestamp(a);
     });
   }, [data, query, sort, tab]);
@@ -175,19 +170,19 @@ export default function MySpotsPanel({ user, onClose, onFlyTo }) {
                       {spot.image_url ? <img src={spot.image_url} alt="" loading="lazy" decoding="async" width="256" height="256" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" /> : <div className="w-full h-full grid place-items-center"><MapPin className="w-7 h-7 text-gray-300" /></div>}
                     </div>
                     <div className="p-3 min-w-0 flex-1 flex flex-col">
-                      <h3 className="font-semibold truncate text-gray-900 dark:text-foreground">{spot.title || 'Spot'}</h3>
-                      <p className="text-xs text-gray-500 dark:text-muted-foreground truncate mt-1 flex items-center gap-1"><MapPin className="w-3.5 h-3.5 shrink-0" />{locationLabel(spot)}</p>
+                      <h3 className="font-semibold truncate text-gray-900 dark:text-foreground">{getSpotDisplayName(spot)}</h3>
+                      <p className="text-xs text-gray-500 dark:text-muted-foreground truncate mt-1 flex items-center gap-1"><MapPin className="w-3.5 h-3.5 shrink-0" />{getSpotLocationLabel(spot)}</p>
                       <p className="text-xs text-gray-500 dark:text-muted-foreground line-clamp-2 mt-1.5 flex-1">{spot.description || 'No description'}</p>
-                      <div className="flex items-center gap-3 text-xs text-gray-500 mt-2" aria-label="Spot statistics">
-                        <span className="flex items-center gap-1"><Star className="w-3.5 h-3.5 text-amber-500" />{Number(spot.rating || 0).toFixed(1)}</span>
-                        <span className="flex items-center gap-1"><Heart className="w-3.5 h-3.5" />{Math.max(0, spot.likes_count || 0)}</span>
-                        <span className="flex items-center gap-1"><Bookmark className="w-3.5 h-3.5" />{Math.max(0, spot.saves_count || 0)}</span>
-                      </div>
+                      {(spot.rating_count > 0 || spot.likes_count > 0 || spot.saves_count > 0) && <div className="flex items-center gap-3 text-xs text-gray-500 mt-2" aria-label="Spot statistics">
+                        {spot.rating_count > 0 && <span className="flex items-center gap-1"><Star className="w-3.5 h-3.5 text-amber-500" />{Number(spot.rating).toFixed(1)}</span>}
+                        {spot.likes_count > 0 && <span className="flex items-center gap-1"><Heart className="w-3.5 h-3.5" />{spot.likes_count}</span>}
+                        {spot.saves_count > 0 && <span className="flex items-center gap-1"><Bookmark className="w-3.5 h-3.5" />{spot.saves_count}</span>}
+                      </div>}
                     </div>
                   </div>
                   <div className="border-t border-gray-100 dark:border-border flex">
                     <button onClick={() => { onFlyTo([spot.lat, spot.lng]); onClose(); }} className="flex-1 min-h-11 text-sm font-semibold flex items-center justify-center gap-1.5 hover:bg-gray-50 dark:hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-green-500"><Eye className="w-4 h-4" />View on map</button>
-                    {tab === 'created' && <button onClick={() => handleDelete(spot.id)} disabled={Boolean(deletingId)} className="w-12 min-h-11 grid place-items-center text-red-500 border-l border-gray-100 dark:border-border hover:bg-red-50 dark:hover:bg-red-950/20 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-red-500" aria-label={`Delete ${spot.title || 'spot'}`}><Trash2 className="w-4 h-4" /></button>}
+                    {tab === 'created' && <button onClick={() => handleDelete(spot.id)} disabled={Boolean(deletingId)} className="w-12 min-h-11 grid place-items-center text-red-500 border-l border-gray-100 dark:border-border hover:bg-red-50 dark:hover:bg-red-950/20 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-red-500" aria-label={`Delete ${getSpotDisplayName(spot)}`}><Trash2 className="w-4 h-4" /></button>}
                   </div>
                 </article>
               ))}

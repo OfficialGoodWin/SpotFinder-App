@@ -311,11 +311,25 @@ exports.submitSpot = functions.runWith({ secrets: ['ANTI_SPAM_IP_SALT'] }).https
   const input = data || {};
   const uid = context.auth.uid;
   const lat = Number(input.lat), lng = Number(input.lng);
+  const rawTitle = cleanString(input.title, 100);
+  const genericTitles = ['spot', 'place', 'location', 'point', 'poi'];
+  const fallbackCategories = {
+    Viewpoint: 'viewpoint', SecretCafe: 'café', Sunset: 'sunset spot', Sunrise: 'sunrise spot',
+    PhotoSpot: 'photo spot', Waterfall: 'waterfall', Hike: 'hiking spot', SwimSpot: 'swimming spot',
+    Ruin: 'historic ruin', UrbanExplore: 'urban discovery', Mountain: 'mountain spot',
+  };
+  const fallbackTag = Array.isArray(input.tags) ? input.tags.find(tag => fallbackCategories[tag]) : null;
+  // Older installed clients submitted the literal title "Spot". Keep them
+  // compatible while ensuring they no longer create misleading generic names.
+  const title = rawTitle && !genericTitles.includes(rawTitle.toLowerCase())
+    ? rawTitle
+    : `Unnamed ${fallbackCategories[fallbackTag] || 'place'}`;
   const description = cleanString(input.description, 2000);
   if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lng) || lng < -180 || lng > 180) {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid spot coordinates.');
   }
   if (!description) throw new functions.https.HttpsError('invalid-argument', 'Description is required.');
+  const submissionAttested = input.submission_attestation?.accepted === true;
 
   const ipHash = hashIp(getRequestIp(context));
   const [userAllowed, ipAllowed] = await Promise.all([
@@ -341,10 +355,20 @@ exports.submitSpot = functions.runWith({ secrets: ['ANTI_SPAM_IP_SALT'] }).https
   const poiMatch = input.poi_match && JSON.stringify(input.poi_match).length <= 5000 ? input.poi_match : null;
   const spot = {
     lat, lng, spot_type: 'general',
-    title: cleanString(input.title, 100) || 'Spot', description,
+    title, description,
     image_url: imageUrls[0] || null, image_urls: imageUrls, is_public: true,
+    photo_metadata: imageUrls.map(url => ({
+      url,
+      source: 'user_upload',
+      creator: cleanString(input.created_by_name, 100) || 'SpotFinder contributor',
+      permission_basis: submissionAttested ? 'uploader_attestation' : 'legacy_upload_unverified',
+      source_url: null,
+      modified: false,
+      location_match_confidence: 'user_placed',
+    })),
     created_by: context.auth.token.email || 'anonymous',
     created_by_name: cleanString(input.created_by_name, 100) || 'Anonymous', created_by_uid: uid,
+    submission_attestation: { accepted: submissionAttested, version: submissionAttested ? '0.5.6' : 'legacy' },
     tags: list(input.tags, 10, 40),
     cost: allowedOption(input.cost, ['free', 'paid', 'donation'], 'free'),
     access_difficulty: allowedOption(input.access_difficulty, ['easy', 'moderate', 'hard'], 'easy'),

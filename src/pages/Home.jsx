@@ -12,6 +12,8 @@ import MapLayerSwitcher from '../components/map/MapLayerSwitcher';
 import SearchBar from '../components/map/SearchBar';
 import MapLibreMap from '../components/map/MapLibreMap';
 import ProfileMenu from '../components/ProfileMenu';
+import WelcomeDiscoveryCard from '../components/WelcomeDiscoveryCard';
+import { getSpotDisplayName } from '@/lib/spotPresentation';
 
 const SubscriptionModal = React.lazy(() => import('../components/SubscriptionModal'));
 const SuperAdminEditor = React.lazy(() => import('../components/map/SuperAdminEditor'));
@@ -57,6 +59,11 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
   const [showMobileMore, setShowMobileMore] = useState(false);
+  const [locationStatus, setLocationStatus] = useState('idle');
+  const [showWelcome, setShowWelcome] = useState(() => {
+    try { return localStorage.getItem('spotfinder_welcome_dismissed_v1') !== '1'; }
+    catch { return true; }
+  });
 
   const [navRouteData, setNavRouteData] = useState({ coordinates: [], turns: [], currentStep: 0 });
   const [showSpots, setShowSpots] = useState(true);
@@ -144,58 +151,53 @@ export default function Home() {
  
   // Track if we've centered to user location once
   const hasCenteredToUser = useRef(false);
-  const geolocationTimeoutRef = useRef(null);
- 
-  // Watch user location
-  useEffect(() => {
-    if (!navigator.geolocation) return;
- 
-    // Fallback center after 15s if geolocation is slow or denied
-    geolocationTimeoutRef.current = setTimeout(() => {
-      if (!hasCenteredToUser.current) {
-        hasCenteredToUser.current = true;
-        setFlyTo([50.0755, 14.4378]);
-      }
-    }, 15000);
- 
-    const wid = navigator.geolocation.watchPosition(
-      (pos) => {
-        // Clear timeout on successful location
-        if (geolocationTimeoutRef.current) {
-          clearTimeout(geolocationTimeoutRef.current);
-          geolocationTimeoutRef.current = null;
-        }
-        const newPos = [pos.coords.latitude, pos.coords.longitude];
-        setUserPos(newPos);
-        setUserAccuracy(pos.coords.accuracy);
-        
-        // Auto-center map to user location on first position
-        if (!hasCenteredToUser.current) {
-          hasCenteredToUser.current = true;
-          setFlyTo(newPos);
-        }
-      },
-      (error) => {
-        // Handle geolocation errors
-        console.warn('Geolocation error:', error.message);
-        if (geolocationTimeoutRef.current) {
-          clearTimeout(geolocationTimeoutRef.current);
-          geolocationTimeoutRef.current = null;
-        }
-        // Continue without location if permission denied or unavailable
-        if (!hasCenteredToUser.current) {
-          hasCenteredToUser.current = true;
-          setFlyTo([50.0755, 14.4378]); // Default to Prague
-        }
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
-    return () => {
-      navigator.geolocation.clearWatch(wid);
-      if (geolocationTimeoutRef.current) {
-        clearTimeout(geolocationTimeoutRef.current);
-      }
-    };
+  const locationWatchRef = useRef(null);
+
+  const requestLocation = useCallback(() => {
+    if (userPos) return Promise.resolve(userPos);
+    if (!navigator.geolocation) {
+      setLocationStatus('unsupported');
+      toast.error('This browser does not provide location access. You can still search the map.');
+      return Promise.resolve(null);
+    }
+    setLocationStatus('requesting');
+    return new Promise(resolve => {
+      navigator.geolocation.getCurrentPosition(
+        position => {
+          const next = [position.coords.latitude, position.coords.longitude];
+          setUserPos(next);
+          setUserAccuracy(position.coords.accuracy);
+          setLocationStatus('granted');
+          if (!hasCenteredToUser.current) {
+            hasCenteredToUser.current = true;
+            setFlyTo(next);
+            window.setTimeout(() => setFlyTo(null), 1000);
+          }
+          if (locationWatchRef.current == null) {
+            locationWatchRef.current = navigator.geolocation.watchPosition(update => {
+              setUserPos([update.coords.latitude, update.coords.longitude]);
+              setUserAccuracy(update.coords.accuracy);
+            }, () => {}, { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 });
+          }
+          resolve(next);
+        },
+        error => {
+          console.warn('Geolocation request failed:', error.message);
+          setLocationStatus(error.code === error.PERMISSION_DENIED ? 'denied' : 'unavailable');
+          resolve(null);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+      );
+    });
+  }, [userPos]);
+
+  useEffect(() => () => {
+    if (locationWatchRef.current != null) navigator.geolocation?.clearWatch(locationWatchRef.current);
+  }, []);
+
+  const dismissWelcome = useCallback(() => {
+    setShowWelcome(false);
+    try { localStorage.setItem('spotfinder_welcome_dismissed_v1', '1'); } catch { /* no-op */ }
   }, []);
  
   const handleMapClick = useCallback((latlng) => {
@@ -208,7 +210,7 @@ export default function Home() {
       let spot = await createSpot(data);
       if (socialUrl) {
         try {
-          await addSocialPost({ url: socialUrl, targetType: 'spot', targetId: String(spot.id), targetName: spot.title || 'Spot' });
+          await addSocialPost({ url: socialUrl, targetType: 'spot', targetId: String(spot.id), targetName: getSpotDisplayName(spot) });
           spot = { ...spot, has_social: true };
         } catch (socialError) {
           console.error('Spot saved but social post attachment failed:', socialError);
@@ -254,9 +256,11 @@ export default function Home() {
     setSelectedSpot(null);
   };
  
-  const handleNavigate = (spot) => {
-    if (!userPos) return alert(t('home.locationUnavailable'));
-    startNavTo({ lat: spot.lat, lng: spot.lng, label: spot.title || 'Spot' });
+  const handleNavigate = async (spot) => {
+    const position = userPos || await requestLocation();
+    if (!position) return toast.error(t('home.locationUnavailable'));
+    setNavFrom({ lat: position[0], lng: position[1] });
+    setNavTarget({ lat: spot.lat, lng: spot.lng, label: getSpotDisplayName(spot) });
     setSelectedSpot(null);
   };
  
@@ -266,12 +270,13 @@ export default function Home() {
   };
 
   const openNearby = useCallback(async (filters) => {
-    if (!userPos) return alert(t('home.enableLocation'));
+    const position = userPos || await requestLocation();
+    if (!position) return;
     setNearbyFilters(filters);
     setShowNearbySpots(true);
     setNearbyLoading(true);
     try {
-      const rows = await getPublicSpotsNear(userPos, filters.maxDistance, 20);
+      const rows = await getPublicSpotsNear(position, filters.maxDistance, 20);
       setNearbySpots(rows);
     } catch (error) {
       console.error('Failed to load nearby spots:', error);
@@ -279,7 +284,7 @@ export default function Home() {
     } finally {
       setNearbyLoading(false);
     }
-  }, [userPos, t]);
+  }, [requestLocation, userPos]);
  
   const showNearby = () => {
     if (!userPos) return alert(t('home.enableLocation'));
@@ -323,6 +328,13 @@ export default function Home() {
   return (
     <div className="relative w-full h-full" style={{ touchAction: addMode ? 'none' : undefined }}>
       <h1 className="sr-only">SpotFinder community map</h1>
+      {showWelcome && (
+        <WelcomeDiscoveryCard
+          locationStatus={locationStatus}
+          onDismiss={dismissWelcome}
+          onUseLocation={async () => { const position = await requestLocation(); if (position) dismissWelcome(); }}
+        />
+      )}
       {/* Cursor overlay in add mode */}
       {addMode && (
         <div
@@ -435,7 +447,7 @@ export default function Home() {
           <div className="mx-1.5 my-1 h-px bg-slate-200/80 dark:bg-white/10" />
           <button
             type="button"
-            onClick={() => userPos && setFlyTo([...userPos])}
+            onClick={async () => { const position = userPos || await requestLocation(); if (position) setFlyTo([...position]); }}
             className="grid h-10 w-10 place-items-center rounded-xl transition-colors hover:bg-slate-100 active:scale-95 dark:hover:bg-white/10"
             aria-label="Center on my location"
             title="Center location"
@@ -524,7 +536,7 @@ export default function Home() {
           <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
             <MapLayerSwitcher activeLayer={mapLayer} onLayerChange={setMapLayer} />
             <button
-              onClick={() => userPos && setFlyTo([...userPos])}
+              onClick={async () => { const position = userPos || await requestLocation(); if (position) setFlyTo([...position]); }}
               className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-accent/60 flex items-center justify-center text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent active:scale-95 transition-all"
               title="Center location"
             >

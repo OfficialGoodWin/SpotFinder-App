@@ -4,11 +4,7 @@ import LegalPageLayout, { LegalH2, LegalP, LegalUl, LegalStrong, LegalNote } fro
 export default function PrivacyPolicy() {
   return (
     <LegalPageLayout title="Privacy Policy" lastUpdated="8 October 2026">
-      <LegalNote>
-        <LegalStrong>Before publishing:</LegalStrong> confirm the operator details below are correct and have this
-        page reviewed by a qualified lawyer for your jurisdiction. This draft was prepared from an
-        automated review of the app's code and is not legal advice.
-      </LegalNote>
+      <LegalNote><LegalStrong>Review status:</LegalStrong> This draft is pending qualified legal review and is not a representation that the Service satisfies every applicable requirement.</LegalNote>
 
       <LegalP>
         This Privacy Policy explains what personal data SpotFinder ("<LegalStrong>we</LegalStrong>",
@@ -86,7 +82,7 @@ export default function PrivacyPolicy() {
         <li>Data portability</li>
         <li>Withdraw consent at any time (this won't affect processing done before withdrawal)</li>
       </LegalUl>
-      <LegalP>To exercise any of these rights, contact us at spotfinder@icloud.com. You can also delete your account and most associated data directly from Settings.</LegalP>
+      <LegalP>To exercise any of these rights or request account deletion, contact us at spotfinder@icloud.com. The current Settings screen does not complete account deletion automatically.</LegalP>
 
       <LegalH2>8. Public content and spot locations</LegalH2>
       <LegalP>

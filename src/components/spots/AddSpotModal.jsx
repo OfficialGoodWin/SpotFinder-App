@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { X, Camera, MapPin, Mic, Loader2, AlertCircle } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { X, Camera, MapPin, Mic, Loader2, AlertCircle, ChevronDown } from 'lucide-react';
 import StarRating from './StarRating';
 import LabeledRatingScale from './LabeledRatingScale';
 import AdBanner from '../AdBanner';
@@ -49,6 +49,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   const { authUid } = useAuth();
   const { t, language } = useLanguage();
   const spotType = 'general';
+  const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [overallRating, setOverallRating] = useState(0);
   const [accessRating, setAccessRating] = useState(0);
@@ -65,6 +66,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   const [socialUrl, setSocialUrl] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitError, setSubmitError] = useState('');
+  const [attested, setAttested] = useState(false);
 
   // ── New fields per submission spec ──────────────────────────────────────────
   const [tags, setTags] = useState([]);
@@ -80,9 +82,34 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   const toggleBestTime = (val) => setBestTime(t => t.includes(val) ? t.filter(x => x !== val) : [...t, val]);
 
   const recognitionRef = useRef(null);
+  const submitLockRef = useRef(false);
   const committedRef = useRef(''); // tracks already-committed final transcript
+  const titleRef = useRef(null);
   const descriptionRef = useRef(null);
   const errorSummaryRef = useRef(null);
+  const draftKey = `spotfinder:add-spot-draft:${Number(latlng?.lat).toFixed(4)}:${Number(latlng?.lng).toFixed(4)}`;
+
+  useEffect(() => {
+    try {
+      const draft = JSON.parse(sessionStorage.getItem(draftKey) || 'null');
+      if (!draft) return;
+      setTitle(draft.title || '');
+      setDescription(draft.description || '');
+      setTags(Array.isArray(draft.tags) ? draft.tags : []);
+      setDirections(draft.directions || '');
+      setSocialUrl(draft.socialUrl || '');
+    } catch { /* An invalid draft should never block contribution. */ }
+  }, [draftKey]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try { sessionStorage.setItem(draftKey, JSON.stringify({ title, description, tags, directions, socialUrl })); }
+      catch { /* Storage may be unavailable in private browsing. */ }
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [description, directions, draftKey, socialUrl, tags, title]);
+
+  useEffect(() => () => recognitionRef.current?.stop(), []);
 
   const focusError = (fieldRef = errorSummaryRef) => {
     requestAnimationFrame(() => {
@@ -192,7 +219,15 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   };
 
   const handleSave = async () => {
+    if (loading || submitLockRef.current) return;
     setSubmitError('');
+    if (!title.trim() || title.trim().toLocaleLowerCase() === 'spot') {
+      const message = 'Give this place a specific, recognizable name.';
+      setFieldErrors(current => ({ ...current, title: message }));
+      setSubmitError(message);
+      focusError(titleRef);
+      return;
+    }
     if (!description.trim()) {
       const message = t('addSpot.descriptionRequired');
       setFieldErrors(current => ({ ...current, description: message }));
@@ -201,6 +236,13 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
       return;
     }
     setFieldErrors(current => ({ ...current, description: '' }));
+    if (!attested) {
+      const message = 'Confirm that the information and any photos are yours to share.';
+      setFieldErrors(current => ({ ...current, attested: message }));
+      setSubmitError(message);
+      focusError(errorSummaryRef);
+      return;
+    }
 
     const socialValidation = socialUrl ? validateSocialPostUrl(socialUrl) : null;
     if (socialUrl && !socialValidation?.ok) {
@@ -237,6 +279,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
     // Overall is an explicit opinion; the practical scales describe the place
     // and are intentionally not averaged together into a fake star score.
 
+    submitLockRef.current = true;
     setLoading(true);
     let image_urls = [];
 
@@ -266,7 +309,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
       lat: latlng.lat,
       lng: latlng.lng,
       spot_type: spotType,
-      title: 'Spot',
+      title: title.trim(),
       description,
       rating: overallRating,
       rating_count: overallRating > 0 ? 1 : 0,
@@ -283,6 +326,10 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
       best_time: bestTime,
       directions,
       poi_match,
+      submission_attestation: {
+        accepted: true,
+        photo_rights_confirmed: image_urls.length > 0,
+      },
     };
 
     Object.assign(baseData, {
@@ -295,6 +342,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
 
     try {
       await onSave(baseData, socialValidation?.canonicalUrl || '');
+      try { sessionStorage.removeItem(draftKey); } catch { /* no-op */ }
     } catch (err) {
       console.error('Save failed:', err);
       const rawMessage = String(err?.message || '');
@@ -310,6 +358,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
         focusError(errorSummaryRef);
       }
     } finally {
+      submitLockRef.current = false;
       setLoading(false);
     }
   };
@@ -319,7 +368,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
       <div className="isolate bg-white dark:bg-card w-full max-w-lg rounded-t-3xl shadow-2xl max-h-[90dvh] overflow-y-auto overscroll-contain">
         <div className="sticky top-0 z-30 bg-white/90 dark:bg-card/90 px-6 pt-5 pb-3 border-b border-gray-100/80 dark:border-border flex items-center justify-between backdrop-blur-xl">
           <div className="flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-blue-500" />
+            <MapPin className="w-5 h-5 text-green-600" />
             <h2 className="text-lg font-bold text-gray-900 dark:text-foreground">{t('addSpot.title')}</h2>
           </div>
           <button onClick={onClose} aria-label={t('common.close')} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-accent">
@@ -348,6 +397,32 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
               </button>
             </div>
           )}
+
+          <section aria-labelledby="essential-information-title" className="space-y-4">
+            <div>
+              <p id="essential-information-title" className="text-sm font-bold text-gray-900 dark:text-foreground">Essential information</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-muted-foreground">Name the place clearly and tell people what makes it worth finding.</p>
+            </div>
+            <div>
+              <label htmlFor="new-spot-name" className="mb-1 block text-sm font-semibold text-gray-700 dark:text-foreground">Spot name <span className="text-red-500" aria-hidden="true">*</span></label>
+              <input
+                ref={titleRef}
+                id="new-spot-name"
+                value={title}
+                maxLength={100}
+                autoComplete="off"
+                onChange={event => {
+                  setTitle(event.target.value);
+                  if (fieldErrors.title) setFieldErrors(current => ({ ...current, title: '' }));
+                }}
+                aria-invalid={Boolean(fieldErrors.title)}
+                aria-describedby={fieldErrors.title ? 'new-spot-name-error' : 'new-spot-name-help'}
+                placeholder="e.g. Old Quarry Viewpoint"
+                className={`w-full rounded-xl border bg-white px-4 py-3 text-base text-gray-900 outline-none focus:ring-2 dark:bg-background dark:text-foreground ${fieldErrors.title ? 'border-red-400 focus:ring-red-300' : 'border-gray-200 focus:ring-green-500 dark:border-border'}`}
+              />
+              <p id="new-spot-name-help" className="mt-1.5 text-xs text-gray-500 dark:text-muted-foreground">Use the real local or commonly known name when one exists.</p>
+              {fieldErrors.title && <p id="new-spot-name-error" className="mt-1.5 text-xs font-semibold text-red-600">{fieldErrors.title}</p>}
+            </div>
 
           {/* Description + voice */}
           <div>
@@ -391,7 +466,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
               className={`w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-background text-gray-900 dark:text-foreground focus:outline-none focus:ring-2 focus:ring-blue-300 text-sm resize-none transition-colors ${
                 fieldErrors.description
                   ? 'border-red-400 bg-red-50/40 focus:ring-red-300 dark:border-red-700 dark:bg-red-950/20'
-                  : listening ? 'border-red-300 dark:border-red-600' : 'border-gray-200 dark:border-border'
+                  : listening ? 'border-red-300 dark:border-red-600' : 'border-gray-200 focus:ring-green-500 dark:border-border'
               }`}
             />
             {fieldErrors.description && (
@@ -406,6 +481,18 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
               </p>
             )}
           </div>
+          <div className="flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:bg-accent/50 dark:text-muted-foreground">
+            <MapPin className="h-4 w-4 shrink-0 text-green-600" aria-hidden="true" />
+            <span>Map position: {Number(latlng.lat).toFixed(5)}, {Number(latlng.lng).toFixed(5)}</span>
+          </div>
+          </section>
+
+          <details className="group rounded-2xl border border-gray-200 dark:border-border">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-bold marker:content-none">
+              <span><span className="block">Optional enrichment</span><span className="mt-0.5 block text-xs font-normal text-gray-500 dark:text-muted-foreground">Ratings, practical details, photos and social links</span></span>
+              <ChevronDown className="h-5 w-5 text-gray-400 transition-transform group-open:rotate-180" aria-hidden="true" />
+            </summary>
+            <div className="space-y-5 border-t border-gray-200 p-4 dark:border-border">
 
           {/* Experience rating + descriptive scales (rating schema v2) */}
           <div className="rounded-2xl border border-gray-200 dark:border-border p-4 space-y-5">
@@ -431,7 +518,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
                   onClick={() => toggleTag(id)}
                   className={`sf-glass-pill ${
                     tags.includes(id)
-                      ? 'sf-glass-pill--selected sf-glass-pill--blue'
+                      ? 'sf-glass-pill--selected sf-glass-pill--green'
                       : ''
                   }`}
                 >
@@ -468,7 +555,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
                     onClick={() => toggleBestTime(o)}
                     className={`sf-glass-pill ${
                       bestTime.includes(o)
-                        ? 'sf-glass-pill--selected sf-glass-pill--purple'
+                        ? 'sf-glass-pill--selected sf-glass-pill--green'
                         : ''
                     }`}
                   >
@@ -535,6 +622,8 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
             {socialUrl && !validateSocialPostUrl(socialUrl).ok && <p className="mt-2 text-xs text-red-600">{INVALID_SOCIAL_URL_MESSAGE}</p>}
             {socialUrl && (!user || user.isAnonymous || user.emailVerified !== true) && <p className="mt-2 text-xs text-amber-600">Sign in with a verified account to attach social content.</p>}
           </div>
+            </div>
+          </details>
 
           {/* Ad Banners */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -547,11 +636,13 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
           </div>
         </div>
 
-        <p className="px-6 pt-3 text-[11px] leading-relaxed text-gray-500 dark:text-muted-foreground">
-          By saving, you confirm this description and these photos are your own (or you have the right to
-          share them) and agree they'll be shown publicly on the map to other SpotFinder users. See our{' '}
-          <a href="/TermsAndConditions" target="_blank" rel="noopener noreferrer" className="underline">Terms</a>.
-        </p>
+        <div className="px-6 pt-3">
+          <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-xs leading-relaxed ${fieldErrors.attested ? 'border-red-400 bg-red-50 dark:bg-red-950/20' : 'border-gray-200 dark:border-border'}`}>
+            <input type="checkbox" checked={attested} onChange={event => { setAttested(event.target.checked); if (event.target.checked) setFieldErrors(current => ({ ...current, attested: '' })); }} className="mt-0.5 h-4 w-4 shrink-0 accent-green-600" />
+            <span>I confirm the information is accurate to the best of my knowledge, and that I own or have permission to share any photos. The contribution will be public under the <a href="/TermsAndConditions" target="_blank" rel="noopener noreferrer" className="font-semibold underline">Terms</a>.</span>
+          </label>
+          {fieldErrors.attested && <p className="mt-1.5 text-xs font-semibold text-red-600">{fieldErrors.attested}</p>}
+        </div>
 
         <div className="px-6 py-4 border-t border-gray-100 dark:border-border flex gap-3">
           <button onClick={onClose} className="flex-1 py-3 rounded-2xl border-2 border-gray-200 dark:border-border text-gray-600 dark:text-foreground font-semibold text-sm hover:bg-gray-50 dark:hover:bg-accent">
@@ -560,7 +651,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
           <button
             onClick={handleSave}
             disabled={loading}
-            className="flex-2 px-8 py-3 rounded-2xl bg-blue-500 text-white font-semibold text-sm hover:bg-blue-600 disabled:opacity-50 transition-colors flex items-center gap-2"
+            className="flex-2 px-8 py-3 rounded-2xl bg-green-600 text-white font-semibold text-sm hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center gap-2"
           >
             {(loading || uploadingImage) && <Loader2 className="w-4 h-4 animate-spin" />}
             {loading ? t('addSpot.saving') : t('addSpot.saveSpot')}

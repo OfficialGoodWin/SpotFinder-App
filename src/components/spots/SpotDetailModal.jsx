@@ -7,6 +7,7 @@ import { useLanguage } from '@/lib/LanguageContext';
 import ReportDialog from '@/components/moderation/ReportDialog';
 import NavigationProviderSheet from '@/components/navigation/NavigationProviderSheet';
 import { localizedShareMessage, reversePlaceContext } from '@/lib/placeContext';
+import { getSpotDisplayName, getSpotLocationLabel } from '@/lib/spotPresentation';
 
 const SocialPostsSection = React.lazy(() => import('@/components/social/SocialPostsSection'));
 
@@ -19,6 +20,8 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
   const [social, setSocial] = useState({ liked: false, saved: false, likesCount: spot.likes_count || 0, savesCount: spot.saves_count || 0 });
   const [socialBusy, setSocialBusy] = useState('');
   const [showNavigationProviders, setShowNavigationProviders] = useState(false);
+  const displayName = getSpotDisplayName(localSpot);
+  const creatorName = localSpot.created_by_name || (String(localSpot.created_by || '').includes('@') ? 'Community contributor' : localSpot.created_by) || 'Community contributor';
 
   useEffect(() => {
     let alive = true;
@@ -128,10 +131,10 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
     const url = new URL('/', window.location.origin);
     url.searchParams.set('spot', spot.id);
     const place = await reversePlaceContext(Number(localSpot.lat), Number(localSpot.lng ?? localSpot.lon), language);
-    const message = localizedShareMessage(language, place, localSpot.title || 'this area');
+    const message = localizedShareMessage(language, place, displayName);
     try {
       if (navigator.share) {
-        await navigator.share({ title: localSpot.title || 'Spot', text: message, url: url.toString() });
+        await navigator.share({ title: displayName, text: message, url: url.toString() });
       } else {
         await navigator.clipboard.writeText(`${message} ${url}`);
         setShareTooltip(true);
@@ -150,7 +153,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
     : [localSpot.image_url]).filter(Boolean);
   const poiMatch = localSpot.poi_match?.name ? localSpot.poi_match : null;
   const detailPhotos = [
-    ...uploadedPhotos.map(url => ({ url, source: 'community' })),
+    ...uploadedPhotos.map(url => ({ url, source: 'community', metadata: localSpot.photo_metadata?.find?.(item => item.url === url) })),
     ...(poiMatch?.image_url && !uploadedPhotos.includes(poiMatch.image_url)
       ? [{ url: poiMatch.image_url, source: 'poi', credit: poiMatch.image_credit }]
       : []),
@@ -169,12 +172,12 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
                 <MapPin className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-foreground">{localSpot.title || 'Spot'}</h2>
-                {poiMatch && (
+                <h2 className="text-lg font-bold text-gray-900 dark:text-foreground">{displayName}</h2>
+                {poiMatch && displayName !== poiMatch.name && (
                   <p className="text-xs font-medium text-blue-600 dark:text-blue-400">Also known as {poiMatch.name}</p>
                 )}
                 <p className="text-xs text-gray-500 dark:text-muted-foreground">
-                  {t('spotDetail.addedBy')} {localSpot.created_by_name || localSpot.created_by || 'Anonymous'}
+                  {t('spotDetail.addedBy')} {creatorName}
                   {localSpot.created_date && ` ${t('spotDetail.addedOn')} ${formatDate(localSpot.created_date)}`}
                 </p>
               </div>
@@ -190,7 +193,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
           {detailPhotos.length > 0 && (
             <div className="space-y-2">
               <div className="relative overflow-hidden rounded-2xl">
-                <img src={detailPhotos[0].url} alt={localSpot.title || 'Spot'} loading="lazy" decoding="async" className="h-52 w-full object-cover" />
+                <img src={detailPhotos[0].url} alt={displayName} loading="lazy" decoding="async" className="h-52 w-full object-cover" />
                 {detailPhotos[0].source === 'poi' && (
                   <span className="absolute bottom-2 left-2 rounded-full bg-black/65 px-2.5 py-1 text-[10px] font-medium text-white backdrop-blur-sm">{detailPhotos[0].credit || 'POI reference photo'}</span>
                 )}
@@ -199,7 +202,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
                 <div className="grid grid-cols-3 gap-2">
                   {detailPhotos.slice(1).map((photo, index) => (
                     <div key={`${photo.url}-${index}`} className="relative aspect-square overflow-hidden rounded-xl">
-                      <img src={photo.url} alt={`${localSpot.title || 'Spot'} photo ${index + 2}`} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                      <img src={photo.url} alt={`${displayName} photo ${index + 2}`} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                       {photo.source === 'poi' && <span className="absolute bottom-1 left-1 rounded bg-black/65 px-1.5 py-0.5 text-[9px] text-white">POI</span>}
                     </div>
                   ))}
@@ -225,7 +228,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
           )}
 
           <React.Suspense fallback={<div className="h-24 animate-pulse rounded-2xl bg-gray-100 motion-reduce:animate-none dark:bg-accent" />}>
-            <SocialPostsSection targetType="spot" targetId={String(spot.id)} targetName={localSpot.title || 'Spot'} user={user} />
+            <SocialPostsSection targetType="spot" targetId={String(spot.id)} targetName={displayName} user={user} />
           </React.Suspense>
 
           {poiMatch && (
@@ -389,7 +392,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
           {/* Coordinates */}
           <div className="flex items-center gap-2 text-gray-400 dark:text-muted-foreground text-xs">
             <MapPin className="w-3 h-3" />
-            <span>{localSpot.lat?.toFixed(5)}, {localSpot.lng?.toFixed(5)}</span>
+            <span>{getSpotLocationLabel(localSpot, 5)}</span>
           </div>
         </div>
 
@@ -438,7 +441,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
           </button>
         </div>
       </div>
-      <ReportDialog open={showReport} onClose={() => setShowReport(false)} user={user} targetType="spot" targetId={String(spot.id)} targetLabel={localSpot.title || 'Spot'} targetSnapshot={{ title: localSpot.title || '', lat: localSpot.lat || '', lon: localSpot.lng || localSpot.lon || '', created_by: localSpot.created_by || '' }} />
+      <ReportDialog open={showReport} onClose={() => setShowReport(false)} user={user} targetType="spot" targetId={String(spot.id)} targetLabel={displayName} targetSnapshot={{ title: displayName, lat: localSpot.lat || '', lon: localSpot.lng || localSpot.lon || '', created_by: localSpot.created_by || '' }} />
       <NavigationProviderSheet
         open={showNavigationProviders}
         destination={localSpot}

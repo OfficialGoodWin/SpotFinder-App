@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import * as maplibregl from 'maplibre-gl';
+import { getSpotDisplayName } from '@/lib/spotPresentation';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { Protocol } from 'pmtiles';
 import { Minus, Plus } from 'lucide-react';
@@ -531,7 +532,7 @@ function makeSpotDom(spot) {
   el.className = 'sf-discovery-marker';
   el.setAttribute('role', 'button');
   el.setAttribute('tabindex', '0');
-  el.setAttribute('aria-label', `Open ${spot.title || 'community spot'}`);
+  el.setAttribute('aria-label', `Open ${getSpotDisplayName(spot)}`);
   el.style.cssText = `width:${photoUrl ? 116 : 96}px;height:${photoUrl ? 98 : 88}px;cursor:pointer;`;
   const root = createRoot(el);
   root.render(photoUrl

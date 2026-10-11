@@ -17,15 +17,19 @@ import { loadStripe } from '@stripe/stripe-js';
 
 // ── Stripe config ─────────────────────────────────────────────────────────────
 const STRIPE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '';
-const stripePromise = STRIPE_KEY ? loadStripe(STRIPE_KEY) : null;
+const SUBSCRIPTIONS_AVAILABLE = import.meta.env.VITE_SUBSCRIPTIONS_ENABLED === 'true'
+  && Boolean(STRIPE_KEY)
+  && ['VITE_STRIPE_ELITE_MONTHLY', 'VITE_STRIPE_ELITE_YEARLY', 'VITE_STRIPE_ULTRA_MONTHLY', 'VITE_STRIPE_ULTRA_YEARLY']
+    .every(key => Boolean(import.meta.env[key]));
+const stripePromise = SUBSCRIPTIONS_AVAILABLE ? loadStripe(STRIPE_KEY) : null;
 
 // ── Price IDs from your Stripe Dashboard ─────────────────────────────────────
 // Replace these with your real price IDs after creating products
 const PRICES = {
-  elite_monthly: import.meta.env.VITE_STRIPE_ELITE_MONTHLY || 'price_elite_monthly',
-  elite_yearly:  import.meta.env.VITE_STRIPE_ELITE_YEARLY  || 'price_elite_yearly',
-  ultra_monthly: import.meta.env.VITE_STRIPE_ULTRA_MONTHLY || 'price_ultra_monthly',
-  ultra_yearly:  import.meta.env.VITE_STRIPE_ULTRA_YEARLY  || 'price_ultra_yearly',
+  elite_monthly: import.meta.env.VITE_STRIPE_ELITE_MONTHLY || '',
+  elite_yearly:  import.meta.env.VITE_STRIPE_ELITE_YEARLY  || '',
+  ultra_monthly: import.meta.env.VITE_STRIPE_ULTRA_MONTHLY || '',
+  ultra_yearly:  import.meta.env.VITE_STRIPE_ULTRA_YEARLY  || '',
 };
 
 // ── Plan definitions ──────────────────────────────────────────────────────────
@@ -136,6 +140,7 @@ function PlanCard({ plan, user, onClose }) {
   const price = billing === 'monthly' ? plan.monthly : plan.yearly;
 
   const handleSubscribe = async () => {
+    if (!SUBSCRIPTIONS_AVAILABLE) return;
     setLoading(true);
     try {
       await redirectToCheckout(price.priceId, user?.email, user?.uid, plan.id || plan.name);
@@ -242,7 +247,7 @@ function PlanCard({ plan, user, onClose }) {
       <div className="px-6 pb-6">
         <button
           onClick={handleSubscribe}
-          disabled={loading}
+          disabled={loading || !SUBSCRIPTIONS_AVAILABLE}
           className="w-full py-3.5 rounded-2xl font-bold text-sm transition-all active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2"
           style={{
             background: plan.accentColor,
@@ -258,12 +263,14 @@ function PlanCard({ plan, user, onClose }) {
           ) : (
             <>
               <Icon className="w-4 h-4" />
-              Subscribe & pay {price.price}{price.period}
+              {SUBSCRIPTIONS_AVAILABLE ? `Subscribe & pay ${price.price}${price.period}` : 'Not currently available'}
             </>
           )}
         </button>
         <p className="text-center text-[10px] mt-2 leading-relaxed" style={{ color: plan.mutedColor }}>
-          Auto-renews at {price.price}{price.period} until cancelled · Cancel anytime · Secured by Stripe
+          {SUBSCRIPTIONS_AVAILABLE
+            ? `Auto-renews at ${price.price}${price.period} until cancelled · Secured by Stripe`
+            : 'Plan preview only. SpotFinder is not currently offering this subscription for purchase.'}
           <br />
           By subscribing you agree to our{' '}
           <a href="/TermsAndConditions" target="_blank" rel="noopener noreferrer" className="underline">Terms</a>,{' '}
@@ -302,9 +309,9 @@ export default function SubscriptionModal({ onClose, user }) {
             </span>
             <Sparkles className="w-5 h-5 text-purple-400" />
           </div>
-          <h2 className="text-2xl font-black text-white mb-1">Unlock the Full Experience</h2>
+          <h2 className="text-2xl font-black text-white mb-1">Premium plan preview</h2>
           <p className="text-sm text-gray-400">
-            Choose your plan and take your adventures to the next level
+            {SUBSCRIPTIONS_AVAILABLE ? 'Choose a plan to continue to secure checkout.' : 'These planned tiers are shown for transparency and are not currently for sale.'}
           </p>
         </div>
 
@@ -317,7 +324,7 @@ export default function SubscriptionModal({ onClose, user }) {
           </div>
 
           {/* Trust badges */}
-          <div className="flex items-center justify-center gap-6 mt-4 pb-2">
+          {SUBSCRIPTIONS_AVAILABLE && <div className="flex items-center justify-center gap-6 mt-4 pb-2">
             <div className="flex items-center gap-1.5 text-gray-500 text-xs">
               <Shield className="w-3.5 h-3.5" />
               256-bit SSL
@@ -330,7 +337,7 @@ export default function SubscriptionModal({ onClose, user }) {
               <Zap className="w-3.5 h-3.5" />
               Instant activation
             </div>
-          </div>
+          </div>}
         </div>
       </div>
 

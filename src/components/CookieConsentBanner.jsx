@@ -37,8 +37,8 @@ export default function CookieConsentBanner() {
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
+      role="region"
+      aria-live="polite"
       aria-labelledby="cookie-consent-title"
       className="fixed inset-x-0 bottom-0 z-[3000] p-3 sm:p-4"
     >
@@ -95,7 +95,7 @@ export default function CookieConsentBanner() {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={handleAcceptAll}
-            className="px-4 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700"
+            className="px-4 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
           >
             Accept all
           </button>

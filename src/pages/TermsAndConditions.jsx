@@ -4,11 +4,7 @@ import LegalPageLayout, { LegalH2, LegalP, LegalUl, LegalStrong, LegalNote } fro
 export default function TermsAndConditions() {
   return (
     <LegalPageLayout title="Terms & Conditions" lastUpdated="8 October 2026">
-      <LegalNote>
-        <LegalStrong>Before publishing:</LegalStrong> confirm the operator details below are correct. Pick a
-        real governing law/jurisdiction, and have this reviewed by a lawyer. This draft was prepared
-        from an automated review of the app's code and is not legal advice.
-      </LegalNote>
+      <LegalNote><LegalStrong>Review status:</LegalStrong> This draft is pending qualified legal review, including the operator identity, governing law, subscriptions, and consumer-rights terms.</LegalNote>
 
       <LegalP>
         These Terms & Conditions ("<LegalStrong>Terms</LegalStrong>") govern your use of the SpotFinder
@@ -20,8 +16,7 @@ export default function TermsAndConditions() {
       <LegalH2>1. The Service</LegalH2>
       <LegalP>
         SpotFinder is a community map app for discovering and sharing outdoor "spots" (viewpoints,
-        parking, camping, and similar places), with optional paid subscription tiers (Elite/Ultra) that
-        unlock additional features. Some map, routing, and points-of-interest data is provided by
+        parking, camping, and similar places). SpotFinder may preview planned Elite/Ultra tiers; a tier is available for purchase only when an enabled checkout explicitly offers it. Some map, routing, and points-of-interest data is provided by
         third parties (see our <a href="/PrivacyPolicy" className="underline text-blue-600 dark:text-blue-400">Privacy Policy</a>);
         we don't guarantee the accuracy of third-party map data, and locations shown may be
         inaccurate, outdated, or on private property — always exercise your own judgment and follow
@@ -64,9 +59,9 @@ export default function TermsAndConditions() {
 
       <LegalH2>5. Subscriptions & payments</LegalH2>
       <LegalUl>
-        <li>SpotFinder Elite and Ultra are paid, auto-renewing subscriptions billed monthly or yearly, as shown at checkout. Prices are shown in the currency displayed at checkout and may change with advance notice.</li>
+        <li>If Elite or Ultra checkout is enabled, it is a paid, auto-renewing subscription billed monthly or yearly as shown at checkout. A plan preview without an enabled checkout is not an offer for sale.</li>
         <li>Payment is processed by Stripe; by subscribing you also agree to <a href="https://stripe.com/legal/end-users" target="_blank" rel="noopener noreferrer" className="underline text-blue-600 dark:text-blue-400">Stripe's terms</a>.</li>
-        <li>Subscriptions renew automatically until cancelled. You can cancel any time from Settings/your account; cancellation takes effect at the end of the current billing period, and you keep access until then.</li>
+        <li>Subscriptions renew automatically until cancelled. The current app does not have self-service cancellation; contact support using the address in the Refund Policy. Cancellation timing must be confirmed by support.</li>
         <li>See our <a href="/RefundPolicy" className="underline text-blue-600 dark:text-blue-400">Refund Policy</a> for cancellations, refunds, and your legal right of withdrawal.</li>
       </LegalUl>
 

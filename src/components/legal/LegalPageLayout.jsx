@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 export default function LegalPageLayout({ title, lastUpdated, children }) {
   const navigate = useNavigate();
   return (
-    <div className="min-h-[100dvh] bg-white dark:bg-background">
+    <main className="min-h-[100dvh] bg-white dark:bg-background">
       <div className="sticky top-0 z-10 bg-white/95 dark:bg-background/95 backdrop-blur-sm border-b border-gray-100 dark:border-border px-4 py-3 flex items-center gap-3">
         <button
           onClick={() => navigate(-1)}
@@ -24,7 +24,7 @@ export default function LegalPageLayout({ title, lastUpdated, children }) {
           {children}
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 

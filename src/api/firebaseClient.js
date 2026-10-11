@@ -423,7 +423,14 @@ export const createSpot = async (spotData) => {
  
 export const updateSpot = async (spotId, data) => {
   const { db } = getFirebaseServices();
-  await updateDoc(doc(db, SPOTS_COLLECTION, spotId), data);
+  const editableFields = [
+    'title', 'description', 'image_url', 'image_urls', 'photo_metadata', 'tags',
+    'cost', 'access_difficulty', 'parking', 'best_time', 'directions', 'poi_match',
+  ];
+  const patch = Object.fromEntries(editableFields
+    .filter(field => Object.prototype.hasOwnProperty.call(data, field))
+    .map(field => [field, data[field]]));
+  await updateDoc(doc(db, SPOTS_COLLECTION, spotId), patch);
 };
  
 export const deleteSpot = async (spotId) => {

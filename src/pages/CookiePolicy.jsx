@@ -5,10 +5,7 @@ import { reopenCookieSettings } from '@/components/CookieConsentBanner';
 export default function CookiePolicy() {
   return (
     <LegalPageLayout title="Cookie Policy" lastUpdated="8 October 2026">
-      <LegalNote>
-        <LegalStrong>Before publishing:</LegalStrong> confirm this list matches what's actually
-        deployed (add/remove rows if you change providers), and fill in the contact details below.
-      </LegalNote>
+      <LegalNote><LegalStrong>Review status:</LegalStrong> This draft is pending legal review and a production tag/cookie inventory. Provider behavior may change independently of SpotFinder.</LegalNote>
 
       <LegalP>
         This Cookie Policy explains what cookies and similar technologies (like browser local storage)

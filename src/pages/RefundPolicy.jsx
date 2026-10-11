@@ -4,16 +4,10 @@ import LegalPageLayout, { LegalH2, LegalP, LegalUl, LegalStrong, LegalNote } fro
 export default function RefundPolicy() {
   return (
     <LegalPageLayout title="Refund Policy" lastUpdated="8 October 2026">
-      <LegalNote>
-        <LegalStrong>Before publishing:</LegalStrong> confirm this matches how you actually handle
-        refund requests in Stripe, and fill in the contact email. If you also sell subscriptions
-        through Google Play or the Apple App Store billing systems, add a section for their refund
-        processes too (those are handled by Google/Apple directly, not by us).
-      </LegalNote>
+      <LegalNote><LegalStrong>Review status:</LegalStrong> This draft is pending legal and operational review. Refund handling and the withdrawal flow must be verified before publication.</LegalNote>
 
       <LegalP>
-        This Refund Policy applies to paid subscriptions (SpotFinder Elite and Ultra) purchased
-        directly through the SpotFinder website/app via Stripe.
+        This Refund Policy applies only to a paid SpotFinder Elite or Ultra subscription actually purchased through an enabled SpotFinder Stripe checkout. Plan previews are not purchases.
       </LegalP>
 
       <LegalH2>1. Your legal right of withdrawal (EU/EEA/UK consumers)</LegalH2>
@@ -36,7 +30,7 @@ export default function RefundPolicy() {
 
       <LegalH2>2. Cancelling your subscription</LegalH2>
       <LegalUl>
-        <li>You can cancel auto-renewal at any time from Settings in the app, or by emailing spotfinder@icloud.com.</li>
+        <li>The current app does not provide a self-service cancellation portal. To request cancellation, email spotfinder@icloud.com. Cancellation timing and completion must be confirmed by support.</li>
         <li>Cancelling stops future renewals but doesn't automatically refund the current billing period — you keep access until the end of the period you already paid for.</li>
         <li>Outside the 14-day withdrawal window described above, renewal charges are generally non-refundable, except where required by law or at our discretion (e.g. accidental duplicate charges, billing errors, or extended service outages).</li>
       </LegalUl>

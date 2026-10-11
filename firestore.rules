@@ -47,6 +47,8 @@ service cloud.firestore {
       // those are only ever written by Cloud Functions with the Admin SDK.
       allow update: if isAuth() && (
         ((resource.data.created_by == authEmail() || resource.data.created_by_uid == request.auth.uid)
+          && strLen(request.resource.data.title, 100)
+          && strLen(request.resource.data.description, 2000)
           && unchanged(['rating', 'rating_count', 'parking_rating', 'parking_rating_count',
                         'beauty_rating', 'beauty_rating_count', 'privacy_rating',
                         'privacy_rating_count', 'access_rating', 'access_rating_count',

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Navigation, X } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
+import { getSpotDisplayName } from '@/lib/spotPresentation';
 
 function haversineKm([lat1, lng1], [lat2, lng2]) {
   const R = 6371;
@@ -10,7 +11,6 @@ function haversineKm([lat1, lng1], [lat2, lng2]) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-const TYPE_LABEL  = { parking: 'Parking', food: 'Food', toilet: 'Toilet' };
 const TYPE_EMOJI  = { parking: '🅿️', food: '🍽️', toilet: '🚽' };
 const HEADER_H    = 56;   // px — drag handle area height
 const SHEET_VH    = 0.60; // fraction of viewport height when fully open
@@ -39,7 +39,7 @@ function SpotRow({ spot, onFlyTo, onSelectSpot, onNavigate, onClose }) {
     >
       <span className="text-xl flex-shrink-0 w-7 text-center">{TYPE_EMOJI[spot.spot_type] || '📍'}</span>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-foreground truncate">{spot.title || TYPE_LABEL[spot.spot_type] || 'Spot'}</p>
+        <p className="text-sm font-semibold text-foreground truncate">{getSpotDisplayName(spot)}</p>
         <StarRow rating={spot.rating} />
       </div>
       {spot._km != null && (

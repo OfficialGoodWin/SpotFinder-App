@@ -3,6 +3,7 @@ import { Navigation, X, SlidersHorizontal } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import NearbySpotsFilterModal from './NearbySpotsFilterModal';
 import { NEARBY_DEFAULT_KM, isDefaultNearbyFilters } from '@/lib/nearbyFilters';
+import { getSpotDisplayName, getSpotLocationLabel } from '@/lib/spotPresentation';
 
 function haversineKm([lat1, lng1], [lat2, lng2]) {
   const R = 6371;
@@ -39,7 +40,7 @@ function SpotRow({ spot, onSelectSpot, onNavigate, onClose }) {
       <span className="text-xl flex-shrink-0 w-7 text-center">{TYPE_EMOJI[spot.spot_type] || '📍'}</span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <p className="text-sm font-semibold text-foreground truncate">{spot.title || TYPE_LABEL[spot.spot_type] || 'Spot'}</p>
+          <p className="text-sm font-semibold text-foreground truncate">{getSpotDisplayName(spot)}</p>
           {spot.spot_type && (
             <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-accent text-gray-500 dark:text-muted-foreground flex-shrink-0">
               {TYPE_LABEL[spot.spot_type] || spot.spot_type}
@@ -49,6 +50,7 @@ function SpotRow({ spot, onSelectSpot, onNavigate, onClose }) {
         {spot.description && (
           <p className="text-xs text-muted-foreground truncate mt-0.5">{spot.description}</p>
         )}
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">{getSpotLocationLabel(spot)}</p>
         <div className="mt-0.5">
           <StarRow rating={spot.rating} />
         </div>

@@ -28,6 +28,7 @@ const toKeySuffix = (opt) => opt.split('_').map(w => w[0].toUpperCase() + w.slic
 
 export default function EditSpotModal({ spot, user, onClose, onSave }) {
   const { t } = useLanguage();
+  const [title, setTitle] = useState(spot.title === 'Spot' ? '' : (spot.title || ''));
   const [description, setDescription] = useState(spot.description || '');
   const [imageFile, setImageFile] = useState(null);
   const existingImageUrls = Array.isArray(spot.image_urls) && spot.image_urls.length ? spot.image_urls : [spot.image_url].filter(Boolean);
@@ -56,6 +57,10 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
   };
 
   const handleSave = async () => {
+    if (!title.trim() || title.trim().toLocaleLowerCase() === 'spot') {
+      toast.error('Give this place a specific, recognizable name.');
+      return;
+    }
     setLoading(true);
     let image_url = spot.image_url;
     let image_urls = [...existingImageUrls];
@@ -76,6 +81,7 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
     
     await onSave({
       ...spot,
+      title: title.trim(),
       description,
       image_url,
       image_urls,
@@ -106,6 +112,10 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
         </div>
 
         <div className="px-6 py-4 space-y-5">
+          <div>
+            <label htmlFor="edit-spot-name" className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">Spot name</label>
+            <input id="edit-spot-name" value={title} maxLength={100} onChange={event => setTitle(event.target.value)} placeholder="e.g. Old Quarry Viewpoint" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-border bg-white dark:bg-background text-gray-900 dark:text-foreground focus:outline-none focus:ring-2 focus:ring-green-500 text-base" />
+          </div>
           {/* Description */}
           <div>
             <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpot.description')}</label>
