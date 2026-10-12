@@ -9,6 +9,7 @@ import NavigationProviderSheet from '@/components/navigation/NavigationProviderS
 import { localizedShareMessage, reversePlaceContext } from '@/lib/placeContext';
 import { getSpotDisplayName, getSpotLocationLabel } from '@/lib/spotPresentation';
 import SpotImage from './SpotImage';
+import { setSpotRelationState } from '@/lib/spotSocialState';
 
 const SocialPostsSection = React.lazy(() => import('@/components/social/SocialPostsSection'));
 
@@ -17,7 +18,7 @@ const RATED_KEY = (spotId, userId) => `sf_rated_${spotId}_${userId || 'guest'}`;
 export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, onNavigate, onEdit, onDelete, onSpotUpdate, onShowAuth }) {
   const { t, language } = useLanguage();
   const [localSpot, setLocalSpot] = useState(spot);
-  const [shareTooltip, setShareTooltip] = useState(false);
+  const [shareTooltip, setShareTooltip] = useState('');
   const [social, setSocial] = useState({ liked: false, saved: false, likesCount: spot.likes_count || 0, savesCount: spot.saves_count || 0 });
   const [socialBusy, setSocialBusy] = useState('');
   const [showNavigationProviders, setShowNavigationProviders] = useState(false);
@@ -42,17 +43,17 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
   const handleLike = async () => {
     if (!requireVerified() || socialBusy) return;
     const old = social.liked; setSocialBusy('like');
-    setSocial(v => ({ ...v, liked: !old, likesCount: Math.max(0, v.likesCount + (old ? -1 : 1)) }));
+    setSocial(value => setSpotRelationState(value, 'like', !old));
     try { await toggleSpotLike(spot.id, user, old); }
-    catch (e) { setSocial(v => ({ ...v, liked: old, likesCount: Math.max(0, v.likesCount + (old ? 1 : -1)) })); alert(e.message || 'Could not update like'); }
+    catch (e) { setSocial(value => setSpotRelationState(value, 'like', old)); alert(e.message || 'Could not update like'); }
     finally { setSocialBusy(''); }
   };
   const handleSave = async () => {
     if (!requireVerified() || socialBusy) return;
     const old = social.saved; setSocialBusy('save');
-    setSocial(v => ({ ...v, saved: !old, savesCount: Math.max(0, v.savesCount + (old ? -1 : 1)) }));
+    setSocial(value => setSpotRelationState(value, 'save', !old));
     try { await toggleSpotSave(spot.id, user, old); }
-    catch (e) { setSocial(v => ({ ...v, saved: old, savesCount: Math.max(0, v.savesCount + (old ? 1 : -1)) })); alert(e.message || 'Could not update save'); }
+    catch (e) { setSocial(value => setSpotRelationState(value, 'save', old)); alert(e.message || 'Could not update save'); }
     finally { setSocialBusy(''); }
   };
 
@@ -87,7 +88,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
     { key: 'privacy', label: 'Privacy (legacy)', val: localSpot.privacy_rating || 0, count: localSpot.privacy_rating_count || 0 },
   ];
 
-  const hasCategoryRatings = catRows.some(r => r.val > 0) || legacyRows.some(r => r.val > 0);
+  const hasCategoryRatings = catRows.some(r => r.count > 0) || legacyRows.some(r => r.count > 0);
 
   // Fractional star display for overall
   const renderOverallStars = (value) =>
@@ -137,14 +138,16 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
       if (navigator.share) {
         await navigator.share({ title: displayName, text: message, url: url.toString() });
       } else {
+        if (!navigator.clipboard?.writeText) throw new Error('clipboard-unavailable');
         await navigator.clipboard.writeText(`${message} ${url}`);
-        setShareTooltip(true);
-        setTimeout(() => setShareTooltip(false), 2000);
+        setShareTooltip('Link copied');
+        setTimeout(() => setShareTooltip(''), 2000);
       }
-    } catch {
-      await navigator.clipboard.writeText(`${message} ${url}`).catch(() => {});
-      setShareTooltip(true);
-      setTimeout(() => setShareTooltip(false), 2000);
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+      const copied = await navigator.clipboard?.writeText?.(`${message} ${url}`).then(() => true).catch(() => false);
+      setShareTooltip(copied ? 'Link copied' : 'Sharing unavailable');
+      setTimeout(() => setShareTooltip(''), 2000);
     }
   };
 
@@ -164,8 +167,8 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
   const poiWebsite = poiMatch?.tags?.website || poiMatch?.tags?.['contact:website'];
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-card w-full max-w-lg rounded-t-3xl shadow-2xl max-h-[85vh] overflow-y-auto">
+    <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/50 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="spot-detail-title" onKeyDown={event => { if (event.key === 'Escape') onClose(); }}>
+      <div className="bg-white dark:bg-card w-full max-w-lg rounded-t-3xl shadow-2xl max-h-[100dvh] sm:max-h-[90dvh] overflow-y-auto overscroll-contain">
 
         {/* Header */}
         <div className="sticky top-0 bg-white dark:bg-card px-6 pt-5 pb-3 border-b border-gray-100 dark:border-border">
@@ -175,11 +178,12 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
                 <MapPin className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-foreground">{displayName}</h2>
+                <h2 id="spot-detail-title" className="text-lg font-bold text-gray-900 dark:text-foreground">{displayName}</h2>
                 {poiMatch && displayName !== poiMatch.name && (
                   <p className="text-xs font-medium text-blue-600 dark:text-blue-400">Also known as {poiMatch.name}</p>
                 )}
-                <p className="text-xs text-gray-500 dark:text-muted-foreground">
+                <p className="mt-0.5 text-xs font-medium text-gray-600 dark:text-muted-foreground">{getSpotLocationLabel(localSpot, 5)}</p>
+                <p className="mt-0.5 text-[11px] text-gray-400 dark:text-muted-foreground">
                   {t('spotDetail.addedBy')} {creatorName}
                   {localSpot.created_date && ` ${t('spotDetail.addedOn')} ${formatDate(localSpot.created_date)}`}
                 </p>
@@ -214,6 +218,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
           {localSpot.description && (
             <p className="text-gray-600 dark:text-muted-foreground text-sm leading-relaxed">{localSpot.description}</p>
           )}
+          {!localSpot.description && <p className="text-sm italic text-gray-500 dark:text-muted-foreground">No description has been added yet.</p>}
 
           {/* Tags */}
           {localSpot.tags?.length > 0 && (
@@ -225,10 +230,6 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
               ))}
             </div>
           )}
-
-          <React.Suspense fallback={<div className="h-24 animate-pulse rounded-2xl bg-gray-100 motion-reduce:animate-none dark:bg-accent" />}>
-            <SocialPostsSection targetType="spot" targetId={String(spot.id)} targetName={displayName} user={user} />
-          </React.Suspense>
 
           {poiMatch && (
             <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4 dark:border-blue-900/60 dark:bg-blue-950/20">
@@ -284,30 +285,30 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
           )}
 
           {/* Community actions — counts are server-maintained and update live */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-4 gap-2" aria-label="Spot actions">
+            <button onClick={() => setShowNavigationProviders(true)} className="min-h-[48px] rounded-2xl bg-blue-500 text-white flex flex-col items-center justify-center gap-0.5 font-semibold text-xs hover:bg-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><Navigation className="h-5 w-5" /><span>Navigate</span></button>
             <button onClick={handleLike} disabled={!!socialBusy} aria-pressed={social.liked} aria-label={`${social.liked ? 'Unlike' : 'Like'} this spot; ${social.likesCount} likes`} className={`min-h-[48px] rounded-2xl border flex items-center justify-center gap-2 font-semibold text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${social.liked ? 'bg-rose-50 border-rose-200 text-rose-600 dark:bg-rose-950/30 dark:border-rose-900' : 'border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent'}`}>
               <Heart className={`w-5 h-5 ${social.liked ? 'fill-current' : ''}`} />
-              <span>{social.liked ? 'Liked' : 'Like'}</span><span className="tabular-nums text-xs opacity-70">{social.likesCount}</span>
+              <span className="sr-only">{social.liked ? 'Liked' : 'Like'} </span><span className="tabular-nums text-xs">{social.likesCount}</span>
             </button>
             <button onClick={handleSave} disabled={!!socialBusy} aria-pressed={social.saved} aria-label={`${social.saved ? 'Remove from saved' : 'Save'} this spot; ${social.savesCount} saves`} className={`min-h-[48px] rounded-2xl border flex items-center justify-center gap-2 font-semibold text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${social.saved ? 'bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-950/30 dark:border-blue-900' : 'border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent'}`}>
               <Bookmark className={`w-5 h-5 ${social.saved ? 'fill-current' : ''}`} />
-              <span>{social.saved ? 'Saved' : 'Save'}</span><span className="tabular-nums text-xs opacity-70">{social.savesCount}</span>
+              <span className="sr-only">{social.saved ? 'Saved' : 'Save'} </span><span className="tabular-nums text-xs">{social.savesCount}</span>
             </button>
+            <button onClick={handleShare} className="relative min-h-[48px] rounded-2xl border border-gray-200 dark:border-border flex items-center justify-center hover:bg-gray-50 dark:hover:bg-accent" aria-label="Share this spot">{shareTooltip === 'Link copied' ? <Check className="h-5 w-5 text-green-500" /> : <Share2 className="h-5 w-5 text-blue-500" />}{shareTooltip && <span role="status" className="absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-lg bg-gray-900 px-2 py-1 text-[10px] text-white">{shareTooltip}</span>}</button>
           </div>
 
-          {/* Overall Rating — read-only, derived from category reviews */}
+          {/* Overall experience is rated directly and is never inferred from descriptive scales. */}
           <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-accent rounded-2xl">
             <div className="flex-1">
               <p className="text-xs text-gray-500 dark:text-muted-foreground mb-1">{t('spotDetail.overallRating')}</p>
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex gap-0.5">{renderOverallStars(overallRating)}</div>
-                <span className="text-gray-700 dark:text-foreground font-semibold">
-                  {overallRating ? overallRating.toFixed(1) : '–'}
-                </span>
-                <span className="text-gray-400 dark:text-muted-foreground text-xs">
-                  ({overallCount} {t('spotDetail.ratings')})
-                </span>
-              </div>
+              {overallCount > 0 ? (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex gap-0.5">{renderOverallStars(overallRating)}</div>
+                  <span className="font-semibold text-gray-700 dark:text-foreground">{overallRating.toFixed(1)}</span>
+                  <span className="text-xs text-gray-400 dark:text-muted-foreground">Based on {overallCount} community {overallCount === 1 ? 'rating' : 'ratings'}</span>
+                </div>
+              ) : <p className="text-sm font-semibold text-gray-600 dark:text-muted-foreground">Unrated · no community ratings yet</p>}
               {overallCount > 0 && (
                 <p className="text-xs text-gray-400 dark:text-muted-foreground mt-0.5 italic">
                   Overall stars are rated directly; the scales describe what the place is like.
@@ -322,13 +323,14 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
               <p className="text-xs font-bold uppercase tracking-wide text-blue-700 dark:text-blue-300 mb-3">
                 {t('spotDetail.detailedRatings')}
               </p>
-              {catRows.filter(r => r.val > 0).map(row => (
+              {catRows.filter(r => r.count > 0).map(row => (
                 <div key={row.key} className="flex items-center justify-between gap-3 py-1">
                   <span className="text-sm text-gray-700 dark:text-foreground">{row.label}</span>
                   <span className="text-sm font-semibold text-gray-800 dark:text-foreground text-right">{row.labels[Math.max(0, Math.round(row.val)-1)]} · {row.val.toFixed(1)} <span className="text-xs font-normal text-gray-400">({row.count})</span></span>
                 </div>
               ))}
-              {legacyRows.filter(r => r.val > 0).map(row => <div key={row.key} className="flex justify-between text-xs text-gray-400"><span>{row.label}</span><span>{row.val.toFixed(1)} ({row.count})</span></div>)}
+              {legacyRows.filter(r => r.count > 0).map(row => <div key={row.key} className="flex justify-between text-xs text-gray-400"><span>{row.label}</span><span>{row.val.toFixed(1)} ({row.count})</span></div>)}
+              {catRows.some(row => row.key === 'crowdedness' && row.count > 0) && <p className="pt-2 text-[11px] leading-4 text-blue-600 dark:text-blue-300">Crowdedness describes how busy the place feels. A lower score means quieter, not worse.</p>}
             </div>
           )}
 
@@ -388,15 +390,14 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
             </div>
           )}
 
-          {/* Coordinates */}
-          <div className="flex items-center gap-2 text-gray-400 dark:text-muted-foreground text-xs">
-            <MapPin className="w-3 h-3" />
-            <span>{getSpotLocationLabel(localSpot, 5)}</span>
-          </div>
+          <React.Suspense fallback={<div className="h-16 animate-pulse rounded-2xl bg-gray-100 motion-reduce:animate-none dark:bg-accent" />}>
+            <SocialPostsSection targetType="spot" targetId={String(spot.id)} targetName={displayName} user={user} />
+          </React.Suspense>
+
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 dark:border-border flex gap-3 flex-wrap" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+        <div className="sticky bottom-0 z-20 px-6 pt-3 border-t border-gray-100 dark:border-border bg-white/95 dark:bg-card/95 backdrop-blur-xl flex gap-3 flex-wrap" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
           {(isOwner || isAdmin) && (
             <>
               {isOwner && (
@@ -415,21 +416,6 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
               <Flag className="w-5 h-5 text-gray-500" />
             </button>
           )}
-
-          <div className="relative">
-            <button
-              onClick={handleShare}
-              className="p-3 rounded-2xl border-2 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-              title={t('spotDetail.share')}
-            >
-              {shareTooltip ? <Check className="w-5 h-5 text-green-500" /> : <Share2 className="w-5 h-5 text-blue-500" />}
-            </button>
-            {shareTooltip && (
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-lg whitespace-nowrap">
-                {t('spotDetail.linkCopied')}
-              </div>
-            )}
-          </div>
 
           <button
             onClick={() => setShowNavigationProviders(true)}

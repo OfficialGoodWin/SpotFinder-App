@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import { X, Camera, MapPin, Mic, Loader2, AlertCircle, ChevronDown } from 'lucide-react';
 import StarRating from './StarRating';
 import LabeledRatingScale from './LabeledRatingScale';
-import AdBanner from '../AdBanner';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
 import { uploadSpotImage } from '@/api/firebaseClient';
@@ -12,6 +11,7 @@ import { findNearbyPoi } from '@/lib/nearbyPoi';
 import { toast } from 'sonner';
 import LiquidSegmentedControl from '../ui/LiquidSegmentedControl';
 import { IMAGE_ACCEPT, validateImageFileMetadata } from '@/lib/imageUploadValidation';
+import { createAddSpotDraft, hasMeaningfulAddSpotDraft, validateRequiredSpotFields, voiceErrorMessage } from '@/lib/contributionFlow';
 
 // Category tags per spec — separate from the existing rating-group `spotType`.
 // A spot can carry several of these. Display uses an emoji + translated label
@@ -88,32 +88,45 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   const descriptionRef = useRef(null);
   const errorSummaryRef = useRef(null);
   const draftKey = `spotfinder:add-spot-draft:${Number(latlng?.lat).toFixed(4)}:${Number(latlng?.lng).toFixed(4)}`;
+  const currentDraft = createAddSpotDraft({ title, description, tags, cost, accessDifficulty, parking, bestTime, directions, socialUrl, overallRating, accessRating, conditionRating, safetyRating, crowdednessRating });
 
   useEffect(() => {
     try {
       const draft = JSON.parse(sessionStorage.getItem(draftKey) || 'null');
       if (!draft) return;
-      setTitle(draft.title || '');
-      setDescription(draft.description || '');
-      setTags(Array.isArray(draft.tags) ? draft.tags : []);
-      setCost(draft.cost || '');
-      setAccessDifficulty(draft.accessDifficulty || '');
-      setParking(draft.parking || '');
-      setBestTime(Array.isArray(draft.bestTime) ? draft.bestTime : []);
-      setDirections(draft.directions || '');
-      setSocialUrl(draft.socialUrl || '');
+      const restored = createAddSpotDraft(draft);
+      setTitle(restored.title);
+      setDescription(restored.description);
+      setTags(restored.tags);
+      setCost(restored.cost);
+      setAccessDifficulty(restored.accessDifficulty);
+      setParking(restored.parking);
+      setBestTime(restored.bestTime);
+      setDirections(restored.directions);
+      setSocialUrl(restored.socialUrl);
+      setOverallRating(restored.overallRating);
+      setAccessRating(restored.accessRating);
+      setConditionRating(restored.conditionRating);
+      setSafetyRating(restored.safetyRating);
+      setCrowdednessRating(restored.crowdednessRating);
     } catch { /* An invalid draft should never block contribution. */ }
   }, [draftKey]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      try { sessionStorage.setItem(draftKey, JSON.stringify({ title, description, tags, cost, accessDifficulty, parking, bestTime, directions, socialUrl })); }
+      try { sessionStorage.setItem(draftKey, JSON.stringify(currentDraft)); }
       catch { /* Storage may be unavailable in private browsing. */ }
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [accessDifficulty, bestTime, cost, description, directions, draftKey, parking, socialUrl, tags, title]);
+  }, [accessDifficulty, accessRating, bestTime, conditionRating, cost, crowdednessRating, description, directions, draftKey, overallRating, parking, safetyRating, socialUrl, tags, title]);
 
   useEffect(() => () => recognitionRef.current?.stop(), []);
+
+  const requestClose = () => {
+    if (loading) return;
+    if (hasMeaningfulAddSpotDraft(currentDraft) && !window.confirm('Close Add Spot? Your draft will stay available for this map position during this session.')) return;
+    onClose();
+  };
 
   const focusError = (fieldRef = errorSummaryRef) => {
     requestAnimationFrame(() => {
@@ -146,7 +159,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   const toggleVoice = async () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert(t('addSpot.voiceNotSupported'));
+      setMicError(voiceErrorMessage('unsupported'));
       return;
     }
 
@@ -159,19 +172,19 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
     // Check microphone availability before starting
     setMicError('');
     try {
+      if (!navigator.mediaDevices?.getUserMedia || !navigator.mediaDevices?.enumerateDevices) {
+        setMicError(voiceErrorMessage('unsupported'));
+        return;
+      }
       const devices = await navigator.mediaDevices.enumerateDevices();
       const hasMic = devices.some(d => d.kind === 'audioinput');
       if (!hasMic) {
-        setMicError('Error: no microphone detected');
+        setMicError(voiceErrorMessage('no-device'));
         return;
       }
       await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (err) {
-      if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        setMicError('Error: no microphone detected');
-      } else {
-        setMicError('Error: microphone permission was not allowed');
-      }
+      setMicError(voiceErrorMessage(err));
       return;
     }
 
@@ -209,12 +222,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
     rec.onerror = (e) => {
       setListening(false);
       setInterimText('');
-      if (e.error === 'no-speech') return;
-      if (e.error === 'audio-capture' || e.error === 'not-allowed') {
-        setMicError(e.error === 'not-allowed'
-          ? 'Error: microphone permission was not allowed'
-          : 'Error: no microphone detected');
-      }
+      setMicError(voiceErrorMessage(e));
     };
     rec.onend = () => { setListening(false); setInterimText(''); };
     rec.start();
@@ -225,28 +233,15 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   const handleSave = async () => {
     if (loading || submitLockRef.current) return;
     setSubmitError('');
-    if (!title.trim() || title.trim().toLocaleLowerCase() === 'spot') {
-      const message = 'Give this place a specific, recognizable name.';
-      setFieldErrors(current => ({ ...current, title: message }));
-      setSubmitError(message);
-      focusError(titleRef);
+    const requiredErrors = validateRequiredSpotFields({ title, description, attested });
+    if (Object.keys(requiredErrors).length) {
+      setFieldErrors(requiredErrors);
+      const firstError = requiredErrors.title || requiredErrors.description || requiredErrors.attested;
+      setSubmitError(firstError);
+      focusError(requiredErrors.title ? titleRef : requiredErrors.description ? descriptionRef : errorSummaryRef);
       return;
     }
-    if (!description.trim()) {
-      const message = t('addSpot.descriptionRequired');
-      setFieldErrors(current => ({ ...current, description: message }));
-      setSubmitError(message);
-      focusError(descriptionRef);
-      return;
-    }
-    setFieldErrors(current => ({ ...current, description: '' }));
-    if (!attested) {
-      const message = 'Confirm that the information and any photos are yours to share.';
-      setFieldErrors(current => ({ ...current, attested: message }));
-      setSubmitError(message);
-      focusError(errorSummaryRef);
-      return;
-    }
+    setFieldErrors({});
 
     const socialValidation = socialUrl ? validateSocialPostUrl(socialUrl) : null;
     if (socialUrl && !socialValidation?.ok) {
@@ -347,6 +342,8 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
     try {
       await onSave(baseData, socialValidation?.canonicalUrl || '');
       try { sessionStorage.removeItem(draftKey); } catch { /* no-op */ }
+      toast.success('Spot added to the map.');
+      onClose();
     } catch (err) {
       console.error('Save failed:', err);
       const rawMessage = String(err?.message || '');
@@ -368,14 +365,14 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/50 backdrop-blur-sm">
-      <div className="isolate bg-white dark:bg-card w-full max-w-lg rounded-t-3xl shadow-2xl max-h-[90dvh] overflow-y-auto overscroll-contain">
+    <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/50 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="add-spot-title" onKeyDown={event => { if (event.key === 'Escape') requestClose(); }}>
+      <div className="isolate bg-white dark:bg-card w-full max-w-lg rounded-t-3xl shadow-2xl max-h-[100dvh] sm:max-h-[90dvh] overflow-y-auto overscroll-contain">
         <div className="sticky top-0 z-30 bg-white/90 dark:bg-card/90 px-6 pt-5 pb-3 border-b border-gray-100/80 dark:border-border flex items-center justify-between backdrop-blur-xl">
           <div className="flex items-center gap-2">
             <MapPin className="w-5 h-5 text-green-600" />
-            <h2 className="text-lg font-bold text-gray-900 dark:text-foreground">{t('addSpot.title')}</h2>
+            <h2 id="add-spot-title" className="text-lg font-bold text-gray-900 dark:text-foreground">{t('addSpot.title')}</h2>
           </div>
-          <button onClick={onClose} aria-label={t('common.close')} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-accent">
+          <button type="button" onClick={requestClose} aria-label={t('common.close')} className="min-h-11 min-w-11 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-accent">
             <X className="w-5 h-5 text-gray-500 dark:text-muted-foreground" />
           </button>
         </div>
@@ -415,6 +412,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
                 value={title}
                 maxLength={100}
                 autoComplete="off"
+                enterKeyHint="next"
                 onChange={event => {
                   setTitle(event.target.value);
                   if (fieldErrors.title) setFieldErrors(current => ({ ...current, title: '' }));
@@ -435,6 +433,8 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
               <button
                 type="button"
                 onClick={toggleVoice}
+                aria-label={listening ? 'Stop voice description' : 'Describe this spot by voice'}
+                aria-pressed={listening}
                 className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
                   listening
                     ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 animate-pulse'
@@ -447,7 +447,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
               </button>
             </div>
             {micError && (
-              <p className="text-xs text-red-500 dark:text-red-400 mb-1 px-1">{micError}</p>
+              <p role="status" className="mb-2 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs font-medium leading-5 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />{micError}</p>
             )}
             <textarea
               ref={descriptionRef}
@@ -466,6 +466,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
               aria-invalid={Boolean(fieldErrors.description)}
               aria-describedby={fieldErrors.description ? 'new-spot-description-error' : undefined}
               placeholder={t('addSpot.descPlaceholder')}
+              inputMode="text"
               rows={3}
               className={`w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-background text-gray-900 dark:text-foreground focus:outline-none focus:ring-2 focus:ring-blue-300 text-sm resize-none transition-colors ${
                 fieldErrors.description
@@ -621,7 +622,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
           <div className="rounded-2xl border border-gray-200 p-4 dark:border-border">
             <label htmlFor="new-spot-social-url" className="text-sm font-semibold text-gray-700 dark:text-foreground">Instagram or TikTok post</label>
             <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-muted-foreground">Optional. Useful when you do not have a photo. Supported: Instagram posts/reels and TikTok videos.</p>
-            <input id="new-spot-social-url" type="url" value={socialUrl} onChange={event => setSocialUrl(event.target.value)} autoCapitalize="none" autoCorrect="off" spellCheck="false" placeholder="Paste a supported post link" className="mt-3 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500 dark:border-border dark:bg-background" />
+            <input id="new-spot-social-url" type="url" inputMode="url" enterKeyHint="done" value={socialUrl} onChange={event => setSocialUrl(event.target.value)} autoCapitalize="none" autoCorrect="off" spellCheck="false" placeholder="Paste a supported post link" className="mt-3 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-base outline-none focus:ring-2 focus:ring-green-500 dark:border-border dark:bg-background" />
             {socialUrl && validateSocialPostUrl(socialUrl).ok && <p className="mt-2 text-xs font-medium text-green-700 dark:text-green-400">✓ {validateSocialPostUrl(socialUrl).provider === 'instagram' ? 'Instagram post' : 'TikTok video'} recognized</p>}
             {socialUrl && !validateSocialPostUrl(socialUrl).ok && <p className="mt-2 text-xs text-red-600">{INVALID_SOCIAL_URL_MESSAGE}</p>}
             {socialUrl && (!user || user.isAnonymous || user.emailVerified !== true) && <p className="mt-2 text-xs text-amber-600">Sign in with a verified account to attach social content.</p>}
@@ -629,15 +630,6 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
             </div>
           </details>
 
-          {/* Ad Banners */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div style={{ minHeight: 90 }}>
-              <AdBanner />
-            </div>
-            <div className="hidden md:block" style={{ minHeight: 90 }}>
-              <AdBanner />
-            </div>
-          </div>
         </div>
 
         <div className="px-6 pt-3">
@@ -648,11 +640,12 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
           {fieldErrors.attested && <p className="mt-1.5 text-xs font-semibold text-red-600">{fieldErrors.attested}</p>}
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-100 dark:border-border flex gap-3">
-          <button onClick={onClose} className="flex-1 py-3 rounded-2xl border-2 border-gray-200 dark:border-border text-gray-600 dark:text-foreground font-semibold text-sm hover:bg-gray-50 dark:hover:bg-accent">
+        <div className="sticky bottom-0 z-30 flex gap-3 border-t border-gray-100 bg-white/95 px-6 pt-3 backdrop-blur-xl dark:border-border dark:bg-card/95" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+          <button type="button" onClick={requestClose} disabled={loading} className="min-h-12 flex-1 py-3 rounded-2xl border-2 border-gray-200 dark:border-border text-gray-600 dark:text-foreground font-semibold text-sm hover:bg-gray-50 dark:hover:bg-accent disabled:opacity-50">
             {t('common.cancel')}
           </button>
           <button
+            type="button"
             onClick={handleSave}
             disabled={loading}
             className="flex-2 px-8 py-3 rounded-2xl bg-green-600 text-white font-semibold text-sm hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center gap-2"

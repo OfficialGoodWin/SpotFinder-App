@@ -124,10 +124,10 @@ export default function SocialPostsSection({ targetType, targetId, targetName, u
   };
 
   return (
-    <section className="my-5" aria-labelledby={`social-posts-${targetType}-${targetId}`}>
+    <section className="my-4" aria-labelledby={`social-posts-${targetType}-${targetId}`}>
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <h2 id={`social-posts-${targetType}-${targetId}`} className="text-sm font-bold text-foreground">Recent posts from this place</h2>
+          <h2 id={`social-posts-${targetType}-${targetId}`} className="text-sm font-bold text-foreground">{posts.length ? 'Community posts' : 'Social posts'}</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">Posts load only when you choose to view them.</p>
         </div>
         <ShieldCheck className="h-5 w-5 shrink-0 text-green-600" aria-hidden="true" />
@@ -139,19 +139,22 @@ export default function SocialPostsSection({ targetType, targetId, targetName, u
             const parsed = safeSocialRecord(post);
             return parsed ? <SocialEmbed key={post.id} post={post} parsed={parsed} onReport={setReportPost} /> : null;
           })}
-          {!posts.length && <p className="rounded-xl border border-dashed p-4 text-center text-sm text-muted-foreground">No social posts have been added yet.</p>}
+          {!posts.length && <p className="rounded-xl border border-dashed px-3 py-2 text-xs text-muted-foreground">No Instagram or TikTok posts have been added.</p>}
         </div>
       )}
 
       {verified && (
-        <div className="mt-4 rounded-2xl border bg-slate-50/80 p-4 dark:bg-slate-900/60">
+        <details className="group mt-3 rounded-2xl border bg-slate-50/80 dark:bg-slate-900/60">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-4 py-2.5 text-sm font-semibold marker:content-none"><Plus className="h-4 w-4" />Add a social post</summary>
+          <div className="border-t p-4 dark:border-slate-700">
           <label htmlFor={`social-url-${targetType}-${targetId}`} className="text-sm font-semibold">Add social post</label>
           <p className="mt-1 text-xs text-muted-foreground">Instagram posts/reels and TikTok videos only.</p>
-          <input id={`social-url-${targetType}-${targetId}`} type="url" value={url} onChange={event => { setUrl(event.target.value); setError(''); }} autoCapitalize="none" autoCorrect="off" spellCheck="false" placeholder="Paste Instagram or TikTok post link" className="mt-3 w-full rounded-xl border bg-white px-3 py-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-green-500 dark:bg-slate-950" />
+          <input id={`social-url-${targetType}-${targetId}`} type="url" inputMode="url" enterKeyHint="done" value={url} onChange={event => { setUrl(event.target.value); setError(''); }} autoCapitalize="none" autoCorrect="off" spellCheck="false" placeholder="Paste Instagram or TikTok post link" className="mt-3 w-full rounded-xl border bg-white px-3 py-2.5 text-base outline-none focus-visible:ring-2 focus-visible:ring-green-500 dark:bg-slate-950" />
           {url && parsedInput.ok && <p className="mt-2 text-xs font-medium text-green-700 dark:text-green-400">✓ {parsedInput.provider === 'instagram' ? 'Instagram post' : 'TikTok video'} recognized</p>}
           {url && !parsedInput.ok && <p className="mt-2 text-xs text-red-600">{INVALID_SOCIAL_URL_MESSAGE}</p>}
           <button type="button" onClick={submit} disabled={!parsedInput.ok || busy} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"><Plus className="h-4 w-4" />{busy ? 'Adding…' : 'Add to SpotFinder'}</button>
-        </div>
+          </div>
+        </details>
       )}
       {error && <p role="alert" className="mt-2 text-sm text-red-600">{error}</p>}
 

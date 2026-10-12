@@ -13,8 +13,11 @@ import SearchBar from '../components/map/SearchBar';
 import MapLibreMap from '../components/map/MapLibreMap';
 import ProfileMenu from '../components/ProfileMenu';
 import WelcomeDiscoveryCard from '../components/WelcomeDiscoveryCard';
+import MapExploreStrip from '../components/MapExploreStrip';
 import { getSpotDisplayName } from '@/lib/spotPresentation';
 import { useSpotOpenFocus } from '@/hooks/useSpotOpenFocus';
+import { getConsent } from '@/lib/consent';
+import { shouldShowWelcome } from '@/lib/discoveryExperience';
 
 const SubscriptionModal = React.lazy(() => import('../components/SubscriptionModal'));
 const SuperAdminEditor = React.lazy(() => import('../components/map/SuperAdminEditor'));
@@ -67,6 +70,13 @@ export default function Home() {
     try { return localStorage.getItem('spotfinder_welcome_dismissed_v1') !== '1'; }
     catch { return true; }
   });
+  const [consentDecided, setConsentDecided] = useState(() => getConsent().decided);
+
+  useEffect(() => {
+    const handleConsent = event => setConsentDecided(Boolean(event.detail?.decided));
+    window.addEventListener('spotfinder:consent-changed', handleConsent);
+    return () => window.removeEventListener('spotfinder:consent-changed', handleConsent);
+  }, []);
 
   const [navRouteData, setNavRouteData] = useState({ coordinates: [], turns: [], currentStep: 0 });
   const [showSpots, setShowSpots] = useState(true);
@@ -270,8 +280,8 @@ export default function Home() {
     setTimeout(() => setFlyTo(null), 1000);
   };
 
-  const openNearby = useCallback(async (filters) => {
-    const position = userPos || await requestLocation();
+  const openNearby = useCallback(async (filters, suppliedPosition = null) => {
+    const position = suppliedPosition || userPos || await requestLocation();
     if (!position) return;
     setNearbyFilters(filters);
     setShowNearbySpots(true);
@@ -318,11 +328,17 @@ export default function Home() {
   return (
     <div className="relative w-full h-full" style={{ touchAction: addMode ? 'none' : undefined }}>
       <h1 className="sr-only">SpotFinder community map</h1>
-      {showWelcome && (
+      {shouldShowWelcome({ dismissed: !showWelcome, consentDecided }) && (
         <WelcomeDiscoveryCard
           locationStatus={locationStatus}
           onDismiss={dismissWelcome}
-          onUseLocation={async () => { const position = await requestLocation(); if (position) dismissWelcome(); }}
+          onUseLocation={async () => {
+            const position = await requestLocation();
+            if (position) {
+              dismissWelcome();
+              await openNearby(nearbyFilters, position);
+            }
+          }}
         />
       )}
       {/* Cursor overlay in add mode */}
@@ -409,6 +425,10 @@ export default function Home() {
           }
         }}
       />
+
+      {!showWelcome && !selectedSpot && !selectedPOI && !showNearbySpots && !pendingLatlng && !isActivelyNavigating && (
+        <MapExploreStrip spots={spots} language={language} onSelectSpot={(spot) => openSpot(spot, { source: 'explore' })} />
+      )}
  
       {/* Profile menu — top right */}
       <ProfileMenu

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Search, X, Navigation, Mic, Compass, SlidersHorizontal } from 'lucide-react';
+import { Search, X, Navigation, Mic, Compass, SlidersHorizontal, AlertCircle } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { filterCategories, getCategoryName } from '@/lib/POICategories';
 import { iconGlyphSVG } from '@/lib/mapIcons';
@@ -8,6 +8,7 @@ import { NEARBY_DEFAULT_KM, NEARBY_SLIDER_MAX, sliderToKm, kmToSlider, formatMax
 import LiquidSegmentedControl from '@/components/ui/LiquidSegmentedControl';
 import { getSpotDisplayName, spotMatchesSearch } from '@/lib/spotPresentation';
 import { toast } from 'sonner';
+import { searchFailureMessage, voiceErrorMessage } from '@/lib/contributionFlow';
 
 
 const LANG_TO_BCP47 = {
@@ -26,6 +27,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
   const [focused, setFocused] = useState(false);
   const [listening, setListening] = useState(false);
   const [micError, setMicError] = useState('');
+  const [searchError, setSearchError] = useState('');
   const [showNearbyFilter, setShowNearbyFilter] = useState(false);
   const [nearbyDraft, setNearbyDraft] = useState({ maxDistance: NEARBY_DEFAULT_KM, minRating: 0 });
   const debounce = useRef(null);
@@ -62,6 +64,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
       setResults([]);
       setSpotResults([]);
       setPoiCategories([]);
+      setSearchError('');
       return;
     }
     setPoiCategories(filterCategories(query, language));
@@ -76,12 +79,16 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
     searchAbortRef.current = controller;
     debounce.current = setTimeout(async () => {
       setLoading(true);
+      setSearchError('');
       try {
         // Merge independent POI/place providers and request one selected UI language.
         const places = await searchPlaces(query, { center: mapCenter, language, signal: controller.signal, limit: 10 });
         if (!controller.signal.aborted) setResults(places);
       } catch (error) {
-        if (error?.name !== 'AbortError') setResults([]);
+        if (error?.name !== 'AbortError') {
+          setResults([]);
+          setSearchError(searchFailureMessage(error));
+        }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -108,18 +115,20 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
 
   const startListening = useCallback(async () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) { alert(t('addSpot.voiceNotSupported')); return; }
+    if (!SpeechRecognition) { setMicError(voiceErrorMessage('unsupported')); return; }
     if (recognitionRef.current) recognitionRef.current.abort();
     setMicError('');
     try {
+      if (!navigator.mediaDevices?.getUserMedia || !navigator.mediaDevices?.enumerateDevices) {
+        setMicError(voiceErrorMessage('unsupported'));
+        return;
+      }
       const devices = await navigator.mediaDevices.enumerateDevices();
       const hasMic = devices.some(d => d.kind === 'audioinput');
-      if (!hasMic) { setMicError('Error: no microphone detected'); return; }
+      if (!hasMic) { setMicError(voiceErrorMessage('no-device')); return; }
       await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (err) {
-      setMicError(err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError'
-        ? 'Error: no microphone detected'
-        : 'Error: microphone permission was not allowed');
+      setMicError(voiceErrorMessage(err));
       return;
     }
     const rec = new SpeechRecognition();
@@ -131,10 +140,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
     rec.onend = () => setListening(false);
     rec.onerror = (e) => {
       setListening(false);
-      if (e.error === 'no-speech') return;
-      setMicError(e.error === 'not-allowed'
-        ? 'Error: microphone permission was not allowed'
-        : 'Error: no microphone detected');
+      setMicError(voiceErrorMessage(e));
     };
     rec.onresult = (e) => {
       let transcript = '';
@@ -144,7 +150,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
     };
     recognitionRef.current = rec;
     rec.start();
-  }, [bcp47, t]);
+  }, [bcp47]);
 
   const toggleMic = () => {
     if (listening) { recognitionRef.current?.stop(); setListening(false); }
@@ -152,7 +158,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
   };
 
   const showDropdown = focused && (poiCategories.length > 0 || results.length > 0 || spotResults.length > 0 || (loading && !!query));
-  const isExpanded = showDropdown || listening || (micError && !listening);
+  const isExpanded = showDropdown || listening || Boolean(searchError) || (micError && !listening);
 
   return (
     <div ref={containerRef} className="absolute left-4 z-[1002]" style={{ top: 'max(1rem, env(safe-area-inset-top))', right: '3.75rem' }}>
@@ -165,6 +171,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
             onChange={e => setQuery(e.target.value)}
             onFocus={() => setFocused(true)}
             placeholder={t('search.placeholder')}
+            aria-label="Search places and community spots"
             className="flex-1 py-3 text-sm outline-none bg-transparent text-gray-800 dark:text-foreground placeholder-gray-400 dark:placeholder-muted-foreground min-w-0"
           />
           {query && (
@@ -174,6 +181,9 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
           )}
           <button
             onMouseDown={e => { e.preventDefault(); toggleMic(); }}
+            type="button"
+            aria-label={listening ? 'Stop voice search' : 'Start voice search'}
+            aria-pressed={listening}
             className={`p-1.5 rounded-lg flex-shrink-0 transition-colors ${listening ? 'bg-red-500 text-white' : 'text-gray-400 dark:text-muted-foreground hover:text-gray-600'}`}
           >
             <Mic className="w-4 h-4" />
@@ -272,8 +282,15 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
           </div>
         )}
         {micError && !listening && (
-          <div className="px-4 py-1.5 border-t border-gray-100 dark:border-border rounded-b-2xl">
-            <span className="text-xs text-red-500 font-medium">{micError}</span>
+          <div role="status" className="mx-2 mb-2 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="text-xs font-medium leading-5">{micError}</span>
+          </div>
+        )}
+        {searchError && !loading && (
+          <div role="status" className="mx-2 mb-2 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="text-xs font-medium leading-5">{searchError}</span>
           </div>
         )}
 
