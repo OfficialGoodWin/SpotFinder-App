@@ -66,10 +66,18 @@ test('storage failure is surfaced and does not report a saved draft', () => {
 test('cloud draft rules bind reads and writes to auth uid and exclude anonymous accounts', () => {
   const rules = readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8');
   assert.match(rules, /match \/spot_drafts\/\{draftId\}/);
+  assert.match(rules, /validDraftCoordinates\(request\.resource\.data\)/);
   assert.match(rules, /resource\.data\.owner_uid == request\.auth\.uid/);
   assert.match(rules, /request\.resource\.data\.owner_uid == request\.auth\.uid/);
   assert.match(rules, /sign_in_provider != 'anonymous'/);
   assert.match(rules, /match \/spot_publications\/\{publicationId\}[\s\S]*allow read, write: if false/);
+});
+
+test('cloud draft save does not pre-read a document that may not exist', () => {
+  const source = readFileSync(new URL('../src/api/firebaseClient.js', import.meta.url), 'utf8');
+  const saveDraft = source.slice(source.indexOf('export const saveCloudSpotDraft'), source.indexOf('export const getCloudSpotDrafts'));
+  assert.doesNotMatch(saveDraft, /getDoc\(/);
+  assert.match(saveDraft, /await setDoc\(/);
 });
 
 test('draft photo storage is private and publication is transactionally idempotent', () => {

@@ -335,10 +335,11 @@ export const saveCloudSpotDraft = async (value) => {
   if (!current || current.isAnonymous) throw new Error('A registered account is required for cloud drafts.');
   const draft = normalizeSpotDraft(value);
   const ref = doc(db, SPOT_DRAFTS_COLLECTION, draft.id);
-  const existing = await getDoc(ref);
-  const createdAt = existing.exists() ? existing.data().created_at : draft.created_at;
-  await setDoc(ref, { ...draft, owner_uid: current.uid, created_at: createdAt, updated_at: new Date().toISOString() });
-  return { ...draft, owner_uid: current.uid, created_at: createdAt };
+  // A missing document has no owner for Firestore's owner-only read rule to
+  // inspect, so a preflight get would reject every first save. Resumed drafts
+  // already carry created_at, which remains immutable under the update rule.
+  await setDoc(ref, { ...draft, owner_uid: current.uid, updated_at: new Date().toISOString() });
+  return { ...draft, owner_uid: current.uid };
 };
 
 export const getCloudSpotDrafts = async () => {

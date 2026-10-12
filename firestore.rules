@@ -20,6 +20,11 @@ service cloud.firestore {
     function strLen(v, max) {
       return v is string && v.size() <= max;
     }
+    function validDraftCoordinates(data) {
+      return (data.lat == null && data.lng == null)
+        || (data.lat is number && data.lat >= -90 && data.lat <= 90
+            && data.lng is number && data.lng >= -180 && data.lng <= 180);
+    }
 
     // ── Public spots ─────────────────────────────────────────────────────────
     match /spots/{spotId} {
@@ -68,22 +73,28 @@ service cloud.firestore {
     // registered Firebase account that created them. Ownership can never be
     // reassigned by a client update.
     match /spot_drafts/{draftId} {
-      allow read, delete: if isAuth() && resource.data.owner_uid == request.auth.uid;
+      // Older clients preflight-get a generated draft ID before its first
+      // create. Reading a missing document reveals no data; existing drafts
+      // remain strictly owner-only. List queries must still prove ownership.
+      allow get: if isAuth() && (
+        !exists(/databases/$(database)/documents/spot_drafts/$(draftId))
+        || resource.data.owner_uid == request.auth.uid
+      );
+      allow list: if isAuth() && resource.data.owner_uid == request.auth.uid;
+      allow delete: if isAuth() && resource.data.owner_uid == request.auth.uid;
       allow create: if isAuth()
         && request.auth.token.firebase.sign_in_provider != 'anonymous'
         && request.resource.data.owner_uid == request.auth.uid
         && strLen(request.resource.data.title, 100)
         && strLen(request.resource.data.description, 2000)
-        && request.resource.data.lat is number && request.resource.data.lat >= -90 && request.resource.data.lat <= 90
-        && request.resource.data.lng is number && request.resource.data.lng >= -180 && request.resource.data.lng <= 180;
+        && validDraftCoordinates(request.resource.data);
       allow update: if isAuth()
         && resource.data.owner_uid == request.auth.uid
         && request.resource.data.owner_uid == request.auth.uid
         && unchanged(['owner_uid', 'created_at'])
         && strLen(request.resource.data.title, 100)
         && strLen(request.resource.data.description, 2000)
-        && request.resource.data.lat is number && request.resource.data.lat >= -90 && request.resource.data.lat <= 90
-        && request.resource.data.lng is number && request.resource.data.lng >= -180 && request.resource.data.lng <= 180;
+        && validDraftCoordinates(request.resource.data);
     }
 
     // Server-only idempotency records prevent a resumed draft from creating
