@@ -209,6 +209,16 @@ export const requestAccountEmailChange = async (currentPassword, nextEmail) => {
   const user = await reauthenticateWithPassword(currentPassword);
   await verifyBeforeUpdateEmail(user, email);
 };
+
+export const updateAccountDisplayName = async (nextName) => {
+  const displayName = String(nextName || '').trim();
+  if (displayName.length < 2) throw new Error('Display name must be at least 2 characters');
+  if (displayName.length > 80) throw new Error('Display name must be 80 characters or fewer');
+  const { auth } = getFirebaseServices();
+  if (!auth.currentUser || auth.currentUser.isAnonymous) throw new Error('A signed-in account is required');
+  await updateProfile(auth.currentUser, { displayName });
+  return displayName;
+};
  
 export const loginWithGoogle = async () => {
   const { auth } = getFirebaseServices();

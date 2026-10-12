@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Moon, Globe, Cookie, FileText, Shield, ReceiptText, Settings2 } from 'lucide-react';
+import { X, Moon, Globe, Cookie, FileText, Shield, ReceiptText, Settings2, Compass, Type, Trash2 } from 'lucide-react';
 import { useTheme } from '@/lib/ThemeContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { LANGUAGES } from '@/locales/translations';
@@ -7,12 +7,16 @@ import MfaSection from '@/components/MfaSection';
 import AccountSecuritySection from '@/components/AccountSecuritySection';
 import { reopenCookieSettings } from '@/components/CookieConsentBanner';
 import SmoothSelect from '@/components/ui/SmoothSelect';
+import { getTextScale, saveTextScale, TEXT_SCALE_DEFAULT, TEXT_SCALE_MAX, TEXT_SCALE_MIN } from '@/lib/textScale';
 
-export default function SettingsModal({ onClose }) {
+export default function SettingsModal({ onClose, mapExploreEnabled = true, onMapExploreEnabledChange, onRequestDeleteAccount }) {
   const { isDark, toggleTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
   const panelRef = React.useRef(null);
   const closeRef = React.useRef(onClose);
+  const [textScale, setTextScale] = React.useState(() => getTextScale());
+
+  const changeTextScale = value => setTextScale(saveTextScale(value));
 
   React.useEffect(() => { closeRef.current = onClose; }, [onClose]);
   React.useEffect(() => {
@@ -36,11 +40,11 @@ export default function SettingsModal({ onClose }) {
         className="fixed inset-0 bg-slate-950/50 backdrop-blur-[2px]"
         onClick={onClose}
       />
-      <section ref={panelRef} className="sf-sheet relative flex max-h-[94dvh] w-full max-w-4xl flex-col overflow-hidden rounded-t-3xl sm:max-h-[88dvh] sm:rounded-3xl">
-        <header className="flex items-center justify-between border-b border-border px-5 py-4 sm:px-7">
+      <section ref={panelRef} className="sf-settings-panel sf-sheet relative flex max-h-[94vh] max-h-[94dvh] w-full max-w-4xl flex-col overflow-hidden rounded-t-3xl sm:max-h-[88vh] sm:max-h-[88dvh] sm:rounded-3xl">
+        <header className="sf-settings-header flex items-center justify-between border-b border-border px-5 py-4 sm:px-7">
           <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><Settings2 className="h-5 w-5" aria-hidden="true" /></span>
-            <div><h2 id="settings-title" className="text-xl font-bold tracking-tight">{t('settings.title')}</h2><p className="text-sm text-muted-foreground">Preferences, privacy, and account security</p></div>
+            <span className="sf-settings-heading-icon grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><Settings2 className="h-5 w-5" aria-hidden="true" /></span>
+            <div className="min-w-0"><h2 id="settings-title" className="text-xl font-bold tracking-tight">{t('settings.title')}</h2><p className="text-sm text-muted-foreground">Preferences, privacy, and account security</p></div>
           </div>
           <button
             onClick={onClose}
@@ -55,7 +59,7 @@ export default function SettingsModal({ onClose }) {
           <div className="grid gap-4 md:grid-cols-2">
           <section className="sf-section" aria-labelledby="appearance-title">
             <h3 id="appearance-title" className="mb-4 text-sm font-bold uppercase tracking-wide text-muted-foreground">Appearance</h3>
-            <div className="flex items-center justify-between gap-4">
+            <div className="sf-settings-row flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><Moon className="w-5 h-5" /></span>
               <div>
@@ -82,6 +86,42 @@ export default function SettingsModal({ onClose }) {
               />
             </button>
           </div>
+          </section>
+
+          <section className="sf-section" aria-labelledby="map-display-title">
+            <h3 id="map-display-title" className="mb-4 text-sm font-bold uppercase tracking-wide text-muted-foreground">Map display</h3>
+            <div className="sf-settings-row flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Compass className="h-5 w-5" aria-hidden="true" /></span>
+                <div>
+                  <p className="font-semibold">Map discovery card</p>
+                  <p className="text-sm text-muted-foreground">Show contextual spots and exploration guidance on the map.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={mapExploreEnabled}
+                aria-label="Show map discovery card"
+                onClick={() => onMapExploreEnabledChange?.(!mapExploreEnabled)}
+                className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${mapExploreEnabled ? 'bg-primary' : 'bg-muted-foreground/35'}`}
+              >
+                <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${mapExploreEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
+            <div className="mt-4 border-t border-border pt-4">
+              <div className="flex items-start gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Type className="h-5 w-5" aria-hidden="true" /></span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div><p className="font-semibold">Text size</p><p className="text-sm text-muted-foreground">Applies throughout SpotFinder.</p></div>
+                    <output htmlFor="text-size" className="rounded-lg bg-muted px-2 py-1 text-sm font-bold tabular-nums">{textScale}%</output>
+                  </div>
+                  <input id="text-size" type="range" min={TEXT_SCALE_MIN} max={TEXT_SCALE_MAX} step="5" value={textScale} onChange={event => changeTextScale(event.target.value)} className="mt-3 w-full accent-green-600" aria-label="Text size percentage" />
+                  <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground"><span>{TEXT_SCALE_MIN}%</span><button type="button" onClick={() => changeTextScale(TEXT_SCALE_DEFAULT)} className="min-h-9 rounded-lg px-2 font-semibold text-primary hover:bg-primary/10">Reset to 100%</button><span>{TEXT_SCALE_MAX}%</span></div>
+                </div>
+              </div>
+            </div>
           </section>
 
           <section className="sf-section" aria-labelledby="language-title">
@@ -122,6 +162,14 @@ export default function SettingsModal({ onClose }) {
             </a>
             </div>
           </section>
+
+          {onRequestDeleteAccount && <section className="sf-section md:col-span-2" aria-labelledby="account-management-title">
+            <h3 id="account-management-title" className="mb-2 text-sm font-bold uppercase tracking-wide text-red-700 dark:text-red-300">Account management</h3>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div><p className="font-semibold">Delete account</p><p className="text-sm text-muted-foreground">Review deletion requirements and the data affected. Account deletion currently requires support.</p></div>
+              <button type="button" onClick={onRequestDeleteAccount} className="sf-button-secondary shrink-0 border-red-200 text-red-700 hover:bg-red-50 focus-visible:ring-red-500 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"><Trash2 className="mr-2 inline h-4 w-4" aria-hidden="true" />Delete account</button>
+            </div>
+          </section>}
 
           <p className="text-sm text-muted-foreground text-center md:col-span-2 pt-1" role="status">{t('settings.prefSaved')}</p>
           </div>

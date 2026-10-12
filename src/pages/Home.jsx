@@ -19,6 +19,7 @@ import { useSpotOpenFocus } from '@/hooks/useSpotOpenFocus';
 import { getConsent } from '@/lib/consent';
 import { shouldShowWelcome } from '@/lib/discoveryExperience';
 import { getGuestDraftOwnerKey, listGuestDrafts } from '@/lib/spotDrafts';
+import { getMapExploreEnabled, setMapExploreEnabled as persistMapExploreEnabled } from '@/lib/mapExplorePreference';
 
 const SubscriptionModal = React.lazy(() => import('../components/SubscriptionModal'));
 const SuperAdminEditor = React.lazy(() => import('../components/map/SuperAdminEditor'));
@@ -65,6 +66,8 @@ export default function Home() {
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [mapExploreEnabled, setMapExploreEnabled] = useState(() => getMapExploreEnabled());
+  const [mapExploreDismissed, setMapExploreDismissed] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
   const [showMobileMore, setShowMobileMore] = useState(false);
   const [locationStatus, setLocationStatus] = useState('idle');
@@ -444,8 +447,13 @@ export default function Home() {
         }}
       />
 
-      {!showWelcome && !selectedSpot && !selectedPOI && !showNearbySpots && !pendingLatlng && !isActivelyNavigating && (
-        <MapExploreStrip spots={spots} language={language} onSelectSpot={(spot) => openSpot(spot, { source: 'explore' })} />
+      {mapExploreEnabled && !mapExploreDismissed && !showWelcome && !selectedSpot && !selectedPOI && !showNearbySpots && !pendingLatlng && !isActivelyNavigating && (
+        <MapExploreStrip
+          spots={spots}
+          language={language}
+          onSelectSpot={(spot) => openSpot(spot, { source: 'explore' })}
+          onDismiss={() => setMapExploreDismissed(true)}
+        />
       )}
  
       {/* Profile menu — top right */}
@@ -456,6 +464,8 @@ export default function Home() {
         onToggleMenu={() => setShowAccountMenu(v => !v)}
         onShowMySpots={() => setShowMySpots(true)}
         onShowDrafts={() => setShowMySpots(true)}
+        onShowNearby={() => openNearby(nearbyFilters)}
+        onShowSettings={() => setShowSettings(true)}
         guestDraftCount={guestDraftCount}
         onSignOut={handleSignOut}
         onShowDeleteConfirm={() => setShowDeleteConfirm(true)}
@@ -729,7 +739,16 @@ export default function Home() {
       )}
  
       {showSettings && (
-        <SettingsModal onClose={() => setShowSettings(false)} />
+        <SettingsModal
+          onClose={() => setShowSettings(false)}
+          mapExploreEnabled={mapExploreEnabled}
+          onMapExploreEnabledChange={(enabled) => {
+            setMapExploreEnabled(enabled);
+            persistMapExploreEnabled(enabled);
+            if (enabled) setMapExploreDismissed(false);
+          }}
+          onRequestDeleteAccount={isAuthenticated ? () => { setShowSettings(false); setShowDeleteConfirm(true); } : undefined}
+        />
       )}
 
       {isSuperAdmin && showAdminEditor && (

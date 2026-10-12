@@ -36,16 +36,37 @@ try {
       });
       if (!box || box.width > width + 1 || box.y < -1 || box.y + box.height > height + 1) failures.push('Auth modal is clipped at 320px');
       await page.keyboard.press('Escape');
+
+      await page.evaluate(() => localStorage.setItem('spotfinder_text_scale_v1', '250'));
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(150);
+      const scaledHome = await page.evaluate(() => ({ overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }));
+      if (scaledHome.overflow > 1) failures.push(`Home at 250% text: ${scaledHome.overflow}px horizontal overflow`);
+      await page.evaluate(() => document.querySelector('button[aria-label="More map options"]')?.click());
+      await page.waitForTimeout(50);
+      await page.evaluate(() => [...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Settings')?.click());
+      await page.waitForTimeout(50);
+      const scaledSettings = await page.evaluate(() => {
+        const panel = document.querySelector('[role="dialog"] section');
+        const rect = panel?.getBoundingClientRect();
+        const slider = document.querySelector('#text-size');
+        const close = document.querySelector('[role="dialog"] button[aria-label="Close"]')?.getBoundingClientRect();
+        return { rect: rect && { x: rect.x, y: rect.y, width: rect.width, height: rect.height }, close: close && { x: close.x, y: close.y, width: close.width, height: close.height }, overflow: panel ? panel.scrollWidth - panel.clientWidth : null, value: slider?.value };
+      });
+      if (!scaledSettings.rect || scaledSettings.rect.width > width + 1 || scaledSettings.rect.x < -1 || scaledSettings.rect.y < -1 || scaledSettings.rect.y + scaledSettings.rect.height > height + 1 || !scaledSettings.close || scaledSettings.close.x + scaledSettings.close.width > width + 1 || scaledSettings.overflow > 1 || scaledSettings.value !== '250') failures.push(`Settings does not remain contained or restore 250% text at 320px: ${JSON.stringify(scaledSettings)}`);
+      await page.evaluate(() => { localStorage.setItem('spotfinder_text_scale_v1', '100'); document.documentElement.style.fontSize = '100%'; document.documentElement.dataset.sfTextScale = 'standard'; });
     }
 
     if (width === 1024) {
       await page.evaluate(() => document.querySelector('button[aria-label="Open settings"]')?.click());
       await page.waitForTimeout(50);
       const box = await page.evaluate(() => {
-        const rect = document.querySelector('[role="dialog"] section')?.getBoundingClientRect();
-        return rect && { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+        const element = document.querySelector('[role="dialog"] section');
+        const rect = element?.getBoundingClientRect();
+        const style = element && getComputedStyle(element);
+        return rect && { x: rect.x, y: rect.y, width: rect.width, height: rect.height, maxHeight: style.maxHeight, rootSize: getComputedStyle(document.documentElement).fontSize, className: element.className };
       });
-      if (!box || box.width > width + 1 || box.height > height + 1) failures.push('Settings dialog exceeds 1024x768 viewport');
+      if (!box || box.width > width + 1 || box.height > height + 1) failures.push(`Settings dialog exceeds 1024x768 viewport: ${JSON.stringify(box)}`);
       await page.keyboard.press('Escape');
     }
     await page.close();

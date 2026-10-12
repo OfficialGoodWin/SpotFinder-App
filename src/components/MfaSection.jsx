@@ -87,7 +87,7 @@ export default function MfaSection() {
       <div id="mfa-enroll-recaptcha" />
 
       {!verificationId ? (
-        <div className="flex gap-2">
+        <div className="sf-settings-action-row flex gap-2">
           <input aria-label="Phone number for two-factor authentication" type="tel" autoComplete="tel"
             value={phone}
             onChange={e => setPhone(e.target.value)}
@@ -99,7 +99,7 @@ export default function MfaSection() {
           </button>
         </div>
       ) : (
-        <form onSubmit={handleVerify} className="flex gap-2">
+        <form onSubmit={handleVerify} className="sf-settings-action-row flex gap-2">
           <input aria-label="Six-digit verification code" autoComplete="one-time-code"
             value={code}
             onChange={e => setCode(e.target.value)}

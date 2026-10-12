@@ -22,8 +22,8 @@ import { deleteGuestDraft, draftDisplayName, listGuestDrafts } from '@/lib/spotD
 import { deleteGuestDraftPhotos, loadGuestDraftPhoto } from '@/lib/guestDraftPhotos';
 
 const TABS = [
-  { id: 'saved', label: 'Saved', icon: Bookmark },
-  { id: 'created', label: 'Created', icon: PlusCircle },
+  { id: 'saved', label: 'Favorites', icon: Bookmark },
+  { id: 'created', label: 'Contributions', icon: PlusCircle },
   { id: 'liked', label: 'Liked', icon: Heart },
   { id: 'drafts', label: 'Drafts', icon: FilePenLine },
 ];
@@ -137,14 +137,14 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
 
   return (
     <div className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center bg-black/45 backdrop-blur-sm" role="presentation">
-      <section className="sf-sheet flex h-[92dvh] w-full flex-col overflow-hidden rounded-t-3xl sm:h-[min(88dvh,760px)] sm:max-w-3xl sm:rounded-3xl" aria-labelledby="my-spots-title">
-        <header className="px-4 sm:px-6 pt-4 sm:pt-5 pb-4 border-b border-gray-200/70 dark:border-border">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 id="my-spots-title" className="text-xl font-bold text-gray-900 dark:text-foreground">{draftOnly ? 'Drafts' : 'My Spots'}</h2>
-              <p className="text-xs sm:text-sm text-gray-500 dark:text-muted-foreground mt-0.5">{user ? 'Your private drafts and public collections.' : 'Drafts saved only on this device and guest session.'}</p>
+      <section className="sf-collection-panel sf-sheet flex h-[92vh] h-[92dvh] w-full flex-col overflow-hidden rounded-t-3xl sm:h-[min(88vh,760px)] sm:h-[min(88dvh,760px)] sm:max-w-3xl sm:rounded-3xl" aria-labelledby="my-spots-title">
+        <header className="sf-collection-header px-4 sm:px-6 pt-4 sm:pt-5 pb-4 border-b border-gray-200/70 dark:border-border">
+          <div className="sf-collection-heading relative flex items-center justify-between mb-4">
+            <div className="min-w-0">
+              <h2 id="my-spots-title" className="text-xl font-bold text-gray-900 dark:text-foreground">{draftOnly ? 'Drafts' : 'My collection'}</h2>
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-muted-foreground mt-0.5">{user ? 'Favorites, contributions, likes, and private drafts.' : 'Drafts saved only on this device and guest session.'}</p>
             </div>
-            <button onClick={onClose} className="w-11 h-11 grid place-items-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500" aria-label="Close My Spots">
+            <button onClick={onClose} className="sf-collection-close w-11 h-11 shrink-0 grid place-items-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500" aria-label="Close My Spots">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -152,13 +152,14 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
           <LiquidSegmentedControl
             ariaLabel="My Spots collections"
             equal
+            className="sf-collection-tabs"
             value={tab}
             onChange={selectTab}
             options={tabs.map(item => ({ ...item, value: item.id }))}
-            renderOption={({ id, label, icon: Icon }) => <><Icon className="w-4 h-4" aria-hidden="true" /><span>{label}</span>{data[id] !== null && <span className="sf-liquid-tabs__count">{data[id].length}</span>}</>}
+            renderOption={({ id, label, icon: Icon }) => <><Icon className="h-4 w-4 shrink-0" aria-hidden="true" /><span className="truncate">{label}</span>{data[id] !== null && <span className="sf-collection-tabs__count">{data[id].length}</span>}</>}
           />
 
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 mt-3">
+          <div className="sf-collection-tools grid grid-cols-[minmax(0,1fr)_auto] gap-2 mt-3">
             <label className="relative min-w-0">
               <span className="sr-only">Search {tab} spots</span>
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" aria-hidden="true" />
@@ -195,8 +196,8 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
               {visibleSpots.map(spot => (
                 tab === 'drafts' ? (
                 <article key={spot.id} className="rounded-2xl border border-gray-200/80 bg-white/80 overflow-hidden dark:border-border dark:bg-white/[0.03]">
-                  <div className="flex min-h-[124px]">
-                    <div className="grid w-28 shrink-0 place-items-center overflow-hidden bg-gray-100 dark:bg-accent"><DraftThumbnail draft={spot} user={user} draftOwnerKey={draftOwnerKey} /></div>
+                  <div className="sf-collection-card-body flex min-h-[124px]">
+                    <div className="sf-collection-thumb grid w-28 shrink-0 place-items-center overflow-hidden bg-gray-100 dark:bg-accent"><DraftThumbnail draft={spot} user={user} draftOwnerKey={draftOwnerKey} /></div>
                     <div className="min-w-0 flex-1 p-3">
                       <h3 className="truncate font-semibold">{draftDisplayName(spot)}</h3>
                       <p className="mt-1 flex items-center gap-1 truncate text-xs text-muted-foreground"><MapPin className="h-3.5 w-3.5" />{getSpotLocationLabel(spot)}</p>
@@ -211,8 +212,8 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
                 </article>
                 ) : (
                 <article key={spot.id} className="group rounded-2xl border border-gray-200/80 dark:border-border bg-white/80 dark:bg-white/[0.03] overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-[transform,box-shadow] duration-200">
-                  <div className="flex min-h-[124px]">
-                    <div className="w-28 sm:w-32 bg-gray-100 dark:bg-accent shrink-0 overflow-hidden">
+                  <div className="sf-collection-card-body flex min-h-[124px]">
+                    <div className="sf-collection-thumb w-28 sm:w-32 bg-gray-100 dark:bg-accent shrink-0 overflow-hidden">
                       <SpotImage spot={spot} alt="" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
                     </div>
                     <div className="p-3 min-w-0 flex-1 flex flex-col">
