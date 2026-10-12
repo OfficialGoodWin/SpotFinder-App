@@ -42,6 +42,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
     const handleOutside = (e) => {
       if (containerRef.current && !containerRef.current.contains(e.target)) {
         closeDropdown();
+        setShowNearbyFilter(false);
       }
     };
     document.addEventListener('mousedown', handleOutside);
@@ -214,9 +215,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
               <Compass className="w-5 h-5" />
             </button>
             {showNearbyFilter && (
-              <>
-                <div className="fixed inset-0 z-[1500]" onClick={() => setShowNearbyFilter(false)} />
-                <div className="sf-nearby-filter-card absolute top-full right-0 mt-3 z-[1600] w-[min(19rem,calc(100vw-1.5rem))] p-4 sm:p-5">
+                <div className="sf-nearby-filter-card absolute top-full right-0 mt-3 z-[1600] w-[min(19rem,calc(100vw-1.5rem))] overflow-y-auto overscroll-contain p-4 sm:p-5">
                   <div className="flex justify-between items-center mb-5">
                     <div className="flex items-center gap-3">
                       <span className="grid h-10 w-10 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-500 ring-1 ring-emerald-500/20"><SlidersHorizontal className="h-5 w-5" /></span>
@@ -226,6 +225,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
                       <X className="w-4 h-4" />
                     </button>
                   </div>
+                  <div className="sf-nearby-filter-grid">
                   <div className="sf-filter-section">
                     <div className="flex justify-between items-center text-xs font-semibold text-gray-600 dark:text-muted-foreground mb-2">
                       <span>Maximum distance</span>
@@ -252,7 +252,8 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
                       options={[0, 3, 3.5, 4, 4.5].map(rating => ({ value: String(rating), label: rating === 0 ? 'Any' : `${rating}★` }))}
                     />
                   </div>
-                  <div className="grid grid-cols-[.8fr_1.2fr] gap-2 mt-4">
+                  </div>
+                  <div className="sf-nearby-filter-actions grid grid-cols-[.8fr_1.2fr] gap-2 mt-4">
                     <button
                       onClick={() => setShowNearbyFilter(false)}
                       className="sf-filter-secondary"
@@ -267,7 +268,6 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
                     </button>
                   </div>
                 </div>
-              </>
             )}
           </div>
         </div>

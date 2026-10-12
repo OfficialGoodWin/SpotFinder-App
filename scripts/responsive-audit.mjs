@@ -69,6 +69,28 @@ try {
       if (!box || box.width > width + 1 || box.height > height + 1) failures.push(`Settings dialog exceeds 1024x768 viewport: ${JSON.stringify(box)}`);
       await page.keyboard.press('Escape');
     }
+
+    if (width === 844 && height === 390) {
+      await page.evaluate(() => {
+        Object.defineProperty(navigator, 'geolocation', { configurable: true, value: {
+          getCurrentPosition: success => success({ coords: { latitude: 50.0755, longitude: 14.4378, accuracy: 10 } }),
+          watchPosition: () => 1,
+          clearWatch: () => {},
+        } });
+        document.querySelector('button[aria-label="Nearby spots filters"]')?.click();
+      });
+      await page.waitForTimeout(100);
+      const landscapeFilter = await page.evaluate(() => {
+        const card = document.querySelector('.sf-nearby-filter-card')?.getBoundingClientRect();
+        const toolbar = document.querySelector('button[aria-label="Open settings"]')?.closest('.absolute.bottom-0')?.getBoundingClientRect();
+        const settings = document.querySelector('button[aria-label="Open settings"]')?.getBoundingClientRect();
+        const hitElement = settings && document.elementFromPoint(settings.x + settings.width / 2, settings.y + settings.height / 2);
+        const hit = hitElement?.closest('button')?.getAttribute('aria-label');
+        return { card: card && { top: card.top, bottom: card.bottom, left: card.left, right: card.right }, toolbarTop: toolbar?.top, settings: settings && { x: settings.x, y: settings.y, width: settings.width, height: settings.height }, hit, hitElement: hitElement && { tag: hitElement.tagName, className: hitElement.getAttribute('class'), ariaLabel: hitElement.getAttribute('aria-label') } };
+      });
+      if (!landscapeFilter.card || landscapeFilter.card.bottom > (landscapeFilter.toolbarTop ?? height) + 1 || landscapeFilter.card.left < -1 || landscapeFilter.card.right > width + 1) failures.push(`Nearby filter does not fit landscape: ${JSON.stringify(landscapeFilter)}`);
+      if (landscapeFilter.hit !== 'Open settings') failures.push(`Bottom toolbar is blocked while Nearby filters are open: ${JSON.stringify(landscapeFilter)}`);
+    }
     await page.close();
   }
 } finally {

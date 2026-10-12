@@ -37,7 +37,7 @@ export default function ProfileMenu({ user, isAuthenticated, showMenu, onToggleM
               : <span className="text-sm font-bold text-primary">{user.displayName?.[0] || user.email?.[0] || '?'}</span>}
           </button>
           {showMenu && (
-            <div ref={menuRef} className="sf-menu-motion absolute right-0 top-full mt-2 w-[min(18rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border bg-card/95 p-1.5 shadow-xl backdrop-blur-xl" role="menu" aria-label={t('profile.account')}>
+            <div ref={menuRef} className="sf-account-menu sf-menu-motion absolute right-0 top-full mt-2 w-[min(18rem,calc(100vw-2rem))] overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl border border-border bg-card/95 p-1.5 shadow-xl backdrop-blur-xl" role="menu" aria-label={t('profile.account')}>
               <div className="flex items-center gap-3 border-b border-border px-3 py-3">
                 <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-primary/10 font-bold text-primary">{user.photoURL ? <img src={user.photoURL} alt="" className="h-full w-full object-cover" /> : user.displayName?.[0] || user.email?.[0] || '?'}</span>
                 <div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{user.displayName || user.email}</p><p className="truncate text-xs text-muted-foreground">{user.email}</p></div>
