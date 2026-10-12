@@ -324,6 +324,43 @@ function isManagedImageUrl(value, uid) {
   }
 }
 
+async function promoteDraftPhotos(uid, draftId, draftData) {
+  const refs = Array.isArray(draftData?.photo_refs) ? draftData.photo_refs.slice(0, 3) : [];
+  if (!refs.length) return [];
+  const bucket = getStorage().bucket();
+  const urls = [];
+  for (let index = 0; index < refs.length; index += 1) {
+    const sourcePath = cleanString(refs[index]?.path, 500);
+    const requiredPrefix = `drafts/${uid}/${draftId}/`;
+    if (!sourcePath.startsWith(requiredPrefix)) {
+      throw new functions.https.HttpsError('permission-denied', 'A draft photo does not belong to this account.');
+    }
+    const source = bucket.file(sourcePath);
+    let metadata;
+    try {
+      [metadata] = await source.getMetadata();
+    } catch (error) {
+      console.warn('Draft photo metadata unavailable:', sourcePath, error.message);
+      throw new functions.https.HttpsError('failed-precondition', 'A private draft photo is missing. Resume the draft and upload it again.');
+    }
+    const size = Number(metadata.size);
+    if (!Number.isFinite(size) || size <= 0 || size > 5 * 1024 * 1024 || !/^image\/(jpeg|png|webp)$/.test(metadata.contentType || '')) {
+      throw new functions.https.HttpsError('failed-precondition', 'A private draft photo failed validation. Remove it and upload it again.');
+    }
+    const destinationPath = `community/${uid}/draft-${draftId}-${index}.jpg`;
+    const token = crypto.randomUUID();
+    const destination = bucket.file(destinationPath);
+    await source.copy(destination);
+    await destination.setMetadata({
+      contentType: metadata.contentType,
+      cacheControl: 'public,max-age=31536000,immutable',
+      metadata: { firebaseStorageDownloadTokens: token },
+    });
+    urls.push(`https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(bucket.name)}/o/${encodeURIComponent(destinationPath)}?alt=media&token=${token}`);
+  }
+  return urls;
+}
+
 function sanitizePoiMatch(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const tagsInput = value.tags && typeof value.tags === 'object' && !Array.isArray(value.tags) ? value.tags : {};
@@ -422,8 +459,19 @@ exports.submitSpot = functions.runWith({ secrets: ['ANTI_SPAM_IP_SALT'] }).https
   const published = await db.collection('spots')
     .where('created_by_uid', '==', uid).where('status', '==', 'published').limit(3).get();
   const status = context.auth.token.email_verified === true && published.size >= 3 ? 'published' : 'pending_trust';
-  const imageUrls = (Array.isArray(input.image_urls) ? input.image_urls : [])
-    .filter(value => typeof value === 'string' && isManagedImageUrl(value, uid)).slice(0, 3);
+  let draftSnapshotForPhotos = null;
+  if (draftId) {
+    draftSnapshotForPhotos = await db.collection('spot_drafts').doc(draftId).get();
+    if (draftSnapshotForPhotos.exists && draftSnapshotForPhotos.data().owner_uid !== uid) {
+      throw new functions.https.HttpsError('permission-denied', 'This draft belongs to another account.');
+    }
+  }
+  const promotedDraftUrls = draftSnapshotForPhotos?.exists
+    ? await promoteDraftPhotos(uid, draftId, draftSnapshotForPhotos.data())
+    : [];
+  const submittedImageUrls = (Array.isArray(input.image_urls) ? input.image_urls : [])
+    .filter(value => typeof value === 'string' && isManagedImageUrl(value, uid));
+  const imageUrls = [...promotedDraftUrls, ...submittedImageUrls].slice(0, 3);
   const ratingValue = Number(input.rating);
   const initialRating = Number.isFinite(ratingValue) && ratingValue >= 1 && ratingValue <= 5 ? ratingValue : 0;
   const allowedOption = (value, allowed) => allowed.includes(value) ? value : null;

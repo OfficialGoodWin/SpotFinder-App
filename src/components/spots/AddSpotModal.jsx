@@ -13,6 +13,7 @@ import LiquidSegmentedControl from '../ui/LiquidSegmentedControl';
 import { IMAGE_ACCEPT, validateImageFileMetadata } from '@/lib/imageUploadValidation';
 import { hasMeaningfulAddSpotDraft, validateRequiredSpotFields, voiceErrorMessage } from '@/lib/contributionFlow';
 import { createDraftId, deleteGuestDraft, getGuestDraftOwnerKey, normalizeSpotDraft, saveGuestDraft } from '@/lib/spotDrafts';
+import { deleteGuestDraftPhotos, loadGuestDraftPhoto, persistGuestDraftPhotos, pruneGuestDraftPhotos } from '@/lib/guestDraftPhotos';
 
 // Category tags per spec — separate from the existing rating-group `spotType`.
 // A spot can carry several of these. Display uses an emoji + translated label
@@ -73,6 +74,8 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
   const [draftError, setDraftError] = useState('');
   const [draftPhotoRefs, setDraftPhotoRefs] = useState([]);
   const [draftPhotosReady, setDraftPhotosReady] = useState(true);
+  const [photoProgress, setPhotoProgress] = useState(0);
+  const [photoReloadKey, setPhotoReloadKey] = useState(0);
 
   // ── New fields per submission spec ──────────────────────────────────────────
   const [tags, setTags] = useState([]);
@@ -98,6 +101,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
 
   useEffect(() => {
     let active = true;
+    let restoredUrls = [];
     if (!draft) return undefined;
     const restore = async () => {
       const restored = normalizeSpotDraft(draft);
@@ -116,22 +120,25 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
       setSafetyRating(restored.safetyRating);
       setCrowdednessRating(restored.crowdednessRating);
       setDraftPhotoRefs(restored.photo_refs);
-      if (restored.photo_refs.length && user) {
+      if (restored.photo_refs.length) {
         setDraftPhotosReady(false);
+        setDraftError('');
         try {
-          const files = await Promise.all(restored.photo_refs.map(loadDraftImageFile));
+          const ownerKey = user ? '' : getGuestDraftOwnerKey(localStorage);
+          const files = await Promise.all(restored.photo_refs.map(ref => user ? loadDraftImageFile(ref) : loadGuestDraftPhoto(ref, ownerKey)));
           if (!active) return;
           setImageFiles(files);
-          setImagePreviews(files.map(file => URL.createObjectURL(file)));
+          restoredUrls = files.map(file => URL.createObjectURL(file));
+          setImagePreviews(restoredUrls);
           setDraftPhotosReady(true);
         } catch (error) {
-          if (active) setDraftError('The draft was restored, but one or more private photos could not be loaded.');
+          if (active) setDraftError(error?.message || 'The draft was restored, but one or more private photos could not be loaded.');
         }
       }
     };
     restore();
-    return () => { active = false; };
-  }, [draft?.id, user?.id]);
+    return () => { active = false; restoredUrls.forEach(url => URL.revokeObjectURL(url)); };
+  }, [draft?.id, user?.id, photoReloadKey]);
 
   useEffect(() => () => recognitionRef.current?.stop(), []);
 
@@ -152,12 +159,28 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
       if (!draftPhotosReady) throw new Error('Private draft photos are not available yet. Check your connection and try again.');
       let refs = draftPhotoRefs;
       if (user) {
-        const uploaded = await Promise.all(imageFiles.map((file, index) => refs[index] || uploadDraftImage(file, draftIdRef.current)));
+        const uploaded = [];
+        for (let index = 0; index < imageFiles.length; index += 1) {
+          if (refs[index]?.path) { uploaded.push(refs[index]); continue; }
+          let lastError;
+          for (let attempt = 0; attempt < 2; attempt += 1) {
+            try {
+              uploaded.push(await uploadDraftImage(imageFiles[index], draftIdRef.current, fraction => setPhotoProgress(Math.round(((index + fraction) / imageFiles.length) * 100))));
+              lastError = null;
+              break;
+            } catch (error) { lastError = error; }
+          }
+          if (lastError) throw lastError;
+        }
         refs = uploaded;
         setDraftPhotoRefs(uploaded);
         await saveCloudSpotDraft({ ...currentDraft, photo_refs: uploaded });
       } else {
-        saveGuestDraft(localStorage, getGuestDraftOwnerKey(localStorage), { ...currentDraft, photo_refs: [] });
+        const ownerKey = getGuestDraftOwnerKey(localStorage);
+        const localRefs = imageFiles.length ? await persistGuestDraftPhotos(ownerKey, draftIdRef.current, imageFiles) : [];
+        saveGuestDraft(localStorage, ownerKey, { ...currentDraft, photo_refs: localRefs });
+        await pruneGuestDraftPhotos(ownerKey, draftIdRef.current, localRefs).catch(error => console.warn('Old guest draft photo cleanup failed:', error));
+        setDraftPhotoRefs(localRefs);
       }
       toast.success(user ? 'Draft saved privately to your account.' : 'Draft saved on this device.');
       window.dispatchEvent(new CustomEvent('spotfinder:drafts-changed'));
@@ -169,6 +192,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
       focusError(errorSummaryRef);
     } finally {
       setSavingDraft(false);
+      setPhotoProgress(0);
     }
   };
 
@@ -279,7 +303,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
   const handleSave = async () => {
     if (loading || submitLockRef.current) return;
     setSubmitError('');
-    if (!draftPhotosReady) {
+    if (!draftPhotosReady && !(draft && user && draftPhotoRefs.length)) {
       setSubmitError('Private draft photos could not be loaded. Reconnect and resume the draft before publishing.');
       focusError(errorSummaryRef);
       return;
@@ -340,7 +364,38 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
         return null;
       });
 
-    if (imageFiles.length) {
+    // A resumed account draft is published from its verified private Storage
+    // objects by the server. Persist any photos added during this edit first.
+    if (draft && user && imageFiles.length && draftPhotosReady) {
+      try {
+        setUploadingImage(true);
+        const refs = [];
+        for (let index = 0; index < imageFiles.length; index += 1) {
+          if (draftPhotoRefs[index]?.path) { refs.push(draftPhotoRefs[index]); continue; }
+          let uploaded;
+          let lastError;
+          for (let attempt = 0; attempt < 2 && !uploaded; attempt += 1) {
+            try {
+              uploaded = await uploadDraftImage(imageFiles[index], draftIdRef.current, fraction => setPhotoProgress(Math.round(((index + fraction) / imageFiles.length) * 100)));
+            } catch (error) { lastError = error; }
+          }
+          if (!uploaded) throw lastError;
+          refs.push(uploaded);
+        }
+        setDraftPhotoRefs(refs);
+        await saveCloudSpotDraft({ ...currentDraft, photo_refs: refs });
+      } catch (error) {
+        setSubmitError(error?.message || 'The private photos could not be persisted. Your draft and form are still available.');
+        submitLockRef.current = false;
+        setLoading(false);
+        setUploadingImage(false);
+        setPhotoProgress(0);
+        focusError(errorSummaryRef);
+        return;
+      }
+    }
+
+    if (imageFiles.length && !(draft && user)) {
       try {
         setUploadingImage(true);
         const uploads = await Promise.allSettled(imageFiles.map(file => uploadSpotImage(file)));
@@ -405,7 +460,11 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
       if (draft) {
         try {
           if (user) await deleteCloudSpotDraft(draftIdRef.current);
-          else deleteGuestDraft(localStorage, getGuestDraftOwnerKey(localStorage), draftIdRef.current);
+          else {
+            const ownerKey = getGuestDraftOwnerKey(localStorage);
+            deleteGuestDraft(localStorage, ownerKey, draftIdRef.current);
+            await deleteGuestDraftPhotos(ownerKey, draftIdRef.current);
+          }
         } catch (cleanupError) {
           console.warn('Published draft cleanup will be retried later:', cleanupError);
         }
@@ -430,6 +489,8 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
     } finally {
       submitLockRef.current = false;
       setLoading(false);
+      setUploadingImage(false);
+      setPhotoProgress(0);
     }
   };
 
@@ -469,7 +530,8 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
           )}
           {draftError && (
             <div ref={errorSummaryRef} role="alert" tabIndex={-1} className="flex gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900 outline-none focus:ring-2 focus:ring-red-400 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100">
-              <AlertCircle className="h-5 w-5 shrink-0" /><span>{draftError}</span>
+              <AlertCircle className="h-5 w-5 shrink-0" />
+              <div><p>{draftError}</p>{draftPhotoRefs.length > 0 && <div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={() => setPhotoReloadKey(value => value + 1)} className="min-h-10 rounded-xl border border-red-300 px-3 font-semibold">Retry photos</button><button type="button" onClick={() => { setDraftPhotoRefs([]); setImageFiles([]); setImagePreviews([]); setDraftPhotosReady(true); setDraftError(''); }} className="min-h-10 rounded-xl border border-red-300 px-3 font-semibold">Remove missing photos</button></div>}</div>
             </div>
           )}
 
@@ -689,7 +751,8 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
                 <input type="file" accept={IMAGE_ACCEPT} multiple onChange={handleImageChange} disabled={!draftPhotosReady} className="sr-only" />
               </label>
             )}
-            {!user && imageFiles.length > 0 && <p className="mt-2 text-xs leading-5 text-amber-700 dark:text-amber-300">Guest drafts preserve the form on this device, but selected photo files cannot survive a refresh. Sign in to save draft photos privately across devices, or add the photos again before publishing.</p>}
+            {(savingDraft || uploadingImage) && photoProgress > 0 && <p className="mt-2 text-xs font-medium text-blue-700 dark:text-blue-300" role="status">Saving photos… {photoProgress}%</p>}
+            {!user && imageFiles.length > 0 && <p className="mt-2 text-xs leading-5 text-amber-700 dark:text-amber-300">Guest draft photos are stored privately in this browser when IndexedDB is available. They do not sync to another device and may be removed if browser site data is cleared.</p>}
           </div>
 
           {/* Optional social post. The callable backend attaches this only
@@ -735,7 +798,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
           <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl dark:bg-card">
             <h3 id="save-draft-title" className="text-lg font-bold">Keep your progress?</h3>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">Save this as an unpublished draft, discard the changes, or return to editing.</p>
-            {!user && imageFiles.length > 0 && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">The form will be saved on this device, but {imageFiles.length === 1 ? 'the selected photo' : `${imageFiles.length} selected photos`} cannot be stored in a guest draft. Add them again when you resume.</p>}
+            {!user && imageFiles.length > 0 && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">The {imageFiles.length === 1 ? 'photo' : 'photos'} will be stored in this browser only. Clearing site data, private-browsing cleanup, or storage limits can remove guest photos.</p>}
             <div className="mt-5 space-y-2">
               <button type="button" onClick={handleSaveDraft} disabled={savingDraft} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-green-600 px-4 font-semibold text-white disabled:opacity-50">{savingDraft && <Loader2 className="h-4 w-4 animate-spin" />}{savingDraft ? 'Saving draft…' : 'Save Draft'}</button>
               <button type="button" onClick={onClose} disabled={savingDraft} className="min-h-12 w-full rounded-2xl border border-red-200 px-4 font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:hover:bg-red-950/30">Discard Changes</button>

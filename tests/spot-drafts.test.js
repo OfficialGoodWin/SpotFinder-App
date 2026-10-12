@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { indexedDB } from 'fake-indexeddb';
 import {
   deleteGuestDraft,
   getGuestDraftOwnerKey,
@@ -8,6 +9,7 @@ import {
   normalizeSpotDraft,
   saveGuestDraft,
 } from '../src/lib/spotDrafts.js';
+import { deleteGuestDraftPhotos, loadGuestDraftPhoto, persistGuestDraftPhotos } from '../src/lib/guestDraftPhotos.js';
 
 class MemoryStorage {
   constructor() { this.values = new Map(); }
@@ -24,17 +26,45 @@ const completeDraft = {
   photo_refs: [{ path: 'drafts/user/draft-one/photo.jpg', name: 'photo.jpg', type: 'image/jpeg', size: 123 }],
 };
 
-test('guest save survives a fresh read and preserves every non-file field', () => {
+test('guest save survives a fresh read and preserves fields plus IndexedDB references', () => {
   const storage = new MemoryStorage();
   const owner = getGuestDraftOwnerKey(storage);
-  saveGuestDraft(storage, owner, completeDraft);
+  const localRef = { local_id: `${owner}:draft-one:0`, name: 'photo.jpg', type: 'image/jpeg', size: 123 };
+  saveGuestDraft(storage, owner, { ...completeDraft, photo_refs: [localRef] });
   const [restored] = listGuestDrafts(storage, owner);
   for (const field of ['title', 'description', 'lat', 'lng', 'cost', 'accessDifficulty', 'parking', 'directions', 'socialUrl', 'overallRating', 'accessRating', 'conditionRating', 'safetyRating', 'crowdednessRating']) {
     assert.deepEqual(restored[field], normalizeSpotDraft(completeDraft)[field]);
   }
   assert.deepEqual(restored.tags, completeDraft.tags);
   assert.deepEqual(restored.bestTime, completeDraft.bestTime);
-  assert.deepEqual(restored.photo_refs, [], 'guest file references must never be persisted');
+  assert.deepEqual(restored.photo_refs, [localRef]);
+});
+
+test('guest draft photo bytes survive an IndexedDB round trip and are deleted with the draft', async () => {
+  const owner = 'guest-photo-owner';
+  const blob = new Blob(['jpeg-bytes'], { type: 'image/jpeg' });
+  Object.defineProperty(blob, 'name', { value: 'river.jpg' });
+  const [ref] = await persistGuestDraftPhotos(owner, 'draft-photo-test', [blob], indexedDB);
+  const restored = await loadGuestDraftPhoto(ref, owner, indexedDB);
+  assert.equal(restored.size, blob.size);
+  assert.equal(restored.type, 'image/jpeg');
+  await assert.rejects(() => loadGuestDraftPhoto(ref, 'different-owner', indexedDB), /another browser profile/);
+  await deleteGuestDraftPhotos(owner, 'draft-photo-test', indexedDB);
+  await assert.rejects(() => loadGuestDraftPhoto(ref, owner, indexedDB), /missing/);
+});
+
+test('guest draft photo persistence keeps the existing three-photo limit', async () => {
+  const owner = 'guest-three-photo-owner';
+  const files = ['one', 'two', 'three'].map((value, index) => {
+    const blob = new Blob([value], { type: 'image/jpeg' });
+    Object.defineProperty(blob, 'name', { value: `${index}.jpg` });
+    return blob;
+  });
+  const refs = await persistGuestDraftPhotos(owner, 'three-photo-draft', files, indexedDB);
+  assert.equal(refs.length, 3);
+  const restored = await Promise.all(refs.map(ref => loadGuestDraftPhoto(ref, owner, indexedDB)));
+  assert.deepEqual(restored.map(file => file.size), files.map(file => file.size));
+  await deleteGuestDraftPhotos(owner, 'three-photo-draft', indexedDB);
 });
 
 test('saving an edited draft updates the same record instead of duplicating it', () => {
@@ -85,6 +115,11 @@ test('draft photo storage is private and publication is transactionally idempote
   const functionsSource = readFileSync(new URL('../functions/index.js', import.meta.url), 'utf8');
   assert.match(storageRules, /match \/drafts\/\{userId\}\/\{draftId\}\/\{fileName\}/);
   assert.match(storageRules, /request\.auth\.uid == userId/);
+  assert.match(storageRules, /sign_in_provider != 'anonymous'/);
+  assert.match(functionsSource, /promoteDraftPhotos/);
+  assert.match(functionsSource, /sourcePath\.startsWith\(requiredPrefix\)/);
+  assert.match(functionsSource, /await source\.copy\(destination\)/);
+  assert.match(functionsSource, /firebaseStorageDownloadTokens/);
   assert.match(functionsSource, /collection\('spot_publications'\)/);
   assert.match(functionsSource, /db\.runTransaction/);
   assert.match(functionsSource, /already_published: true/);

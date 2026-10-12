@@ -19,6 +19,7 @@ import SpotImage from './SpotImage';
 import { sortSpotCollection } from '@/lib/spotDiscovery';
 import { useLanguage } from '@/lib/LanguageContext';
 import { deleteGuestDraft, draftDisplayName, listGuestDrafts } from '@/lib/spotDrafts';
+import { deleteGuestDraftPhotos, loadGuestDraftPhoto } from '@/lib/guestDraftPhotos';
 
 const TABS = [
   { id: 'saved', label: 'Saved', icon: Bookmark },
@@ -42,19 +43,20 @@ const EMPTY_COPY = {
   drafts: ['No drafts yet', 'Saved drafts stay private until you publish them.'],
 };
 
-function DraftThumbnail({ draft }) {
+function DraftThumbnail({ draft, user, draftOwnerKey }) {
   const [src, setSrc] = useState('');
   useEffect(() => {
     let url = '';
     let active = true;
     if (!draft.photo_refs?.[0]) return undefined;
-    loadDraftImageFile(draft.photo_refs[0]).then(file => {
+    const loader = user ? loadDraftImageFile(draft.photo_refs[0]) : loadGuestDraftPhoto(draft.photo_refs[0], draftOwnerKey);
+    loader.then(file => {
       if (!active) return;
       url = URL.createObjectURL(file);
       setSrc(url);
     }).catch(() => {});
     return () => { active = false; if (url) URL.revokeObjectURL(url); };
-  }, [draft.id, draft.photo_refs]);
+  }, [draft.id, draft.photo_refs, draftOwnerKey, user]);
   return src ? <img src={src} alt="" onError={() => setSrc('')} className="h-full w-full object-cover" /> : <FilePenLine className="h-7 w-7 text-gray-400" aria-hidden="true" />;
 }
 
@@ -115,7 +117,10 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
     try {
       if (isDraft) {
         if (user) await deleteCloudSpotDraft(id);
-        else deleteGuestDraft(localStorage, draftOwnerKey, id);
+        else {
+          deleteGuestDraft(localStorage, draftOwnerKey, id);
+          await deleteGuestDraftPhotos(draftOwnerKey, id);
+        }
         window.dispatchEvent(new CustomEvent('spotfinder:drafts-changed'));
       } else await firebaseDeleteSpot(id);
       setData(current => Object.fromEntries(Object.entries(current).map(([key, rows]) =>
@@ -191,7 +196,7 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
                 tab === 'drafts' ? (
                 <article key={spot.id} className="rounded-2xl border border-gray-200/80 bg-white/80 overflow-hidden dark:border-border dark:bg-white/[0.03]">
                   <div className="flex min-h-[124px]">
-                    <div className="grid w-28 shrink-0 place-items-center overflow-hidden bg-gray-100 dark:bg-accent"><DraftThumbnail draft={spot} /></div>
+                    <div className="grid w-28 shrink-0 place-items-center overflow-hidden bg-gray-100 dark:bg-accent"><DraftThumbnail draft={spot} user={user} draftOwnerKey={draftOwnerKey} /></div>
                     <div className="min-w-0 flex-1 p-3">
                       <h3 className="truncate font-semibold">{draftDisplayName(spot)}</h3>
                       <p className="mt-1 flex items-center gap-1 truncate text-xs text-muted-foreground"><MapPin className="h-3.5 w-3.5" />{getSpotLocationLabel(spot)}</p>

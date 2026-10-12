@@ -40,7 +40,7 @@ import {
   arrayUnion,
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, getBlob, listAll, deleteObject } from 'firebase/storage';
+import { getStorage, ref as storageRef, uploadBytes, uploadBytesResumable, getDownloadURL, getBlob, getMetadata, listAll, deleteObject } from 'firebase/storage';
 import { validateImageDimensions, validateImageFile } from '@/lib/imageUploadValidation';
 import { firebaseConfig } from './firebaseConfig';
 import { getRecaptchaToken } from '@/lib/recaptcha';
@@ -252,10 +252,7 @@ export const handlePOIError = (error, poiData) => {
  
 // Compress image in-browser, then store the binary file in Firebase Storage.
 // Firestore keeps only a small URL instead of a base64 payload.
-export const uploadSpotImage = async (file) => {
-  const { auth, storage } = getFirebaseServices();
-  const uid = auth.currentUser?.uid;
-  if (!uid) throw new Error('You must be signed in to upload a photo.');
+const prepareSpotImageBlob = async (file) => {
   await validateImageFile(file);
 
   const blob = await new Promise((resolve, reject) => {
@@ -294,6 +291,14 @@ export const uploadSpotImage = async (file) => {
   });
 
   if (blob.size > 5 * 1024 * 1024) throw new Error('The processed image is too large to upload.');
+  return blob;
+};
+
+export const uploadSpotImage = async (file) => {
+  const { auth, storage } = getFirebaseServices();
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('You must be signed in to upload a photo.');
+  const blob = await prepareSpotImageBlob(file);
 
   const id = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const path = `community/${uid}/${id}.jpg`;
@@ -304,21 +309,47 @@ export const uploadSpotImage = async (file) => {
 
 const SPOT_DRAFTS_COLLECTION = 'spot_drafts';
 
-export const uploadDraftImage = async (file, draftId) => {
+const uploadWithProgress = (ref, blob, metadata, onProgress) => new Promise((resolve, reject) => {
+  const task = uploadBytesResumable(ref, blob, metadata);
+  task.on('state_changed', snapshot => {
+    onProgress?.(snapshot.totalBytes ? snapshot.bytesTransferred / snapshot.totalBytes : 0);
+  }, reject, () => resolve(task.snapshot));
+});
+
+export const uploadDraftImage = async (file, draftId, onProgress) => {
   const { auth, storage } = getFirebaseServices();
   const current = auth.currentUser;
   if (!current || current.isAnonymous) throw new Error('Sign in to preserve draft photos across devices.');
-  await validateImageFile(file);
+  const blob = await prepareSpotImageBlob(file);
   const id = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const path = `drafts/${current.uid}/${draftId}/${id}-${String(file.name || 'photo').replace(/[^A-Za-z0-9._-]/g, '_').slice(-80)}`;
-  await uploadBytes(storageRef(storage, path), file, { contentType: file.type });
-  return { path, name: file.name || 'Draft photo', type: file.type, size: file.size };
+  const path = `drafts/${current.uid}/${draftId}/${id}.jpg`;
+  const ref = storageRef(storage, path);
+  await uploadWithProgress(ref, blob, { contentType: 'image/jpeg', cacheControl: 'private,max-age=0,no-store' }, onProgress);
+  const metadata = await getMetadata(ref);
+  if (Number(metadata.size) !== blob.size) throw new Error('The draft photo upload could not be verified. Please retry.');
+  return { path, name: file.name || 'Draft photo', type: 'image/jpeg', size: blob.size };
 };
 
 export const loadDraftImageFile = async (photoRef) => {
-  const { storage } = getFirebaseServices();
-  const blob = await getBlob(storageRef(storage, photoRef.path));
-  return new File([blob], photoRef.name || 'draft-photo', { type: photoRef.type || blob.type || 'image/jpeg' });
+  const { auth, storage } = getFirebaseServices();
+  const current = auth.currentUser;
+  if (!current || current.isAnonymous || !String(photoRef?.path || '').startsWith(`drafts/${current.uid}/`)) {
+    throw new Error('This private draft photo is not available to the signed-in account.');
+  }
+  let lastError;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      if (attempt) await current.getIdToken(true);
+      const blob = await getBlob(storageRef(storage, photoRef.path));
+      return new File([blob], photoRef.name || 'draft-photo.jpg', { type: photoRef.type || blob.type || 'image/jpeg' });
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  const code = String(lastError?.code || '');
+  if (code.includes('object-not-found')) throw new Error('A saved draft photo is missing. Remove it or upload it again.');
+  if (code.includes('unauthorized') || code.includes('unauthenticated')) throw new Error('Your session cannot access this private photo. Sign in again and retry.');
+  throw new Error(navigator.onLine === false ? 'This draft photo is unavailable offline.' : 'The private draft photo could not be downloaded. Check your connection and retry.');
 };
 
 export const deleteDraftImages = async (draftId) => {
