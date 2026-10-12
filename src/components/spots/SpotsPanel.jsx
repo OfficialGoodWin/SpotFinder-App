@@ -173,7 +173,7 @@ function MobileSheet({ children, header, onClose, bottomOffset }) {
   return (
     <div
       ref={sheetRef}
-      className="fixed inset-x-0 z-[1500] mx-2 rounded-t-3xl shadow-2xl border border-gray-100 dark:border-border bg-white dark:bg-card overflow-hidden"
+      className="sf-sheet fixed inset-x-0 z-[1500] mx-2 overflow-hidden rounded-t-3xl"
       style={{
         bottom: bottomOffset,
         height: sheetH,
@@ -278,7 +278,7 @@ export default function SpotsPanel({
 
       {/* ─ DESKTOP ── */}
       <div
-        className="hidden md:block absolute z-[1002] rounded-2xl shadow-2xl border border-gray-100 dark:border-border bg-white dark:bg-card overflow-hidden"
+        className="sf-sheet absolute z-[1002] hidden overflow-hidden rounded-2xl md:block"
         style={{ top: '5rem', left: '1rem', width: 340 }}
       >
         <div className="border-b border-gray-100 dark:border-border">{header}</div>

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, Mail, Lock, User, ArrowRight, ExternalLink, Smartphone, CalendarDays } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Mail, Lock, User, ArrowRight, ExternalLink, Smartphone, CalendarDays, Eye, EyeOff } from 'lucide-react';
 import { loginWithEmail, registerWithEmail, loginWithGoogle, isRestrictedBrowser, getMfaResolverFromError, getMfaRecaptchaVerifier, clearMfaRecaptchaVerifier, startMfaSignIn, completeMfaSignIn } from '@/api/firebaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -10,7 +10,7 @@ const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS = 5 * 60 * 1000; // 5 minutes
 
 export default function AuthModal({ onClose, onSuccess = () => {} }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [tab, setTab] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,7 +21,11 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
   const [restricted, setRestricted] = useState(false);
   const [lockoutRemaining, setLockoutRemaining] = useState(0);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { checkUserAuth } = useAuth();
+  const modalRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+  const dateExample = new Intl.DateTimeFormat(language, { dateStyle: 'medium' }).format(new Date(Date.UTC(2000, 9, 12)));
 
   // ── MFA challenge state (only used when the account has a second factor) ──
   const [mfaResolver, setMfaResolver] = useState(null);
@@ -30,6 +34,24 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
   const [mfaSending, setMfaSending] = useState(false);
 
   useEffect(() => { setRestricted(isRestrictedBrowser()); }, []);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+
+  useEffect(() => {
+    const previousFocus = document.activeElement;
+    const modal = modalRef.current;
+    requestAnimationFrame(() => modal?.querySelector('input, button')?.focus());
+    const handleKeyDown = event => {
+      if (event.key === 'Escape') { event.preventDefault(); onCloseRef.current(); return; }
+      if (event.key !== 'Tab' || !modal) return;
+      const focusable = [...modal.querySelectorAll('button:not([disabled]), input:not([disabled]), a[href]')];
+      if (!focusable.length) return;
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => { document.removeEventListener('keydown', handleKeyDown); previousFocus?.focus?.(); };
+  }, []);
 
   // Countdown timer for lockout
   useEffect(() => {
@@ -144,20 +166,20 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-card w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-6 sm:p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-        <button onClick={onClose} aria-label={t('common.close')} className="absolute top-4 right-4 w-10 h-10 rounded-full bg-gray-100 dark:bg-accent flex items-center justify-center">
+    <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-slate-950/50 p-0 backdrop-blur-[2px] sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
+      <div ref={modalRef} className="sf-sheet relative max-h-[96dvh] w-full overflow-y-auto overscroll-contain rounded-t-3xl p-5 sm:max-w-md sm:rounded-3xl sm:p-7" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
+        <button onClick={onClose} aria-label={t('common.close')} className="sf-icon-button absolute right-3 top-3">
           <X className="w-5 h-5 text-gray-600" />
         </button>
 
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
             <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-foreground">
+          <h2 id="auth-modal-title" className="text-2xl font-bold tracking-tight text-gray-900 dark:text-foreground">
             {tab === 'login' ? t('auth.welcomeBack') : t('auth.createAccount')}
           </h2>
           <p className="text-gray-500 dark:text-muted-foreground mt-2 text-sm">
@@ -167,11 +189,11 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
 
         {mfaResolver ? (
           <div className="space-y-4">
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-2xl flex items-start gap-3">
-              <Smartphone className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+            <div className="sf-status-warning flex items-start gap-3 p-4">
+              <Smartphone className="w-5 h-5 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold text-blue-800 dark:text-blue-300">Two-factor verification</p>
-                <p className="text-xs text-blue-700 dark:text-blue-400 mt-0.5">
+                <p className="text-sm font-semibold">Two-factor verification</p>
+                <p className="mt-0.5 text-xs">
                   {mfaResolver.hints[0]?.phoneNumber ? `Code sent to ${mfaResolver.hints[0].phoneNumber}` : 'This account requires a verification code.'}
                 </p>
               </div>
@@ -179,7 +201,7 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
             <div id="mfa-recaptcha-container" />
             {!mfaVerificationId ? (
               <button onClick={handleSendMfaCode} disabled={mfaSending}
-                className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-2xl disabled:opacity-50">
+                className="sf-button-primary w-full">
                 {mfaSending ? 'Sending…' : 'Send verification code'}
               </button>
             ) : (
@@ -193,12 +215,12 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
                   className="w-full px-4 py-3.5 bg-gray-50 dark:bg-background border border-gray-200 dark:border-border rounded-2xl text-center text-lg tracking-widest"
                 />
                 <button type="submit" disabled={loading}
-                  className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-2xl disabled:opacity-50">
+                  className="sf-button-primary w-full">
                   {loading ? 'Verifying…' : 'Verify & sign in'}
                 </button>
               </form>
             )}
-            {error && <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-xl"><p className="text-sm text-red-600 dark:text-red-400">{error}</p></div>}
+            {error && <div className="sf-status-error" role="alert">{error}</div>}
             <button onClick={() => { clearMfaRecaptchaVerifier(); setMfaResolver(null); setMfaVerificationId(null); setMfaCode(''); }}
               className="w-full text-sm text-gray-500 dark:text-muted-foreground underline">
               Cancel
@@ -207,7 +229,7 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
         ) : (
         <>
         {restricted && (
-          <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-2xl">
+          <div className="sf-status-warning mb-4 p-4">
             <p className="text-sm text-amber-800 dark:text-amber-300 font-semibold mb-1">⚠️ {t('auth.inAppBrowserTitle')}</p>
             <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">{t('auth.inAppBrowserBody')}</p>
             <a href={window.location.href} target="_blank" rel="noopener noreferrer"
@@ -239,7 +261,8 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
         <div className="flex gap-2 mb-4">
           {['login','register'].map(v => (
             <button key={v} onClick={() => { setTab(v); setError(''); }}
-              className={`flex-1 py-2 rounded-xl font-semibold text-sm transition-colors ${tab===v ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-accent text-gray-600 dark:text-muted-foreground hover:bg-gray-200'}`}>
+              aria-pressed={tab === v}
+              className={`min-h-11 flex-1 rounded-xl font-semibold text-sm transition-colors ${tab===v ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}>
               {v === 'login' ? t('auth.signIn') : t('auth.signUp')}
             </button>
           ))}
@@ -252,7 +275,7 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
               <div className="relative">
                 <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder={t('auth.namePlaceholder')}
-                  className="w-full pl-12 pr-4 py-3.5 bg-gray-50 dark:bg-background border border-gray-200 dark:border-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-foreground placeholder:text-gray-400" />
+                  autoComplete="name" className="sf-control w-full pl-12 pr-4" />
               </div>
             </div>
           )}
@@ -262,9 +285,9 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
               <div className="relative">
                 <CalendarDays className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
                 <input id="auth-date-of-birth" type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} required max={new Date().toISOString().slice(0, 10)}
-                  className="w-full min-h-12 pl-12 pr-4 py-3 bg-gray-50 dark:bg-background border border-gray-200 dark:border-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-foreground" />
+                  className="sf-control w-full pl-12 pr-4" />
               </div>
-              <p className="mt-1.5 text-xs text-gray-500 dark:text-muted-foreground">You must be at least 16. This stays private and is used for age eligibility.</p>
+              <p className="mt-1.5 text-xs text-gray-500 dark:text-muted-foreground">Use your local date format (for example, {dateExample}). You must be at least 16; this stays private.</p>
             </div>
           )}
           <div>
@@ -272,21 +295,22 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={t('auth.emailPlaceholder')} required
-                className="w-full pl-12 pr-4 py-3.5 bg-gray-50 dark:bg-background border border-gray-200 dark:border-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-foreground placeholder:text-gray-400" />
+                autoComplete="email" inputMode="email" className="sf-control w-full pl-12 pr-4" />
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-foreground mb-1.5">{t('auth.password')}</label>
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required minLength={6}
-                className="w-full pl-12 pr-4 py-3.5 bg-gray-50 dark:bg-background border border-gray-200 dark:border-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-foreground" />
+              <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required minLength={6} autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
+                className="sf-control w-full pl-12 pr-12" />
+              <button type="button" onClick={() => setShowPassword(value => !value)} className="absolute right-1 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground hover:bg-muted" aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
             </div>
           </div>
-          {error && <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-xl"><p className="text-sm text-red-600 dark:text-red-400">{error}</p></div>}
+          {error && <div className="sf-status-error" role="alert">{error}</div>}
           {lockoutRemaining > 0 && (
-            <div className="p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-xl">
-              <p className="text-sm text-orange-700 dark:text-orange-300 font-semibold">🔒 Locked — try again in {lockoutRemaining}s</p>
+            <div className="sf-status-warning" role="status">
+              <p className="text-sm font-semibold">🔒 Locked — try again in {lockoutRemaining}s</p>
             </div>
           )}
           {tab === 'register' && (
@@ -297,7 +321,7 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
                 checked={agreedToTerms}
                 onChange={e => setAgreedToTerms(e.target.checked)}
                 required
-                className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 flex-shrink-0"
+                className="mt-0.5 h-4 w-4 flex-shrink-0 rounded border-gray-300 accent-green-700 focus:ring-2 focus:ring-ring"
               />
               <label htmlFor="auth-agree-terms" className="text-xs text-gray-600 dark:text-muted-foreground leading-snug">
                 {t('auth.agreeToTermsPrefix')}{' '}
@@ -312,7 +336,7 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
             </div>
           )}
           <button type="submit" disabled={loading || lockoutRemaining > 0 || (tab === 'register' && !agreedToTerms)}
-            className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold rounded-2xl transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+            className="sf-button-primary flex w-full items-center justify-center gap-2">
             {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               : <>{tab === 'login' ? t('auth.signIn') : t('auth.createAccount')}<ArrowRight className="w-5 h-5" /></>}
           </button>

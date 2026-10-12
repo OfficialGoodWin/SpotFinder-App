@@ -496,7 +496,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
 
   return (
     <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/50 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="add-spot-title" onKeyDown={event => { if (event.key === 'Escape') requestClose(); }}>
-      <div className="isolate bg-white dark:bg-card w-full max-w-lg rounded-t-3xl shadow-2xl max-h-[100dvh] sm:max-h-[90dvh] overflow-y-auto overscroll-contain">
+      <div className="sf-sheet isolate w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-3xl max-h-[100dvh] sm:max-h-[90dvh] sm:rounded-3xl">
         <div className="sticky top-0 z-30 bg-white/90 dark:bg-card/90 px-6 pt-5 pb-3 border-b border-gray-100/80 dark:border-border flex items-center justify-between backdrop-blur-xl">
           <div className="flex items-center gap-2">
             <MapPin className="w-5 h-5 text-green-600" />
@@ -795,7 +795,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
       </div>
       {showCloseChoices && (
         <div className="absolute inset-0 z-50 grid place-items-center bg-black/55 p-4" role="alertdialog" aria-modal="true" aria-labelledby="save-draft-title">
-          <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl dark:bg-card">
+          <div className="sf-sheet w-full max-w-sm rounded-3xl p-5">
             <h3 id="save-draft-title" className="text-lg font-bold">Keep your progress?</h3>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">Save this as an unpublished draft, discard the changes, or return to editing.</p>
             {!user && imageFiles.length > 0 && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">The {imageFiles.length === 1 ? 'photo' : 'photos'} will be stored in this browser only. Clearing site data, private-browsing cleanup, or storage limits can remove guest photos.</p>}

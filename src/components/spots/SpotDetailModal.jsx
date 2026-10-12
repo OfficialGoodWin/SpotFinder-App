@@ -168,7 +168,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
 
   return (
     <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/50 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="spot-detail-title" onKeyDown={event => { if (event.key === 'Escape') onClose(); }}>
-      <div className="bg-white dark:bg-card w-full max-w-lg rounded-t-3xl shadow-2xl max-h-[100dvh] sm:max-h-[90dvh] overflow-y-auto overscroll-contain">
+      <div className="sf-sheet w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-3xl max-h-[100dvh] sm:max-h-[90dvh] sm:rounded-3xl">
 
         {/* Header */}
         <div className="sticky top-0 bg-white dark:bg-card px-6 pt-5 pb-3 border-b border-gray-100 dark:border-border">

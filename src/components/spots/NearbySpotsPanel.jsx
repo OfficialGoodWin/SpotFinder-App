@@ -173,8 +173,8 @@ export default function NearbySpotsPanel({ spots, userPos, loading = false, onSe
       {/* ── MOBILE ── */}
       <div className="md:hidden">
         <div
-          className="fixed inset-x-0 bottom-0 z-[1500] mx-2 rounded-t-3xl shadow-2xl border border-gray-100 dark:border-border bg-white dark:bg-card overflow-hidden"
-          style={{ maxHeight: '70vh' }}
+          className="sf-sheet fixed inset-x-0 bottom-0 z-[1500] mx-2 overflow-hidden rounded-t-3xl"
+          style={{ maxHeight: '70dvh', paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
           <div className="border-b border-gray-100 dark:border-border">{header}</div>
           <div style={{ maxHeight: 'calc(70vh - 56px)', overflowY: 'scroll', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
@@ -185,7 +185,7 @@ export default function NearbySpotsPanel({ spots, userPos, loading = false, onSe
 
       {/* ─ DESKTOP ── */}
       <div
-        className="hidden md:block absolute z-[1002] rounded-2xl shadow-2xl border border-gray-100 dark:border-border bg-white dark:bg-card overflow-hidden"
+        className="sf-sheet absolute z-[1002] hidden overflow-hidden rounded-2xl md:block"
         style={{ top: '5rem', left: '1rem', width: 340 }}
       >
         <div className="border-b border-gray-100 dark:border-border">{header}</div>

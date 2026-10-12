@@ -134,7 +134,7 @@ function MobileSheet({ children, header, onClose, closeLabel, bottomOffset }) {
       
       <div
         ref={sheetRef}
-        className="fixed left-0 right-0 z-[1100] bg-white dark:bg-card rounded-t-3xl shadow-2xl flex flex-col"
+        className="sf-sheet fixed left-0 right-0 z-[1100] flex flex-col rounded-t-3xl"
         style={{
           height: `${sheetH}px`,
           bottom: bottomOffset || 0,
@@ -214,7 +214,7 @@ export default function POIPanel({ pois, category, userPos, loading, onFlyTo, on
 
       {/* ── DESKTOP — left side panel, matching SpotsPanel ── */}
       <div
-        className="hidden md:block absolute z-[1002] rounded-2xl shadow-2xl border border-gray-100 dark:border-border bg-white dark:bg-card overflow-hidden"
+        className="sf-sheet absolute z-[1002] hidden overflow-hidden rounded-2xl md:block"
         style={{ top: '5rem', left: '1rem', width: 340 }}
       >
         <div className="border-b border-gray-100 dark:border-border px-4 py-3 flex items-center justify-between">

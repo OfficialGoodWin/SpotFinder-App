@@ -472,7 +472,7 @@ export default function Home() {
           <button
             type="button"
             onClick={async () => { const position = userPos || await requestLocation(); if (position) setFlyTo([...position]); }}
-            className="grid h-10 w-10 place-items-center rounded-xl transition-colors hover:bg-slate-100 active:scale-95 dark:hover:bg-white/10"
+            className="grid h-11 w-11 place-items-center rounded-xl transition-colors hover:bg-slate-100 active:scale-95 dark:hover:bg-white/10"
             aria-label="Center on my location"
             title="Center location"
           >
@@ -481,7 +481,7 @@ export default function Home() {
           <button
             type="button"
             onClick={() => setTerrainEnabled(value => !value)}
-            className={`grid h-10 w-10 place-items-center rounded-xl text-xs font-black italic transition-all active:scale-95 ${terrainEnabled ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/25' : 'hover:bg-slate-100 dark:hover:bg-white/10'}`}
+            className={`grid h-11 w-11 place-items-center rounded-xl text-xs font-black italic transition-all active:scale-95 ${terrainEnabled ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-slate-100 dark:hover:bg-white/10'}`}
             aria-label="Toggle 3D terrain"
             aria-pressed={terrainEnabled}
             title="3D terrain"
@@ -505,7 +505,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() => setShowMobileMore(value => !value)}
-              className={`grid h-10 w-10 place-items-center rounded-xl transition-all active:scale-95 ${showMobileMore ? 'bg-primary text-primary-foreground' : 'hover:bg-slate-100 dark:hover:bg-white/10'}`}
+              className={`grid h-11 w-11 place-items-center rounded-xl transition-all active:scale-95 ${showMobileMore ? 'bg-primary text-primary-foreground' : 'hover:bg-slate-100 dark:hover:bg-white/10'}`}
               aria-label="More map options"
               aria-expanded={showMobileMore}
               title="More"
@@ -557,8 +557,9 @@ export default function Home() {
             <MapLayerSwitcher activeLayer={mapLayer} onLayerChange={setMapLayer} />
             <button
               onClick={async () => { const position = userPos || await requestLocation(); if (position) setFlyTo([...position]); }}
-              className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-accent/60 flex items-center justify-center text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent active:scale-95 transition-all"
+              className="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-100 text-gray-600 transition-all hover:bg-gray-200 active:scale-95 dark:bg-accent/60 dark:text-foreground dark:hover:bg-accent"
               title="Center location"
+              aria-label="Center map on my location"
             >
               <Crosshair className="w-5 h-5" />
             </button>
@@ -566,12 +567,14 @@ export default function Home() {
             {/* 3D Terrain toggle */}
             <button
               onClick={() => setTerrainEnabled(v => !v)}
-              className={`w-10 h-10 rounded-xl flex items-center justify-center active:scale-95 transition-all ${
+              className={`flex h-11 w-11 items-center justify-center rounded-xl transition-all active:scale-95 ${
                 terrainEnabled
                   ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30'
                   : 'bg-gray-100 dark:bg-accent/60 text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent'
               }`}
               title="3D terrain"
+              aria-label="Toggle 3D terrain"
+              aria-pressed={terrainEnabled}
             >
               <span className="text-base font-extrabold italic tracking-tight">3D</span>
             </button>
@@ -584,15 +587,17 @@ export default function Home() {
           <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
             <button
               onClick={() => navigate('/faq')}
-              className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-accent/60 flex items-center justify-center text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent active:scale-95 transition-all"
+              className="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-100 text-gray-600 transition-all hover:bg-gray-200 active:scale-95 dark:bg-accent/60 dark:text-foreground dark:hover:bg-accent"
               title="FAQ"
+              aria-label="Open help and FAQ"
             >
               <HelpCircle className="w-5 h-5" />
             </button>
             <button
               onClick={() => setShowSettings(true)}
-              className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-accent/60 flex items-center justify-center text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent active:scale-95 transition-all"
+              className="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-100 text-gray-600 transition-all hover:bg-gray-200 active:scale-95 dark:bg-accent/60 dark:text-foreground dark:hover:bg-accent"
               title="Settings"
+              aria-label="Open settings"
             >
               <Settings className="w-5 h-5" />
             </button>
@@ -756,16 +761,16 @@ export default function Home() {
  
       {/* Delete Account Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-card w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-[2px]" role="alertdialog" aria-modal="true" aria-labelledby="delete-account-title" aria-describedby="delete-account-description" onKeyDown={event => { if (event.key === 'Escape') { setShowDeleteConfirm(false); setDeleteInput(''); } }}>
+          <div className="sf-sheet w-full max-w-sm rounded-3xl p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
                 <Trash2 className="w-5 h-5 text-red-600" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-foreground">{t('home.deleteAccountTitle')}</h3>
+              <h3 id="delete-account-title" className="text-lg font-bold text-gray-900 dark:text-foreground">{t('home.deleteAccountTitle')}</h3>
             </div>
             
-            <p className="text-gray-600 dark:text-muted-foreground text-sm mb-4">
+            <p id="delete-account-description" className="text-gray-600 dark:text-muted-foreground text-sm mb-4">
               {t('home.deleteAccountWarning')}
             </p>
             
@@ -778,20 +783,22 @@ export default function Home() {
               value={deleteInput}
               onChange={(e) => setDeleteInput(e.target.value)}
               placeholder={t('home.deleteAccountPlaceholder')}
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-border bg-white dark:bg-background text-gray-900 dark:text-foreground focus:outline-none focus:ring-2 focus:ring-red-300 text-sm mb-4"
+              aria-label={t('home.deleteAccountType')}
+              autoFocus
+              className="sf-control mb-4 w-full focus-visible:ring-red-500"
             />
             
             <div className="flex gap-3">
               <button
                 onClick={() => { setShowDeleteConfirm(false); setDeleteInput(''); }}
-                className="flex-1 py-3 rounded-2xl border-2 border-gray-200 dark:border-border text-gray-600 dark:text-foreground font-semibold text-sm hover:bg-gray-50 dark:hover:bg-accent"
+                className="sf-button-secondary flex-1"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteAccount}
                 disabled={deleteInput !== 'DELETE'}
-                className="flex-1 py-3 rounded-2xl bg-red-500 text-white font-semibold text-sm hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="sf-button-danger flex-1"
               >
                 {t('home.deleteAccountConfirm')}
               </button>

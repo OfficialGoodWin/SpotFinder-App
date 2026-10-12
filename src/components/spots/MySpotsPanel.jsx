@@ -137,7 +137,7 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
 
   return (
     <div className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center bg-black/45 backdrop-blur-sm" role="presentation">
-      <section className="bg-white/95 dark:bg-card/95 w-full sm:max-w-3xl rounded-t-[28px] sm:rounded-[28px] shadow-2xl h-[92dvh] sm:h-[min(88dvh,760px)] flex flex-col overflow-hidden border border-white/60 dark:border-white/10" aria-labelledby="my-spots-title">
+      <section className="sf-sheet flex h-[92dvh] w-full flex-col overflow-hidden rounded-t-3xl sm:h-[min(88dvh,760px)] sm:max-w-3xl sm:rounded-3xl" aria-labelledby="my-spots-title">
         <header className="px-4 sm:px-6 pt-4 sm:pt-5 pb-4 border-b border-gray-200/70 dark:border-border">
           <div className="flex items-center justify-between mb-4">
             <div>

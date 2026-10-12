@@ -23,10 +23,10 @@ export default function NearbySpotsFilterModal({ isOpen, onClose, onApply, curre
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[2500]">
-      <div className="sf-nearby-filter-card relative max-w-sm w-full p-5">
+    <div className="fixed inset-0 z-[2500] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="nearby-filter-title" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
+      <div className="sf-nearby-filter-card relative w-full max-w-sm p-5">
         <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-500 ring-1 ring-emerald-500/20"><SlidersHorizontal className="h-5 w-5" /></span><div><h3 className="font-bold text-gray-900 dark:text-foreground text-base">Nearby spots</h3><p className="text-[11px] text-gray-500 dark:text-muted-foreground">Fine-tune what appears</p></div></div>
+          <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><SlidersHorizontal className="h-5 w-5" /></span><div><h3 id="nearby-filter-title" className="text-base font-bold text-gray-900 dark:text-foreground">Nearby spots</h3><p className="text-xs text-gray-500 dark:text-muted-foreground">Fine-tune what appears</p></div></div>
           <button onClick={onClose} aria-label="Close" className="sf-filter-icon-button">
             <X className="w-4 h-4" />
           </button>

@@ -65,16 +65,16 @@ export default function MfaSection() {
   };
 
   return (
-    <div className="p-4 bg-muted rounded-2xl">
-      <div className="flex items-center gap-2 mb-2">
-        <ShieldCheck className="w-4 h-4" />
-        <span className="font-semibold text-sm">Two-factor authentication</span>
+    <section className="sf-section" aria-labelledby="mfa-settings-title">
+      <div className="mb-3 flex items-center gap-2 text-muted-foreground">
+        <ShieldCheck className="w-4 h-4 text-primary" />
+        <h3 id="mfa-settings-title" className="text-sm font-bold uppercase tracking-wide">Two-factor authentication</h3>
       </div>
 
       {factors.length > 0 && (
         <div className="space-y-2 mb-3">
           {factors.map(f => (
-            <div key={f.uid} className="flex items-center justify-between text-sm bg-background rounded-xl px-3 py-2">
+            <div key={f.uid} className="flex items-center justify-between rounded-xl border border-border bg-background px-3 py-2 text-sm">
               <span className="flex items-center gap-2"><Smartphone className="w-4 h-4" />{f.displayName || f.phoneNumber}</span>
               <button disabled={busy} onClick={() => handleRemove(f.uid)} className="text-xs text-red-500 underline disabled:opacity-40">
                 Remove
@@ -88,35 +88,35 @@ export default function MfaSection() {
 
       {!verificationId ? (
         <div className="flex gap-2">
-          <input
+          <input aria-label="Phone number for two-factor authentication" type="tel" autoComplete="tel"
             value={phone}
             onChange={e => setPhone(e.target.value)}
             placeholder="+1 555 555 5555"
-            className="flex-1 px-3 py-2 rounded-xl border border-border bg-background text-sm"
+            className="sf-control min-w-0 flex-1 text-sm"
           />
-          <button disabled={busy} onClick={handleSendCode} className="px-4 py-2 rounded-xl bg-blue-500 text-white text-sm disabled:opacity-40">
+          <button disabled={busy || !phone.trim()} onClick={handleSendCode} className="sf-button-primary shrink-0 text-sm">
             Send code
           </button>
         </div>
       ) : (
         <form onSubmit={handleVerify} className="flex gap-2">
-          <input
+          <input aria-label="Six-digit verification code" autoComplete="one-time-code"
             value={code}
             onChange={e => setCode(e.target.value)}
             placeholder="6-digit code"
             inputMode="numeric"
-            className="flex-1 px-3 py-2 rounded-xl border border-border bg-background text-sm"
+            className="sf-control min-w-0 flex-1 text-sm"
           />
-          <button disabled={busy} className="px-4 py-2 rounded-xl bg-blue-500 text-white text-sm disabled:opacity-40">
+          <button disabled={busy || !code.trim()} className="sf-button-primary shrink-0 text-sm">
             Confirm
           </button>
         </form>
       )}
 
-      {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
+      {error && <p className="sf-status-error mt-3" role="alert">{error}</p>}
       <p className="text-xs text-muted-foreground mt-2">
         Adds a text-message code requirement on top of your password when signing in.
       </p>
-    </div>
+    </section>
   );
 }

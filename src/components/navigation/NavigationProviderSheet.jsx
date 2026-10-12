@@ -72,7 +72,7 @@ export default function NavigationProviderSheet({ open, destination, onClose, on
 
   return (
     <div className="fixed inset-0 z-[6000] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm" onMouseDown={event => { if (event.target === event.currentTarget) onClose?.(); }}>
-      <section className="w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl border border-white/20 bg-white/95 dark:bg-slate-900/95 shadow-2xl p-5" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }} aria-labelledby="navigation-provider-title">
+      <section className="sf-sheet w-full rounded-t-3xl p-5 sm:max-w-sm sm:rounded-3xl" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }} aria-labelledby="navigation-provider-title">
         <div className="flex items-start justify-between gap-4 mb-4">
           <div><h2 id="navigation-provider-title" className="text-lg font-bold">Choose navigation</h2><p className="text-sm text-muted-foreground mt-0.5">External maps route to the nearest parking, then you can walk to {destination.title || destination.label || 'this spot'}.</p></div>
           <button onClick={onClose} className="w-11 h-11 -mr-2 -mt-2 grid place-items-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-blue-500" aria-label="Close navigation choices"><X className="w-5 h-5" /></button>

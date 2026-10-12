@@ -483,7 +483,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
   if (!isNavigating) {
     return (
       <div className="fixed inset-x-0 bottom-0 z-[1500] pointer-events-none">
-        <div className="bg-background rounded-t-3xl shadow-2xl px-4 pt-4 pb-6 pointer-events-auto mx-3 mb-3">
+        <div className="sf-sheet pointer-events-auto mx-3 mb-3 rounded-3xl px-4 pb-6 pt-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex-1">
               <p className="text-sm text-muted-foreground font-medium">{t('navPanel.navigatingTo')}</p>
@@ -565,7 +565,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
         </div>
       )}
 
-      <div className="bg-card rounded-t-3xl shadow-2xl px-4 pt-4 pb-8 pointer-events-auto">
+      <div className="sf-sheet pointer-events-auto rounded-t-3xl px-4 pb-8 pt-4">
         <div className="flex items-center justify-between mb-3">
           <div>
             <p className="text-sm text-muted-foreground font-medium">{t('navPanel.navigatingTo')}</p>

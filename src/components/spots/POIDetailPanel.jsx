@@ -371,7 +371,7 @@ function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavig
   const count = sfRating?.count || 0;
 
   return (
-    <div className="fixed left-0 right-0 z-[1200] bg-white dark:bg-card shadow-2xl border-t border-gray-100 dark:border-border rounded-t-2xl"
+    <div className="sf-sheet fixed left-0 right-0 z-[1200] rounded-t-2xl"
       style={{ bottom: 0 }}>
       <button className="w-full flex justify-center pt-2.5 pb-0" onClick={onExpand} aria-label="Expand details">
         <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-border" />
@@ -451,8 +451,8 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
 
   return (
     <div className="fixed inset-0 z-[1200] flex flex-col bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="mt-auto bg-white dark:bg-card rounded-t-3xl shadow-2xl overflow-hidden"
-        style={{ maxHeight: '92vh' }} onClick={e => e.stopPropagation()}>
+      <div className="sf-sheet mt-auto overflow-hidden rounded-t-3xl sm:mx-auto sm:w-full sm:max-w-2xl sm:rounded-3xl"
+        style={{ maxHeight: '92dvh' }} onClick={e => e.stopPropagation()}>
 
         {/* Hero — clickable to open lightbox */}
         <div

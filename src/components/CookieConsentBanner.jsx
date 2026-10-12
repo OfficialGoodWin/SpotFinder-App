@@ -41,8 +41,9 @@ export default function CookieConsentBanner() {
       aria-live="polite"
       aria-labelledby="cookie-consent-title"
       className="fixed inset-x-0 bottom-0 z-[3000] p-3 sm:p-4"
+      style={{ paddingBottom: 'max(.75rem, env(safe-area-inset-bottom))' }}
     >
-      <div className="max-w-2xl mx-auto bg-white dark:bg-card border border-gray-200 dark:border-border rounded-2xl shadow-2xl p-5">
+      <div className="sf-sheet mx-auto max-w-2xl rounded-2xl p-4 sm:p-5">
         <div className="flex items-start gap-3 mb-3">
           <Cookie className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
           <div>
@@ -92,30 +93,30 @@ export default function CookieConsentBanner() {
           </div>
         )}
 
-        <div className="flex flex-wrap gap-2">
+        <div className="grid gap-2 sm:grid-cols-2">
           <button
             onClick={handleAcceptAll}
-            className="px-4 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
+            className="sf-button-primary text-sm"
           >
             Accept all
           </button>
           <button
             onClick={handleRejectAll}
-            className="px-4 py-2.5 rounded-xl border-2 border-gray-200 dark:border-border text-sm font-semibold text-gray-700 dark:text-foreground hover:bg-gray-50 dark:hover:bg-accent"
+            className="sf-button-secondary border-2 text-sm"
           >
             Reject non-essential
           </button>
           {!expanded ? (
             <button
               onClick={() => setExpanded(true)}
-              className="px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-500 dark:text-muted-foreground underline"
+              className="min-h-11 rounded-xl px-4 text-sm font-semibold text-foreground underline hover:bg-muted sm:col-span-2"
             >
               Customize
             </button>
           ) : (
             <button
               onClick={handleSavePreferences}
-              className="px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-500 dark:text-muted-foreground underline"
+              className="min-h-11 rounded-xl px-4 text-sm font-semibold text-foreground underline hover:bg-muted sm:col-span-2"
             >
               Save preferences
             </button>

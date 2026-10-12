@@ -103,7 +103,7 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/50 backdrop-blur-sm">
-      <div className="isolate bg-white dark:bg-card w-full max-w-lg rounded-t-3xl shadow-2xl max-h-[90dvh] overflow-y-auto overscroll-contain">
+      <div className="sf-sheet isolate w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-3xl max-h-[90dvh] sm:rounded-3xl">
         <div className="sticky top-0 z-30 bg-white/90 dark:bg-card/90 px-6 pt-5 pb-3 border-b border-gray-100/80 dark:border-border flex items-center justify-between backdrop-blur-xl">
           <div className="flex items-center gap-2">
             <MapPin className="w-5 h-5 text-blue-500" />

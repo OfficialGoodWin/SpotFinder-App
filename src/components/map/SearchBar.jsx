@@ -161,8 +161,8 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
   const isExpanded = showDropdown || listening || Boolean(searchError) || (micError && !listening);
 
   return (
-    <div ref={containerRef} className="absolute left-4 z-[1002]" style={{ top: 'max(1rem, env(safe-area-inset-top))', right: '3.75rem' }}>
-      <div className={`bg-white dark:bg-card shadow-lg border transition-all ${isExpanded ? 'rounded-t-2xl' : 'rounded-full'} ${focused ? 'border-blue-400 dark:border-blue-500' : 'border-gray-200 dark:border-border'}`}>
+    <div ref={containerRef} className="sf-map-search absolute left-4 z-[1002]" style={{ top: 'max(1rem, env(safe-area-inset-top))' }}>
+      <div className={`border bg-card/95 shadow-md backdrop-blur-xl transition-[border-radius,border-color] ${isExpanded ? 'rounded-t-2xl' : 'rounded-full'} ${focused ? 'border-primary ring-2 ring-primary/15' : 'border-border'}`}>
         <div className="flex items-center px-3 gap-1.5">
           <Search className="w-4 h-4 text-gray-400 dark:text-muted-foreground flex-shrink-0" />
           <input
@@ -175,7 +175,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
             className="flex-1 py-3 text-sm outline-none bg-transparent text-gray-800 dark:text-foreground placeholder-gray-400 dark:placeholder-muted-foreground min-w-0"
           />
           {query && (
-            <button onClick={() => { setQuery(''); closeDropdown(); }} className="p-1 flex-shrink-0">
+            <button onClick={() => { setQuery(''); closeDropdown(); }} className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg hover:bg-muted" aria-label="Clear search">
               <X className="w-3.5 h-3.5 text-gray-400 dark:text-muted-foreground" />
             </button>
           )}
@@ -184,7 +184,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
             type="button"
             aria-label={listening ? 'Stop voice search' : 'Start voice search'}
             aria-pressed={listening}
-            className={`p-1.5 rounded-lg flex-shrink-0 transition-colors ${listening ? 'bg-red-500 text-white' : 'text-gray-400 dark:text-muted-foreground hover:text-gray-600'}`}
+            className={`grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg transition-colors ${listening ? 'bg-red-500 text-white' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
           >
             <Mic className="w-4 h-4" />
           </button>
@@ -208,6 +208,8 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
                   : 'text-gray-500 dark:text-muted-foreground hover:text-gray-700'
               }`}
               title="Nearby spots"
+              aria-label="Nearby spots filters"
+              aria-expanded={showNearbyFilter}
             >
               <Compass className="w-5 h-5" />
             </button>

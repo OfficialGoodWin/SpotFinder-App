@@ -1400,7 +1400,7 @@ function StepGuide({ steps }) {
     <div className="mt-4 space-y-3">
       {steps.map((step, i) => (
         <div key={i} className="flex gap-3 items-start">
-          <div className="flex-shrink-0 w-7 h-7 rounded-full bg-blue-500 text-white text-xs font-bold flex items-center justify-center mt-0.5">
+          <div className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
             {i + 1}
           </div>
           <div className="flex-1 min-w-0">
@@ -1418,17 +1418,20 @@ function StepGuide({ steps }) {
 // ─── Accordion item with step-by-step guide ───────────────────────────────────
 function AccordionItem({ q, a, steps }) {
   const [open, setOpen] = useState(false);
+  const contentId = React.useId();
   return (
-    <div className={`border-b border-gray-100 dark:border-border last:border-0 ${open ? 'bg-gray-50 dark:bg-accent/30' : ''}`}>
+    <div className={`border-b border-border last:border-0 ${open ? 'bg-muted/55' : ''}`}>
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-5 py-4 text-left gap-4"
+        aria-expanded={open}
+        aria-controls={contentId}
+        className="flex min-h-14 w-full items-center justify-between gap-4 px-5 py-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
         <span className="text-sm font-semibold text-gray-800 dark:text-foreground">{q}</span>
         <ChevronDown className={`w-4 h-4 flex-shrink-0 text-gray-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="px-5 pb-5">
+        <div id={contentId} className="px-5 pb-5">
           <p className="text-sm text-gray-600 dark:text-muted-foreground leading-relaxed mb-1">{a}</p>
           {steps && <StepGuide steps={steps} />}
         </div>
@@ -1441,16 +1444,16 @@ function AccordionItem({ q, a, steps }) {
 function AboutSection({ data }) {
   const icons = [Star, MapPin, Navigation, Mic, Layers, Share2];
   return (
-    <div className="rounded-2xl overflow-hidden border border-blue-100 dark:border-blue-900/40 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
+    <section className="sf-surface overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-5 bg-gradient-to-r from-blue-600 to-indigo-600">
+      <div className="border-b border-border bg-primary/8 px-5 py-5 sm:px-6">
         <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-            <MapPin className="w-5 h-5 text-white" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/12">
+            <MapPin className="w-5 h-5 text-primary" />
           </div>
-          <h2 className="text-xl font-bold text-white">{data.title}</h2>
+          <h2 className="text-xl font-bold text-foreground">{data.title}</h2>
         </div>
-        <p className="text-sm text-blue-100 leading-relaxed">{data.desc}</p>
+        <p className="text-sm leading-relaxed text-muted-foreground">{data.desc}</p>
       </div>
       {/* Features */}
       <div className="px-6 py-4">
@@ -1458,9 +1461,9 @@ function AboutSection({ data }) {
           {data.features.map((f, i) => {
             const Icon = icons[i] || Star;
             return (
-              <div key={i} className="flex items-start gap-3 py-2 border-b border-blue-100 dark:border-blue-900/40 last:border-0">
-                <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Icon className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              <div key={i} className="flex items-start gap-3 border-b border-border py-2 last:border-0">
+                <div className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                  <Icon className="w-3.5 h-3.5 text-primary" />
                 </div>
                 <p className="text-sm text-gray-700 dark:text-foreground">{f}</p>
               </div>
@@ -1469,11 +1472,11 @@ function AboutSection({ data }) {
         </div>
       </div>
       {/* Footer */}
-      <div className="px-6 py-4 bg-blue-50 dark:bg-blue-950/40 border-t border-blue-100 dark:border-blue-900/40">
+      <div className="border-t border-border bg-muted/45 px-6 py-4">
         <p className="text-xs text-gray-500 dark:text-muted-foreground">{data.built}</p>
         <p className="text-xs text-gray-400 dark:text-muted-foreground mt-0.5">{data.version}</p>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -1522,10 +1525,10 @@ function FeedbackSection({ language }) {
   };
 
   return (
-    <div className="rounded-2xl overflow-hidden border border-purple-100 dark:border-purple-900/40">
-      <div className="px-5 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 flex items-center gap-3">
-        <MessageSquare className="w-5 h-5 text-white flex-shrink-0" />
-        <h2 className="text-lg font-bold text-white">{labels.title}</h2>
+    <section className="sf-surface overflow-hidden">
+      <div className="flex items-center gap-3 border-b border-border bg-primary/8 px-5 py-4">
+        <MessageSquare className="w-5 h-5 text-primary flex-shrink-0" />
+        <h2 className="text-lg font-bold text-foreground">{labels.title}</h2>
       </div>
       <div className="px-5 py-4 bg-white dark:bg-card space-y-3">
         {status === 'sent' && (
@@ -1552,7 +1555,7 @@ function FeedbackSection({ language }) {
               value={email}
               onChange={e => setEmail(e.target.value)}
               placeholder={labels.emailPh}
-              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-border bg-gray-50 dark:bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-purple-400"
+              className="sf-control w-full text-sm"
             />
           </div>
           <div>
@@ -1562,13 +1565,13 @@ function FeedbackSection({ language }) {
               onChange={e => { setMsg(e.target.value); if (status === 'required') setStatus('idle'); }}
               placeholder={labels.msgPh}
               rows={4}
-              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-border bg-gray-50 dark:bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none"
+              className="sf-control w-full resize-none py-3 text-sm"
             />
           </div>
           <button
             type="submit"
             disabled={status === 'sending'}
-            className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors"
+            className="sf-button-primary flex w-full items-center justify-center gap-2"
           >
             {status === 'sending'
               ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />{labels.sending}</>
@@ -1577,7 +1580,7 @@ function FeedbackSection({ language }) {
           </button>
         </form>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -1592,12 +1595,13 @@ export default function FAQ() {
 
   return (
     // FIX: use fixed+overflow-y-auto to escape the Layout's overflow:hidden prison
-    <div className="bg-background text-foreground min-h-screen">
+    <div className="sf-page-viewport bg-background text-foreground">
       {/* Sticky header */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border px-4 py-4 flex items-center gap-3">
+      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background/92 px-4 py-3 backdrop-blur-xl">
         <button
           onClick={() => navigate('/')}
-          className="w-9 h-9 rounded-full bg-muted flex items-center justify-center active:scale-95 transition-transform flex-shrink-0"
+          aria-label={t('faq.backToMap')}
+          className="sf-icon-button flex-shrink-0"
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
@@ -1608,13 +1612,13 @@ export default function FAQ() {
       </div>
 
       {/* Content */}
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6 pb-16">
+      <main className="mx-auto max-w-3xl space-y-7 px-4 py-6 pb-20 sm:px-6 sm:py-8">
         {content.sections.map(section => (
           <div key={section.category}>
             <h2 className="text-xs font-bold uppercase tracking-widest text-primary mb-2 px-1">
               {section.category}
             </h2>
-            <div className="bg-white dark:bg-card rounded-2xl shadow-sm border border-gray-100 dark:border-border overflow-hidden">
+            <div className="sf-surface overflow-hidden">
               {section.items.map(item => (
                 <AccordionItem key={item.q} q={item.q} a={item.a} steps={item.steps} />
               ))}
@@ -1627,7 +1631,7 @@ export default function FAQ() {
 
         {/* Feedback */}
         <FeedbackSection language={language} />
-      </div>
+      </main>
     </div>
   );
 }

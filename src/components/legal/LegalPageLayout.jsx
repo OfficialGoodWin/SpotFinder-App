@@ -5,25 +5,25 @@ import { useNavigate } from 'react-router-dom';
 export default function LegalPageLayout({ title, lastUpdated, children }) {
   const navigate = useNavigate();
   return (
-    <main className="min-h-[100dvh] bg-white dark:bg-background">
-      <div className="sticky top-0 z-10 bg-white/95 dark:bg-background/95 backdrop-blur-sm border-b border-gray-100 dark:border-border px-4 py-3 flex items-center gap-3">
+    <main className="sf-page-viewport bg-background">
+      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background/92 px-4 py-3 backdrop-blur-xl">
         <button
           onClick={() => navigate(-1)}
           aria-label="Go back"
-          className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-accent flex-shrink-0"
+          className="sf-icon-button flex-shrink-0"
         >
           <ArrowLeft className="w-5 h-5 text-gray-700 dark:text-foreground" aria-hidden="true" />
         </button>
-        <h1 className="text-lg font-bold text-gray-900 dark:text-foreground">{title}</h1>
+        <h1 className="text-lg font-bold tracking-tight text-gray-900 dark:text-foreground sm:text-xl">{title}</h1>
       </div>
-      <div className="max-w-2xl mx-auto px-5 py-6 pb-16">
+      <article className="mx-auto max-w-3xl px-5 py-7 pb-20 sm:px-8 sm:py-10">
         {lastUpdated && (
           <p className="text-xs text-gray-400 dark:text-muted-foreground mb-6">Last updated: {lastUpdated}</p>
         )}
-        <div className="space-y-4">
+        <div className="sf-surface space-y-4 p-5 sm:p-8">
           {children}
         </div>
-      </div>
+      </article>
     </main>
   );
 }
@@ -32,13 +32,13 @@ export default function LegalPageLayout({ title, lastUpdated, children }) {
 // installed in this project, so we style headings/paragraphs/lists
 // explicitly instead of relying on `prose` classes).
 export function LegalH2({ children }) {
-  return <h2 className="text-base font-bold text-gray-900 dark:text-foreground mt-6 mb-2">{children}</h2>;
+  return <h2 className="mb-2 mt-7 text-lg font-bold tracking-tight text-gray-900 dark:text-foreground">{children}</h2>;
 }
 export function LegalP({ children }) {
-  return <p className="text-sm text-gray-700 dark:text-muted-foreground leading-relaxed">{children}</p>;
+  return <p className="text-[15px] leading-7 text-gray-700 dark:text-muted-foreground">{children}</p>;
 }
 export function LegalUl({ children }) {
-  return <ul className="list-disc pl-5 space-y-1.5 text-sm text-gray-700 dark:text-muted-foreground leading-relaxed">{children}</ul>;
+  return <ul className="list-disc space-y-2 pl-5 text-[15px] leading-7 text-gray-700 dark:text-muted-foreground">{children}</ul>;
 }
 export function LegalStrong({ children }) {
   return <strong className="font-semibold text-gray-900 dark:text-foreground">{children}</strong>;
