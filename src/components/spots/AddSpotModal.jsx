@@ -4,14 +4,15 @@ import StarRating from './StarRating';
 import LabeledRatingScale from './LabeledRatingScale';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
-import { uploadSpotImage } from '@/api/firebaseClient';
+import { deleteCloudSpotDraft, loadDraftImageFile, saveCloudSpotDraft, uploadDraftImage, uploadSpotImage } from '@/api/firebaseClient';
 import { INVALID_SOCIAL_URL_MESSAGE, validateSocialPostUrl } from '@/lib/socialUrlPolicy';
 import { moderateSubmission } from '@/lib/moderation';
 import { findNearbyPoi } from '@/lib/nearbyPoi';
 import { toast } from 'sonner';
 import LiquidSegmentedControl from '../ui/LiquidSegmentedControl';
 import { IMAGE_ACCEPT, validateImageFileMetadata } from '@/lib/imageUploadValidation';
-import { createAddSpotDraft, hasMeaningfulAddSpotDraft, validateRequiredSpotFields, voiceErrorMessage } from '@/lib/contributionFlow';
+import { hasMeaningfulAddSpotDraft, validateRequiredSpotFields, voiceErrorMessage } from '@/lib/contributionFlow';
+import { createDraftId, deleteGuestDraft, getGuestDraftOwnerKey, normalizeSpotDraft, saveGuestDraft } from '@/lib/spotDrafts';
 
 // Category tags per spec — separate from the existing rating-group `spotType`.
 // A spot can carry several of these. Display uses an emoji + translated label
@@ -45,7 +46,7 @@ const LANG_TO_BCP47 = {
   ro: 'ro-RO', es: 'es-ES', bg: 'bg-BG',
 };
 
-export default function AddSpotModal({ latlng, onClose, onSave, user }) {
+export default function AddSpotModal({ latlng, draft = null, onClose, onSave, user }) {
   const { authUid } = useAuth();
   const { t, language } = useLanguage();
   const spotType = 'general';
@@ -67,6 +68,11 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitError, setSubmitError] = useState('');
   const [attested, setAttested] = useState(false);
+  const [showCloseChoices, setShowCloseChoices] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [draftError, setDraftError] = useState('');
+  const [draftPhotoRefs, setDraftPhotoRefs] = useState([]);
+  const [draftPhotosReady, setDraftPhotosReady] = useState(true);
 
   // ── New fields per submission spec ──────────────────────────────────────────
   const [tags, setTags] = useState([]);
@@ -87,14 +93,14 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   const titleRef = useRef(null);
   const descriptionRef = useRef(null);
   const errorSummaryRef = useRef(null);
-  const draftKey = `spotfinder:add-spot-draft:${Number(latlng?.lat).toFixed(4)}:${Number(latlng?.lng).toFixed(4)}`;
-  const currentDraft = createAddSpotDraft({ title, description, tags, cost, accessDifficulty, parking, bestTime, directions, socialUrl, overallRating, accessRating, conditionRating, safetyRating, crowdednessRating });
+  const draftIdRef = useRef(draft?.id || createDraftId());
+  const currentDraft = normalizeSpotDraft({ id: draftIdRef.current, lat: latlng?.lat, lng: latlng?.lng, title, description, tags, cost, accessDifficulty, parking, bestTime, directions, socialUrl, overallRating, accessRating, conditionRating, safetyRating, crowdednessRating, photo_refs: draftPhotoRefs, created_at: draft?.created_at });
 
   useEffect(() => {
-    try {
-      const draft = JSON.parse(sessionStorage.getItem(draftKey) || 'null');
-      if (!draft) return;
-      const restored = createAddSpotDraft(draft);
+    let active = true;
+    if (!draft) return undefined;
+    const restore = async () => {
+      const restored = normalizeSpotDraft(draft);
       setTitle(restored.title);
       setDescription(restored.description);
       setTags(restored.tags);
@@ -109,23 +115,61 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
       setConditionRating(restored.conditionRating);
       setSafetyRating(restored.safetyRating);
       setCrowdednessRating(restored.crowdednessRating);
-    } catch { /* An invalid draft should never block contribution. */ }
-  }, [draftKey]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      try { sessionStorage.setItem(draftKey, JSON.stringify(currentDraft)); }
-      catch { /* Storage may be unavailable in private browsing. */ }
-    }, 250);
-    return () => window.clearTimeout(timer);
-  }, [accessDifficulty, accessRating, bestTime, conditionRating, cost, crowdednessRating, description, directions, draftKey, overallRating, parking, safetyRating, socialUrl, tags, title]);
+      setDraftPhotoRefs(restored.photo_refs);
+      if (restored.photo_refs.length && user) {
+        setDraftPhotosReady(false);
+        try {
+          const files = await Promise.all(restored.photo_refs.map(loadDraftImageFile));
+          if (!active) return;
+          setImageFiles(files);
+          setImagePreviews(files.map(file => URL.createObjectURL(file)));
+          setDraftPhotosReady(true);
+        } catch (error) {
+          if (active) setDraftError('The draft was restored, but one or more private photos could not be loaded.');
+        }
+      }
+    };
+    restore();
+    return () => { active = false; };
+  }, [draft?.id, user?.id]);
 
   useEffect(() => () => recognitionRef.current?.stop(), []);
 
   const requestClose = () => {
-    if (loading) return;
-    if (hasMeaningfulAddSpotDraft(currentDraft) && !window.confirm('Close Add Spot? Your draft will stay available for this map position during this session.')) return;
+    if (loading || savingDraft) return;
+    if (hasMeaningfulAddSpotDraft(currentDraft) || imageFiles.length) {
+      setShowCloseChoices(true);
+      return;
+    }
     onClose();
+  };
+
+  const handleSaveDraft = async () => {
+    if (savingDraft) return;
+    setSavingDraft(true);
+    setDraftError('');
+    try {
+      if (!draftPhotosReady) throw new Error('Private draft photos are not available yet. Check your connection and try again.');
+      let refs = draftPhotoRefs;
+      if (user) {
+        const uploaded = await Promise.all(imageFiles.map((file, index) => refs[index] || uploadDraftImage(file, draftIdRef.current)));
+        refs = uploaded;
+        setDraftPhotoRefs(uploaded);
+        await saveCloudSpotDraft({ ...currentDraft, photo_refs: uploaded });
+      } else {
+        saveGuestDraft(localStorage, getGuestDraftOwnerKey(localStorage), { ...currentDraft, photo_refs: [] });
+      }
+      toast.success(user ? 'Draft saved privately to your account.' : 'Draft saved on this device.');
+      window.dispatchEvent(new CustomEvent('spotfinder:drafts-changed'));
+      onClose();
+    } catch (error) {
+      console.error('Draft save failed:', error);
+      setDraftError(error?.message || 'The draft could not be saved. Your form is still open.');
+      setShowCloseChoices(false);
+      focusError(errorSummaryRef);
+    } finally {
+      setSavingDraft(false);
+    }
   };
 
   const focusError = (fieldRef = errorSummaryRef) => {
@@ -145,6 +189,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
     const accepted = selected.slice(0, remaining);
     setImageFiles(current => [...current, ...accepted]);
     setImagePreviews(current => [...current, ...accepted.map(file => URL.createObjectURL(file))]);
+    setDraftPhotoRefs(current => [...current, ...accepted.map(() => null)]);
     if (selected.length > remaining) toast.info('You can add up to 3 photos per spot.');
     e.target.value = '';
   };
@@ -153,6 +198,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
     URL.revokeObjectURL(imagePreviews[index]);
     setImageFiles(current => current.filter((_, itemIndex) => itemIndex !== index));
     setImagePreviews(current => current.filter((_, itemIndex) => itemIndex !== index));
+    setDraftPhotoRefs(current => current.filter((_, itemIndex) => itemIndex !== index));
   };
 
   // Voice dictation
@@ -233,6 +279,11 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
   const handleSave = async () => {
     if (loading || submitLockRef.current) return;
     setSubmitError('');
+    if (!draftPhotosReady) {
+      setSubmitError('Private draft photos could not be loaded. Reconnect and resume the draft before publishing.');
+      focusError(errorSummaryRef);
+      return;
+    }
     const requiredErrors = validateRequiredSpotFields({ title, description, attested });
     if (Object.keys(requiredErrors).length) {
       setFieldErrors(requiredErrors);
@@ -281,6 +332,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
     submitLockRef.current = true;
     setLoading(true);
     let image_urls = [];
+    let failedImageUploads = 0;
 
     const nearbyPoiPromise = findNearbyPoi(Number(latlng.lat), Number(latlng.lng), language)
       .catch(error => {
@@ -293,13 +345,21 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
         setUploadingImage(true);
         const uploads = await Promise.allSettled(imageFiles.map(file => uploadSpotImage(file)));
         image_urls = uploads.filter(result => result.status === 'fulfilled').map(result => result.value);
-        const failedCount = uploads.length - image_urls.length;
-        if (failedCount) toast.error(`${failedCount} photo${failedCount === 1 ? '' : 's'} could not be uploaded.`);
+        failedImageUploads = uploads.length - image_urls.length;
+        if (failedImageUploads) toast.error(`${failedImageUploads} photo${failedImageUploads === 1 ? '' : 's'} could not be uploaded.`);
       } catch (err) {
         console.error('Image uploads failed:', err);
       } finally {
         setUploadingImage(false);
       }
+    }
+
+    if (draft && failedImageUploads) {
+      setSubmitError('The draft was not published because one or more saved photos could not be uploaded. Your draft is still available; check your connection and try again.');
+      submitLockRef.current = false;
+      setLoading(false);
+      focusError(errorSummaryRef);
+      return;
     }
 
     const poi_match = await nearbyPoiPromise;
@@ -329,6 +389,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
         accepted: true,
         photo_rights_confirmed: image_urls.length > 0,
       },
+      _draft_id: draftIdRef.current,
     };
 
     Object.assign(baseData, {
@@ -341,7 +402,15 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
 
     try {
       await onSave(baseData, socialValidation?.canonicalUrl || '');
-      try { sessionStorage.removeItem(draftKey); } catch { /* no-op */ }
+      if (draft) {
+        try {
+          if (user) await deleteCloudSpotDraft(draftIdRef.current);
+          else deleteGuestDraft(localStorage, getGuestDraftOwnerKey(localStorage), draftIdRef.current);
+        } catch (cleanupError) {
+          console.warn('Published draft cleanup will be retried later:', cleanupError);
+        }
+        window.dispatchEvent(new CustomEvent('spotfinder:drafts-changed'));
+      }
       toast.success('Spot added to the map.');
       onClose();
     } catch (err) {
@@ -370,7 +439,7 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
         <div className="sticky top-0 z-30 bg-white/90 dark:bg-card/90 px-6 pt-5 pb-3 border-b border-gray-100/80 dark:border-border flex items-center justify-between backdrop-blur-xl">
           <div className="flex items-center gap-2">
             <MapPin className="w-5 h-5 text-green-600" />
-            <h2 id="add-spot-title" className="text-lg font-bold text-gray-900 dark:text-foreground">{t('addSpot.title')}</h2>
+            <h2 id="add-spot-title" className="text-lg font-bold text-gray-900 dark:text-foreground">{draft ? 'Resume draft' : t('addSpot.title')}</h2>
           </div>
           <button type="button" onClick={requestClose} aria-label={t('common.close')} className="min-h-11 min-w-11 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-accent">
             <X className="w-5 h-5 text-gray-500 dark:text-muted-foreground" />
@@ -396,6 +465,11 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
               <button type="button" onClick={() => setSubmitError('')} aria-label={t('common.close')} className="absolute right-2.5 top-2.5 rounded-full p-1.5 text-red-500 transition hover:bg-red-100 dark:hover:bg-red-900/60">
                 <X className="h-4 w-4" />
               </button>
+            </div>
+          )}
+          {draftError && (
+            <div ref={errorSummaryRef} role="alert" tabIndex={-1} className="flex gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900 outline-none focus:ring-2 focus:ring-red-400 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100">
+              <AlertCircle className="h-5 w-5 shrink-0" /><span>{draftError}</span>
             </div>
           )}
 
@@ -612,9 +686,10 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
                 <Camera className="w-8 h-8 text-gray-400 dark:text-muted-foreground mb-1" />
                 <span className="text-sm text-gray-500 dark:text-muted-foreground">Add up to {3 - imageFiles.length} more photo{3 - imageFiles.length === 1 ? '' : 's'}</span>
                 <span className="mt-1 text-xs text-gray-400">Choose several at once or add them one by one</span>
-                <input type="file" accept={IMAGE_ACCEPT} multiple onChange={handleImageChange} className="sr-only" />
+                <input type="file" accept={IMAGE_ACCEPT} multiple onChange={handleImageChange} disabled={!draftPhotosReady} className="sr-only" />
               </label>
             )}
+            {!user && imageFiles.length > 0 && <p className="mt-2 text-xs leading-5 text-amber-700 dark:text-amber-300">Guest drafts preserve the form on this device, but selected photo files cannot survive a refresh. Sign in to save draft photos privately across devices, or add the photos again before publishing.</p>}
           </div>
 
           {/* Optional social post. The callable backend attaches this only
@@ -655,6 +730,20 @@ export default function AddSpotModal({ latlng, onClose, onSave, user }) {
           </button>
         </div>
       </div>
+      {showCloseChoices && (
+        <div className="absolute inset-0 z-50 grid place-items-center bg-black/55 p-4" role="alertdialog" aria-modal="true" aria-labelledby="save-draft-title">
+          <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl dark:bg-card">
+            <h3 id="save-draft-title" className="text-lg font-bold">Keep your progress?</h3>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">Save this as an unpublished draft, discard the changes, or return to editing.</p>
+            {!user && imageFiles.length > 0 && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">The form will be saved on this device, but {imageFiles.length === 1 ? 'the selected photo' : `${imageFiles.length} selected photos`} cannot be stored in a guest draft. Add them again when you resume.</p>}
+            <div className="mt-5 space-y-2">
+              <button type="button" onClick={handleSaveDraft} disabled={savingDraft} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-green-600 px-4 font-semibold text-white disabled:opacity-50">{savingDraft && <Loader2 className="h-4 w-4 animate-spin" />}{savingDraft ? 'Saving draft…' : 'Save Draft'}</button>
+              <button type="button" onClick={onClose} disabled={savingDraft} className="min-h-12 w-full rounded-2xl border border-red-200 px-4 font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:hover:bg-red-950/30">Discard Changes</button>
+              <button type="button" onClick={() => setShowCloseChoices(false)} disabled={savingDraft} className="min-h-12 w-full rounded-2xl px-4 font-semibold text-muted-foreground hover:bg-accent disabled:opacity-50">Continue Editing</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

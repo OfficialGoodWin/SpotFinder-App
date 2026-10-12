@@ -18,6 +18,7 @@ import { getSpotDisplayName } from '@/lib/spotPresentation';
 import { useSpotOpenFocus } from '@/hooks/useSpotOpenFocus';
 import { getConsent } from '@/lib/consent';
 import { shouldShowWelcome } from '@/lib/discoveryExperience';
+import { getGuestDraftOwnerKey, listGuestDrafts } from '@/lib/spotDrafts';
 
 const SubscriptionModal = React.lazy(() => import('../components/SubscriptionModal'));
 const SuperAdminEditor = React.lazy(() => import('../components/map/SuperAdminEditor'));
@@ -34,7 +35,7 @@ const SettingsModal = React.lazy(() => import('../components/SettingsModal'));
  
  
 export default function Home() {
-  const { user, logout, isAuthenticated, isAdmin } = useAuth();
+  const { user, authUid, logout, isAuthenticated, isAdmin } = useAuth();
   const { t, language } = useLanguage();
   const { isDark } = useTheme();
   const navigate = useNavigate();
@@ -45,6 +46,7 @@ export default function Home() {
   const [userAccuracy, setUserAccuracy] = useState(null);
   const [addMode, setAddMode] = useState(false);
   const [pendingLatlng, setPendingLatlng] = useState(null);
+  const [resumingDraft, setResumingDraft] = useState(null);
   const [selectedSpot, setSelectedSpot] = useState(null);
   const { closeSpot, openSpot, spotFocus } = useSpotOpenFocus({ selectedSpot, setSelectedSpot });
   const openMarkerSpot = useCallback((spot) => openSpot(spot, { source: 'marker' }), [openSpot]);
@@ -70,6 +72,21 @@ export default function Home() {
     try { return localStorage.getItem('spotfinder_welcome_dismissed_v1') !== '1'; }
     catch { return true; }
   });
+  const [guestDraftCount, setGuestDraftCount] = useState(0);
+  const [guestDraftOwnerKey] = useState(() => {
+    try { return getGuestDraftOwnerKey(localStorage); } catch { return ''; }
+  });
+
+  useEffect(() => {
+    const refreshDraftCount = () => {
+      if (!guestDraftOwnerKey || isAuthenticated) { setGuestDraftCount(0); return; }
+      try { setGuestDraftCount(listGuestDrafts(localStorage, guestDraftOwnerKey).length); }
+      catch { setGuestDraftCount(0); }
+    };
+    refreshDraftCount();
+    window.addEventListener('spotfinder:drafts-changed', refreshDraftCount);
+    return () => window.removeEventListener('spotfinder:drafts-changed', refreshDraftCount);
+  }, [guestDraftOwnerKey, isAuthenticated]);
   const [consentDecided, setConsentDecided] = useState(() => getConsent().decided);
 
   useEffect(() => {
@@ -214,6 +231,7 @@ export default function Home() {
   }, []);
  
   const handleMapClick = useCallback((latlng) => {
+    setResumingDraft(null);
     setPendingLatlng(latlng);
     setAddMode(false);
   }, []);
@@ -437,6 +455,8 @@ export default function Home() {
         showMenu={showAccountMenu}
         onToggleMenu={() => setShowAccountMenu(v => !v)}
         onShowMySpots={() => setShowMySpots(true)}
+        onShowDrafts={() => setShowMySpots(true)}
+        guestDraftCount={guestDraftCount}
         onSignOut={handleSignOut}
         onShowDeleteConfirm={() => setShowDeleteConfirm(true)}
         onShowAuth={() => setShowAuth(true)}
@@ -604,7 +624,8 @@ export default function Home() {
       {pendingLatlng && (
         <AddSpotModal
           latlng={pendingLatlng}
-          onClose={() => setPendingLatlng(null)}
+          draft={resumingDraft}
+          onClose={() => { setPendingLatlng(null); setResumingDraft(null); }}
           onSave={handleSaveSpot}
           user={user}
         />
@@ -662,11 +683,18 @@ export default function Home() {
  
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
  
-      {showMySpots && isAuthenticated && user && (
+      {showMySpots && ((isAuthenticated && user) || (!isAuthenticated && guestDraftOwnerKey)) && (
         <MySpotsPanel
           user={user}
+          draftOwnerKey={guestDraftOwnerKey}
+          draftOnly={!isAuthenticated}
+          initialTab={!isAuthenticated ? 'drafts' : undefined}
           onClose={() => setShowMySpots(false)}
           onSelectSpot={(spot) => openSpot(spot, { source: 'my-spots' })}
+          onResumeDraft={(spotDraft) => {
+            setResumingDraft(spotDraft);
+            setPendingLatlng({ lat: spotDraft.lat, lng: spotDraft.lng });
+          }}
         />
       )}
 

@@ -40,12 +40,13 @@ import {
   arrayUnion,
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, getBlob, listAll, deleteObject } from 'firebase/storage';
 import { validateImageDimensions, validateImageFile } from '@/lib/imageUploadValidation';
 import { firebaseConfig } from './firebaseConfig';
 import { getRecaptchaToken } from '@/lib/recaptcha';
 import { filterAndSortNearbySpots, normalizeLatLng } from '@/lib/spotDiscovery';
 import { applyReviewedLegacyIdentity } from '@/lib/reviewedLegacySpots';
+import { normalizeSpotDraft } from '@/lib/spotDrafts';
 
 let app, auth, db, functionsInstance, storage;
 try {
@@ -299,6 +300,60 @@ export const uploadSpotImage = async (file) => {
   const ref = storageRef(storage, path);
   await uploadBytes(ref, blob, { contentType: 'image/jpeg', cacheControl: 'public,max-age=31536000,immutable' });
   return getDownloadURL(ref);
+};
+
+const SPOT_DRAFTS_COLLECTION = 'spot_drafts';
+
+export const uploadDraftImage = async (file, draftId) => {
+  const { auth, storage } = getFirebaseServices();
+  const current = auth.currentUser;
+  if (!current || current.isAnonymous) throw new Error('Sign in to preserve draft photos across devices.');
+  await validateImageFile(file);
+  const id = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const path = `drafts/${current.uid}/${draftId}/${id}-${String(file.name || 'photo').replace(/[^A-Za-z0-9._-]/g, '_').slice(-80)}`;
+  await uploadBytes(storageRef(storage, path), file, { contentType: file.type });
+  return { path, name: file.name || 'Draft photo', type: file.type, size: file.size };
+};
+
+export const loadDraftImageFile = async (photoRef) => {
+  const { storage } = getFirebaseServices();
+  const blob = await getBlob(storageRef(storage, photoRef.path));
+  return new File([blob], photoRef.name || 'draft-photo', { type: photoRef.type || blob.type || 'image/jpeg' });
+};
+
+export const deleteDraftImages = async (draftId) => {
+  const { auth, storage } = getFirebaseServices();
+  const current = auth.currentUser;
+  if (!current || current.isAnonymous) return;
+  const listing = await listAll(storageRef(storage, `drafts/${current.uid}/${draftId}`));
+  await Promise.all(listing.items.map(item => deleteObject(item)));
+};
+
+export const saveCloudSpotDraft = async (value) => {
+  const { auth, db } = getFirebaseServices();
+  const current = auth.currentUser;
+  if (!current || current.isAnonymous) throw new Error('A registered account is required for cloud drafts.');
+  const draft = normalizeSpotDraft(value);
+  const ref = doc(db, SPOT_DRAFTS_COLLECTION, draft.id);
+  const existing = await getDoc(ref);
+  const createdAt = existing.exists() ? existing.data().created_at : draft.created_at;
+  await setDoc(ref, { ...draft, owner_uid: current.uid, created_at: createdAt, updated_at: new Date().toISOString() });
+  return { ...draft, owner_uid: current.uid, created_at: createdAt };
+};
+
+export const getCloudSpotDrafts = async () => {
+  const { auth, db } = getFirebaseServices();
+  const current = auth.currentUser;
+  if (!current || current.isAnonymous) return [];
+  const snapshot = await getDocs(query(collection(db, SPOT_DRAFTS_COLLECTION), where('owner_uid', '==', current.uid), limit(100)));
+  return snapshot.docs.filter(item => !item.data().published_spot_id).map(item => normalizeSpotDraft({ id: item.id, ...item.data() }))
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+};
+
+export const deleteCloudSpotDraft = async (draftId, { deletePhotos = true } = {}) => {
+  const { db } = getFirebaseServices();
+  await deleteDoc(doc(db, SPOT_DRAFTS_COLLECTION, draftId));
+  if (deletePhotos) await deleteDraftImages(draftId).catch(error => console.warn('Draft photo cleanup failed:', error));
 };
 
  

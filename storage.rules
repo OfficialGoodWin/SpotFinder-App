@@ -11,5 +11,17 @@ service firebase.storage {
                    && request.resource.contentType == 'image/jpeg';
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
+    match /drafts/{userId}/{draftId}/{fileName} {
+      allow read: if request.auth != null
+                  && request.auth.uid == userId
+                  && request.auth.token.firebase.sign_in_provider != 'anonymous';
+      allow create, update: if request.auth != null
+                            && request.auth.uid == userId
+                            && request.auth.token.firebase.sign_in_provider != 'anonymous'
+                            && request.resource.size > 0
+                            && request.resource.size <= 10 * 1024 * 1024
+                            && request.resource.contentType.matches('image/(jpeg|png|webp|heic|heif)');
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
   }
 }

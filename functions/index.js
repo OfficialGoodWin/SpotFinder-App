@@ -113,6 +113,26 @@ exports.enforceDateOfBirthDeadline = functions.pubsub.schedule('every day 03:15'
     return null;
   });
 
+// Private draft data follows the Firebase account lifecycle. Public spots are
+// intentionally not touched here; they have a separate moderation/deletion
+// policy, while unpublished drafts and idempotency markers are user-private.
+exports.cleanupSpotDraftsOnAccountDelete = functions.auth.user().onDelete(async (account) => {
+  const deleteOwned = async (collectionName) => {
+    let snapshot;
+    do {
+      snapshot = await db.collection(collectionName).where('owner_uid', '==', account.uid).limit(400).get();
+      if (snapshot.empty) break;
+      const batch = db.batch();
+      snapshot.docs.forEach(document => batch.delete(document.ref));
+      await batch.commit();
+    } while (!snapshot.empty);
+  };
+  await Promise.all([deleteOwned('spot_drafts'), deleteOwned('spot_publications')]);
+  await getStorage().bucket().deleteFiles({ prefix: `drafts/${account.uid}/` }).catch(error => {
+    console.warn('Draft image cleanup failed for deleted account:', account.uid, error.message);
+  });
+});
+
 // ─── Feedback email notifications ──────────────────────────────────────────
 // The feedback form in FAQ.jsx was only ever writing to Firestore — nothing
 // ever sent a notification anywhere, so submissions silently piled up with
@@ -359,6 +379,16 @@ exports.submitSpot = functions.runWith({ secrets: ['ANTI_SPAM_IP_SALT'] }).https
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in to add a spot.');
   const input = data || {};
   const uid = context.auth.uid;
+  const rawDraftId = cleanString(input._draft_id, 100);
+  const draftId = /^[A-Za-z0-9_-]{1,100}$/.test(rawDraftId) ? rawDraftId : '';
+  const publicationRef = draftId ? db.collection('spot_publications').doc(`${uid}_${draftId}`) : null;
+  if (publicationRef) {
+    const priorPublication = await publicationRef.get();
+    if (priorPublication.exists) {
+      const priorSpot = await db.collection('spots').doc(priorPublication.data().spot_id).get();
+      if (priorSpot.exists) return { id: priorSpot.id, ...priorSpot.data(), already_published: true };
+    }
+  }
   const lat = Number(input.lat), lng = Number(input.lng);
   const rawTitle = cleanString(input.title, 100);
   const genericTitles = ['spot', 'place', 'location', 'point', 'poi'];
@@ -436,8 +466,29 @@ exports.submitSpot = functions.runWith({ secrets: ['ANTI_SPAM_IP_SALT'] }).https
     spot[`${field}_rating`] = Number.isFinite(score) && score >= 1 && score <= 5 ? score : 0;
     spot[`${field}_rating_count`] = spot[`${field}_rating`] ? 1 : 0;
   }
-  const ref = await db.collection('spots').add(spot);
-  return { id: ref.id, ...spot };
+  const spotRef = db.collection('spots').doc();
+  if (publicationRef) {
+    const result = await db.runTransaction(async transaction => {
+      const marker = await transaction.get(publicationRef);
+      if (marker.exists) return { existingSpotId: marker.data().spot_id };
+      const draftRef = db.collection('spot_drafts').doc(draftId);
+      const draftSnapshot = await transaction.get(draftRef);
+      if (draftSnapshot.exists && draftSnapshot.data().owner_uid !== uid) {
+        throw new functions.https.HttpsError('permission-denied', 'This draft belongs to another account.');
+      }
+      transaction.set(spotRef, spot);
+      transaction.set(publicationRef, { owner_uid: uid, draft_id: draftId, spot_id: spotRef.id, created_at: new Date().toISOString() });
+      if (draftSnapshot.exists) transaction.update(draftRef, { published_spot_id: spotRef.id, published_at: new Date().toISOString() });
+      return { existingSpotId: null };
+    });
+    if (result.existingSpotId) {
+      const existing = await db.collection('spots').doc(result.existingSpotId).get();
+      if (existing.exists) return { id: existing.id, ...existing.data(), already_published: true };
+    }
+  } else {
+    await spotRef.set(spot);
+  }
+  return { id: spotRef.id, ...spot };
 });
 
 // Best-effort caller identity: Firestore triggers don't carry the writer's

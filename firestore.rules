@@ -64,6 +64,34 @@ service cloud.firestore {
       );
     }
 
+    // Unpublished drafts are stored outside /spots and are private to the
+    // registered Firebase account that created them. Ownership can never be
+    // reassigned by a client update.
+    match /spot_drafts/{draftId} {
+      allow read, delete: if isAuth() && resource.data.owner_uid == request.auth.uid;
+      allow create: if isAuth()
+        && request.auth.token.firebase.sign_in_provider != 'anonymous'
+        && request.resource.data.owner_uid == request.auth.uid
+        && strLen(request.resource.data.title, 100)
+        && strLen(request.resource.data.description, 2000)
+        && request.resource.data.lat is number && request.resource.data.lat >= -90 && request.resource.data.lat <= 90
+        && request.resource.data.lng is number && request.resource.data.lng >= -180 && request.resource.data.lng <= 180;
+      allow update: if isAuth()
+        && resource.data.owner_uid == request.auth.uid
+        && request.resource.data.owner_uid == request.auth.uid
+        && unchanged(['owner_uid', 'created_at'])
+        && strLen(request.resource.data.title, 100)
+        && strLen(request.resource.data.description, 2000)
+        && request.resource.data.lat is number && request.resource.data.lat >= -90 && request.resource.data.lat <= 90
+        && request.resource.data.lng is number && request.resource.data.lng >= -180 && request.resource.data.lng <= 180;
+    }
+
+    // Server-only idempotency records prevent a resumed draft from creating
+    // two public spots. Clients cannot inspect or forge these markers.
+    match /spot_publications/{publicationId} {
+      allow read, write: if false;
+    }
+
     // ── Per-user spot ratings (one doc per user per spot; aggregates are  ──────
     // recomputed server-side by a Cloud Function trigger — never trust a
     // client-submitted average).

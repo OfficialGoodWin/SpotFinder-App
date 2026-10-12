@@ -1,8 +1,8 @@
 import React from 'react';
-import { LogOut, List, Trash2, User } from 'lucide-react';
+import { FilePenLine, LogOut, List, Trash2, User } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 
-export default function ProfileMenu({ user, isAuthenticated, showMenu, onToggleMenu, onShowMySpots, onSignOut, onShowDeleteConfirm, onShowAuth }) {
+export default function ProfileMenu({ user, isAuthenticated, showMenu, onToggleMenu, onShowMySpots, onShowDrafts, guestDraftCount = 0, onSignOut, onShowDeleteConfirm, onShowAuth }) {
   const { t } = useLanguage();
   return (
     <div className="absolute right-4 z-[1003]" style={{ top: 'max(1rem, env(safe-area-inset-top))' }}>
@@ -39,11 +39,10 @@ export default function ProfileMenu({ user, isAuthenticated, showMenu, onToggleM
           )}
         </>
       ) : (
-        <button onClick={onShowAuth}
-          className="w-10 h-10 rounded-full shadow-lg border border-gray-200 dark:border-border bg-white dark:bg-card flex items-center justify-center active:scale-95 transition-transform"
-          title={t('profile.signIn')}>
-          <User className="w-5 h-5 text-gray-500 dark:text-muted-foreground" />
-        </button>
+        <div className="flex flex-col gap-2">
+          <button onClick={onShowAuth} className="w-10 h-10 rounded-full shadow-lg border border-gray-200 dark:border-border bg-white dark:bg-card flex items-center justify-center active:scale-95 transition-transform" title={t('profile.signIn')} aria-label={t('profile.signIn')}><User className="w-5 h-5 text-gray-500 dark:text-muted-foreground" /></button>
+          <button onClick={onShowDrafts} className="relative w-10 h-10 rounded-full shadow-lg border border-gray-200 dark:border-border bg-white dark:bg-card flex items-center justify-center active:scale-95 transition-transform" title="Drafts" aria-label={`Drafts${guestDraftCount ? `, ${guestDraftCount} saved` : ''}`}><FilePenLine className="w-5 h-5 text-gray-500 dark:text-muted-foreground" />{guestDraftCount > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-green-600 px-1 text-[10px] font-bold text-white">{guestDraftCount}</span>}</button>
+        </div>
       )}
     </div>
   );

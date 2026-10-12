@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  AlertCircle, ArrowUpDown, Bookmark, Eye, Heart, MapPin, PlusCircle,
+  AlertCircle, ArrowUpDown, Bookmark, Eye, FilePenLine, Heart, MapPin, PlusCircle,
   RefreshCw, Search, Star, Trash2, X,
 } from 'lucide-react';
 import {
@@ -8,6 +8,9 @@ import {
   getLikedSpots,
   getSavedSpots,
   getUserSpots,
+  deleteCloudSpotDraft,
+  getCloudSpotDrafts,
+  loadDraftImageFile,
 } from '@/api/firebaseClient';
 import LiquidSegmentedControl from '../ui/LiquidSegmentedControl';
 import SmoothSelect from '../ui/SmoothSelect';
@@ -15,11 +18,13 @@ import { getSpotDisplayName, getSpotLocationLabel } from '@/lib/spotPresentation
 import SpotImage from './SpotImage';
 import { sortSpotCollection } from '@/lib/spotDiscovery';
 import { useLanguage } from '@/lib/LanguageContext';
+import { deleteGuestDraft, draftDisplayName, listGuestDrafts } from '@/lib/spotDrafts';
 
 const TABS = [
   { id: 'saved', label: 'Saved', icon: Bookmark },
   { id: 'created', label: 'Created', icon: PlusCircle },
   { id: 'liked', label: 'Liked', icon: Heart },
+  { id: 'drafts', label: 'Drafts', icon: FilePenLine },
 ];
 
 const SORTS = [
@@ -34,25 +39,44 @@ const EMPTY_COPY = {
   saved: ['No saved spots yet', 'Save places you want to come back to.'],
   created: ['No created spots yet', 'Add a spot to start your collection.'],
   liked: ['No liked spots yet', 'Like a spot and it will appear here.'],
+  drafts: ['No drafts yet', 'Saved drafts stay private until you publish them.'],
 };
 
-export default function MySpotsPanel({ user, onClose, onSelectSpot }) {
+function DraftThumbnail({ draft }) {
+  const [src, setSrc] = useState('');
+  useEffect(() => {
+    let url = '';
+    let active = true;
+    if (!draft.photo_refs?.[0]) return undefined;
+    loadDraftImageFile(draft.photo_refs[0]).then(file => {
+      if (!active) return;
+      url = URL.createObjectURL(file);
+      setSrc(url);
+    }).catch(() => {});
+    return () => { active = false; if (url) URL.revokeObjectURL(url); };
+  }, [draft.id, draft.photo_refs]);
+  return src ? <img src={src} alt="" onError={() => setSrc('')} className="h-full w-full object-cover" /> : <FilePenLine className="h-7 w-7 text-gray-400" aria-hidden="true" />;
+}
+
+export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, initialTab, onClose, onSelectSpot, onResumeDraft }) {
   const { language } = useLanguage();
-  const [tab, setTab] = useState('saved');
-  const [data, setData] = useState({ saved: null, created: null, liked: null });
-  const [loading, setLoading] = useState({ saved: false, created: false, liked: false });
-  const [errors, setErrors] = useState({ saved: '', created: '', liked: '' });
+  const tabs = draftOnly ? TABS.filter(item => item.id === 'drafts') : TABS;
+  const [tab, setTab] = useState(initialTab || (draftOnly ? 'drafts' : 'saved'));
+  const [data, setData] = useState({ saved: null, created: null, liked: null, drafts: null });
+  const [loading, setLoading] = useState({ saved: false, created: false, liked: false, drafts: false });
+  const [errors, setErrors] = useState({ saved: '', created: '', liked: '', drafts: '' });
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('newest');
   const [deletingId, setDeletingId] = useState('');
 
   const loadTab = useCallback(async (tabId) => {
-    if (!user?.id) return;
+    if (tabId !== 'drafts' && !user?.id) return;
     setLoading(current => ({ ...current, [tabId]: true }));
     setErrors(current => ({ ...current, [tabId]: '' }));
     try {
       let rows;
-      if (tabId === 'saved') rows = await getSavedSpots(user.id, 100);
+      if (tabId === 'drafts') rows = user ? await getCloudSpotDrafts() : listGuestDrafts(localStorage, draftOwnerKey);
+      else if (tabId === 'saved') rows = await getSavedSpots(user.id, 100);
       else if (tabId === 'liked') rows = await getLikedSpots(user.id, 100);
       else rows = await getUserSpots(user.email, 100, user.id);
       setData(current => ({ ...current, [tabId]: rows }));
@@ -62,7 +86,7 @@ export default function MySpotsPanel({ user, onClose, onSelectSpot }) {
     } finally {
       setLoading(current => ({ ...current, [tabId]: false }));
     }
-  }, [user?.email, user?.id]);
+  }, [draftOwnerKey, user?.email, user?.id]);
 
   useEffect(() => {
     if (data[tab] === null && !loading[tab] && !errors[tab]) loadTab(tab);
@@ -71,8 +95,11 @@ export default function MySpotsPanel({ user, onClose, onSelectSpot }) {
   const visibleSpots = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
     const filtered = (data[tab] || []).filter(spot => !normalized ||
-      [getSpotDisplayName(spot, language), spot.description, getSpotLocationLabel(spot)].some(value =>
+      [tab === 'drafts' ? draftDisplayName(spot) : getSpotDisplayName(spot, language), spot.description, getSpotLocationLabel(spot)].some(value =>
         String(value || '').toLocaleLowerCase().includes(normalized)));
+    if (tab === 'drafts') return [...filtered].sort((a, b) => sort === 'alphabetical'
+      ? draftDisplayName(a).localeCompare(draftDisplayName(b))
+      : sort === 'oldest' ? a.updated_at.localeCompare(b.updated_at) : b.updated_at.localeCompare(a.updated_at));
     return sortSpotCollection(filtered, sort, { relationFirst: tab !== 'created', getTitle: spot => getSpotDisplayName(spot, language) });
   }, [data, language, query, sort, tab]);
 
@@ -82,10 +109,15 @@ export default function MySpotsPanel({ user, onClose, onSelectSpot }) {
   };
 
   const handleDelete = async (id) => {
-    if (deletingId || !window.confirm('Delete this spot permanently?')) return;
+    const isDraft = tab === 'drafts';
+    if (deletingId || !window.confirm(isDraft ? 'Delete this unpublished draft permanently?' : 'Delete this spot permanently?')) return;
     setDeletingId(id);
     try {
-      await firebaseDeleteSpot(id);
+      if (isDraft) {
+        if (user) await deleteCloudSpotDraft(id);
+        else deleteGuestDraft(localStorage, draftOwnerKey, id);
+        window.dispatchEvent(new CustomEvent('spotfinder:drafts-changed'));
+      } else await firebaseDeleteSpot(id);
       setData(current => Object.fromEntries(Object.entries(current).map(([key, rows]) =>
         [key, rows?.filter(spot => spot.id !== id) ?? rows])));
     } catch (error) {
@@ -104,8 +136,8 @@ export default function MySpotsPanel({ user, onClose, onSelectSpot }) {
         <header className="px-4 sm:px-6 pt-4 sm:pt-5 pb-4 border-b border-gray-200/70 dark:border-border">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 id="my-spots-title" className="text-xl font-bold text-gray-900 dark:text-foreground">My Spots</h2>
-              <p className="text-xs sm:text-sm text-gray-500 dark:text-muted-foreground mt-0.5">Your places, collected in one view.</p>
+              <h2 id="my-spots-title" className="text-xl font-bold text-gray-900 dark:text-foreground">{draftOnly ? 'Drafts' : 'My Spots'}</h2>
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-muted-foreground mt-0.5">{user ? 'Your private drafts and public collections.' : 'Drafts saved only on this device and guest session.'}</p>
             </div>
             <button onClick={onClose} className="w-11 h-11 grid place-items-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500" aria-label="Close My Spots">
               <X className="w-5 h-5" />
@@ -117,7 +149,7 @@ export default function MySpotsPanel({ user, onClose, onSelectSpot }) {
             equal
             value={tab}
             onChange={selectTab}
-            options={TABS.map(item => ({ ...item, value: item.id }))}
+            options={tabs.map(item => ({ ...item, value: item.id }))}
             renderOption={({ id, label, icon: Icon }) => <><Icon className="w-4 h-4" aria-hidden="true" /><span>{label}</span>{data[id] !== null && <span className="sf-liquid-tabs__count">{data[id].length}</span>}</>}
           />
 
@@ -147,7 +179,7 @@ export default function MySpotsPanel({ user, onClose, onSelectSpot }) {
             <div className="min-h-64 grid place-items-center text-center px-8">
               <div>
                 <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-accent grid place-items-center mx-auto mb-3">
-                  {query ? <Search className="w-6 h-6 text-gray-400" /> : tab === 'saved' ? <Bookmark className="w-6 h-6 text-gray-400" /> : tab === 'liked' ? <Heart className="w-6 h-6 text-gray-400" /> : <MapPin className="w-6 h-6 text-gray-400" />}
+                  {query ? <Search className="w-6 h-6 text-gray-400" /> : tab === 'saved' ? <Bookmark className="w-6 h-6 text-gray-400" /> : tab === 'liked' ? <Heart className="w-6 h-6 text-gray-400" /> : tab === 'drafts' ? <FilePenLine className="w-6 h-6 text-gray-400" /> : <MapPin className="w-6 h-6 text-gray-400" />}
                 </div>
                 <p className="font-semibold">{query ? 'No matching spots' : EMPTY_COPY[tab][0]}</p>
                 <p className="text-sm text-gray-500 mt-1">{query ? 'Try another title, description, or location.' : EMPTY_COPY[tab][1]}</p>
@@ -156,6 +188,23 @@ export default function MySpotsPanel({ user, onClose, onSelectSpot }) {
           ) : (
             <div className="grid sm:grid-cols-2 gap-3">
               {visibleSpots.map(spot => (
+                tab === 'drafts' ? (
+                <article key={spot.id} className="rounded-2xl border border-gray-200/80 bg-white/80 overflow-hidden dark:border-border dark:bg-white/[0.03]">
+                  <div className="flex min-h-[124px]">
+                    <div className="grid w-28 shrink-0 place-items-center overflow-hidden bg-gray-100 dark:bg-accent"><DraftThumbnail draft={spot} /></div>
+                    <div className="min-w-0 flex-1 p-3">
+                      <h3 className="truncate font-semibold">{draftDisplayName(spot)}</h3>
+                      <p className="mt-1 flex items-center gap-1 truncate text-xs text-muted-foreground"><MapPin className="h-3.5 w-3.5" />{getSpotLocationLabel(spot)}</p>
+                      <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{spot.description || 'No description yet'}</p>
+                      <p className="mt-2 text-[11px] text-muted-foreground">Edited {new Date(spot.updated_at).toLocaleString()}</p>
+                    </div>
+                  </div>
+                  <div className="flex border-t border-gray-100 dark:border-border">
+                    <button onClick={() => { onResumeDraft?.(spot); onClose(); }} className="flex min-h-11 flex-1 items-center justify-center gap-1.5 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-accent"><FilePenLine className="h-4 w-4" />Resume editing</button>
+                    <button onClick={() => handleDelete(spot.id)} disabled={Boolean(deletingId)} className="grid min-h-11 w-12 place-items-center border-l border-gray-100 text-red-500 hover:bg-red-50 disabled:opacity-50 dark:border-border dark:hover:bg-red-950/20" aria-label={`Delete ${draftDisplayName(spot)}`}><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                </article>
+                ) : (
                 <article key={spot.id} className="group rounded-2xl border border-gray-200/80 dark:border-border bg-white/80 dark:bg-white/[0.03] overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-[transform,box-shadow] duration-200">
                   <div className="flex min-h-[124px]">
                     <div className="w-28 sm:w-32 bg-gray-100 dark:bg-accent shrink-0 overflow-hidden">
@@ -177,6 +226,7 @@ export default function MySpotsPanel({ user, onClose, onSelectSpot }) {
                     {tab === 'created' && <button onClick={() => handleDelete(spot.id)} disabled={Boolean(deletingId)} className="w-12 min-h-11 grid place-items-center text-red-500 border-l border-gray-100 dark:border-border hover:bg-red-50 dark:hover:bg-red-950/20 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-red-500" aria-label={`Delete ${getSpotDisplayName(spot, language)}`}><Trash2 className="w-4 h-4" /></button>}
                   </div>
                 </article>
+                )
               ))}
             </div>
           )}
