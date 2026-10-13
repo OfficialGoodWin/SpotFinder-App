@@ -3,118 +3,52 @@ import LegalPageLayout, { LegalH2, LegalP, LegalUl, LegalStrong, LegalNote } fro
 
 export default function TermsAndConditions() {
   return (
-    <LegalPageLayout title="Terms & Conditions" lastUpdated="8 October 2026">
-      <LegalNote><LegalStrong>Review status:</LegalStrong> This draft is pending qualified legal review, including the operator identity, governing law, subscriptions, and consumer-rights terms.</LegalNote>
+    <LegalPageLayout title="Terms & Conditions" lastUpdated="13 October 2026">
+      <LegalNote><LegalStrong>Review status:</LegalStrong> This draft is pending qualified legal review, including operator identity, governing law, subscriptions, and consumer rights.</LegalNote>
+      <LegalP>These terms govern SpotFinder, currently identified as operated by Michael Neděle. Contact: spotfinder@icloud.com. Required operator registration, address, and tax disclosures have not been confirmed.</LegalP>
 
-      <LegalP>
-        These Terms & Conditions ("<LegalStrong>Terms</LegalStrong>") govern your use of the SpotFinder
-        app and website (the "<LegalStrong>Service</LegalStrong>"), operated by Michael Neděle,
-        an individual ("<LegalStrong>we</LegalStrong>", "<LegalStrong>us</LegalStrong>"). Contact: spotfinder@icloud.com.
-        By creating an account or using the Service, you agree to these Terms.
-      </LegalP>
+      <LegalH2>1. Service</LegalH2>
+      <LegalP>SpotFinder is a community map for outdoor places. Locations, conditions, access rights, and third-party map/routes may be inaccurate or outdated. Follow local law, verify access and safety, and do not rely on the Service as an emergency or safety system.</LegalP>
 
-      <LegalH2>1. The Service</LegalH2>
-      <LegalP>
-        SpotFinder is a community map app for discovering and sharing outdoor "spots" (viewpoints,
-        parking, camping, and similar places). SpotFinder may preview planned Elite/Ultra tiers; a tier is available for purchase only when an enabled checkout explicitly offers it. Some map, routing, and points-of-interest data is provided by
-        third parties (see our <a href="/PrivacyPolicy" className="underline text-blue-600 dark:text-blue-400">Privacy Policy</a>);
-        we don't guarantee the accuracy of third-party map data, and locations shown may be
-        inaccurate, outdated, or on private property — always exercise your own judgment and follow
-        local laws (including trespassing and access rules) when visiting any spot.
-      </LegalP>
-
-      <LegalH2>2. Accounts</LegalH2>
+      <LegalH2>2. Accounts and age</LegalH2>
       <LegalUl>
-        <li>You must provide accurate information when creating an account and keep your login credentials confidential.</li>
-        <li>You're responsible for all activity under your account.</li>
-        <li>You must be at least 16 years old to create an account. If we learn an account belongs to a younger child, we may suspend or delete it.</li>
-        <li>You must add a valid date of birth when requested. Existing accounts receive a 30-day deadline; accounts that remain incomplete after that deadline are automatically deleted.</li>
-        <li>You may delete your account at any time from Settings.</li>
+        <li>Keep credentials secure and provide accurate information.</li>
+        <li>The current minimum registration age is 16. Existing registered accounts without a DOB receive a 30-day completion deadline enforced by a daily backend job.</li>
+        <li>You may request deletion in Settings after recent reauthentication. An active or unresolved subscription must first be cancelled through support so billing is not orphaned. Private data is removed while public geographic contributions may be retained under a former-contributor label as described in the Privacy Policy.</li>
       </LegalUl>
 
-      <LegalH2>3. User-generated content</LegalH2>
-      <LegalP>By submitting a spot, rating, description, photo, or review, you confirm that:</LegalP>
-      <LegalUl>
-        <li>It's your own content, or you have the right to share it (don't upload photos you don't own or that show identifiable people without their consent).</li>
-        <li>It doesn't infringe anyone's copyright, privacy, or other rights.</li>
-        <li>It's accurate to the best of your knowledge — spot ratings and descriptions reflect one contributor's opinion/experience, not a verified guarantee of the location's condition, safety, legality of access, or accessibility.</li>
-        <li>It doesn't contain hate speech, harassment, spam, illegal content, or content that could endanger others.</li>
-      </LegalUl>
-      <LegalP>
-        You keep ownership of your content, but grant us a worldwide, non-exclusive, royalty-free
-        license to host, display, and distribute it within the Service so other users can see it. We
-        may remove content that violates these Terms or that we're required to remove by law, and may
-        suspend accounts that repeatedly violate them (see our moderation/reporting tools in the app).
-      </LegalP>
+      <LegalH2>3. User content</LegalH2>
+      <LegalP>You must own or have permission to share submitted spots, text, social links, and photos; respect privacy and intellectual-property rights; and avoid illegal, dangerous, deceptive, or abusive content. You retain ownership and grant SpotFinder a worldwide, non-exclusive, royalty-free licence to host, reproduce as technically necessary, display, and distribute the contribution within the Service. The scope and post-deletion duration of this licence require legal review. Content may be moderated or removed.</LegalP>
 
       <LegalH2>4. Acceptable use</LegalH2>
-      <LegalP>You agree not to:</LegalP>
       <LegalUl>
-        <li>Use the Service to harass, defraud, or endanger others</li>
-        <li>Post fake, misleading, or manipulated ratings/reviews</li>
-        <li>Attempt to access other users' accounts or bypass security/rate-limiting measures</li>
-        <li>Scrape, reverse-engineer, or resell the Service's data without permission</li>
-        <li>Use automated bots to create accounts or content</li>
+        <li>Do not access another account, evade security/rate limits, automate abuse, or manipulate ratings.</li>
+        <li>Do not post personal data without authority or content that infringes rights.</li>
+        <li>Do not scrape or resell protected Service/provider data without permission.</li>
       </LegalUl>
 
-      <LegalH2>5. Subscriptions & payments</LegalH2>
+      <LegalH2>5. Subscriptions and payments</LegalH2>
       <LegalUl>
-        <li>If Elite or Ultra checkout is enabled, it is a paid, auto-renewing subscription billed monthly or yearly as shown at checkout. A plan preview without an enabled checkout is not an offer for sale.</li>
-        <li>Payment is processed by Stripe; by subscribing you also agree to <a href="https://stripe.com/legal/end-users" target="_blank" rel="noopener noreferrer" className="underline text-blue-600 dark:text-blue-400">Stripe's terms</a>.</li>
-        <li>Subscriptions renew automatically until cancelled. The current app does not have self-service cancellation; contact support using the address in the Refund Policy. Cancellation timing must be confirmed by support.</li>
-        <li>See our <a href="/RefundPolicy" className="underline text-blue-600 dark:text-blue-400">Refund Policy</a> for cancellations, refunds, and your legal right of withdrawal.</li>
+        <li>Elite/Ultra cards are previews unless both client and server checkout switches are enabled. A preview is not an offer for sale.</li>
+        <li>If enabled after review, Stripe Checkout creates an auto-renewing monthly/yearly subscription at the price shown at checkout.</li>
+        <li>The current app has no verified self-service cancellation portal. Support cancellation, tax/invoice handling, failure recovery, entitlement revocation, and checkout withdrawal disclosures must be operationally verified before sales are enabled.</li>
+        <li>See the <a href="/RefundPolicy" className="underline text-blue-600 dark:text-blue-400">Refund Policy</a>, which is also pending review.</li>
       </LegalUl>
 
       <LegalH2>6. Advertising</LegalH2>
-      <LegalP>
-        Free-tier use of the Service may display ads served by Google AdSense, shown only if you've
-        consented to advertising cookies. Elite and Ultra subscriptions remove ads. We aren't
-        responsible for the content of third-party ads.
-      </LegalP>
+      <LegalP>The free tier may request Google ads only after advertising consent. Any promise that paid tiers remove ads applies only if paid subscriptions are actually enabled and the entitlement is active.</LegalP>
 
-      <LegalH2>7. Disclaimers</LegalH2>
-      <LegalP>
-        THE SERVICE IS PROVIDED "AS IS." Spot locations, ratings, directions, and other user- or
-        third-party-supplied content may be inaccurate, incomplete, or unsafe. We are not responsible
-        for injury, loss, or damage arising from visiting a spot found through the app, from following
-        navigation directions, or from relying on user-submitted information. Always check current
-        local conditions, access rules, and safety before visiting any location.
-      </LegalP>
+      <LegalH2>7. Disclaimers and liability</LegalH2>
+      <LegalP>The Service is provided without a guarantee that community or third-party information is accurate, complete, available, lawful to access, or safe. Nothing in these terms excludes rights or liability that applicable law does not permit us to exclude. The appropriate liability wording requires qualified review.</LegalP>
 
-      <LegalH2>8. Limitation of liability</LegalH2>
-      <LegalP>
-        To the maximum extent permitted by law, Michael Neděle is not liable for indirect,
-        incidental, or consequential damages arising from your use of the Service. Nothing in these
-        Terms limits liability that cannot be limited under applicable law (for example, liability for
-        death or personal injury caused by negligence, where such a limitation isn't permitted).
-      </LegalP>
+      <LegalH2>8. Suspension and termination</LegalH2>
+      <LegalP>Accounts or content may be suspended or removed for rule violations, legal requirements, safety, or abuse prevention. You may stop using the Service and request account deletion.</LegalP>
 
-      <LegalH2>9. Termination</LegalH2>
-      <LegalP>
-        We may suspend or terminate your account if you violate these Terms. You may stop using the
-        Service and delete your account at any time.
-      </LegalP>
+      <LegalH2>9. Governing law and disputes</LegalH2>
+      <LegalP>The governing law and competent court have not been selected or approved and must be completed after operator details are confirmed. Mandatory consumer protections may apply regardless of that choice. The former EU Online Dispute Resolution platform was discontinued in July 2025 and is not presented as an available dispute channel.</LegalP>
 
-      <LegalH2>10. Governing law</LegalH2>
-      <LegalP>
-        These Terms are governed by the laws of [GOVERNING JURISDICTION, e.g. the Czech Republic],
-        without regard to conflict-of-law rules. If you're a consumer resident in the EU, mandatory
-        consumer-protection provisions of your country of residence may also apply, and you can use
-        the EU's{' '}
-        <a href="https://ec.europa.eu/consumers/odr" target="_blank" rel="noopener noreferrer" className="underline text-blue-600 dark:text-blue-400">
-          Online Dispute Resolution platform
-        </a>{' '}
-        for cross-border disputes.
-      </LegalP>
-
-      <LegalH2>11. Changes to these Terms</LegalH2>
-      <LegalP>
-        We may update these Terms from time to time. We'll notify you of material changes in the app.
-        Continuing to use the Service after changes take effect means you accept the updated Terms.
-      </LegalP>
-
-      <LegalH2>12. Contact</LegalH2>
-      <LegalP>Questions about these Terms? Email spotfinder@icloud.com.</LegalP>
+      <LegalH2>10. Changes and contact</LegalH2>
+      <LegalP>Material changes should be communicated before they take effect where required. Questions: spotfinder@icloud.com.</LegalP>
     </LegalPageLayout>
   );
 }

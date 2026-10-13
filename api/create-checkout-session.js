@@ -78,6 +78,12 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
+  // This server-side flag is the source of truth. Client configuration alone
+  // must never make a dormant or legally unreviewed checkout callable live.
+  if (process.env.SUBSCRIPTIONS_ENABLED !== 'true') {
+    return res.status(503).json({ message: 'Subscriptions are not currently available for purchase.' });
+  }
+
   if (!process.env.STRIPE_SECRET_KEY) {
     return res.status(500).json({ message: 'STRIPE_SECRET_KEY is not configured on the server.' });
   }
@@ -95,6 +101,11 @@ export default async function handler(req, res) {
   if (await isRateLimited(decoded.uid)) {
     res.setHeader('Retry-After', '60');
     return res.status(429).json({ message: 'Too many requests. Please try again later.' });
+  }
+
+  const deletionRequest = await adminDb.collection('account_deletion_requests').doc(decoded.uid).get();
+  if (deletionRequest.exists) {
+    return res.status(409).json({ message: 'Account deletion is pending or was requested. Resolve it with support before starting checkout.' });
   }
 
   const plan = getPricePlans().get(priceId);
@@ -130,7 +141,7 @@ export default async function handler(req, res) {
     const session = await stripe.checkout.sessions.create(sessionParams);
     return res.status(200).json({ sessionId: session.id, url: session.url });
   } catch (err) {
-    console.error('[Stripe] Checkout session error:', err);
+    console.error('[Stripe] Checkout session error', { type: err?.type || 'unknown', code: err?.code || 'unknown' });
     return res.status(500).json({ message: 'Unable to start checkout. Please try again.' });
   }
 }

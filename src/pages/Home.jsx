@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 import { Plus, Settings, Crosshair, HelpCircle, Trash2, MoreHorizontal } from 'lucide-react';
-import { getPublicSpotsInBounds, getPublicSpotsNear, getPublicSpotById, createSpot, deleteSpot, updateSpot, getAdminPOIs, getAdminClosures, getAdminERouteOverrides, getAdminRoadOverrides, getDeletedAmbientPOIs, addDeletedAmbientPOI, addSocialPost } from '@/api/firebaseClient';
+import { getPublicSpotsInBounds, getPublicSpotsNear, getPublicSpotById, createSpot, deleteSpot, updateSpot, getAdminPOIs, getAdminClosures, getAdminERouteOverrides, getAdminRoadOverrides, getDeletedAmbientPOIs, addDeletedAmbientPOI, addSocialPost, getFirebaseServices, reauthenticateForAccountDeletion, requestAccountDeletion } from '@/api/firebaseClient';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
@@ -103,6 +103,9 @@ export default function Home() {
   const [fitBoundsData, setFitBoundsData] = useState(null);
   const [zoomToArea, setZoomToArea] = useState(null);
   const [deleteInput, setDeleteInput] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const [selectedPOICategory, setSelectedPOICategory] = useState(null);
   const [currentPOIs, setCurrentPOIs] = useState([]);
   const [showPOIPanel, setShowPOIPanel] = useState(false);
@@ -325,12 +328,27 @@ export default function Home() {
     await logout();
   };
  
-  const handleDeleteAccount = () => {
-    if (deleteInput === 'DELETE') {
-      // Note: This would need backend support to actually delete the account
-      alert('Account deletion requires backend implementation. Please contact support.');
+  const handleDeleteAccount = async () => {
+    if (deleteInput !== 'DELETE' || deleteBusy) return;
+    setDeleteBusy(true);
+    setDeleteError('');
+    try {
+      await reauthenticateForAccountDeletion(deletePassword);
+      await requestAccountDeletion({ confirmation: 'DELETE' });
       setShowDeleteConfirm(false);
       setDeleteInput('');
+      setDeletePassword('');
+      toast.success('Your account was deleted. Public contributions were retained under a former-contributor label.');
+      await logout().catch(() => {});
+    } catch (error) {
+      const code = String(error?.code || '');
+      setDeleteError(code.includes('wrong-password') || code.includes('invalid-credential')
+        ? 'Your current password is incorrect.'
+        : code.includes('popup-closed')
+          ? 'Reauthentication was cancelled. Your account was not deleted.'
+          : error?.message?.replace(/^Firebase:\s*/i, '') || 'Account deletion could not be completed. Your account remains available; retry or contact support.');
+    } finally {
+      setDeleteBusy(false);
     }
   };
  
@@ -780,7 +798,7 @@ export default function Home() {
  
       {/* Delete Account Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-[2px]" role="alertdialog" aria-modal="true" aria-labelledby="delete-account-title" aria-describedby="delete-account-description" onKeyDown={event => { if (event.key === 'Escape') { setShowDeleteConfirm(false); setDeleteInput(''); } }}>
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-[2px]" role="alertdialog" aria-modal="true" aria-labelledby="delete-account-title" aria-describedby="delete-account-description" onKeyDown={event => { if (event.key === 'Escape' && !deleteBusy) { setShowDeleteConfirm(false); setDeleteInput(''); setDeletePassword(''); setDeleteError(''); } }}>
           <div className="sf-sheet w-full max-w-sm rounded-3xl p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
@@ -790,38 +808,53 @@ export default function Home() {
             </div>
             
             <p id="delete-account-description" className="text-gray-600 dark:text-muted-foreground text-sm mb-4">
-              {t('home.deleteAccountWarning')}
+              This removes your sign-in account, private profile (including date of birth and enrolled SMS factors), drafts, saves, likes, and individual ratings. Public spots, reviews, social links, and photos are retained under a former-contributor label to preserve the community map and moderation record; public photo URLs may keep a pseudonymous storage path. Active subscriptions must be cancelled through support first. This cannot be undone.
             </p>
             
             <p className="text-gray-500 dark:text-muted-foreground text-xs mb-4">
-              {t('home.deleteAccountType')}
+              Reauthentication is required. Type DELETE to confirm:
             </p>
+
+            {getFirebaseServices().auth.currentUser?.providerData.some(provider => provider.providerId === 'password') && (
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={(event) => setDeletePassword(event.target.value)}
+                placeholder="Current password"
+                aria-label="Current password"
+                autoComplete="current-password"
+                className="sf-control mb-3 w-full focus-visible:ring-red-500"
+              />
+            )}
             
             <input
               type="text"
               value={deleteInput}
               onChange={(e) => setDeleteInput(e.target.value)}
-              placeholder={t('home.deleteAccountPlaceholder')}
-              aria-label={t('home.deleteAccountType')}
+              placeholder="Type DELETE"
+              aria-label="Type DELETE to confirm account deletion"
               autoFocus
               className="sf-control mb-4 w-full focus-visible:ring-red-500"
             />
             
             <div className="flex gap-3">
               <button
-                onClick={() => { setShowDeleteConfirm(false); setDeleteInput(''); }}
+                onClick={() => { setShowDeleteConfirm(false); setDeleteInput(''); setDeletePassword(''); setDeleteError(''); }}
+                disabled={deleteBusy}
                 className="sf-button-secondary flex-1"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteAccount}
-                disabled={deleteInput !== 'DELETE'}
+                disabled={deleteInput !== 'DELETE' || deleteBusy}
                 className="sf-button-danger flex-1"
               >
-                {t('home.deleteAccountConfirm')}
+                {deleteBusy ? 'Deleting…' : 'Delete account'}
               </button>
             </div>
+            {deleteError && <p role="alert" className="mt-3 text-sm text-red-600 dark:text-red-400">{deleteError}</p>}
+            <p className="mt-3 text-xs text-muted-foreground">If cleanup fails, the account remains available so you can retry. Contact spotfinder@icloud.com if a retry does not complete.</p>
           </div>
         </div>
       )}

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CalendarDays, ShieldCheck, X } from 'lucide-react';
 import { ensureAccountProfile, setAccountDateOfBirth } from '@/api/firebaseClient';
+import { accountBirthDateBounds } from '@/lib/ageEligibility';
 
 export default function BirthDateReminder({ user }) {
   const [profile, setProfile] = useState(null);
@@ -18,6 +19,7 @@ export default function BirthDateReminder({ user }) {
 
   if (!user || !profile || profile.hasDateOfBirth || dismissed) return null;
   const deadline = profile.deadline ? new Date(profile.deadline) : null;
+  const birthDateBounds = accountBirthDateBounds();
 
   const save = async (event) => {
     event.preventDefault();
@@ -39,7 +41,7 @@ export default function BirthDateReminder({ user }) {
       </div>
       <form onSubmit={save} className="mt-4 flex flex-col gap-3 sm:flex-row">
         <label className="sr-only" htmlFor="reminder-date-of-birth">Date of birth</label>
-        <input id="reminder-date-of-birth" type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} required max={new Date().toISOString().slice(0, 10)} className="min-h-12 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-base dark:border-white/10 dark:bg-slate-900" />
+        <input id="reminder-date-of-birth" type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} required min={birthDateBounds.min} max={birthDateBounds.max} className="min-h-12 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-base dark:border-white/10 dark:bg-slate-900" />
         <button disabled={saving} className="min-h-12 rounded-xl bg-emerald-600 px-5 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">{saving ? 'Saving…' : 'Save securely'}</button>
       </form>
       {error && <p role="alert" className="mt-2 text-sm text-red-600">{error}</p>}

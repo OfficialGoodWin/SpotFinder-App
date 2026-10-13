@@ -143,7 +143,7 @@ function PlanCard({ plan, user, onClose }) {
     if (!SUBSCRIPTIONS_AVAILABLE) return;
     setLoading(true);
     try {
-      await redirectToCheckout(price.priceId, user?.email, user?.uid, plan.id || plan.name);
+      await redirectToCheckout(price.priceId, user?.email, user?.id, plan.id || plan.name);
     } finally {
       setLoading(false);
     }

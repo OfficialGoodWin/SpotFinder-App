@@ -3,67 +3,24 @@ import LegalPageLayout, { LegalH2, LegalP, LegalUl, LegalStrong, LegalNote } fro
 
 export default function RefundPolicy() {
   return (
-    <LegalPageLayout title="Refund Policy" lastUpdated="8 October 2026">
-      <LegalNote><LegalStrong>Review status:</LegalStrong> This draft is pending legal and operational review. Refund handling and the withdrawal flow must be verified before publication.</LegalNote>
+    <LegalPageLayout title="Refund Policy" lastUpdated="13 October 2026">
+      <LegalNote><LegalStrong>Review status:</LegalStrong> This draft is pending legal and operational review. Paid checkout must remain disabled until cancellation, withdrawal, tax, and refund operations are verified.</LegalNote>
+      <LegalP>This policy applies only to a subscription actually purchased through an enabled SpotFinder checkout. Plan previews are not purchases.</LegalP>
 
-      <LegalP>
-        This Refund Policy applies only to a paid SpotFinder Elite or Ultra subscription actually purchased through an enabled SpotFinder Stripe checkout. Plan previews are not purchases.
-      </LegalP>
+      <LegalH2>1. Withdrawal rights</LegalH2>
+      <LegalP>Depending on location and contract, a consumer may have a statutory withdrawal right, including a 14-day period under some European laws. The exact scope, exceptions, notices, and refund calculation need qualified review. Immediate digital-service performance and any proportionate charge may depend on an explicit checkout request and acknowledgement; the current flow has not been verified to collect every required acknowledgement.</LegalP>
 
-      <LegalH2>1. Your legal right of withdrawal (EU/EEA/UK consumers)</LegalH2>
-      <LegalP>
-        If you're a consumer in the EU, EEA, or UK, you have a legal right to withdraw from a new
-        subscription within <LegalStrong>14 days</LegalStrong> of purchase without giving a reason, for a
-        full refund.
-      </LegalP>
-      <LegalP>
-        Because a subscription gives you access to paid features immediately, if you ask us to start
-        the service right away (which happens automatically when you subscribe) and then withdraw
-        during the 14-day period, we may deduct an amount proportionate to what you already used before
-        you told us you wanted to withdraw. If you don't use any paid features before withdrawing, you
-        get a full refund of that period.
-      </LegalP>
-      <LegalP>
-        To withdraw, email spotfinder@icloud.com within 14 days of your purchase with your account email and
-        the date you subscribed.
-      </LegalP>
-
-      <LegalH2>2. Cancelling your subscription</LegalH2>
+      <LegalH2>2. Cancellation</LegalH2>
       <LegalUl>
-        <li>The current app does not provide a self-service cancellation portal. To request cancellation, email spotfinder@icloud.com. Cancellation timing and completion must be confirmed by support.</li>
-        <li>Cancelling stops future renewals but doesn't automatically refund the current billing period — you keep access until the end of the period you already paid for.</li>
-        <li>Outside the 14-day withdrawal window described above, renewal charges are generally non-refundable, except where required by law or at our discretion (e.g. accidental duplicate charges, billing errors, or extended service outages).</li>
+        <li>The current app has no verified self-service cancellation portal. Contact spotfinder@icloud.com. Support must confirm completion and effective timing.</li>
+        <li>Whether access continues to period end and whether a current-period amount is refundable depends on applicable law, checkout terms, and the confirmed Stripe operation.</li>
       </LegalUl>
 
-      <LegalH2>3. Billing errors and duplicate charges</LegalH2>
-      <LegalP>
-        If you believe you were charged in error (wrong amount, duplicate charge, or charged after you
-        cancelled), contact spotfinder@icloud.com with your receipt/transaction ID and we'll investigate and
-        correct genuine errors.
-      </LegalP>
+      <LegalH2>3. Errors and refunds</LegalH2>
+      <LegalP>For a duplicate, incorrect, or post-cancellation charge, contact spotfinder@icloud.com with the Stripe receipt or transaction identifier. Any approved refund should be returned through Stripe to the original method. No fixed 5–10-day timing is promised because provider and issuer timing has not been operationally verified.</LegalP>
 
-      <LegalH2>4. How refunds are issued</LegalH2>
-      <LegalP>
-        Approved refunds are returned to your original payment method via Stripe. Processing times
-        depend on your bank/card issuer and are typically 5–10 business days.
-      </LegalP>
-
-      <LegalH2>5. Subscriptions purchased through an app store</LegalH2>
-      <LegalP>
-        If in the future a subscription is purchased through Google Play or the Apple App Store rather
-        than directly via Stripe, that purchase is governed by{' '}
-        <a href="https://support.google.com/googleplay/answer/2479637" target="_blank" rel="noopener noreferrer" className="underline text-blue-600 dark:text-blue-400">
-          Google Play's refund policy
-        </a>{' '}
-        or{' '}
-        <a href="https://support.apple.com/en-us/HT204084" target="_blank" rel="noopener noreferrer" className="underline text-blue-600 dark:text-blue-400">
-          Apple's refund policy
-        </a>{' '}
-        respectively — refunds for those purchases must be requested from Google/Apple, not from us.
-      </LegalP>
-
-      <LegalH2>6. Contact</LegalH2>
-      <LegalP>Questions about a charge or refund? Email spotfinder@icloud.com.</LegalP>
+      <LegalH2>4. App-store purchases</LegalH2>
+      <LegalP>No App Store or Google Play purchase path is implemented in the audited web flow. If one is later added, the applicable store process and disclosures must be documented before sale.</LegalP>
     </LegalPageLayout>
   );
 }

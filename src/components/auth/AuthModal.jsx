@@ -3,6 +3,7 @@ import { X, Mail, Lock, User, ArrowRight, ExternalLink, Smartphone, CalendarDays
 import { loginWithEmail, registerWithEmail, loginWithGoogle, isRestrictedBrowser, getMfaResolverFromError, getMfaRecaptchaVerifier, clearMfaRecaptchaVerifier, startMfaSignIn, completeMfaSignIn } from '@/api/firebaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useLanguage } from '@/lib/LanguageContext';
+import { accountBirthDateBounds } from '@/lib/ageEligibility';
 
 // Client-side brute-force protection: track failed attempts per session
 const loginAttempts = { count: 0, lockedUntil: 0 };
@@ -23,6 +24,7 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const { checkUserAuth } = useAuth();
+  const birthDateBounds = accountBirthDateBounds();
   const modalRef = useRef(null);
   const onCloseRef = useRef(onClose);
   const dateExample = new Intl.DateTimeFormat(language, { dateStyle: 'medium' }).format(new Date(Date.UTC(2000, 9, 12)));
@@ -284,7 +286,7 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
               <label htmlFor="auth-date-of-birth" className="block text-sm font-medium text-gray-700 dark:text-foreground mb-1.5">Date of birth</label>
               <div className="relative">
                 <CalendarDays className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
-                <input id="auth-date-of-birth" type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} required max={new Date().toISOString().slice(0, 10)}
+                <input id="auth-date-of-birth" type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} required min={birthDateBounds.min} max={birthDateBounds.max}
                   className="sf-control w-full pl-12 pr-4" />
               </div>
               <p className="mt-1.5 text-xs text-gray-500 dark:text-muted-foreground">Use your local date format (for example, {dateExample}). You must be at least 16; this stays private.</p>

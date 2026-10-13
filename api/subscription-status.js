@@ -19,7 +19,7 @@ export default async function handler(req, res) {
       isUltra: subscription?.status === 'active' && subscription?.plan === 'ultra',
     });
   } catch (error) {
-    console.error('Subscription status error:', error);
+    console.error('Subscription status error', { code: error?.code || 'unknown' });
     return res.status(500).json({ error: 'Unable to load subscription status' });
   }
 }

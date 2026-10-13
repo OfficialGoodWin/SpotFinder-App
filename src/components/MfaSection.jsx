@@ -27,15 +27,24 @@ export default function MfaSection() {
   if (!user || user.isAnonymous) return null;
 
   const handleSendCode = async () => {
-    if (!phone.trim()) return;
+    const normalizedPhone = phone.replace(/[\s()-]/g, '');
+    if (!/^\+[1-9]\d{7,14}$/.test(normalizedPhone)) {
+      setError('Enter a phone number in international format, for example +420123456789.');
+      return;
+    }
     setBusy(true); setError('');
     try {
       const verifier = getMfaRecaptchaVerifier('mfa-enroll-recaptcha');
-      const id = await startMfaEnrollment(user, phone.trim(), verifier);
+      const id = await startMfaEnrollment(user, normalizedPhone, verifier);
+      setPhone(normalizedPhone);
       setVerificationId(id);
     } catch (err) {
-      setError(err.message === 'auth/unverified-email'
+      setError(err.code === 'auth/unverified-email' || err.message === 'auth/unverified-email'
         ? 'Verify your email address before adding two-factor authentication.'
+        : err.code === 'auth/too-many-requests'
+          ? 'Too many SMS attempts. Wait before trying again.'
+          : err.code === 'auth/operation-not-allowed'
+            ? 'SMS two-factor authentication is not available for this account right now.'
         : err.message || 'Could not send code.');
     } finally { setBusy(false); }
   };
@@ -84,6 +93,10 @@ export default function MfaSection() {
         </div>
       )}
 
+      <p className="mb-3 text-xs font-medium text-muted-foreground" role="status">
+        {factors.length > 0 ? 'SMS two-factor authentication is active.' : 'SMS two-factor authentication is not active.'}
+      </p>
+
       <div id="mfa-enroll-recaptcha" />
 
       {!verificationId ? (
@@ -115,7 +128,7 @@ export default function MfaSection() {
 
       {error && <p className="sf-status-error mt-3" role="alert">{error}</p>}
       <p className="text-xs text-muted-foreground mt-2">
-        Adds a text-message code requirement on top of your password when signing in.
+        After enrollment completes, a text-message code is required in addition to your primary sign-in method. Keep access to the enrolled number; recovery options depend on Firebase and your sign-in provider.
       </p>
     </section>
   );

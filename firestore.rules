@@ -54,6 +54,7 @@ service cloud.firestore {
         ((resource.data.created_by == authEmail() || resource.data.created_by_uid == request.auth.uid)
           && strLen(request.resource.data.title, 100)
           && strLen(request.resource.data.description, 2000)
+          && !request.resource.data.keys().hasAny(['email', 'date_of_birth', 'phone', 'phone_number', 'password', 'auth_token'])
           && unchanged(['rating', 'rating_count', 'parking_rating', 'parking_rating_count',
                         'beauty_rating', 'beauty_rating_count', 'privacy_rating',
                         'privacy_rating_count', 'access_rating', 'access_rating_count',
@@ -107,13 +108,14 @@ service cloud.firestore {
     // recomputed server-side by a Cloud Function trigger — never trust a
     // client-submitted average).
     match /spot_ratings/{ratingId} {
-      allow read: if true;
+      allow read: if isAuth() && (resource.data.user_id == request.auth.uid || isSuperAdmin());
       // ratingId MUST be `${spotId}_${uid}` so a user can only ever create
       // or overwrite *their own* rating for a given spot (built-in de-dupe).
       allow create, update: if isAuth()
         && request.auth.token.email_verified == true
         && ratingId == request.resource.data.spot_id + '_' + request.auth.uid
         && request.resource.data.user_id == request.auth.uid
+        && request.resource.data.keys().hasOnly(['spot_id', 'user_id', 'overall', 'access', 'condition', 'safety', 'crowdedness', 'schema', 'updated_date'])
         && request.resource.data.schema == 2
         && request.resource.data.overall is number && request.resource.data.overall >= 1 && request.resource.data.overall <= 5
         && request.resource.data.access is number && request.resource.data.access >= 0 && request.resource.data.access <= 5
@@ -134,18 +136,22 @@ service cloud.firestore {
     match /poi_photos/{docId} {
       allow read: if true;
       allow create: if isAuth() && request.auth.token.email_verified == true
-        && request.resource.data.created_by == authEmail();
-      allow delete: if isSuperAdmin() || (isAuth() && resource.data.created_by == authEmail());
+        && request.resource.data.created_by == 'registered-account'
+        && request.resource.data.created_by_uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['poi_id', 'image', 'created_by', 'created_by_uid', 'created_date']);
+      allow delete: if isSuperAdmin() || (isAuth() && resource.data.created_by_uid == request.auth.uid);
     }
 
     match /poi_ratings/{docId} {
       allow read: if true;
       allow create: if isAuth() && request.auth.token.email_verified == true
-        && request.resource.data.user_email == authEmail()
+        && request.resource.data.created_by == 'registered-account'
+        && request.resource.data.created_by_uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['poi_id', 'rating', 'review', 'created_by', 'created_by_uid', 'created_date'])
         && request.resource.data.rating is number
         && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
-        && strLen(request.resource.data.get('comment', ''), 1000);
-      allow delete: if isSuperAdmin() || (isAuth() && resource.data.user_email == authEmail());
+        && strLen(request.resource.data.get('review', ''), 1000);
+      allow delete: if isSuperAdmin() || (isAuth() && resource.data.created_by_uid == request.auth.uid);
     }
 
     // Social references are validated and written only by callable Cloud
@@ -165,6 +171,8 @@ service cloud.firestore {
       allow create: if isAuth() && request.auth.token.email_verified == true
         && flagId == request.resource.data.spot_id + '_' + authEmail()
         && request.resource.data.reporter_email == authEmail()
+        && request.resource.data.keys().hasOnly(['spot_id', 'reporter_email', 'reason', 'note', 'status', 'created_date'])
+        && strLen(request.resource.data.get('note', ''), 1000)
         && request.resource.data.status == 'open'
         && request.resource.data.reason in
              ['private_property', 'dangerous', 'duplicate', 'spam', 'inaccurate_location'];
@@ -173,10 +181,11 @@ service cloud.firestore {
 
     // ── Votes (up/down) — one vote per user per spot ───────────────────────────
     match /votes/{voteId} {
-      allow read: if isAuth();
+      allow read: if isAuth() && (resource.data.user_email == authEmail() || isSuperAdmin());
       allow create, update: if isAuth() && request.auth.token.email_verified == true
         && voteId == authEmail() + '_' + request.resource.data.spot_id
         && request.resource.data.user_email == authEmail()
+        && request.resource.data.keys().hasOnly(['user_email', 'spot_id', 'type', 'created_date'])
         && request.resource.data.type in ['up', 'down'];
       allow delete: if isAuth() && resource.data.user_email == authEmail();
     }
@@ -184,7 +193,8 @@ service cloud.firestore {
     // ── Bookmarks — private to each user ───────────────────────────────────────
     match /bookmarks/{bookmarkId} {
       allow read, delete: if isAuth() && resource.data.user_email == authEmail();
-      allow create: if isAuth() && request.resource.data.user_email == authEmail();
+      allow create: if isAuth() && request.resource.data.user_email == authEmail()
+        && request.resource.data.keys().hasOnly(['user_email', 'spot_id', 'created_date']);
     }
 
     // ── Spot likes + saves — verified accounts, one doc per user/spot ──────
@@ -193,7 +203,8 @@ service cloud.firestore {
       allow read: if isAuth() && (resource.data.user_id == request.auth.uid || isSuperAdmin());
       allow create: if isAuth() && request.auth.token.email_verified == true
         && relationId == request.resource.data.spot_id + '_' + request.auth.uid
-        && request.resource.data.user_id == request.auth.uid;
+        && request.resource.data.user_id == request.auth.uid
+        && request.resource.data.keys().hasOnly(['spot_id', 'user_id', 'created_date']);
       allow delete: if isAuth() && resource.data.user_id == request.auth.uid;
       allow update: if false;
     }
@@ -201,7 +212,8 @@ service cloud.firestore {
       allow read: if isAuth() && (resource.data.user_id == request.auth.uid || isSuperAdmin());
       allow create: if isAuth() && request.auth.token.email_verified == true
         && relationId == request.resource.data.spot_id + '_' + request.auth.uid
-        && request.resource.data.user_id == request.auth.uid;
+        && request.resource.data.user_id == request.auth.uid
+        && request.resource.data.keys().hasOnly(['spot_id', 'user_id', 'created_date']);
       allow delete: if isAuth() && resource.data.user_id == request.auth.uid;
       allow update: if false;
     }
@@ -288,6 +300,10 @@ service cloud.firestore {
       // reCAPTCHA + IP/session rate limiting. Direct SDK writes are blocked.
       allow create: if false;
       allow read, delete: if isSuperAdmin();
+    }
+
+    match /account_deletion_requests/{userId} {
+      allow read, write: if false;
     }
   }
 }

@@ -19,9 +19,17 @@ export default function CookieConsentBanner() {
 
   useEffect(() => {
     const state = getConsent();
+    setAnalyticsChecked(state.analytics);
+    setAdsChecked(state.ads);
     if (!state.decided) setVisible(true);
 
-    const reopen = () => setVisible(true);
+    const reopen = () => {
+      const current = getConsent();
+      setAnalyticsChecked(current.analytics);
+      setAdsChecked(current.ads);
+      setExpanded(true);
+      setVisible(true);
+    };
     window.addEventListener('spotfinder:open-cookie-settings', reopen);
     return () => window.removeEventListener('spotfinder:open-cookie-settings', reopen);
   }, []);

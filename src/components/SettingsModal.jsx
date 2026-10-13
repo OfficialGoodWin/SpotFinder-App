@@ -166,7 +166,7 @@ export default function SettingsModal({ onClose, mapExploreEnabled = true, onMap
           {onRequestDeleteAccount && <section className="sf-section md:col-span-2" aria-labelledby="account-management-title">
             <h3 id="account-management-title" className="mb-2 text-sm font-bold uppercase tracking-wide text-red-700 dark:text-red-300">Account management</h3>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div><p className="font-semibold">Delete account</p><p className="text-sm text-muted-foreground">Review deletion requirements and the data affected. Account deletion currently requires support.</p></div>
+              <div><p className="font-semibold">Delete account</p><p className="text-sm text-muted-foreground">Review what is deleted or de-identified, then reauthenticate to submit the deletion.</p></div>
               <button type="button" onClick={onRequestDeleteAccount} className="sf-button-secondary shrink-0 border-red-200 text-red-700 hover:bg-red-50 focus-visible:ring-red-500 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"><Trash2 className="mr-2 inline h-4 w-4" aria-hidden="true" />Delete account</button>
             </div>
           </section>}

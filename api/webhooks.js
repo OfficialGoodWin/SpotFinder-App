@@ -82,21 +82,26 @@ export default async function handler(req, res) {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' });
     const event = stripe.webhooks.constructEvent(rawBody, signature, process.env.STRIPE_WEBHOOK_SECRET);
     const eventRef = adminDb.collection('stripe_webhook_events').doc(event.id);
-    if ((await eventRef.get()).exists) return res.status(200).send('Already processed');
-
-    await processEvent(stripe, event);
     try {
-      await eventRef.create({ type: event.type, processedAt: new Date().toISOString() });
+      await eventRef.create({ type: event.type, status: 'processing', receivedAt: new Date().toISOString() });
     } catch (error) {
-      // A concurrent delivery may have completed first; event handlers above
-      // only perform idempotent document updates.
-      if (error?.code !== 6 && error?.code !== 'already-exists') throw error;
+      if (error?.code === 6 || error?.code === 'already-exists') return res.status(200).send('Already received');
+      throw error;
+    }
+    try {
+      await processEvent(stripe, event);
+      await eventRef.set({ status: 'complete', processedAt: new Date().toISOString() }, { merge: true });
+    } catch (error) {
+      // Release the idempotency claim so Stripe's retry can recover from a
+      // transient processing failure. No payment payload is logged.
+      await eventRef.delete().catch(() => {});
+      throw error;
     }
     return res.status(200).send('OK');
   } catch (error) {
     const status = error?.statusCode || (error?.type === 'StripeSignatureVerificationError' ? 400 : 500);
     if (status === 400) console.warn('Stripe webhook signature verification failed');
-    else console.error('Stripe webhook processing failed:', error);
+    else console.error('Stripe webhook processing failed', { type: error?.type || 'unknown', code: error?.code || 'unknown' });
     return res.status(status).send(status === 400 ? 'Invalid Stripe signature' : 'Webhook processing failed');
   }
 }

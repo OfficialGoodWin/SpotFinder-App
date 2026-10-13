@@ -24,6 +24,7 @@ test('private draft photos are accessible only to their authenticated owner', { 
     await assertSucceeds(deleteObject(ref(ownerStorage, path)));
     await assertFails(uploadBytes(ref(ownerStorage, 'drafts/other/draft-one/photo.jpg'), new Blob(['jpeg'], { type: 'image/jpeg' })));
     await assertFails(uploadBytes(ref(ownerStorage, 'drafts/owner/draft-one/photo.gif'), new Blob(['gif'], { type: 'image/gif' })));
+    await assertFails(uploadBytes(ref(ownerStorage, 'drafts/owner/draft-one/photo.png'), new Blob(['png'], { type: 'image/png' })));
   } finally {
     await testEnv.cleanup();
   }

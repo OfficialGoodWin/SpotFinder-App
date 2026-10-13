@@ -17,7 +17,7 @@
 const functions = require('firebase-functions/v1');
 const { initializeApp } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
-const { getFirestore } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { getStorage } = require('firebase-admin/storage');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
@@ -31,6 +31,97 @@ const RECAPTCHA_SITE_KEY = defineString('RECAPTCHA_SITE_KEY');
 const googleAuth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
 
 const DOB_GRACE_DAYS = 30;
+const RECENT_AUTH_SECONDS = 5 * 60;
+
+async function forEachQueryBatch(query, mutate) {
+  while (true) {
+    const snapshot = await query.limit(300).get();
+    if (snapshot.empty) return;
+    const batch = db.batch();
+    snapshot.docs.forEach(document => mutate(batch, document));
+    await batch.commit();
+    if (snapshot.size < 300) return;
+  }
+}
+
+async function deleteWhere(collectionName, field, value) {
+  await forEachQueryBatch(db.collection(collectionName).where(field, '==', value),
+    (batch, document) => batch.delete(document.ref));
+}
+
+async function anonymizeWhere(collectionName, field, value, patch) {
+  await forEachQueryBatch(db.collection(collectionName).where(field, '==', value),
+    (batch, document) => batch.update(document.ref, patch));
+}
+
+async function anonymizeOwnedSpots(field, value) {
+  await forEachQueryBatch(db.collection('spots').where(field, '==', value), (batch, document) => {
+    const current = document.data();
+    const photoMetadata = Array.isArray(current.photo_metadata)
+      ? current.photo_metadata.map(item => ({ ...item, creator: 'Former contributor' }))
+      : current.photo_metadata;
+    batch.update(document.ref, {
+      created_by: 'deleted-account',
+      created_by_name: 'Former contributor',
+      created_by_uid: FieldValue.delete(),
+      account_deleted_at: new Date().toISOString(),
+      ...(photoMetadata ? { photo_metadata: photoMetadata } : {}),
+    });
+  });
+}
+
+/**
+ * Remove private account data while retaining public geographic contributions
+ * in a de-identified form. This is intentionally idempotent: the callable and
+ * Auth onDelete trigger can safely retry after a partial failure.
+ */
+async function cleanupAccountData(uid, email) {
+  await Promise.all([
+    deleteWhere('spot_drafts', 'owner_uid', uid),
+    deleteWhere('spot_publications', 'owner_uid', uid),
+    deleteWhere('spot_ratings', 'user_id', uid),
+    deleteWhere('spot_likes', 'user_id', uid),
+    deleteWhere('spot_saves', 'user_id', uid),
+    deleteWhere('feedback', 'account_uid', uid),
+    anonymizeOwnedSpots('created_by_uid', uid),
+    anonymizeWhere('social_posts', 'added_by', uid, {
+      added_by: FieldValue.delete(), added_by_email: FieldValue.delete(), account_deleted: true,
+    }),
+    anonymizeWhere('reports', 'reporter_uid', uid, {
+      reporter_uid: FieldValue.delete(), reporter_email: FieldValue.delete(), account_deleted: true,
+    }),
+    anonymizeWhere('poi_ratings', 'created_by_uid', uid, {
+      created_by_uid: FieldValue.delete(), created_by: 'Former contributor', account_deleted: true,
+    }),
+    anonymizeWhere('poi_photos', 'created_by_uid', uid, {
+      created_by_uid: FieldValue.delete(), created_by: 'Former contributor', account_deleted: true,
+    }),
+  ]);
+
+  if (email) {
+    await Promise.all([
+      deleteWhere('votes', 'user_email', email),
+      deleteWhere('bookmarks', 'user_email', email),
+      deleteWhere('feedback', 'email', email),
+      deleteWhere('flags', 'reporter_email', email),
+      anonymizeWhere('poi_ratings', 'user_email', email, {
+        user_email: FieldValue.delete(), created_by: 'Former contributor', account_deleted: true,
+      }),
+      anonymizeWhere('poi_ratings', 'created_by', email, {
+        created_by: 'Former contributor', account_deleted: true,
+      }),
+      anonymizeWhere('poi_photos', 'created_by', email, {
+        created_by: 'Former contributor', account_deleted: true,
+      }),
+      anonymizeOwnedSpots('created_by', email),
+    ]);
+  }
+
+  await db.collection('users').doc(uid).delete().catch(() => {});
+  await Promise.all(['add_spot', 'feedback', 'social_post', 'content_report', 'account_deletion']
+    .map(action => db.collection('rate_limits').doc(`${uid}_${action}`).delete().catch(() => {})));
+  await getStorage().bucket().deleteFiles({ prefix: `drafts/${uid}/` });
+}
 
 function validateBirthDate(value) {
   const raw = String(value || '');
@@ -104,8 +195,8 @@ exports.enforceDateOfBirthDeadline = functions.pubsub.schedule('every day 03:15'
           continue;
         }
         if (Date.parse(profile.dob_deadline) <= now) {
+          await cleanupAccountData(account.uid, account.email || null);
           await adminAuth.deleteUser(account.uid);
-          await ref.delete();
         }
       }
       pageToken = page.pageToken;
@@ -117,20 +208,51 @@ exports.enforceDateOfBirthDeadline = functions.pubsub.schedule('every day 03:15'
 // intentionally not touched here; they have a separate moderation/deletion
 // policy, while unpublished drafts and idempotency markers are user-private.
 exports.cleanupSpotDraftsOnAccountDelete = functions.auth.user().onDelete(async (account) => {
-  const deleteOwned = async (collectionName) => {
-    let snapshot;
-    do {
-      snapshot = await db.collection(collectionName).where('owner_uid', '==', account.uid).limit(400).get();
-      if (snapshot.empty) break;
-      const batch = db.batch();
-      snapshot.docs.forEach(document => batch.delete(document.ref));
-      await batch.commit();
-    } while (!snapshot.empty);
-  };
-  await Promise.all([deleteOwned('spot_drafts'), deleteOwned('spot_publications')]);
-  await getStorage().bucket().deleteFiles({ prefix: `drafts/${account.uid}/` }).catch(error => {
-    console.warn('Draft image cleanup failed for deleted account:', account.uid, error.message);
+  await cleanupAccountData(account.uid, account.email || null).catch(error => {
+    console.error('Account cleanup retry failed', { uid: account.uid, message: error.message });
+    throw error;
   });
+});
+
+exports.requestAccountDeletion = functions.runWith({ timeoutSeconds: 120, memory: '512MB' }).https.onCall(async (_data, context) => {
+  if (!context.auth || context.auth.token.firebase?.sign_in_provider === 'anonymous') {
+    throw new functions.https.HttpsError('unauthenticated', 'A registered account is required.');
+  }
+  if (_data?.confirmation !== 'DELETE') {
+    throw new functions.https.HttpsError('invalid-argument', 'Explicit deletion confirmation is required.');
+  }
+  const authTime = Number(context.auth.token.auth_time || 0);
+  if (!authTime || Math.floor(Date.now() / 1000) - authTime > RECENT_AUTH_SECONDS) {
+    throw new functions.https.HttpsError('failed-precondition', 'Sign in again before deleting your account.');
+  }
+
+  const uid = context.auth.uid;
+  const requestRef = db.collection('account_deletion_requests').doc(uid);
+  await requestRef.set({
+    status: 'processing', requested_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(), attempts: FieldValue.increment(1),
+  }, { merge: true });
+  const profile = await db.collection('users').doc(uid).get();
+  const subscriptionStatus = profile.data()?.subscription?.status;
+  if (['active', 'trialing', 'past_due', 'unpaid'].includes(subscriptionStatus)) {
+    await requestRef.set({ status: 'blocked_subscription', updated_at: new Date().toISOString() }, { merge: true });
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'An active or unresolved subscription is linked to this account. Contact support to cancel it before deleting the account.'
+    );
+  }
+  try {
+    const account = await adminAuth.getUser(uid);
+    await cleanupAccountData(uid, account.email || context.auth.token.email || null);
+    await requestRef.set({ status: 'auth_deletion_started', updated_at: new Date().toISOString() }, { merge: true });
+    await adminAuth.deleteUser(uid);
+    await requestRef.set({ status: 'complete', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { merge: true });
+    return { status: 'complete' };
+  } catch (error) {
+    await requestRef.set({ status: 'failed', updated_at: new Date().toISOString() }, { merge: true }).catch(() => {});
+    console.error('Account deletion failed', { uid, code: error?.code || 'unknown' });
+    throw new functions.https.HttpsError('internal', 'Account deletion could not be completed. Your account remains available; retry or contact support.');
+  }
 });
 
 // ─── Feedback email notifications ──────────────────────────────────────────
@@ -340,7 +462,7 @@ async function promoteDraftPhotos(uid, draftId, draftData) {
     try {
       [metadata] = await source.getMetadata();
     } catch (error) {
-      console.warn('Draft photo metadata unavailable:', sourcePath, error.message);
+      console.warn('Draft photo metadata unavailable', { code: error?.code || 'unknown' });
       throw new functions.https.HttpsError('failed-precondition', 'A private draft photo is missing. Resume the draft and upload it again.');
     }
     const size = Number(metadata.size);
@@ -496,7 +618,8 @@ exports.submitSpot = functions.runWith({ secrets: ['ANTI_SPAM_IP_SALT'] }).https
       modified: false,
       location_match_confidence: 'user_placed',
     })),
-    created_by: context.auth.token.email || 'anonymous',
+    // Email addresses must never be copied into the publicly readable spot.
+    created_by: 'registered-account',
     created_by_name: cleanString(input.created_by_name, 100) || 'Anonymous', created_by_uid: uid,
     submission_attestation: { accepted: submissionAttested, version: submissionAttested ? '0.5.6' : 'legacy' },
     tags: list(input.tags, 10, 40),
@@ -704,6 +827,7 @@ exports.submitFeedback = functions.runWith({
     recaptcha_score: captcha.score,
     recaptcha_action: 'feedback',
     anonymous_session: context.auth?.token?.firebase?.sign_in_provider === 'anonymous',
+    account_uid: context.auth?.uid || null,
     ip_hash: ipHash,
     hidden: spam.score >= 5,
     moderation_note: spam.score >= 5 ? `auto_hidden:${spam.reasons.join(',')}` : (spam.score > 0 ? `low_confidence:${spam.reasons.join(',')}` : null),
@@ -728,7 +852,7 @@ exports.onFeedbackCreated = functions.firestore
     await sendFeedbackEmail(feedback).catch((err) => {
       // Never let a broken mail provider block feedback from being saved —
       // it's already in Firestore either way, this is just the notification.
-      console.error('Failed to send feedback notification email:', err);
+      console.error('Failed to send feedback notification email', { code: err?.code || 'unknown' });
     });
   });
 

@@ -35,7 +35,14 @@ export function getConsent() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { ...DEFAULT_STATE };
     const parsed = JSON.parse(raw);
-    return { ...DEFAULT_STATE, ...parsed };
+    if (!parsed || typeof parsed !== 'object') return { ...DEFAULT_STATE };
+    return {
+      necessary: true,
+      analytics: parsed.analytics === true,
+      ads: parsed.ads === true,
+      decided: parsed.decided === true,
+      timestamp: typeof parsed.timestamp === 'string' ? parsed.timestamp : null,
+    };
   } catch {
     return { ...DEFAULT_STATE };
   }
@@ -98,6 +105,8 @@ function applyConsent(state) {
   }
   if (state.analytics) loadAnalytics();
   if (state.ads) loadAds();
+  if (!state.analytics) disableAnalytics();
+  if (!state.ads) disableAds();
   window.dispatchEvent(new CustomEvent('spotfinder:consent-changed', { detail: state }));
 }
 
@@ -108,11 +117,25 @@ export function loadAnalytics() {
   analyticsLoaded = true;
   const GA_ID = 'G-GC7D8SVBMV';
   const script = document.createElement('script');
+  script.id = 'spotfinder-google-analytics';
   script.async = true;
   script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_ID}`;
   document.head.appendChild(script);
   window.gtag('js', new Date());
   window.gtag('config', GA_ID, { anonymize_ip: true });
+}
+
+function expireFirstPartyCookie(name) {
+  document.cookie = `${name}=; Max-Age=0; path=/; SameSite=Lax`;
+  document.cookie = `${name}=; Max-Age=0; path=/; domain=.${location.hostname}; SameSite=Lax`;
+}
+
+export function disableAnalytics() {
+  document.getElementById('spotfinder-google-analytics')?.remove();
+  analyticsLoaded = false;
+  document.cookie.split(';').map(value => value.split('=')[0].trim())
+    .filter(name => name === '_ga' || name.startsWith('_ga_'))
+    .forEach(expireFirstPartyCookie);
 }
 
 let adsLoaded = false;
@@ -121,10 +144,18 @@ export function loadAds() {
   adsLoaded = true;
   const CLIENT = 'ca-pub-9210597135045895';
   const script = document.createElement('script');
+  script.id = 'spotfinder-google-ads';
   script.async = true;
   script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${CLIENT}`;
   script.crossOrigin = 'anonymous';
   document.head.appendChild(script);
+}
+
+export function disableAds() {
+  document.getElementById('spotfinder-google-ads')?.remove();
+  document.querySelectorAll('ins.adsbygoogle').forEach(element => element.replaceChildren());
+  adsLoaded = false;
+  ['__gads', '__gpi', '__eoi'].forEach(expireFirstPartyCookie);
 }
 
 // On boot, if the user already decided in a previous session, re-apply their

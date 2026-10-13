@@ -12,6 +12,7 @@ import {
   sendEmailVerification,
   EmailAuthProvider,
   reauthenticateWithCredential,
+  reauthenticateWithPopup,
   updatePassword,
   verifyBeforeUpdateEmail,
   signInAnonymously,
@@ -20,7 +21,8 @@ import {
   PhoneMultiFactorGenerator,
   RecaptchaVerifier,
   getMultiFactorResolver,
-  updateProfile
+  updateProfile,
+  deleteUser as deleteFirebaseUser,
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -47,6 +49,7 @@ import { getRecaptchaToken } from '@/lib/recaptcha';
 import { filterAndSortNearbySpots, normalizeLatLng } from '@/lib/spotDiscovery';
 import { applyReviewedLegacyIdentity } from '@/lib/reviewedLegacySpots';
 import { normalizeSpotDraft } from '@/lib/spotDrafts';
+import { isEligibleBirthDate } from '@/lib/ageEligibility';
 
 let app, auth, db, functionsInstance, storage;
 try {
@@ -104,17 +107,26 @@ export const loginWithEmail = async (email, password) => {
  
 export const ensureAccountProfile = callFn('ensureAccountProfile');
 export const setAccountDateOfBirth = callFn('setAccountDateOfBirth');
+export const requestAccountDeletion = callFn('requestAccountDeletion');
 
 export const registerWithEmail = async (email, password, dateOfBirth, displayName = '') => {
+  if (!isEligibleBirthDate(dateOfBirth)) throw new Error('Enter a valid date of birth. You must be at least 16.');
   const { auth } = getFirebaseServices();
   const user = (await createUserWithEmailAndPassword(auth, email, password)).user;
-  if (displayName.trim()) await updateProfile(user, { displayName: displayName.trim().slice(0, 80) });
-  await setAccountDateOfBirth({ dateOfBirth });
+  try {
+    if (displayName.trim()) await updateProfile(user, { displayName: displayName.trim().slice(0, 80) });
+    await setAccountDateOfBirth({ dateOfBirth });
+  } catch (error) {
+    // Never leave a newly-created, incomplete account silently signed in if
+    // the required private DOB profile could not be stored.
+    await deleteFirebaseUser(user).catch(() => {});
+    throw error;
+  }
   // Required now that firestore.rules gates all content creation on
   // `request.auth.token.email_verified == true` — without this, every new
   // account would be silently unable to add a spot or leave a review the
   // moment those rules take effect, with no indication why.
-  await sendEmailVerification(user).catch((err) => console.error('Failed to send verification email:', err));
+  await sendEmailVerification(user).catch((err) => console.error('Failed to send verification email', { code: err?.code || 'unknown' }));
   return user;
 };
 
@@ -195,6 +207,22 @@ const reauthenticateWithPassword = async (currentPassword) => {
   const credential = EmailAuthProvider.credential(user.email, currentPassword);
   await reauthenticateWithCredential(user, credential);
   return user;
+};
+
+export const reauthenticateForAccountDeletion = async (currentPassword = '') => {
+  const { auth } = getFirebaseServices();
+  const user = auth.currentUser;
+  if (!user || user.isAnonymous) throw new Error('A registered account is required');
+  const providerIds = user.providerData.map(provider => provider.providerId);
+  if (providerIds.includes('password')) {
+    if (!currentPassword) throw new Error('Enter your current password');
+    await reauthenticateWithPassword(currentPassword);
+  } else if (providerIds.includes('google.com')) {
+    await reauthenticateWithPopup(user, new GoogleAuthProvider());
+  } else {
+    throw new Error('Sign out and sign in again before deleting this account.');
+  }
+  await user.getIdToken(true);
 };
 
 export const changeAccountPassword = async (currentPassword, nextPassword) => {
@@ -824,11 +852,14 @@ export const getPOIPhotos = async (poiId) => {
 };
 
 export const addPOIPhoto = async (poiId, imageUrl, userEmail) => {
-  const { db } = getFirebaseServices();
+  const { auth, db } = getFirebaseServices();
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('Sign in to add a photo');
   const docRef = await addDoc(collection(db, POI_PHOTOS_COLLECTION), {
     poi_id: poiId,
     image: imageUrl,
-    created_by: userEmail || 'anonymous',
+    created_by: 'registered-account',
+    created_by_uid: uid,
     created_date: new Date().toISOString(),
   });
   return { id: docRef.id, poi_id: poiId, image: imageUrl };
@@ -847,12 +878,15 @@ export const getPOIRatings = async (poiId) => {
 };
 
 export const addPOIRating = async (poiId, rating, reviewText, userEmail) => {
-  const { db } = getFirebaseServices();
+  const { auth, db } = getFirebaseServices();
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('Sign in to add a review');
   const docRef = await addDoc(collection(db, POI_RATINGS_COLLECTION), {
     poi_id: poiId,
     rating,
     review: reviewText || '',
-    created_by: userEmail || 'anonymous',
+    created_by: 'registered-account',
+    created_by_uid: uid,
     created_date: new Date().toISOString(),
   });
   return { id: docRef.id };
@@ -1099,7 +1133,7 @@ export const base44 = {
       }
     }
   },
-  appLogs: { logUserInApp: async (p) => console.log('User in app:', p) }
+  appLogs: { logUserInApp: async () => undefined }
 };
  
 export default base44;

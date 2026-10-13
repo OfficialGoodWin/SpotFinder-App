@@ -129,7 +129,11 @@ test('draft photo storage is private and publication is transactionally idempote
 test('account deletion cleanup includes private drafts, markers, and draft images', () => {
   const functionsSource = readFileSync(new URL('../functions/index.js', import.meta.url), 'utf8');
   assert.match(functionsSource, /cleanupSpotDraftsOnAccountDelete/);
-  assert.match(functionsSource, /deleteOwned\('spot_drafts'\)/);
-  assert.match(functionsSource, /deleteOwned\('spot_publications'\)/);
-  assert.match(functionsSource, /prefix: `drafts\/\$\{account\.uid\}\//);
+  assert.match(functionsSource, /deleteWhere\('spot_drafts', 'owner_uid', uid\)/);
+  assert.match(functionsSource, /deleteWhere\('spot_publications', 'owner_uid', uid\)/);
+  assert.match(functionsSource, /prefix: `drafts\/\$\{uid\}\//);
+  assert.match(functionsSource, /RECENT_AUTH_SECONDS/);
+  assert.match(functionsSource, /requestAccountDeletion/);
+  assert.match(functionsSource, /An active or unresolved subscription is linked/);
+  assert.match(functionsSource, /photo_metadata/);
 });

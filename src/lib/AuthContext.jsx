@@ -23,7 +23,7 @@ export const AuthProvider = ({ children }) => {
     
     // Handle redirect result from Google OAuth (TikTok/WebView flow)
     handleGoogleRedirectResult().then(redirectUser => {
-      if (redirectUser) console.log('Google redirect sign-in succeeded:', redirectUser.email);
+      if (redirectUser) console.info('Google redirect sign-in succeeded');
     }).catch(e => console.warn('Redirect result:', e));
 
     try {
