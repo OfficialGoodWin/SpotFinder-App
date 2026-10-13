@@ -1,33 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { Cookie } from 'lucide-react';
-import { getConsent, acceptAll, rejectNonEssential, setConsent } from '@/lib/consent';
+import {
+  acknowledgeCurrentPrivacyNotice,
+  getConsent,
+  rejectNonEssential,
+} from '@/lib/consent';
 
-// Cookie consent banner — shown until the user makes an explicit choice.
-// Required for GDPR/ePrivacy compliance because this app uses Google
-// Analytics and Google AdSense (non-essential cookies). Strictly-necessary
-// items (login session, language preference) never need this and are not
-// listed as optional here.
-//
-// Also exported as `CookiePreferencesLink` so Settings/Footer can let users
-// re-open this banner at any time to change their mind, as required by law.
-
+// Optional analytics and advertising are currently suspended, so this panel
+// intentionally offers no functional-looking optional consent controls.
 export default function CookieConsentBanner() {
   const [visible, setVisible] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-  const [analyticsChecked, setAnalyticsChecked] = useState(false);
-  const [adsChecked, setAdsChecked] = useState(false);
+  const [reopened, setReopened] = useState(false);
 
   useEffect(() => {
-    const state = getConsent();
-    setAnalyticsChecked(state.analytics);
-    setAdsChecked(state.ads);
-    if (!state.decided) setVisible(true);
+    if (!getConsent().decided) setVisible(true);
 
     const reopen = () => {
-      const current = getConsent();
-      setAnalyticsChecked(current.analytics);
-      setAdsChecked(current.ads);
-      setExpanded(true);
+      setReopened(true);
       setVisible(true);
     };
     window.addEventListener('spotfinder:open-cookie-settings', reopen);
@@ -36,10 +25,13 @@ export default function CookieConsentBanner() {
 
   if (!visible) return null;
 
-  const handleAcceptAll = () => { acceptAll(); setVisible(false); };
-  const handleRejectAll = () => { rejectNonEssential(); setVisible(false); };
-  const handleSavePreferences = () => {
-    setConsent({ analytics: analyticsChecked, ads: adsChecked });
+  const close = () => {
+    acknowledgeCurrentPrivacyNotice();
+    setVisible(false);
+  };
+
+  const withdrawOldChoices = () => {
+    rejectNonEssential();
     setVisible(false);
   };
 
@@ -52,92 +44,45 @@ export default function CookieConsentBanner() {
       style={{ paddingBottom: 'max(.75rem, env(safe-area-inset-bottom))' }}
     >
       <div className="sf-sheet mx-auto max-w-2xl rounded-2xl p-4 sm:p-5">
-        <div className="flex items-start gap-3 mb-3">
-          <Cookie className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
+        <div className="mb-4 flex items-start gap-3">
+          <Cookie className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" aria-hidden="true" />
           <div>
             <h2 id="cookie-consent-title" className="text-sm font-bold text-gray-900 dark:text-foreground">
               Cookies &amp; privacy
             </h2>
-            <p className="text-sm text-gray-600 dark:text-muted-foreground mt-1">
-              We use strictly-necessary cookies to run this site. With your permission, we'd
-              also like to use analytics cookies (to understand how the app is used) and
-              advertising cookies (to show ads that keep the free tier funded). You can change
-              this anytime in Settings.{' '}
-              <a href="/CookiePolicy" className="underline font-medium" target="_blank" rel="noopener noreferrer">
+            <p className="mt-1 text-sm text-gray-600 dark:text-muted-foreground">
+              SpotFinder currently uses necessary storage only. Google Analytics and Google
+              advertising are temporarily disabled, regardless of any choice saved previously.
+              Essential Firebase authentication and reCAPTCHA may still contact Google.{' '}
+              <a href="/CookiePolicy" className="font-medium underline" target="_blank" rel="noopener noreferrer">
                 Cookie Policy
               </a>
               {' · '}
-              <a href="/PrivacyPolicy" className="underline font-medium" target="_blank" rel="noopener noreferrer">
+              <a href="/PrivacyPolicy" className="font-medium underline" target="_blank" rel="noopener noreferrer">
                 Privacy Policy
               </a>
             </p>
           </div>
         </div>
 
-        {expanded && (
-          <div className="space-y-2 mb-4 pl-8">
-            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-foreground">
-              <input type="checkbox" checked disabled className="w-4 h-4 rounded" />
-              Strictly necessary (always on)
-            </label>
-            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-foreground">
-              <input
-                type="checkbox"
-                checked={analyticsChecked}
-                onChange={e => setAnalyticsChecked(e.target.checked)}
-                className="w-4 h-4 rounded"
-              />
-              Analytics (Google Analytics)
-            </label>
-            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-foreground">
-              <input
-                type="checkbox"
-                checked={adsChecked}
-                onChange={e => setAdsChecked(e.target.checked)}
-                className="w-4 h-4 rounded"
-              />
-              Advertising (Google AdSense)
-            </label>
-          </div>
-        )}
+        <div className="rounded-xl border border-border bg-muted/40 px-3 py-2 text-sm text-foreground">
+          Strictly necessary storage is active. Analytics and advertising controls are unavailable
+          because those services cannot be enabled in this release.
+        </div>
 
-        <div className="grid gap-2 sm:grid-cols-2">
-          <button
-            onClick={handleAcceptAll}
-            className="sf-button-primary text-sm"
-          >
-            Accept all
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <button onClick={close} className="sf-button-primary text-sm">
+            {reopened ? 'Close preferences' : 'Continue'}
           </button>
-          <button
-            onClick={handleRejectAll}
-            className="sf-button-secondary border-2 text-sm"
-          >
-            Reject non-essential
+          <button onClick={withdrawOldChoices} className="sf-button-secondary border-2 text-sm">
+            Keep optional services off
           </button>
-          {!expanded ? (
-            <button
-              onClick={() => setExpanded(true)}
-              className="min-h-11 rounded-xl px-4 text-sm font-semibold text-foreground underline hover:bg-muted sm:col-span-2"
-            >
-              Customize
-            </button>
-          ) : (
-            <button
-              onClick={handleSavePreferences}
-              className="min-h-11 rounded-xl px-4 text-sm font-semibold text-foreground underline hover:bg-muted sm:col-span-2"
-            >
-              Save preferences
-            </button>
-          )}
         </div>
       </div>
     </div>
   );
 }
 
-// Call this from a "Cookie settings" button anywhere in the app (e.g.
-// SettingsModal, footer) to let users reopen the banner and change consent,
-// which GDPR requires be as easy as giving it.
 export function reopenCookieSettings() {
   window.dispatchEvent(new CustomEvent('spotfinder:open-cookie-settings'));
 }

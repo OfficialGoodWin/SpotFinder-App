@@ -1,34 +1,19 @@
-// src/lib/consent.js
-//
-// Minimal cookie/tracking consent manager for GDPR / ePrivacive compliance.
-//
-// Why this exists: this app loads Google Analytics (gtag) and Google AdSense,
-// both of which set non-essential cookies / use device storage for tracking
-// and advertising purposes. Under the EU ePrivacy Directive (as implemented in
-// Czech law, § 89 Act No. 127/2005 Coll. on Electronic Communications) and the
-// GDPR, prior opt-in consent is required before such non-essential
-// cookies/scripts may run for users in the EU/EEA/UK. Strictly-necessary
-// cookies (e.g. login session, language preference, security) do NOT require
-// consent and are always allowed.
-//
-// This module stores the user's choice in localStorage and exposes helpers to
-// gate loading of Analytics/Ads scripts, plus a Google "Consent Mode v2"
-// bootstrap so Google's own tags respect the choice (and Google's ad
-// products don't treat EEA/UK traffic as consented by default).
-//
-// NOTE: This is a lightweight, framework-free implementation appropriate for
-// a small app. It is NOT a substitute for legal review — see the Cookie
-// Policy page and the compliance notes shared alongside this change.
+// Optional analytics and advertising are suspended. This module deliberately
+// contains no tag loader: stored choices are retained for a future reviewed
+// migration, but they never become effective consent in this release.
 
 const STORAGE_KEY = 'spotfinder_cookie_consent_v1';
 
 const DEFAULT_STATE = {
-  necessary: true, // always on, no choice needed
+  necessary: true,
   analytics: false,
   ads: false,
-  decided: false, // has the user made an explicit choice yet?
+  decided: false,
   timestamp: null,
+  historicalPreferences: { analytics: false, ads: false },
 };
+
+export const OPTIONAL_TRACKING_AVAILABLE = false;
 
 export function getConsent() {
   try {
@@ -38,91 +23,61 @@ export function getConsent() {
     if (!parsed || typeof parsed !== 'object') return { ...DEFAULT_STATE };
     return {
       necessary: true,
-      analytics: parsed.analytics === true,
-      ads: parsed.ads === true,
+      analytics: false,
+      ads: false,
       decided: parsed.decided === true,
       timestamp: typeof parsed.timestamp === 'string' ? parsed.timestamp : null,
+      // Preserve the old record without treating it as permission. Any future
+      // integration must collect a fresh opt-in under a new consent version.
+      historicalPreferences: {
+        analytics: parsed.analytics === true,
+        ads: parsed.ads === true,
+      },
     };
   } catch {
     return { ...DEFAULT_STATE };
   }
 }
 
-export function setConsent({ analytics, ads }) {
+export function getEffectiveConsent() {
+  return {
+    necessary: true,
+    analytics: false,
+    ads: false,
+    optionalServicesAvailable: OPTIONAL_TRACKING_AVAILABLE,
+  };
+}
+
+// Records a necessary-only decision. Optional choices cannot be granted while
+// the integrations are suspended.
+export function setConsent() {
   const state = {
     necessary: true,
-    analytics: !!analytics,
-    ads: !!ads,
+    analytics: false,
+    ads: false,
     decided: true,
     timestamp: new Date().toISOString(),
   };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
-    // localStorage unavailable (private mode / disabled) — consent will be
-    // re-asked next load, which is the safe failure mode.
+    // Safe failure: optional services remain unavailable.
   }
-  applyConsent(state);
+  dispatchEffectiveConsent(state);
   return state;
 }
 
-export function acceptAll() {
-  return setConsent({ analytics: true, ads: true });
-}
-
 export function rejectNonEssential() {
-  return setConsent({ analytics: false, ads: false });
+  return setConsent();
 }
 
-// ── Google Consent Mode v2 ──────────────────────────────────────────────────
-// Must run before gtag.js loads. Defaults everything to "denied" so no
-// tracking cookie is set until the user opts in. Also sets a couple of
-// Google-recommended defaults (wait_for_update, region-agnostic here — this
-// app doesn't attempt geo-targeted consent rules like "only EEA needs to
-// ask", which is a defensible simplification but worth revisiting if you
-// want to show non-EEA users a lighter-weight/no banner).
-export function initConsentMode() {
-  window.dataLayer = window.dataLayer || [];
-  function gtag() { window.dataLayer.push(arguments); }
-  window.gtag = window.gtag || gtag;
-  window.gtag('consent', 'default', {
-    ad_storage: 'denied',
-    ad_user_data: 'denied',
-    ad_personalization: 'denied',
-    analytics_storage: 'denied',
-    wait_for_update: 500,
-  });
-}
-
-function applyConsent(state) {
-  if (window.gtag) {
-    window.gtag('consent', 'update', {
-      ad_storage: state.ads ? 'granted' : 'denied',
-      ad_user_data: state.ads ? 'granted' : 'denied',
-      ad_personalization: state.ads ? 'granted' : 'denied',
-      analytics_storage: state.analytics ? 'granted' : 'denied',
-    });
+export function acknowledgeCurrentPrivacyNotice() {
+  const current = getConsent();
+  if (current.decided) {
+    dispatchEffectiveConsent(current);
+    return current;
   }
-  if (state.analytics) loadAnalytics();
-  if (state.ads) loadAds();
-  if (!state.analytics) disableAnalytics();
-  if (!state.ads) disableAds();
-  window.dispatchEvent(new CustomEvent('spotfinder:consent-changed', { detail: state }));
-}
-
-// ── Script loaders (only ever called after consent is granted) ─────────────
-let analyticsLoaded = false;
-export function loadAnalytics() {
-  if (analyticsLoaded) return;
-  analyticsLoaded = true;
-  const GA_ID = 'G-GC7D8SVBMV';
-  const script = document.createElement('script');
-  script.id = 'spotfinder-google-analytics';
-  script.async = true;
-  script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_ID}`;
-  document.head.appendChild(script);
-  window.gtag('js', new Date());
-  window.gtag('config', GA_ID, { anonymize_ip: true });
+  return rejectNonEssential();
 }
 
 function expireFirstPartyCookie(name) {
@@ -130,39 +85,37 @@ function expireFirstPartyCookie(name) {
   document.cookie = `${name}=; Max-Age=0; path=/; domain=.${location.hostname}; SameSite=Lax`;
 }
 
-export function disableAnalytics() {
-  document.getElementById('spotfinder-google-analytics')?.remove();
-  analyticsLoaded = false;
+export function removeLegacyOptionalTracking() {
+  // Defense in depth for a same-tab upgrade or stale HTML. The CSP also blocks
+  // these providers, and this release has no code capable of loading them.
+  window['ga-disable-G-GC7D8SVBMV'] = true;
+  document.querySelectorAll(
+    'script[src*="googletagmanager.com"], script[src*="googlesyndication.com"], script[src*="doubleclick.net"], ins.adsbygoogle',
+  ).forEach(element => element.remove());
+
   document.cookie.split(';').map(value => value.split('=')[0].trim())
-    .filter(name => name === '_ga' || name.startsWith('_ga_'))
+    .filter(name => name === '_ga' || name.startsWith('_ga_') || ['__gads', '__gpi', '__eoi'].includes(name))
     .forEach(expireFirstPartyCookie);
+
+  if (Array.isArray(window.dataLayer)) window.dataLayer.length = 0;
+  if ('gtag' in window) window.gtag = () => {};
+  if ('adsbygoogle' in window) delete window.adsbygoogle;
 }
 
-let adsLoaded = false;
-export function loadAds() {
-  if (adsLoaded) return;
-  adsLoaded = true;
-  const CLIENT = 'ca-pub-9210597135045895';
-  const script = document.createElement('script');
-  script.id = 'spotfinder-google-ads';
-  script.async = true;
-  script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${CLIENT}`;
-  script.crossOrigin = 'anonymous';
-  document.head.appendChild(script);
+function dispatchEffectiveConsent(savedState) {
+  window.dispatchEvent(new CustomEvent('spotfinder:consent-changed', {
+    detail: {
+      ...savedState,
+      analytics: false,
+      ads: false,
+      optionalServicesAvailable: false,
+    },
+  }));
 }
 
-export function disableAds() {
-  document.getElementById('spotfinder-google-ads')?.remove();
-  document.querySelectorAll('ins.adsbygoogle').forEach(element => element.replaceChildren());
-  adsLoaded = false;
-  ['__gads', '__gpi', '__eoi'].forEach(expireFirstPartyCookie);
-}
-
-// On boot, if the user already decided in a previous session, re-apply their
-// choice (this re-runs the loaders / consent-mode update on every page load).
 export function bootConsent() {
-  initConsentMode();
+  removeLegacyOptionalTracking();
   const state = getConsent();
-  if (state.decided) applyConsent(state);
+  dispatchEffectiveConsent(state);
   return state;
 }

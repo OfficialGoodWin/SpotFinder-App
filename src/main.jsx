@@ -5,9 +5,8 @@ import '@/index.css'
 import { bootConsent } from '@/lib/consent'
 import { applyTextScale, getTextScale } from '@/lib/textScale'
 
-// Must run before any analytics/ads script can load: sets Google Consent
-// Mode defaults to "denied" and re-applies any previously-saved consent
-// choice. See src/lib/consent.js.
+// Optional analytics and advertising are suspended. Boot only removes legacy
+// tag artifacts/cookies and exposes an effective necessary-only state.
 bootConsent()
 applyTextScale(getTextScale())
 

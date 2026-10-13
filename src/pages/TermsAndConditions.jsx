@@ -36,7 +36,7 @@ export default function TermsAndConditions() {
       </LegalUl>
 
       <LegalH2>6. Advertising</LegalH2>
-      <LegalP>The free tier may request Google ads only after advertising consent. Any promise that paid tiers remove ads applies only if paid subscriptions are actually enabled and the entitlement is active.</LegalP>
+      <LegalP>Advertising is temporarily disabled and the current build does not request Google ads or create ad slots. Any future advertising requires separate implementation, disclosure, and consent review. Any promise that paid tiers remove ads applies only if paid subscriptions and advertising are actually enabled and the entitlement is active.</LegalP>
 
       <LegalH2>7. Disclaimers and liability</LegalH2>
       <LegalP>The Service is provided without a guarantee that community or third-party information is accurate, complete, available, lawful to access, or safe. Nothing in these terms excludes rights or liability that applicable law does not permit us to exclude. The appropriate liability wording requires qualified review.</LegalP>

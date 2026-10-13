@@ -1,4 +1,5 @@
-// Navigation tracking placeholder — analytics can be wired here if needed
+// Route metadata updater only. It does not record navigation or send page
+// views; optional analytics is suspended.
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 

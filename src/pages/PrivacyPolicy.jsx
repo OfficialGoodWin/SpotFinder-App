@@ -19,7 +19,7 @@ export default function PrivacyPolicy() {
         <li><LegalStrong>Private activity:</LegalStrong> drafts and draft photos, saved/liked spots, and per-account rating records.</li>
         <li><LegalStrong>Feedback, reports, and abuse prevention:</LegalStrong> submitted text, optional contact email, reCAPTCHA result, account/session identifiers, and a salted hash derived from the request IP. Infrastructure and external providers also receive ordinary network data such as an IP address.</li>
         <li><LegalStrong>Payments:</LegalStrong> only if checkout is enabled, Stripe processes card and billing details. SpotFinder stores plan/status, Stripe customer and subscription identifiers, and current-period end; it does not receive the full card number.</li>
-        <li><LegalStrong>Optional analytics and advertising:</LegalStrong> Google Analytics and Google AdSense load only for the independently selected consent category. Choices are stored in local storage under <code>spotfinder_cookie_consent_v1</code>.</li>
+        <li><LegalStrong>Optional analytics and advertising:</LegalStrong> Google Analytics, Firebase Analytics, Google Tag Manager, and Google AdSense are temporarily disabled. The current build does not initialize them or offer controls that can enable them. The existing <code>spotfinder_cookie_consent_v1</code> record is retained so prior rejections are not made more permissive; prior acceptances have no effect and cannot reactivate tracking.</li>
       </LegalUl>
 
       <LegalH2>3. Purposes and proposed legal bases</LegalH2>
@@ -27,11 +27,11 @@ export default function PrivacyPolicy() {
         <li>Provide and secure accounts and core app features: contract performance.</li>
         <li>Moderation, fraud, rate limiting, and service security: proposed legitimate interests, subject to review and balancing.</li>
         <li>Payments and required accounting: contract performance and applicable legal obligations.</li>
-        <li>Analytics and advertising storage/access: consent, withdrawable in Settings.</li>
+        <li>Analytics and advertising are not current processing purposes. Any future reintroduction requires a reviewed, explicit opt-in and updated disclosures.</li>
       </LegalUl>
 
       <LegalH2>4. Providers and disclosures</LegalH2>
-      <LegalP>Implemented integrations include Google Firebase (Auth, Firestore, Storage, Functions), Google sign-in/reCAPTCHA/Analytics/AdSense, Vercel, Stripe, Mapy/Seznam, OpenStreetMap-based services, OpenFreeMap/Protomaps, OpenRouteService, OSRM, Geoapify, Wikimedia Commons, Instagram, and TikTok. A provider receives only the requests made to its feature, but social embeds can receive IP/browser data after the user chooses to load them. Provider roles, production data regions, contracts, and exact subprocessor lists still require verification.</LegalP>
+      <LegalP>Currently implemented service integrations include Google Firebase (Auth, Firestore, Storage, Functions), Google sign-in and reCAPTCHA, Vercel, Stripe, Mapy/Seznam, OpenStreetMap-based services, OpenFreeMap/Protomaps, OpenRouteService, OSRM, Geoapify, Wikimedia Commons, Instagram, and TikTok. Google Analytics and Google AdSense code is retained only as a disabled future integration point and is not active. A provider receives requests only when its related feature is used, but social embeds can receive IP/browser data after the user chooses to load them. Provider roles, production data regions, contracts, and exact subprocessor lists still require verification.</LegalP>
 
       <LegalH2>5. International transfers</LegalH2>
       <LegalP>Some providers may process data outside the EU/EEA, including in the United States. The applicable transfer mechanisms and contractual safeguards have not yet been verified for publication.</LegalP>

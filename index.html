@@ -17,9 +17,6 @@
       default-src 'self';
       script-src 'self' 'unsafe-inline' https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/
         https://apis.google.com https://maps.googleapis.com https://www.google.com https://www.gstatic.com
-        https://www.googletagmanager.com
-        https://pagead2.googlesyndication.com
-        https://ep1.adtrafficquality.google https://ep2.adtrafficquality.google
         https://js.stripe.com;
       style-src 'self' 'unsafe-inline';
       img-src 'self' data: blob: https:;
@@ -34,12 +31,10 @@
         https://api.mymemory.translated.net
         https://tiles.openfreemap.org https://protomaps.github.io
         https://s3.amazonaws.com https://commons.wikimedia.org https://www.wikidata.org https://*.wikipedia.org
-        https://*.google.com https://*.analytics.google.com
-        https://*.doubleclick.net https://*.adtrafficquality.google
-        https://*.googlesyndication.com;
+        https://*.google.com;
       worker-src 'self' blob:;
-      frame-src https://js.stripe.com https://checkout.stripe.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://ep2.adtrafficquality.google
-        https://*.firebaseapp.com https://pagead2.googlesyndication.com
+      frame-src https://js.stripe.com https://checkout.stripe.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/
+        https://*.firebaseapp.com
         https://www.instagram.com https://www.tiktok.com;
       object-src 'none';
       base-uri 'self';
@@ -69,15 +64,8 @@
     <meta name="twitter:title" content="SpotFinder" />
     <meta name="twitter:description" content="Discover and navigate to hidden outdoor spots rated by the community." />
     <meta name="twitter:image" content="https://spotfinder.cz/og-image.png" />
-    <!--
-      Google Analytics and Google AdSense are NOT loaded unconditionally here.
-      Both set non-essential cookies, which under GDPR/ePrivacy require the
-      user's prior opt-in consent for EU/EEA/UK visitors. They are instead
-      loaded from src/lib/consent.js only after the user accepts them in the
-      cookie banner (see src/components/CookieConsentBanner.jsx). Google
-      Consent Mode is initialized (default: denied) before anything else so
-      Google's own tags never assume consent that wasn't given.
-    -->
+    <!-- Google Analytics, Tag Manager, and AdSense are temporarily disabled.
+         Their origins are intentionally absent from this document's CSP. -->
   </head>
   <body>
     <div id="root"></div>

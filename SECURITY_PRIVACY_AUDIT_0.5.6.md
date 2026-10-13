@@ -19,8 +19,8 @@ Status: engineering review; not legal advice and not approval for publication or
 | Reports / moderation | Report text/target, reporter UID/email, device hash, salted IP hash and reCAPTCHA score | Server-only `reports`, `report_blocks`; admin tools only | Reporter UID/email removed on account deletion; hashed anti-abuse/moderation record retained pending approved schedule |
 | IP / abuse metadata | Cloud Function extracts request IP and HMAC-hashes it with `ANTI_SPAM_IP_SALT`; raw IP is not written by reviewed functions | Hash in feedback/reports/rate limits; providers/hosting still see raw network IP | Account-linked counters removed where addressable; fixed hash/log retention is unresolved |
 | Precise location / search / routes | Browser geolocation feeds map/nearby UI. Search, reverse geocoding, start and destination coordinates are used for provider requests | Geoapify, Mapy/Seznam, OpenRouteService, public OSRM and configured tile/POI services; local/offline routing where selected | App code does not intentionally persist user GPS history server-side; providers control their logs |
-| Analytics | GA script injected only when analytics consent is true; IP anonymization option requested | Google Analytics; consent in `spotfinder_cookie_consent_v1` local storage | Revocation sends denied consent, removes loader and first-party `_ga*` cookies; provider-side prior data is not automatically erased |
-| Advertising | AdSense script/ad requests only when ads consent is true | Google AdSense | Revocation sends denied consent, removes loader/content and known first-party ad cookies; third-party cleanup depends on browser/provider |
+| Analytics | Temporarily suspended: no GA4, Firebase Analytics, Tag Manager, page-view, or custom-event initialization path remains | No analytics transmission is initiated by the current build. The existing `spotfinder_cookie_consent_v1` record is retained, but its optional values are always ineffective | Boot removes legacy tag elements and expires readable first-party `_ga*` cookies. Provider-side historical data and inaccessible third-party storage are not erased |
+| Advertising | Temporarily suspended: no AdSense loader, ad initialization, slot, or placeholder is rendered | No advertising transmission is initiated by the current build | Boot removes legacy ad elements and expires readable first-party `__gads`, `__gpi`, and `__eoi` cookies; historical provider data may remain |
 | Stripe | Authenticated server endpoint creates allowlisted-price subscription Checkout only when server `SUBSCRIPTIONS_ENABLED=true`; verified webhook updates entitlement | Stripe gets account email, UID/plan metadata, billing/payment details; Firestore stores plan/status/customer/subscription/end | Account cleanup deletes local `users` record. Stripe/tax record retention and cancellation/refund operations require approval |
 | Social content | Strict HTTPS host/path allowlist canonicalizes Instagram posts/reels and TikTok videos; server repeats validation | Canonical reference stored in public Firestore; iframe created only after per-embed click, sandboxed and lazy | Reference retained/de-identified on deletion; provider gets IP/browser data only after load click |
 | Error/log data | Client currently logs some Firebase/service error objects; server logs sanitized deletion/Stripe errors but some existing paths log caught errors | Browser console, Firebase/Google Cloud or Vercel logs | Provider retention not verified. Production log sampling/redaction and retention need manual configuration review |
@@ -35,7 +35,7 @@ Status: engineering review; not legal advice and not approval for publication or
 - Draft Storage writes now accept only processed `.jpg` files, `image/jpeg`, maximum 5 MB, in the authenticated owner's path.
 - Added client DOB calendar/boundary/leap-year validation and rollback of a just-created Auth account if required DOB storage fails.
 - MFA UI now distinguishes inactive from enrolled, validates international phone format, and describes primary-provider protection/recovery accurately.
-- Consent preferences reopen with saved choices; rejection/revocation keeps categories independent, updates Google consent, removes loaders and known first-party cookies.
+- Analytics and advertising are hard-suspended. Saved legacy preferences are retained but always evaluate to off, the UI has no optional-service checkboxes, known first-party GA/ad cookies are expired, and CSP no longer permits the tag/ad origins.
 - Stripe Checkout now has a server-side disabled-by-default switch. Webhooks claim event IDs before processing and release failed claims for retry.
 - Social embeds remain URL-allowlisted, click-to-load, lazy, and sandboxed; uploads remain signature/dimension checked and JPEG re-encoded.
 
@@ -50,14 +50,14 @@ Status: engineering review; not legal advice and not approval for publication or
    Account deletion is blocked while local subscription status is active, trialing, past due, or unpaid so recurring billing cannot be orphaned.
 7. **Operator/legal terms:** confirm controller/operator identity, legal/service address, registration/tax status, governing law, courts, consumer dispute route and accessibility disclosures.
 8. **Processors/transfers:** verify current production vendors, data regions, DPAs, roles and international-transfer mechanisms.
-9. **Production consent scan:** browser automation can verify app-request behavior locally, but a production tag/cookie scan and provider-console review remain required. reCAPTCHA is security processing, not automatically exempt from every notice/legal-basis requirement.
+9. **Production privacy-hotfix scan:** local browser automation can verify the built application, but the owner must repeat the route/session matrix after deployment and inspect provider consoles. Google traffic from Firebase Auth, Google sign-in, or reCAPTCHA is distinct from GA4/AdSense and remains possible. reCAPTCHA is security processing, not automatically exempt from every notice/legal-basis requirement.
 10. **Logs:** establish structured redaction and retention. Avoid logging full Firebase/Stripe error objects where they could contain request or provider metadata.
 11. **Account deletion test:** use Auth/Firestore/Storage emulators or disposable non-production accounts after function deployment; never validate by deleting a real production user.
 12. **Build-tool advisories:** `npm audit` reports seven advisories (five high, two moderate) in the Tailwind 3 development/build chain (`braces` and `postcss-selector-parser` paths). `npm ls --omit=dev` shows that chain is absent from the production dependency tree, and the built browser bundle does not ship those Node tools. npm's proposed fix is a breaking Tailwind 4 upgrade, which needs a separate tested migration. The Cloud Functions package reports zero vulnerabilities.
 
 ## Verification results
 
-- `npm test`: 48 passed, 0 failed, 2 emulator suites skipped. The passing tests include DOB boundaries/leap years, consent gating/revocation, social URL attack cases, upload signature/size/dimension checks, draft isolation, and static deletion-cleanup assertions.
+- `npm test`: 50 passed, 0 failed, 2 emulator suites skipped. The passing tests include DOB boundaries/leap years, hard-disabled optional tracking under new/legacy consent states, social URL attack cases, upload signature/size/dimension checks, draft isolation, and static deletion-cleanup assertions.
 - `npm run lint`: passed.
 - `npm run typecheck`: passed.
 - `npm run build`: passed.
@@ -68,7 +68,7 @@ Status: engineering review; not legal advice and not approval for publication or
 - Account deletion with a disposable Auth user: not run because Auth/Functions emulators were unavailable; no production account was touched.
 - SMS delivery/provider recovery: not run because a configured Firebase Identity Platform test project and test phone numbers were unavailable.
 - Stripe test mode: not run because enabled test keys/prices/webhook secret were not configured; server checkout remains disabled by default.
-- Consent: unit behavior was verified. A production browser network/cookie scan and provider-console verification were not available and remain mandatory.
+- Privacy hotfix: local production-build browser audit passed 4 isolated consent histories across 9 routes plus home interaction/reload. It observed no GA4/GTM/AdSense requests, globals, scripts, slots, or readable first-party tracking cookies. Expected Google-family traffic was limited to `firestore.googleapis.com`, `identitytoolkit.googleapis.com`, and `www.google.com`. Registered sign-in, submission, and populated spot-detail checks were not run because no disposable test credentials were supplied; tracking boot is auth-independent, but an owner-run post-deployment production test remains mandatory.
 
 ## Deployment and rollback
 

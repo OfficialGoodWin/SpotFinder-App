@@ -5,7 +5,7 @@ import { reopenCookieSettings } from '@/components/CookieConsentBanner';
 export default function CookiePolicy() {
   return (
     <LegalPageLayout title="Cookie Policy" lastUpdated="13 October 2026">
-      <LegalNote><LegalStrong>Review status:</LegalStrong> This draft is pending legal review and a production browser/tag inventory. Provider behavior can change independently of SpotFinder.</LegalNote>
+      <LegalNote><LegalStrong>Review status:</LegalStrong> This privacy hotfix draft is pending legal review and an owner-run production browser/tag inventory after deployment. Provider behavior can change independently of SpotFinder.</LegalNote>
       <LegalP>This policy covers cookies and similar browser storage. It does not claim that a consent banner alone establishes compliance.</LegalP>
       <button onClick={reopenCookieSettings} className="px-4 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">Manage cookie preferences</button>
 
@@ -18,19 +18,20 @@ export default function CookiePolicy() {
       </LegalUl>
 
       <LegalH2>2. Optional analytics</LegalH2>
-      <LegalP>Google Analytics is not injected until analytics consent is granted. It can process page/device data and approximate location inferred from IP. Analytics consent is independent of advertising consent.</LegalP>
+      <LegalP>Google Analytics, Firebase Analytics, and Google Tag Manager are not initialized or loaded by the current SpotFinder build. Analytics cannot be enabled through cookie settings while this temporary suspension is active.</LegalP>
 
       <LegalH2>3. Optional advertising</LegalH2>
-      <LegalP>Google AdSense is not injected and ad slots do not request ads until advertising consent is granted. Advertising consent is independent of analytics consent.</LegalP>
+      <LegalP>Google AdSense is not loaded by the current SpotFinder build. The app does not create AdSense slots, reserve advertising space, or offer an advertising-consent control while this temporary suspension is active.</LegalP>
 
       <LegalH2>4. Maps, routing, search, and social embeds</LegalH2>
       <LegalP>Core map/search/routing requests can transmit IP address, search text, map context, and route coordinates regardless of optional analytics/advertising choices. Instagram/TikTok iframes are not created until the user explicitly chooses to load an individual post. These network requests are described in the Privacy Policy and need their own legal assessment.</LegalP>
 
       <LegalH2>5. Changing or withdrawing consent</LegalH2>
-      <LegalP>Use the button above or Settings at any time. Saved choices are shown without being overwritten. Revocation sends denied Google consent, stops future app-initiated optional loading, removes the injected loader/ad content, and expires known first-party Google cookies. A browser or provider may retain third-party storage or data collected before withdrawal; clearing site/browser data may also be necessary.</LegalP>
+      <LegalP>Use the button above or Settings to review the current necessary-only state. Previously saved choices remain in the existing <code>spotfinder_cookie_consent_v1</code> record for migration history but have no effect; selecting “Keep optional services off” replaces them with an explicit rejection. The app removes legacy tag elements and expires known first-party <code>_ga*</code>, <code>__gads</code>, <code>__gpi</code>, and <code>__eoi</code> cookies without clearing Firebase authentication state. Browser or provider storage and data collected before this hotfix may remain.</LegalP>
+      <LegalP>If optional integrations return, they must use a new, explicit opt-in. A historical acceptance will not be treated as consent for a restored service.</LegalP>
 
       <LegalH2>6. Verification and contact</LegalH2>
-      <LegalP>A production network and storage scan is still required before publication. Questions: spotfinder@icloud.com.</LegalP>
+      <LegalP>Google network requests can still occur for essential Firebase authentication, Google sign-in, and reCAPTCHA, and for a user-selected Google-backed feature. Those requests are not evidence that Google Analytics or AdSense is active. A production network and storage scan is still required before publication. Questions: spotfinder@icloud.com.</LegalP>
     </LegalPageLayout>
   );
 }
