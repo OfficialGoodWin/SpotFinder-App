@@ -9,8 +9,8 @@ Status: **not approved for publication**. This engineering audit is not legal ad
 - Verify production data regions, retention periods, processor roles, transfer mechanisms, and data-processing agreements for Firebase, Vercel, Stripe, Google, Geoapify, Mapy/Seznam, OpenRouteService, OSRM, OpenFreeMap/Protomaps, and Wikimedia Commons.
 - Run a production cookie/tag inventory. Confirm that Analytics and AdSense make no non-essential storage or requests before opt-in, including Consent Mode behavior.
 - Decide whether Elite/Ultra sales are live. If live, verify prices, renewals, checkout consent, invoices/tax, cancellation, withdrawal, and refund operations. If not, remove purchase claims and disable checkout entry points.
-- Deploy and verify the new recent-auth account-deletion workflow with disposable emulator/staging accounts. Approve the policy of deleting private data while de-identifying and retaining public geographic contributions; define support recovery for failed requests.
-- Confirm the age threshold, parental-consent handling, date-of-birth retention, and the claimed 30-day deletion process.
+- Deploy and verify the new recent-auth account-deletion workflow with disposable emulator/staging accounts. Approve the policy of deleting private data while relabeling and retaining public geographic contributions; public Storage paths can retain a pseudonymous UID. Define support recovery for failed requests.
+- Confirm the age threshold, parental-consent handling, and date-of-birth retention. The legacy-account DOB completion migration and 30-day deletion job have been removed from source; verify their deployed Cloud Functions are explicitly deleted during the approved release.
 - Document moderation retention, abuse-prevention IP hashing/retention, reCAPTCHA processing, user-content licensing, takedowns, and appeals.
 - Confirm public contributor identity never exposes an email. Legacy records may contain email-derived `created_by` values and require a non-destructive display/privacy audit.
 - Confirm consumer-dispute and accessibility information required for the operator's jurisdiction.

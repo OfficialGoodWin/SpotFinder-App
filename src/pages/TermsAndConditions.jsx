@@ -13,7 +13,7 @@ export default function TermsAndConditions() {
       <LegalH2>2. Accounts and age</LegalH2>
       <LegalUl>
         <li>Keep credentials secure and provide accurate information.</li>
-        <li>The current minimum registration age is 16. Existing registered accounts without a DOB receive a 30-day completion deadline enforced by a daily backend job.</li>
+        <li>The current minimum registration age is 16. New email/password registrations must provide a valid date of birth. No legacy-account DOB completion migration is currently active.</li>
         <li>You may request deletion in Settings after recent reauthentication. An active or unresolved subscription must first be cancelled through support so billing is not orphaned. Private data is removed while public geographic contributions may be retained under a former-contributor label as described in the Privacy Policy.</li>
       </LegalUl>
 

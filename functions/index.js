@@ -30,7 +30,6 @@ const adminAuth = getAuth();
 const RECAPTCHA_SITE_KEY = defineString('RECAPTCHA_SITE_KEY');
 const googleAuth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
 
-const DOB_GRACE_DAYS = 30;
 const RECENT_AUTH_SECONDS = 5 * 60;
 
 async function forEachQueryBatch(query, mutate) {
@@ -136,26 +135,6 @@ function validateBirthDate(value) {
   return age >= 16 && age <= 120 ? raw : null;
 }
 
-// Creates the private profile metadata used by the DOB reminder. Anonymous
-// guest sessions are intentionally excluded and remain able to submit spots.
-exports.ensureAccountProfile = functions.https.onCall(async (_data, context) => {
-  if (!context.auth || context.auth.token.firebase?.sign_in_provider === 'anonymous') {
-    throw new functions.https.HttpsError('unauthenticated', 'A registered account is required.');
-  }
-  const ref = db.collection('users').doc(context.auth.uid);
-  const snap = await ref.get();
-  const current = snap.data() || {};
-  if (!current.dob_deadline && !current.date_of_birth) {
-    const deadline = new Date(Date.now() + DOB_GRACE_DAYS * 86400000).toISOString();
-    await ref.set({ dob_deadline: deadline, dob_required: true }, { merge: true });
-    current.dob_deadline = deadline;
-  }
-  return {
-    hasDateOfBirth: Boolean(current.date_of_birth),
-    deadline: current.dob_deadline || null,
-  };
-});
-
 exports.setAccountDateOfBirth = functions.https.onCall(async (data, context) => {
   if (!context.auth || context.auth.token.firebase?.sign_in_provider === 'anonymous') {
     throw new functions.https.HttpsError('unauthenticated', 'A registered account is required.');
@@ -166,43 +145,10 @@ exports.setAccountDateOfBirth = functions.https.onCall(async (data, context) => 
   }
   await db.collection('users').doc(context.auth.uid).set({
     date_of_birth: dateOfBirth,
-    dob_required: false,
     dob_completed_at: new Date().toISOString(),
   }, { merge: true });
   return { success: true };
 });
-
-// Daily enforcement. The first run gives every existing registered account
-// a full 30-day grace period; later runs remove accounts that ignored it.
-exports.enforceDateOfBirthDeadline = functions.pubsub.schedule('every day 03:15')
-  .timeZone('Europe/Prague')
-  .onRun(async () => {
-    let pageToken;
-    const now = Date.now();
-    do {
-      const page = await adminAuth.listUsers(1000, pageToken);
-      for (const account of page.users) {
-        if (account.providerData.length === 0) continue; // anonymous account
-        const ref = db.collection('users').doc(account.uid);
-        const snap = await ref.get();
-        const profile = snap.data() || {};
-        if (profile.date_of_birth) continue;
-        if (!profile.dob_deadline) {
-          await ref.set({
-            dob_required: true,
-            dob_deadline: new Date(now + DOB_GRACE_DAYS * 86400000).toISOString(),
-          }, { merge: true });
-          continue;
-        }
-        if (Date.parse(profile.dob_deadline) <= now) {
-          await cleanupAccountData(account.uid, account.email || null);
-          await adminAuth.deleteUser(account.uid);
-        }
-      }
-      pageToken = page.pageToken;
-    } while (pageToken);
-    return null;
-  });
 
 // Private draft data follows the Firebase account lifecycle. Public spots are
 // intentionally not touched here; they have a separate moderation/deletion

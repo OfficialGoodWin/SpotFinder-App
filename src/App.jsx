@@ -11,7 +11,6 @@ import { ThemeProvider } from '@/lib/ThemeContext';
 import { LanguageProvider } from '@/lib/LanguageContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ErrorBoundary from '@/lib/ErrorBoundary';
-import BirthDateReminder from '@/components/BirthDateReminder';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -31,7 +30,7 @@ const LayoutWrapper = ({ children, currentPageName }) => Layout ?
   : <Suspense fallback={<RouteFallback />}>{children}</Suspense>;
 
 const AuthenticatedApp = () => {
-  const { user, isLoadingAuth, isLoadingPublicSettings, authError } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError } = useAuth();
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -73,7 +72,6 @@ const AuthenticatedApp = () => {
         </LayoutWrapper>
       } />
     </Routes>
-    <BirthDateReminder user={user} />
     </>
   );
 };

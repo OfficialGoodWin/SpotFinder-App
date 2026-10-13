@@ -105,7 +105,6 @@ export const loginWithEmail = async (email, password) => {
   return (await signInWithEmailAndPassword(auth, email, password)).user;
 };
  
-export const ensureAccountProfile = callFn('ensureAccountProfile');
 export const setAccountDateOfBirth = callFn('setAccountDateOfBirth');
 export const requestAccountDeletion = callFn('requestAccountDeletion');
 
