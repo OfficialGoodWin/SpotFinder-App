@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Moon, Globe, Cookie, FileText, Shield, ReceiptText, Settings2, Compass, Type, Trash2 } from 'lucide-react';
+import { X, Moon, Globe, Cookie, FileText, Shield, ReceiptText, Settings2, Compass, Type, Trash2, History } from 'lucide-react';
 import { useTheme } from '@/lib/ThemeContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { LANGUAGES } from '@/locales/translations';
@@ -8,6 +8,7 @@ import AccountSecuritySection from '@/components/AccountSecuritySection';
 import { reopenCookieSettings } from '@/components/CookieConsentBanner';
 import SmoothSelect from '@/components/ui/SmoothSelect';
 import { getTextScale, saveTextScale, TEXT_SCALE_DEFAULT, TEXT_SCALE_MAX, TEXT_SCALE_MIN } from '@/lib/textScale';
+import { APP_VERSION } from '@/config/appVersion';
 
 export default function SettingsModal({ onClose, mapExploreEnabled = true, onMapExploreEnabledChange, onRequestDeleteAccount }) {
   const { isDark, toggleTheme } = useTheme();
@@ -161,6 +162,15 @@ export default function SettingsModal({ onClose, mapExploreEnabled = true, onMap
               <ReceiptText className="w-4 h-4 flex-shrink-0" aria-hidden="true" /> Refund Policy
             </a>
             </div>
+          </section>
+
+          <section className="sf-section md:col-span-2" aria-labelledby="app-information-title">
+            <h3 id="app-information-title" className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">App information</h3>
+            <a href="/updates" className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
+              <History className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+              <span className="flex-1"><span className="block font-semibold text-foreground">What’s new</span><span className="block text-xs text-muted-foreground">Release notes and verified changes</span></span>
+              <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary">v{APP_VERSION}</span>
+            </a>
           </section>
 
           {onRequestDeleteAccount && <section className="sf-section md:col-span-2" aria-labelledby="account-management-title">

@@ -75,7 +75,7 @@ export const translations = {
         "addedOn": "on",
         "signInToRate": "Sign in to rate this spot",
         "thanksRating": "Thanks for rating!",
-        "overallAuto": "Calculated from parking, views & privacy ratings",
+        "overallAuto": "Calculated automatically from category ratings",
         "overallAutoCalc": "Calculated automatically from category ratings",
         "ratings": "ratings",
         "detailedRatings": "Detailed Ratings",
@@ -284,7 +284,7 @@ export const translations = {
         "enableLocation": "Enable location to find nearby spots",
         "locationUnavailable": "Location not available yet",
         "deleteAccountTitle": "Delete Account",
-        "deleteAccountWarning": "This action cannot be undone. All your data will be permanently deleted.",
+        "deleteAccountWarning": "This starts account deletion. Cleanup may continue in the background, and limited records may be retained where required.",
         "deleteAccountType": "Type DELETE to confirm:",
         "deleteAccountPlaceholder": "Type DELETE",
         "deleteAccountConfirm": "Delete"

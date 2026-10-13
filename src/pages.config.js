@@ -58,6 +58,7 @@ const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions'));
 const CookiePolicy = lazy(() => import('./pages/CookiePolicy'));
 const RefundPolicy = lazy(() => import('./pages/RefundPolicy'));
+const Updates = lazy(() => import('./pages/Updates'));
 import __Layout from './Layout.jsx';
  
  
@@ -71,6 +72,7 @@ export const PAGES = {
     "TermsAndConditions": TermsAndConditions,
     "CookiePolicy": CookiePolicy,
     "RefundPolicy": RefundPolicy,
+    "updates": Updates,
 }
  
 export const pagesConfig = {

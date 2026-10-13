@@ -2,36 +2,27 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 
 const ThemeContext = createContext();
 
+function savedDarkTheme() {
+  if (typeof document === 'undefined') return false;
+  return document.cookie
+    .split('; ')
+    .find(row => row.startsWith('theme='))
+    ?.split('=')[1] === 'dark';
+}
+
 export const ThemeProvider = ({ children }) => {
-  const [isDark, setIsDark] = useState(false);
+  // Read the persisted choice before rendering children. This avoids a light
+  // flash and prevents the map from loading one style only to replace it on
+  // the first effect pass.
+  const [isDark, setIsDark] = useState(savedDarkTheme);
 
   useEffect(() => {
-    // Load theme from cookie on mount
-    const saved = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('theme='))
-      ?.split('=')[1];
-    
-    if (saved === 'dark') {
-      setIsDark(true);
-      document.documentElement.classList.add('dark');
-    } else {
-      setIsDark(false);
-      document.documentElement.classList.remove('dark');
-    }
-  }, []);
+    document.documentElement.classList.toggle('dark', isDark);
+    document.cookie = `theme=${isDark ? 'dark' : 'light'}; path=/; max-age=31536000`;
+  }, [isDark]);
 
   const toggleTheme = () => {
-    const newValue = !isDark;
-    setIsDark(newValue);
-    
-    if (newValue) {
-      document.documentElement.classList.add('dark');
-      document.cookie = 'theme=dark; path=/; max-age=31536000'; // 1 year
-    } else {
-      document.documentElement.classList.remove('dark');
-      document.cookie = 'theme=light; path=/; max-age=31536000'; // 1 year
-    }
+    setIsDark(current => !current);
   };
 
   return (

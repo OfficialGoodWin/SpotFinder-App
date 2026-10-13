@@ -5,7 +5,7 @@ const baseURL = process.env.SPOTFINDER_AUDIT_URL || 'http://127.0.0.1:4173';
 const consentKey = 'spotfinder_cookie_consent_v1';
 const blockedProviderPattern = /(?:google-analytics\.com|analytics\.google\.com|googletagmanager\.com|googlesyndication\.com|doubleclick\.net|adtrafficquality\.google)/i;
 const routes = [
-  '/', '/FAQ', '/Status', '/Admin', '/StatusAdmin',
+  '/', '/FAQ', '/Status', '/updates', '/Admin', '/StatusAdmin',
   '/PrivacyPolicy', '/CookiePolicy', '/TermsAndConditions', '/RefundPolicy',
 ];
 const scenarios = [

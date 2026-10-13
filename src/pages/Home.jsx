@@ -571,6 +571,8 @@ export default function Home() {
         <div className="absolute left-1/2 -translate-x-1/2 z-10 pointer-events-none" style={{ bottom: '100%', marginBottom: '-36px' }}>
           <button
             onClick={() => setAddMode(a => !a)}
+            aria-label={addMode ? 'Cancel adding spot' : 'Add a spot'}
+            aria-pressed={addMode}
             className={`w-[72px] h-[72px] rounded-full shadow-2xl flex items-center justify-center transition-all active:scale-95 pointer-events-auto
               ${addMode ? 'bg-red-500 rotate-45 shadow-red-300' : 'bg-green-500 shadow-green-300'}`}
           >

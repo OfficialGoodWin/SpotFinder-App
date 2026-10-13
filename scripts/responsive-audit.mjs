@@ -17,6 +17,16 @@ try {
     const faq = await page.evaluate(() => ({ overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }));
     if (faq.overflow > 1) failures.push(`FAQ ${width}x${height}: ${faq.overflow}px horizontal overflow`);
 
+    await page.goto(`${baseURL}/updates`, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(200);
+    const updates = await page.evaluate(() => ({
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      version: document.body.textContent.includes('0.5.6'),
+      timeline: Boolean(document.querySelector('main ol time[datetime]')),
+    }));
+    if (updates.overflow > 1) failures.push(`Updates ${width}x${height}: ${updates.overflow}px horizontal overflow`);
+    if (!updates.version || !updates.timeline) failures.push(`Updates content missing at ${width}x${height}: ${JSON.stringify(updates)}`);
+
     await page.goto(baseURL, { waitUntil: 'domcontentloaded' });
     await page.evaluate(() => {
       localStorage.setItem('spotfinder_cookie_consent_v1', JSON.stringify({ necessary: true, analytics: false, ads: false, decided: true }));

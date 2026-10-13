@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { getFirebaseServices } from '../api/firebaseClient';
+import { reportedUptimePercent } from '@/lib/statusMetrics';
 
 // ── Status page ────────────────────────────────────────────────────────────
 // Reads two optional Firestore collections, both public-read / admin-write:
@@ -12,14 +13,14 @@ import { getFirebaseServices } from '../api/firebaseClient';
 //     updates: [{ type: 'investigating'|'identified'|'monitoring'|'resolved',
 //                 message, at: ISO timestamp }] }  — updates oldest → newest.
 //
-// If either collection is empty (nothing configured yet), the page falls
-// back to a single "SpotFinder" service shown fully operational with no
-// incidents, so it never looks broken before you've written any status data.
+// Empty, missing, or unreadable monitoring data is shown as unverified. The
+// page never substitutes successful intervals that were not actually stored.
 
 const STATUS_META = {
   up:       { label: 'Operational', dot: 'bg-[#4C7A52]',  bar: 'bg-[#4C7A52]'  },
   degraded: { label: 'Degraded',    dot: 'bg-[#C98A2C]',  bar: 'bg-[#C98A2C]'  },
   down:     { label: 'Down',        dot: 'bg-[#B4453A]',  bar: 'bg-[#B4453A]'  },
+  unknown:  { label: 'No data',     dot: 'bg-[#8A8270]',  bar: 'bg-[#CFC8B8]'  },
 };
 
 const UPDATE_META = {
@@ -28,14 +29,6 @@ const UPDATE_META = {
   monitoring:    { label: 'Monitoring',    border: 'border-[#8A6E52]' },
   resolved:      { label: 'Resolved',      border: 'border-[#4C7A52]' },
 };
-
-function uptimePct(days) {
-  if (!days?.length) return 100;
-  // Degraded service is still reachable, so it counts as uptime. Only a
-  // full outage lowers the uptime percentage.
-  const up = days.filter(d => d !== 'down').length;
-  return ((up / days.length) * 100).toFixed(2).replace(/\.00$/, '');
-}
 
 const STATUS_SEVERITY = { up: 0, degraded: 1, down: 2 };
 
@@ -52,7 +45,7 @@ function localDateKey(date) {
 // through the date of its resolved update). Existing manual service history is
 // preserved and the more severe state wins.
 function incidentAdjustedDays(rawDays, incidents) {
-  const days = rawDays?.length ? [...rawDays] : Array(90).fill('up');
+  const days = rawDays?.length ? [...rawDays] : [];
   const today = new Date();
   today.setHours(12, 0, 0, 0);
   const todayKey = localDateKey(today);
@@ -61,7 +54,7 @@ function incidentAdjustedDays(rawDays, incidents) {
     const day = new Date(today);
     day.setDate(today.getDate() - (days.length - 1 - index));
     const dayKey = localDateKey(day);
-    let effectiveStatus = storedStatus || 'up';
+    let effectiveStatus = STATUS_META[storedStatus] && storedStatus !== 'unknown' ? storedStatus : 'unknown';
 
     for (const incident of incidents || []) {
       const startKey = incident.date;
@@ -92,9 +85,10 @@ function incidentAdjustedDays(rawDays, incidents) {
 }
 
 function ServiceRow({ service, incidents }) {
-  const rawDays = service.days?.length ? service.days : Array(90).fill('up');
+  const rawDays = service.days?.length ? service.days : [];
   const days = incidentAdjustedDays(rawDays, incidents);
-  const current = days.at(-1) || 'up';
+  const current = STATUS_META[days.at(-1)] ? days.at(-1) : 'unknown';
+  const uptime = reportedUptimePercent(days);
 
   return (
     <div className="py-5 border-b border-[#DDD6C8] last:border-0">
@@ -103,9 +97,9 @@ function ServiceRow({ service, incidents }) {
           <span className={`w-1.5 h-1.5 rounded-full ${STATUS_META[current]?.dot || STATUS_META.up.dot}`} />
           <span className="font-medium text-[#1B2A1E]">{service.name}</span>
         </div>
-        <span className="text-sm font-mono text-[#5C5546]">{uptimePct(days)}% uptime</span>
+        <span className="text-sm font-mono text-[#5C5546]">{uptime === null ? 'No history' : `${uptime}% reported uptime`}</span>
       </div>
-      <div className="flex gap-[2px] h-8">
+      {days.length > 0 ? <><div className="flex gap-[2px] h-8">
         {days.map((d, i) => {
           const day = new Date();
           day.setHours(12, 0, 0, 0);
@@ -113,16 +107,17 @@ function ServiceRow({ service, incidents }) {
           return (
             <div
               key={i}
-              className={`flex-1 rounded-[1px] ${STATUS_META[d]?.bar || STATUS_META.up.bar}`}
-              title={`${localDateKey(day)} — ${STATUS_META[d]?.label || 'Operational'}`}
+              className={`flex-1 rounded-[1px] ${STATUS_META[d]?.bar || STATUS_META.unknown.bar}`}
+              title={`${localDateKey(day)} — ${STATUS_META[d]?.label || STATUS_META.unknown.label}`}
             />
           );
         })}
       </div>
       <div className="flex justify-between mt-1.5 text-xs font-mono text-[#8A8270]">
         <span>{Math.max(days.length - 1, 0)} days ago</span>
-        <span>Today</span>
+        <span>{days.filter(day => ['up', 'degraded', 'down'].includes(day)).length} reported intervals · Today</span>
       </div>
+      </> : <p className="rounded-md bg-[#E7E2D3] px-3 py-2 text-sm text-[#5C5546]">No monitoring history has been published for this service.</p>}
     </div>
   );
 }
@@ -156,25 +151,29 @@ function IncidentGroup({ date, incidents }) {
 }
 
 export default function StatusPage() {
-  const [services, setServices] = useState(null);
+  const [services, setServices] = useState([]);
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [dataNotice, setDataNotice] = useState('');
 
   useEffect(() => {
     (async () => {
-      const { db } = getFirebaseServices();
+      const firebase = getFirebaseServices();
+      if (!firebase?.db) { setDataNotice('Status data is unavailable.'); setLoading(false); return; }
       try {
-        const svcSnap = await getDocs(query(collection(db, 'status_services'), orderBy('order', 'asc')));
-        const svcs = svcSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setServices(svcs.length ? svcs : [{ id: 'spotfinder', name: 'SpotFinder', days: Array(90).fill('up') }]);
-
-        const incSnap = await getDocs(query(collection(db, 'status_incidents'), orderBy('date', 'desc'), limit(30)));
-        setIncidents(incSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      } catch (e) {
-        // Collections not created yet, or rules not deployed — fail open
-        // to the "all operational, no incidents" default rather than error.
-        setServices([{ id: 'spotfinder', name: 'SpotFinder', days: Array(90).fill('up') }]);
-        setIncidents([]);
+        const [serviceResult, incidentResult] = await Promise.allSettled([
+          getDocs(query(collection(firebase.db, 'status_services'), orderBy('order', 'asc'))),
+          getDocs(query(collection(firebase.db, 'status_incidents'), orderBy('date', 'desc'), limit(30))),
+        ]);
+        if (serviceResult.status === 'fulfilled') {
+          const records = serviceResult.value.docs.map(d => ({ id: d.id, ...d.data() }));
+          setServices(records);
+          if (!records.length) setDataNotice('No service-monitoring history has been published.');
+        } else {
+          setDataNotice('Service-monitoring history could not be verified.');
+        }
+        if (incidentResult.status === 'fulfilled') setIncidents(incidentResult.value.docs.map(d => ({ id: d.id, ...d.data() })));
+        else setDataNotice(current => current || 'Incident history could not be verified.');
       } finally {
         setLoading(false);
       }
@@ -196,10 +195,11 @@ export default function StatusPage() {
   // to degraded. This makes already-open incidents behave correctly too.
   const incidentDown = activeIncidents.some(inc => inc.impact === 'down');
   const incidentDegraded = activeIncidents.some(inc => inc.impact !== 'down');
-  const overallDown = services?.some(s => s.days?.at(-1) === 'down') || incidentDown;
-  const overallDegraded = services?.some(s => s.days?.at(-1) === 'degraded') || incidentDegraded;
-  const bannerColor = overallDown ? 'bg-[#B4453A]' : overallDegraded ? 'bg-[#C98A2C]' : 'bg-[#4C7A52]';
-  const bannerText = overallDown ? 'Some systems are down' : overallDegraded ? 'Some systems are degraded' : 'All systems operational';
+  const hasCurrentServiceData = services.some(service => ['up', 'degraded', 'down'].includes(service.days?.at(-1)));
+  const overallDown = services.some(s => s.days?.at(-1) === 'down') || incidentDown;
+  const overallDegraded = services.some(s => s.days?.at(-1) === 'degraded') || incidentDegraded;
+  const bannerColor = overallDown ? 'bg-[#B4453A]' : overallDegraded ? 'bg-[#C98A2C]' : hasCurrentServiceData ? 'bg-[#4C7A52]' : 'bg-[#6F6A5E]';
+  const bannerText = overallDown ? 'Reported service outage' : overallDegraded ? 'Reported service degradation' : hasCurrentServiceData ? 'Published services report operational' : 'Current status is not verified';
 
   return (
     <div className="min-h-screen bg-[#F3F1EA]">
@@ -221,7 +221,10 @@ export default function StatusPage() {
           <>
             <section>
               {services.map(s => <ServiceRow key={s.id} service={s} incidents={incidents} />)}
+              {dataNotice && <p className="rounded-md bg-[#E7E2D3] px-4 py-3 text-sm text-[#5C5546]">{dataNotice}</p>}
             </section>
+
+            <p className="mt-4 text-xs leading-5 text-[#8A8270]">Status and uptime are calculated only from published Firestore monitoring intervals. Missing intervals are not counted as operational. This page is not an independent external uptime monitor.</p>
 
             {activeIncidentGroups.length > 0 && (
               <section className="mt-4">

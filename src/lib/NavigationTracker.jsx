@@ -6,11 +6,12 @@ import { useLocation } from 'react-router-dom';
 const PAGE_METADATA = {
   '/': ['SpotFinder | Discover community-rated outdoor spots', 'Discover, rate, save, and navigate to scenic outdoor spots shared by the SpotFinder community.'],
   '/faq': ['FAQ | SpotFinder', 'Answers to common questions about using SpotFinder.'],
-  '/status': ['Service status | SpotFinder', 'Current availability and incident updates for SpotFinder services.'],
+  '/status': ['Service status | SpotFinder', 'Published availability history and incident updates for SpotFinder services.'],
   '/privacypolicy': ['Privacy policy | SpotFinder', 'How SpotFinder collects, uses, and protects personal information.'],
   '/termsandconditions': ['Terms and conditions | SpotFinder', 'Terms governing use of the SpotFinder service.'],
   '/cookiepolicy': ['Cookie policy | SpotFinder', 'How SpotFinder uses cookies and manages consent.'],
   '/refundpolicy': ['Refund policy | SpotFinder', 'SpotFinder subscription cancellation and refund information.'],
+  '/updates': ["What's new | SpotFinder", 'Verified release notes and product updates for SpotFinder.'],
 };
 
 function setMeta(name, content) {
