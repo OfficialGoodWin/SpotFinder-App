@@ -84,11 +84,9 @@ export const AuthProvider = ({ children }) => {
       // No need to check app public settings from base44 anymore
       // Just allow guest browsing by default
       setIsLoadingPublicSettings(false);
-      setIsLoadingAuth(false);
     } catch (error) {
       console.error('App state check failed:', error);
       setIsLoadingPublicSettings(false);
-      setIsLoadingAuth(false);
     }
   };
 

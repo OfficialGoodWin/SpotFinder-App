@@ -10,6 +10,8 @@ import { moderateSubmission } from '@/lib/moderation';
 import { findNearbyPoi } from '@/lib/nearbyPoi';
 import { toast } from 'sonner';
 import LiquidSegmentedControl from '../ui/LiquidSegmentedControl';
+import DraftConfirmationDialog from '../ui/DraftConfirmationDialog';
+import { draftToast } from '../ui/draftToast';
 import { IMAGE_ACCEPT, validateImageFileMetadata } from '@/lib/imageUploadValidation';
 import { hasMeaningfulAddSpotDraft, validateRequiredSpotFields, voiceErrorMessage } from '@/lib/contributionFlow';
 import { createDraftId, deleteGuestDraft, getGuestDraftOwnerKey, normalizeSpotDraft, saveGuestDraft } from '@/lib/spotDrafts';
@@ -182,12 +184,13 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
         await pruneGuestDraftPhotos(ownerKey, draftIdRef.current, localRefs).catch(error => console.warn('Old guest draft photo cleanup failed:', error));
         setDraftPhotoRefs(localRefs);
       }
-      toast.success(user ? 'Draft saved privately to your account.' : 'Draft saved on this device.');
+      draftToast.saved();
       window.dispatchEvent(new CustomEvent('spotfinder:drafts-changed'));
       onClose();
     } catch (error) {
       console.error('Draft save failed:', error);
       setDraftError(error?.message || 'The draft could not be saved. Your form is still open.');
+      draftToast.saveFailed();
       setShowCloseChoices(false);
       focusError(errorSummaryRef);
     } finally {
@@ -793,20 +796,19 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
           </button>
         </div>
       </div>
-      {showCloseChoices && (
-        <div className="absolute inset-0 z-50 grid place-items-center bg-black/55 p-4" role="alertdialog" aria-modal="true" aria-labelledby="save-draft-title">
-          <div className="sf-sheet w-full max-w-sm rounded-3xl p-5">
-            <h3 id="save-draft-title" className="text-lg font-bold">Keep your progress?</h3>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">Save this as an unpublished draft, discard the changes, or return to editing.</p>
-            {!user && imageFiles.length > 0 && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">The {imageFiles.length === 1 ? 'photo' : 'photos'} will be stored in this browser only. Clearing site data, private-browsing cleanup, or storage limits can remove guest photos.</p>}
-            <div className="mt-5 space-y-2">
-              <button type="button" onClick={handleSaveDraft} disabled={savingDraft} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-green-600 px-4 font-semibold text-white disabled:opacity-50">{savingDraft && <Loader2 className="h-4 w-4 animate-spin" />}{savingDraft ? 'Saving draft…' : 'Save Draft'}</button>
-              <button type="button" onClick={onClose} disabled={savingDraft} className="min-h-12 w-full rounded-2xl border border-red-200 px-4 font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:hover:bg-red-950/30">Discard Changes</button>
-              <button type="button" onClick={() => setShowCloseChoices(false)} disabled={savingDraft} className="min-h-12 w-full rounded-2xl px-4 font-semibold text-muted-foreground hover:bg-accent disabled:opacity-50">Continue Editing</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DraftConfirmationDialog
+        open={showCloseChoices}
+        onOpenChange={setShowCloseChoices}
+        title="Keep your progress?"
+        description="Save this as an unpublished draft, discard the changes, or return to editing."
+        confirmLabel={savingDraft ? 'Saving…' : 'Save Draft'}
+        onConfirm={handleSaveDraft}
+        secondaryLabel="Discard"
+        onSecondary={onClose}
+        busy={savingDraft}
+      >
+        {!user && imageFiles.length > 0 && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">The {imageFiles.length === 1 ? 'photo' : 'photos'} will be stored in this browser only. Clearing site data, private-browsing cleanup, or storage limits can remove guest photos.</p>}
+      </DraftConfirmationDialog>
     </div>
   );
 }

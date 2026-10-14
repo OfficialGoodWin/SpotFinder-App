@@ -15,14 +15,15 @@ export default function TermsAndConditions() {
         <li>Keep credentials secure and provide accurate information.</li>
         <li>The current minimum registration age is 16. New email/password registrations must provide a valid date of birth. No legacy-account DOB completion migration is currently active.</li>
         <li>You may request deletion in Settings after recent reauthentication. An active or unresolved subscription must first be cancelled through support so billing is not orphaned. Private data is removed while public geographic contributions may be retained under a former-contributor label as described in the Privacy Policy.</li>
+        <li>If you do not cancel your subscription before you delete the account from our service, then you can contact support to cancel the subscription.</li>
       </LegalUl>
 
       <LegalH2>3. User content</LegalH2>
-      <LegalP>You must own or have permission to share submitted spots, text, social links, and photos; respect privacy and intellectual-property rights; and avoid illegal, dangerous, deceptive, or abusive content. You retain ownership and grant SpotFinder a worldwide, non-exclusive, royalty-free licence to host, reproduce as technically necessary, display, and distribute the contribution within the Service. The scope and post-deletion duration of this licence require legal review. Content may be moderated or removed.</LegalP>
+      <LegalP>You must own or have permission to share submitted spots, text, social links, and photos; respect privacy and intellectual-property rights; and avoid illegal, dangerous, deceptive, or abusive content. You retain ownership and grant SpotFinder a worldwide, non-exclusive, royalty-free licence to host, reproduce as technically necessary, display, and distribute the contribution within the Service. The scope and post-deletion duration of this licence require legal review. Content may be moderated or removed at any time.</LegalP>
 
       <LegalH2>4. Acceptable use</LegalH2>
       <LegalUl>
-        <li>Do not access another account, evade security/rate limits, automate abuse, or manipulate ratings.</li>
+        <li>Do not access other accounts without permission, evade security/rate limits, automate abuse, or manipulate ratings.</li>
         <li>Do not post personal data without authority or content that infringes rights.</li>
         <li>Do not scrape or resell protected Service/provider data without permission.</li>
       </LegalUl>
@@ -36,8 +37,8 @@ export default function TermsAndConditions() {
       </LegalUl>
 
       <LegalH2>6. Advertising</LegalH2>
-      <LegalP>Advertising is temporarily disabled and the current build does not request Google ads or create ad slots. Any future advertising requires separate implementation, disclosure, and consent review. Any promise that paid tiers remove ads applies only if paid subscriptions and advertising are actually enabled and the entitlement is active.</LegalP>
-
+      <LegalP>The free tier may request Google . Any promise that paid tiers remove ads applies only if paid subscriptions are actually enabled and the entitlement is active.</LegalP>
+ads only after advertising consent
       <LegalH2>7. Disclaimers and liability</LegalH2>
       <LegalP>The Service is provided without a guarantee that community or third-party information is accurate, complete, available, lawful to access, or safe. Nothing in these terms excludes rights or liability that applicable law does not permit us to exclude. The appropriate liability wording requires qualified review.</LegalP>
 

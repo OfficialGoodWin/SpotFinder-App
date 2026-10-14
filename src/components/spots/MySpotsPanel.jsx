@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle, ArrowUpDown, Bookmark, Eye, FilePenLine, Heart, MapPin, PlusCircle,
   RefreshCw, Search, Star, Trash2, X,
@@ -20,6 +20,8 @@ import { sortSpotCollection } from '@/lib/spotDiscovery';
 import { useLanguage } from '@/lib/LanguageContext';
 import { deleteGuestDraft, draftDisplayName, listGuestDrafts } from '@/lib/spotDrafts';
 import { deleteGuestDraftPhotos, loadGuestDraftPhoto } from '@/lib/guestDraftPhotos';
+import DraftConfirmationDialog from '../ui/DraftConfirmationDialog';
+import { draftToast } from '../ui/draftToast';
 
 const TABS = [
   { id: 'saved', label: 'Favorites', icon: Bookmark },
@@ -70,9 +72,20 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('newest');
   const [deletingId, setDeletingId] = useState('');
+  const [confirmDraftId, setConfirmDraftId] = useState('');
+  const draftScope = user?.id || `guest:${draftOwnerKey}`;
+  const draftScopeRef = useRef(draftScope);
+  draftScopeRef.current = draftScope;
+
+  useEffect(() => {
+    setData(current => ({ ...current, drafts: null }));
+    setErrors(current => ({ ...current, drafts: '' }));
+    setLoading(current => ({ ...current, drafts: false }));
+  }, [draftOwnerKey, user?.id]);
 
   const loadTab = useCallback(async (tabId) => {
     if (tabId !== 'drafts' && !user?.id) return;
+    const requestedDraftScope = draftScopeRef.current;
     setLoading(current => ({ ...current, [tabId]: true }));
     setErrors(current => ({ ...current, [tabId]: '' }));
     try {
@@ -81,12 +94,16 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
       else if (tabId === 'saved') rows = await getSavedSpots(user.id, 100);
       else if (tabId === 'liked') rows = await getLikedSpots(user.id, 100);
       else rows = await getUserSpots(user.email, 100, user.id);
-      setData(current => ({ ...current, [tabId]: rows }));
+      if (tabId !== 'drafts' || draftScopeRef.current === requestedDraftScope) {
+        setData(current => ({ ...current, [tabId]: rows }));
+      }
     } catch (error) {
       console.error(`My Spots ${tabId} load failed`, error);
       setErrors(current => ({ ...current, [tabId]: 'Could not load these spots. Please try again.' }));
     } finally {
-      setLoading(current => ({ ...current, [tabId]: false }));
+      if (tabId !== 'drafts' || draftScopeRef.current === requestedDraftScope) {
+        setLoading(current => ({ ...current, [tabId]: false }));
+      }
     }
   }, [draftOwnerKey, user?.email, user?.id]);
 
@@ -112,23 +129,30 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
 
   const handleDelete = async (id) => {
     const isDraft = tab === 'drafts';
-    if (deletingId || !window.confirm(isDraft ? 'Delete this unpublished draft permanently?' : 'Delete this spot permanently?')) return;
+    if (deletingId) return;
+    if (isDraft && confirmDraftId !== id) { setConfirmDraftId(id); return; }
+    if (!isDraft && !window.confirm('Delete this spot permanently?')) return;
     setDeletingId(id);
     try {
       if (isDraft) {
         if (user) await deleteCloudSpotDraft(id);
         else {
-          deleteGuestDraft(localStorage, draftOwnerKey, id);
           await deleteGuestDraftPhotos(draftOwnerKey, id);
+          deleteGuestDraft(localStorage, draftOwnerKey, id);
         }
         window.dispatchEvent(new CustomEvent('spotfinder:drafts-changed'));
+        draftToast.deleted();
       } else await firebaseDeleteSpot(id);
       setData(current => Object.fromEntries(Object.entries(current).map(([key, rows]) =>
         [key, rows?.filter(spot => spot.id !== id) ?? rows])));
     } catch (error) {
-      window.alert(error?.message || 'Could not delete this spot.');
+      if (isDraft) {
+        console.error('Draft delete failed:', error);
+        draftToast.deleteFailed();
+      } else window.alert(error?.message || 'Could not delete this spot.');
     } finally {
       setDeletingId('');
+      if (isDraft) setConfirmDraftId('');
     }
   };
 
@@ -238,6 +262,17 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
           )}
         </div>
       </section>
+      <DraftConfirmationDialog
+        open={Boolean(confirmDraftId)}
+        onOpenChange={open => { if (!open) setConfirmDraftId(''); }}
+        title="Delete this draft?"
+        description="This unpublished spot will be permanently removed. This action cannot be undone."
+        cancelLabel="Cancel"
+        confirmLabel={deletingId ? 'Deleting…' : 'Delete Draft'}
+        onConfirm={() => handleDelete(confirmDraftId)}
+        destructive
+        busy={Boolean(deletingId)}
+      />
     </div>
   );
 }

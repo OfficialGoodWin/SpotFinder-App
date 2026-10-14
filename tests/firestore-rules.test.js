@@ -1,7 +1,7 @@
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
-import { deleteDoc, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
 
 const emulatorAvailable = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
 
@@ -27,6 +27,10 @@ test('Firestore rules enforce private profiles, ownership, and verified interact
       await setDoc(doc(db, 'spot_ratings', 'spot-one_owner'), {
         spot_id: 'spot-one', user_id: 'owner', overall: 4, access: 4, condition: 4, safety: 4, crowdedness: 4, schema: 2,
       });
+      await setDoc(doc(db, 'spot_drafts', 'draft-one'), {
+        owner_uid: 'owner', title: 'Private draft', description: 'Only the owner can access this.',
+        lat: 50.1, lng: 14.2, created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z',
+      });
     });
 
     await assertSucceeds(getDoc(doc(owner, 'users', 'owner')));
@@ -38,6 +42,13 @@ test('Firestore rules enforce private profiles, ownership, and verified interact
     await assertFails(deleteDoc(doc(other, 'spots', 'spot-one')));
     await assertSucceeds(getDoc(doc(owner, 'spot_ratings', 'spot-one_owner')));
     await assertFails(getDoc(doc(other, 'spot_ratings', 'spot-one_owner')));
+    await assertSucceeds(getDoc(doc(owner, 'spot_drafts', 'draft-one')));
+    await assertFails(getDoc(doc(other, 'spot_drafts', 'draft-one')));
+    await assertSucceeds(getDocs(query(collection(owner, 'spot_drafts'), where('owner_uid', '==', 'owner'))));
+    await assertFails(getDocs(collection(other, 'spot_drafts')));
+    await assertFails(updateDoc(doc(owner, 'spot_drafts', 'draft-one'), { owner_uid: 'other' }));
+    await assertFails(deleteDoc(doc(other, 'spot_drafts', 'draft-one')));
+    await assertSucceeds(deleteDoc(doc(owner, 'spot_drafts', 'draft-one')));
     await assertFails(setDoc(doc(unverified, 'spot_likes', 'spot-one_unverified'), { spot_id: 'spot-one', user_id: 'unverified' }));
     await assertSucceeds(setDoc(doc(owner, 'spot_likes', 'spot-one_owner'), { spot_id: 'spot-one', user_id: 'owner' }));
     await assertFails(getDoc(doc(owner, 'account_deletion_requests', 'owner')));

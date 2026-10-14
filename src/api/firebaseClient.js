@@ -346,6 +346,11 @@ export const uploadSpotImage = async (file) => {
 
 const SPOT_DRAFTS_COLLECTION = 'spot_drafts';
 
+const waitForAuthRestore = async (auth) => {
+  if (typeof auth.authStateReady === 'function') await auth.authStateReady();
+  return auth.currentUser;
+};
+
 const uploadWithProgress = (ref, blob, metadata, onProgress) => new Promise((resolve, reject) => {
   const task = uploadBytesResumable(ref, blob, metadata);
   task.on('state_changed', snapshot => {
@@ -355,7 +360,7 @@ const uploadWithProgress = (ref, blob, metadata, onProgress) => new Promise((res
 
 export const uploadDraftImage = async (file, draftId, onProgress) => {
   const { auth, storage } = getFirebaseServices();
-  const current = auth.currentUser;
+  const current = await waitForAuthRestore(auth);
   if (!current || current.isAnonymous) throw new Error('Sign in to preserve draft photos across devices.');
   const blob = await prepareSpotImageBlob(file);
   const id = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -369,7 +374,7 @@ export const uploadDraftImage = async (file, draftId, onProgress) => {
 
 export const loadDraftImageFile = async (photoRef) => {
   const { auth, storage } = getFirebaseServices();
-  const current = auth.currentUser;
+  const current = await waitForAuthRestore(auth);
   if (!current || current.isAnonymous || !String(photoRef?.path || '').startsWith(`drafts/${current.uid}/`)) {
     throw new Error('This private draft photo is not available to the signed-in account.');
   }
@@ -391,7 +396,7 @@ export const loadDraftImageFile = async (photoRef) => {
 
 export const deleteDraftImages = async (draftId) => {
   const { auth, storage } = getFirebaseServices();
-  const current = auth.currentUser;
+  const current = await waitForAuthRestore(auth);
   if (!current || current.isAnonymous) return;
   const listing = await listAll(storageRef(storage, `drafts/${current.uid}/${draftId}`));
   await Promise.all(listing.items.map(item => deleteObject(item)));
@@ -399,7 +404,7 @@ export const deleteDraftImages = async (draftId) => {
 
 export const saveCloudSpotDraft = async (value) => {
   const { auth, db } = getFirebaseServices();
-  const current = auth.currentUser;
+  const current = await waitForAuthRestore(auth);
   if (!current || current.isAnonymous) throw new Error('A registered account is required for cloud drafts.');
   const draft = normalizeSpotDraft(value);
   const ref = doc(db, SPOT_DRAFTS_COLLECTION, draft.id);
@@ -412,7 +417,7 @@ export const saveCloudSpotDraft = async (value) => {
 
 export const getCloudSpotDrafts = async () => {
   const { auth, db } = getFirebaseServices();
-  const current = auth.currentUser;
+  const current = await waitForAuthRestore(auth);
   if (!current || current.isAnonymous) return [];
   const snapshot = await getDocs(query(collection(db, SPOT_DRAFTS_COLLECTION), where('owner_uid', '==', current.uid), limit(100)));
   return snapshot.docs.filter(item => !item.data().published_spot_id).map(item => normalizeSpotDraft({ id: item.id, ...item.data() }))
@@ -420,7 +425,9 @@ export const getCloudSpotDrafts = async () => {
 };
 
 export const deleteCloudSpotDraft = async (draftId, { deletePhotos = true } = {}) => {
-  const { db } = getFirebaseServices();
+  const { auth, db } = getFirebaseServices();
+  const current = await waitForAuthRestore(auth);
+  if (!current || current.isAnonymous) throw new Error('A registered account is required to delete cloud drafts.');
   await deleteDoc(doc(db, SPOT_DRAFTS_COLLECTION, draftId));
   if (deletePhotos) await deleteDraftImages(draftId).catch(error => console.warn('Draft photo cleanup failed:', error));
 };
