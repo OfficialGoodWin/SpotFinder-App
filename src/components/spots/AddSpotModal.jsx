@@ -473,7 +473,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
         }
         window.dispatchEvent(new CustomEvent('spotfinder:drafts-changed'));
       }
-      toast.success('Spot added to the map.');
+      draftToast.published();
       onClose();
     } catch (err) {
       console.error('Save failed:', err);
