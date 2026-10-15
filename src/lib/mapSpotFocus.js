@@ -1,5 +1,14 @@
 import { normalizeLatLng } from './spotDiscovery.js';
 
+// OpenFreeMap's vector source is intentionally overzoomed for close inspection,
+// but zooming beyond 19 magnifies existing geometry instead of adding detail.
+export const MAP_MAX_ZOOM = 19;
+
+export function clampMapZoom(zoom, fallback = MAP_MAX_ZOOM) {
+  const numericZoom = Number(zoom);
+  return Math.min(MAP_MAX_ZOOM, Number.isFinite(numericZoom) ? numericZoom : fallback);
+}
+
 let focusSequence = 0;
 
 export function createSpotFocusRequest(spot, source = 'unknown') {
@@ -33,7 +42,9 @@ export function getSpotCameraOptions(request, {
   const verticalOffset = -Math.min(desiredOffset, safeOffset);
   return {
     center: [lng, lat],
-    zoom: Math.min(16, Math.max(14.5, Number(currentZoom) || 0)),
+    // Zoom distant selections in without pulling users back out when they are
+    // already inspecting the marker closely. The map-wide ceiling still wins.
+    zoom: clampMapZoom(Math.max(14.5, Number(currentZoom) || 0)),
     offset: [0, verticalOffset],
     duration: reducedMotion ? 0 : 700,
     essential: false,

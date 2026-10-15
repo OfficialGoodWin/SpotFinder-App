@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createSpotFocusRequest, getSpotCameraOptions } from '../src/lib/mapSpotFocus.js';
+import { clampMapZoom, createSpotFocusRequest, getSpotCameraOptions, MAP_MAX_ZOOM } from '../src/lib/mapSpotFocus.js';
 
 test('spot focus preserves latitude/longitude input and emits MapLibre longitude/latitude center', () => {
   const request = createSpotFocusRequest({ id: 'castle-1', lat: 50.357, lng: 13.251 }, 'my-spots');
@@ -23,6 +23,17 @@ test('spot camera is restrained, offsets the marker above the detail sheet, and 
   const shortViewport = getSpotCameraOptions(request, { viewportWidth: 800, viewportHeight: 300, currentZoom: 15 });
   assert.ok(shortViewport.offset[1] >= -38, 'marker card remains inside a short in-app map viewport');
   const close = getSpotCameraOptions(request, { viewportWidth: 1200, viewportHeight: 800, currentZoom: 19, reducedMotion: true });
-  assert.equal(close.zoom, 16);
+  assert.equal(close.zoom, MAP_MAX_ZOOM);
   assert.equal(close.duration, 0);
+});
+
+test('all requested camera zooms are capped at the supported map maximum', () => {
+  assert.equal(MAP_MAX_ZOOM, 19);
+  assert.equal(clampMapZoom(22), 19);
+  assert.equal(clampMapZoom('18.5'), 18.5);
+  assert.equal(clampMapZoom(Number.POSITIVE_INFINITY), 19);
+
+  const request = createSpotFocusRequest({ id: 'close', lat: 50, lng: 14 }, 'nearby');
+  assert.equal(getSpotCameraOptions(request, { currentZoom: 18 }).zoom, 18);
+  assert.equal(getSpotCameraOptions(request, { currentZoom: 22 }).zoom, 19);
 });

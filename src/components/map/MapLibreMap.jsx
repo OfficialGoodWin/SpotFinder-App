@@ -11,7 +11,8 @@ import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import * as maplibregl from 'maplibre-gl';
 import { getSpotDisplayName, getSpotImageInfo } from '@/lib/spotPresentation';
-import { getSpotCameraOptions } from '@/lib/mapSpotFocus';
+import { clampMapZoom, getSpotCameraOptions, MAP_MAX_ZOOM } from '@/lib/mapSpotFocus';
+import { registerSingleMapListener } from '@/lib/mapLifecycle';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { Protocol } from 'pmtiles';
 import { Minus, Plus } from 'lucide-react';
@@ -346,8 +347,7 @@ function withHighZoomRoadGeometry(style) {
         const laneWidthAt18 = ['*', laneCount, 6];
         const measuredAt18 = isRoadCasing ? ['+', laneWidthAt18, 3] : laneWidthAt18;
         const at18 = ['case', ['has', 'lanes'], ['max', lastWidth, measuredAt18], lastWidth];
-        layer.paint['line-width'] = [...width.slice(0, -1), at18,
-          20, ['*', at18, 4], 22, ['*', at18, 16]];
+        layer.paint['line-width'] = [...width.slice(0, -1), at18];
       }
     }
 
@@ -361,7 +361,7 @@ function withHighZoomRoadGeometry(style) {
     pedestrian.paint['line-color'] = isDarkTheme ? '#b3a58d' : '#d8d1c3';
     pedestrian.paint['line-opacity'] = 1;
     pedestrian.paint['line-width'] = ['interpolate', ['exponential', 2], ['zoom'],
-      15, 1, 18, 3, 20, 12, 22, 48];
+      15, 1, 18, 3];
     pedestrian.paint['line-dasharray'] = [2.5, 1.5];
     cloned.layers.splice(pedestrianIndex, 0, {
       ...pedestrian,
@@ -370,7 +370,7 @@ function withHighZoomRoadGeometry(style) {
         'line-color': isDarkTheme ? '#544b3f' : '#9f9584',
         'line-opacity': 0.9,
         'line-width': ['interpolate', ['exponential', 2], ['zoom'],
-          15, 2, 18, 5, 20, 16, 22, 56],
+          15, 2, 18, 5],
       },
     });
   }
@@ -379,10 +379,10 @@ function withHighZoomRoadGeometry(style) {
     if (layer.type !== 'symbol' || layer['source-layer'] !== 'transportation_name') continue;
     if (!['lbl-primary', 'lbl-street'].includes(layer.id)) continue;
     layer.layout['text-size'] = ['interpolate', ['linear'], ['zoom'],
-      13, 11, 16, 13, 18, 15, 20, 21, 22, 30];
-    layer.layout['symbol-spacing'] = 180;
+      13, 11, 16, 13, 18, 15];
+    layer.layout['symbol-spacing'] = 320;
     layer.layout['text-letter-spacing'] = 0.02;
-    layer.paint['text-halo-width'] = ['interpolate', ['linear'], ['zoom'], 13, 1.5, 18, 2, 22, 3];
+    layer.paint['text-halo-width'] = ['interpolate', ['linear'], ['zoom'], 13, 1.5, 18, 2];
   }
 
   // Replace theme-specific approximations with one boundary per real lane gap:
@@ -404,10 +404,9 @@ function withHighZoomRoadGeometry(style) {
       paint: {
         'line-color': '#ffffff',
         'line-opacity': 0.62,
-        'line-width': ['interpolate', ['linear'], ['zoom'], 16, 0.5, 18, 1, 20, 1.8, 22, 3],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 16, 0.5, 18, 1],
         'line-offset': ['interpolate', ['exponential', 2], ['zoom'],
-          16, ['*', relativeOffset, 1.5], 18, ['*', relativeOffset, 6],
-          20, ['*', relativeOffset, 24], 22, ['*', relativeOffset, 96]],
+          16, ['*', relativeOffset, 1.5], 18, ['*', relativeOffset, 6]],
         'line-dasharray': [6, 5],
       },
     };
@@ -520,7 +519,7 @@ function makeDot(catKey, color, size = 28, label = '') {
   return el;
 }
 
-function makeSpotDom(spot, language = 'en') {
+function makeSpotDom(spot, language = 'en', onClick) {
   const photoUrl = getSpotImageInfo(spot)?.url || '';
 
   const el = document.createElement('div');
@@ -544,7 +543,11 @@ function makeSpotDom(spot, language = 'en') {
     document.querySelectorAll('.sf-discovery-marker.is-selected').forEach(marker => marker.classList.remove('is-selected'));
     el.classList.add('is-selected');
   };
-  el.addEventListener('click', select);
+  el.addEventListener('click', event => {
+    event.stopPropagation();
+    select();
+    onClick?.(spot);
+  });
   el.addEventListener('keydown', event => {
     if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); select(); el.click(); }
   });
@@ -777,18 +780,23 @@ function registerMissingImageResolver(map) {
   });
 }
 
-function reRegisterShieldListener(map, getTerrainEnabled) {
+function registerStyleRestoration(map, getTerrainEnabled, onStyleLoad) {
   // The missing-image resolver survives setStyle in MapLibre — no need to re-add
   // BUT we need to clear the image cache so shields get redrawn after style reload
   // (setStyle wipes all images including our shields)
-    map.on('style.load', () => {
+  const restore = () => {
       // Shields are gone after style reload — the resolver recreates them on demand
       // No action needed, the listener persists
       // Re-apply 3D terrain + buildings after a style reload wipes them
-      applyTerrain(map, getTerrainEnabled());
-      apply3DBuildings(map, getTerrainEnabled());
-    });
-  }
+    applyTerrain(map, getTerrainEnabled());
+    apply3DBuildings(map, getTerrainEnabled());
+    addOnewayArrow(map);
+    addAmbientVectorLayer(map);
+    onStyleLoad?.();
+    map.triggerRepaint();
+  };
+  return registerSingleMapListener(map, 'style.load', restore);
+}
 
 
 export default function MapLibreMap({
@@ -827,6 +835,7 @@ export default function MapLibreMap({
   const poiTimer = useRef(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [mapZoom, setMapZoom] = useState(13);
+  const [styleRevision, setStyleRevision] = useState(0);
 
   // ── Apply admin E-route shield removals ───────────────────────────────────
   useEffect(() => {
@@ -861,7 +870,7 @@ export default function MapLibreMap({
       center: [center.lng, center.lat],
       zoom: 13,
       minZoom: 3,
-      maxZoom: 22,
+      maxZoom: MAP_MAX_ZOOM,
       attributionControl: false,
       pitchWithRotate: false,
       // Android fix: enable preserveDrawingBuffer to prevent canvas loss on context change
@@ -882,20 +891,12 @@ export default function MapLibreMap({
     // both). Previously this listener was defined but never registered, so 3D
     // silently broke — visually stuck tilted with no terrain/buildings — the
     // moment the user switched map layer or dark/light mode while 3D was on.
-    reRegisterShieldListener(map, () => terrainRef.current);
+    const removeStyleRestoration = registerStyleRestoration(map, () => terrainRef.current, () => {
+      setStyleRevision(revision => revision + 1);
+    });
     // Add the one-way arrow image on first style load, and re-add after style reloads
-    const addImages = () => {
-      addOnewayArrow(map);
-      map.triggerRepaint();
-    };
-    map.once('load', addImages);
-    // Re-add on every subsequent style load (dark/light toggle, offline switch)
-    map.on('style.load', addImages);
-
     // Ambient POI vector tiles (if configured) also get wiped by setStyle(),
     // same as the terrain/shield listeners above — re-add every time.
-    map.once('load', () => addAmbientVectorLayer(map));
-    map.on('style.load', () => addAmbientVectorLayer(map));
     if (AMBIENT_TILES_URL) {
       // Query a small box around the tap so icons are easy to hit on touch screens.
       const ambientHits = (point) => {
@@ -962,6 +963,7 @@ export default function MapLibreMap({
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
       map.off('zoom', syncZoom);
+      removeStyleRestoration();
       markers.current.spots.forEach(removeSpotMarker);
       markers.current.spots.clear();
       map.remove();
@@ -977,15 +979,12 @@ export default function MapLibreMap({
     const styleKey = `${isDark ? 'dark' : 'light'}:${mapLayer}`;
     if (appliedStyleRef.current === styleKey) return;
     appliedStyleRef.current = styleKey;
-    const doSwitch = () => {
+    try {
       map.setStyle(getMapStyle(isDark, mapLayer));
-      map.once('idle', () => {
-        map.triggerRepaint();
-        // E-routes embedded in shields, no separate layer needed
-      });
-    };
-    if (!map.isStyleLoaded()) map.once('idle', doSwitch);
-    else doSwitch();
+    } catch (error) {
+      appliedStyleRef.current = null;
+      console.warn('Map style switch failed; keeping the current style:', error);
+    }
   }, [isDark, mapLayer]);
 
   // ── Cursor ─────────────────────────────────────────────────────────────────
@@ -996,7 +995,9 @@ export default function MapLibreMap({
   // ── flyTo ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!flyTo || !mapRef.current) return;
-    mapRef.current.flyTo({ center: [flyTo[1], flyTo[0]], zoom: 15, duration: 1000 });
+    const [lat, lng] = flyTo;
+    if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) return;
+    mapRef.current.flyTo({ center: [Number(lng), Number(lat)], zoom: clampMapZoom(15), duration: 1000 });
   }, [flyTo]);
 
   // One camera path for community spots opened from markers, lists, search,
@@ -1024,7 +1025,7 @@ export default function MapLibreMap({
     const lats = fitBoundsData.map(c => c[0] ?? c.lat ?? c[1]);
     mapRef.current.fitBounds(
       [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-      { padding: 60, duration: 1200 }
+      { padding: 60, duration: 1200, maxZoom: MAP_MAX_ZOOM }
     );
   }, [fitBoundsData]);
 
@@ -1041,24 +1042,24 @@ export default function MapLibreMap({
     if (!map) return;
     const m = markers.current.spots;
     if (!showSpots) { m.forEach(removeSpotMarker); m.clear(); return; }
-    const ids = new Set(spots.map(s => s.id).filter(Boolean));
+    const ids = new Set(spots.map(s => s.id).filter(Boolean).map(String));
     m.forEach((x, id) => { if (!ids.has(id)) { removeSpotMarker(x); m.delete(id); } });
     for (const spot of spots) {
       if (!spot.id || !Number.isFinite(Number(spot.lat)) || !Number.isFinite(Number(spot.lng))) continue;
+      const spotId = String(spot.id);
       const signature = JSON.stringify([
         Number(spot.lat), Number(spot.lng), getSpotDisplayName(spot, language), spot.image_url || '',
         spot.rating || 0, spot.rating_count || 0, spot.access_difficulty || '',
         Array.isArray(spot.tags) ? spot.tags : [], Boolean(spot.has_social || spot.video_url),
       ]);
-      const existing = m.get(spot.id);
+      const existing = m.get(spotId);
       if (existing?.__spotSignature === signature) continue;
       if (existing) removeSpotMarker(existing);
-      const el = makeSpotDom(spot, language);
+      const el = makeSpotDom(spot, language, onSelectSpot);
       el.classList.toggle('is-selected', String(selectedSpotId || '') === String(spot.id));
       const mk = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([spot.lng, spot.lat]).addTo(map);
-      el.addEventListener('click', e => { e.stopPropagation(); onSelectSpot?.(spot); });
       mk.__spotSignature = signature;
-      m.set(spot.id, mk);
+      m.set(spotId, mk);
     }
   }, [language, onSelectSpot, selectedSpotId, spots, showSpots]);
 
@@ -1088,7 +1089,7 @@ export default function MapLibreMap({
     el.style.cssText = 'width:22px;height:22px;';
     el.innerHTML = '<div style="width:22px;height:22px;background:white;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.25);"><div style="width:12px;height:12px;background:#3B82F6;border-radius:50%;"></div></div>';
     markers.current.user = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat([userPos[1], userPos[0]]).addTo(map);
-  }, [userPos, userAccuracy]);
+  }, [userPos, userAccuracy, styleRevision]);
 
   // ── Ambient POIs ───────────────────────────────────────────────────────────
   // Skipped entirely when pre-baked vector tiles are configured — MapLibre
@@ -1235,7 +1236,7 @@ export default function MapLibreMap({
       } catch (_) { }
     };
     if (map.isStyleLoaded()) addRoute(); else map.once('styledata', addRoute);
-  }, [navTarget, navRouteData]);
+  }, [navTarget, navRouteData, styleRevision]);
 
   // ── Traffic incident markers (TomTom incidents → MapLibre markers) ───────────
   useEffect(() => {
@@ -1534,7 +1535,7 @@ const addAdminMarkers = () => {
     } else {
       map.once('idle', add);
     }
-  }, [mapLayer, isDark]);
+  }, [mapLayer, isDark, styleRevision]);
 
   // ── Aerial layer (Mapy.cz satellite) ──────────────────────────────────────
   useEffect(() => {
@@ -1552,7 +1553,7 @@ const addAdminMarkers = () => {
       } catch (_) { }
     };
     if (map.isStyleLoaded()) add(); else map.once('styledata', add);
-  }, [mapLayer]);
+  }, [mapLayer, styleRevision]);
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
