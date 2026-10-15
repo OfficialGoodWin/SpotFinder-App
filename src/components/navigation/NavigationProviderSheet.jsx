@@ -1,94 +1,52 @@
-import { useState } from 'react';
-import { ExternalLink, LoaderCircle, Map, Navigation, X } from 'lucide-react';
-import { useLanguage } from '@/lib/LanguageContext';
-import { nearestParking } from '@/lib/placeContext';
+import { useEffect, useRef, useState } from 'react';
+import { ExternalLink, MapPinned, Navigation2, X } from 'lucide-react';
+import { NAVIGATION_PROVIDERS, buildExternalNavigationUrl, navigationCoordinates } from '@/lib/externalNavigation';
 
 const PREFERENCE_KEY = 'spotfinder_navigation_provider';
 
-const PROVIDERS = {
-  google: {
-    label: 'Google Maps',
-    build: (lat, lng) => {
-      const url = new URL('https://www.google.com/maps/dir/');
-      url.searchParams.set('api', '1');
-      url.searchParams.set('destination', `${lat},${lng}`);
-      url.searchParams.set('dir_action', 'navigate');
-      return url.toString();
-    },
-  },
-  mapy: {
-    label: 'Mapy.com',
-    build: (lat, lng) => {
-      const url = new URL('https://mapy.com/fnc/v1/route');
-      url.searchParams.set('end', `${lng},${lat}`);
-      url.searchParams.set('routeType', 'car_fast_traffic');
-      url.searchParams.set('navigate', 'true');
-      return url.toString();
-    },
-  },
-  apple: {
-    label: 'Apple Maps',
-    build: (lat, lng) => {
-      const url = new URL('https://maps.apple.com/directions');
-      url.searchParams.set('destination', `${lat},${lng}`);
-      return url.toString();
-    },
-  },
-};
-
-const preferredProvider = () => {
+function preferredProvider() {
   try {
     const saved = localStorage.getItem(PREFERENCE_KEY);
-    if (PROVIDERS[saved]) return saved;
-  } catch {}
+    if (NAVIGATION_PROVIDERS.some(provider => provider.id === saved)) return saved;
+  } catch { /* Storage may be unavailable. */ }
   return /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent) ? 'apple' : 'google';
-};
+}
 
-export default function NavigationProviderSheet({ open, destination, onClose, onInternalNavigate }) {
-  const { language } = useLanguage();
-  const [launching, setLaunching] = useState('');
-  if (!open || !destination) return null;
-  const lat = Number(destination.lat);
-  const lng = Number(destination.lng ?? destination.lon);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+export default function NavigationProviderSheet({ destination, onClose }) {
+  const [preferred, setPreferred] = useState(preferredProvider);
+  const closeButton = useRef(null);
+  useEffect(() => { if (destination) closeButton.current?.focus(); }, [destination]);
+  if (!destination || !navigationCoordinates(destination)) return null;
 
-  const preferred = preferredProvider();
-  const ordered = Object.entries(PROVIDERS).sort(([a], [b]) =>
-    Number(b === preferred) - Number(a === preferred));
+  const ordered = [...NAVIGATION_PROVIDERS].sort((a, b) =>
+    Number(b.id === preferred) - Number(a.id === preferred));
+  const destinationName = destination.title || destination.label || destination.name || 'this place';
 
-  const launch = async (id, provider) => {
-    try { localStorage.setItem(PREFERENCE_KEY, id); } catch {}
-    setLaunching(id);
-    const newWindow = window.open('', '_blank');
-    if (newWindow) newWindow.opener = null;
-    const parking = await nearestParking(lat, lng, language);
-    const target = parking || { lat, lng };
-    const routeUrl = provider.build(target.lat, target.lng);
-    if (newWindow) newWindow.location.replace(routeUrl);
-    else window.location.assign(routeUrl);
-    setLaunching('');
-    onClose?.();
+  const remember = id => {
+    setPreferred(id);
+    try { localStorage.setItem(PREFERENCE_KEY, id); } catch { /* Handoff still works. */ }
+    // Let the browser follow the native link before unmounting the sheet.
+    window.setTimeout(() => onClose?.(), 0);
   };
 
   return (
-    <div className="fixed inset-0 z-[6000] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm" onMouseDown={event => { if (event.target === event.currentTarget) onClose?.(); }}>
-      <section className="sf-sheet w-full rounded-t-3xl p-5 sm:max-w-sm sm:rounded-3xl" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }} aria-labelledby="navigation-provider-title">
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <div><h2 id="navigation-provider-title" className="text-lg font-bold">Choose navigation</h2><p className="text-sm text-muted-foreground mt-0.5">External maps route to the nearest parking, then you can walk to {destination.title || destination.label || 'this spot'}.</p></div>
-          <button onClick={onClose} className="w-11 h-11 -mr-2 -mt-2 grid place-items-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-blue-500" aria-label="Close navigation choices"><X className="w-5 h-5" /></button>
+    <div className="fixed inset-0 z-[6000] flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center" onMouseDown={event => { if (event.target === event.currentTarget) onClose?.(); }} onKeyDown={event => { if (event.key === 'Escape') onClose?.(); }}>
+      <section className="sf-sheet w-full rounded-t-3xl p-5 sm:max-w-sm sm:rounded-3xl" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }} role="dialog" aria-modal="true" aria-labelledby="navigation-provider-title">
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <h2 id="navigation-provider-title" className="text-lg font-bold">Choose navigation</h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">Open directions to {destinationName} in your preferred map app.</p>
+          </div>
+          <button ref={closeButton} type="button" onClick={onClose} className="-mr-2 -mt-2 grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-primary dark:hover:bg-white/10" aria-label="Close navigation choices"><X className="h-5 w-5" /></button>
         </div>
-
         <div className="space-y-2">
-          <button onClick={() => { onInternalNavigate?.(destination); onClose?.(); }} className="w-full min-h-12 px-4 rounded-2xl border border-blue-200 dark:border-blue-900 bg-blue-50/80 dark:bg-blue-950/30 flex items-center gap-3 text-left font-semibold hover:bg-blue-100 dark:hover:bg-blue-950/50 focus-visible:ring-2 focus-visible:ring-blue-500">
-            <Navigation className="w-5 h-5 text-blue-600" /><span className="flex-1">SpotFinder navigation</span>
-          </button>
-          {ordered.map(([id, provider]) => (
-            <button key={id} disabled={!!launching} onClick={() => launch(id, provider)} className="w-full min-h-12 px-4 rounded-2xl border border-gray-200 dark:border-border bg-white/70 dark:bg-white/[0.03] flex items-center gap-3 text-left hover:bg-gray-50 dark:hover:bg-white/[0.07] focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-60">
-              {launching === id ? <LoaderCircle className="w-5 h-5 animate-spin text-emerald-500" /> : <Map className="w-5 h-5 text-gray-500" />}
+          {ordered.map(provider => (
+            <a key={provider.id} href={buildExternalNavigationUrl(provider.id, destination)} target="_blank" rel="noopener noreferrer" onClick={() => remember(provider.id)} className="flex min-h-14 w-full items-center gap-3 rounded-2xl border border-primary/20 bg-white px-4 text-left text-foreground transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:bg-white/[0.03] dark:hover:bg-primary/10">
+              {provider.id === 'apple' ? <Navigation2 className="h-5 w-5 text-primary" aria-hidden="true" /> : <MapPinned className="h-5 w-5 text-primary" aria-hidden="true" />}
               <span className="flex-1 font-semibold">{provider.label}</span>
-              {id === preferred && <span className="text-[11px] text-muted-foreground">Preferred</span>}
-              <ExternalLink className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
-            </button>
+              {provider.id === preferred && <span className="text-xs text-muted-foreground">Preferred</span>}
+              <ExternalLink className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            </a>
           ))}
         </div>
       </section>

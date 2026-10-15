@@ -333,8 +333,12 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
                   </button>
                   {pos && onNavigate && (
                     <button
-                      onMouseDown={e => { e.preventDefault(); e.stopPropagation(); onNavigate({ lat: pos.lat, lng: pos.lon || pos.lng, label: item.name || item.label }); closeDropdown(); }}
-                      className="px-3 py-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-accent transition-colors"
+                      type="button"
+                      onMouseDown={e => { e.preventDefault(); e.stopPropagation(); onNavigate({ lat: pos.lat, lng: pos.lon ?? pos.lng, label: item.name || item.label }); closeDropdown(); }}
+                      onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); onNavigate({ lat: pos.lat, lng: pos.lon ?? pos.lng, label: item.name || item.label }); closeDropdown(); }}
+                      onClick={e => { if (e.detail === 0) { onNavigate({ lat: pos.lat, lng: pos.lon ?? pos.lng, label: item.name || item.label }); closeDropdown(); } }}
+                      className="grid min-h-11 min-w-11 place-items-center text-primary hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-primary dark:hover:bg-accent"
+                      aria-label={`Navigate to ${item.name || item.label}`}
                     >
                       <Navigation className="w-5 h-5" />
                     </button>

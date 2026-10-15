@@ -50,7 +50,6 @@ const PLANS = [
     yearly:  { price: '$27.99', priceId: PRICES.elite_yearly,  period: '/year', saving: 'Save $31.89' },
     features: [
       'Unlimited spot saves',
-      'Advanced route planning',
       'Priority spot ratings',
       'Elite badge on profile',
       'No ads',

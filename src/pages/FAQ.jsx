@@ -96,10 +96,10 @@ const LayersGraphic = () => (
 );
 
 const NavigateShareGraphic = () => (
-  <TutorialFrame label="Spot Details actions for navigation and sharing, followed by drive, bike, and walk route choices">
+  <TutorialFrame label="Spot Details actions for navigation and sharing, followed by external map choices">
     <div className="mx-auto max-w-sm space-y-3">
-      <div className="rounded-2xl border border-border bg-card p-4"><p className="font-bold">Riverside Viewpoint</p><div className="mt-3 grid grid-cols-2 gap-2"><span className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 p-2 text-xs font-bold text-white"><Navigation className="h-4 w-4" />Navigate</span><span className="flex items-center justify-center gap-2 rounded-xl border border-border p-2 text-xs font-bold"><Share2 className="h-4 w-4" />Share</span></div></div>
-      <div className="flex justify-center gap-2 text-xs font-semibold"><span className="rounded-full bg-primary px-3 py-1.5 text-primary-foreground">Drive</span><span className="rounded-full bg-muted px-3 py-1.5">Bike</span><span className="rounded-full bg-muted px-3 py-1.5">Walk</span></div>
+      <div className="rounded-2xl border border-border bg-card p-4"><p className="font-bold">Riverside Viewpoint</p><div className="mt-3 grid grid-cols-2 gap-2"><span className="flex items-center justify-center gap-2 rounded-xl bg-primary p-2 text-xs font-bold text-primary-foreground"><Navigation className="h-4 w-4" />Navigate</span><span className="flex items-center justify-center gap-2 rounded-xl border border-border p-2 text-xs font-bold"><Share2 className="h-4 w-4" />Share</span></div></div>
+      <div className="flex flex-wrap justify-center gap-2 text-xs font-semibold"><span className="rounded-full bg-primary px-3 py-1.5 text-primary-foreground">Google Maps</span><span className="rounded-full bg-muted px-3 py-1.5">Mapy.com</span><span className="rounded-full bg-muted px-3 py-1.5">Apple Maps</span></div>
     </div>
   </TutorialFrame>
 );
@@ -108,7 +108,7 @@ const FAQ_SECTIONS = [
   {
     category: 'Getting started',
     items: [
-      { q: 'What is SpotFinder?', a: 'SpotFinder is a community map for discovering and sharing useful outdoor places. Browsing, search, map layers, sharing, and route planning work without a registered account. Some contribution and account features have additional identity requirements.' },
+      { q: 'What is SpotFinder?', a: 'SpotFinder is a community map for discovering and sharing useful outdoor places. Browsing, search, map layers, sharing, and opening directions in an external map app work without a registered account. Some contribution and account features have additional identity requirements.' },
       { q: 'Do I need an account?', a: 'You can browse and add a basic spot as a guest through an anonymous app session. A registered, email-verified account is required to rate, like, save, manage synced drafts, or attach supported social content. Owners cannot rate their own spots.' },
       { q: 'Are Elite and Ultra subscriptions available?', a: 'No purchase flow is currently enabled by default. Elite and Ultra cards are previews of possible plans, not an active offer for sale.' },
     ],
@@ -137,14 +137,14 @@ const FAQ_SECTIONS = [
     items: [
       { q: 'Which map styles are available?', a: 'Open Map layers to choose Basic, Outdoor, Aerial, Winter, or Traffic. Provider availability and network access can affect individual layers.', steps: [{ label: 'Open Map layers and choose the view that suits the trip.', Graphic: LayersGraphic }] },
       { q: 'What does the Traffic layer show?', a: 'When the TomTom integration is configured and reachable, Traffic displays provider flow tiles and current incident markers such as closures, works, accidents, lane restrictions, and jams. SpotFinder can also display operator-entered closures. This data may be delayed or incomplete and should not replace official road information.' },
-      { q: 'How does navigation work?', a: 'Open a spot, select Navigate, and choose SpotFinder navigation or an available external provider. Internal routing supports driving, cycling, and walking profiles with route steps and browser voice guidance when supported. With location updates active, the app requests a new route after detecting that you are more than 80 metres from the route.', steps: [{ label: 'Choose Navigate, select a route profile, then start navigation.', Graphic: NavigateShareGraphic }] },
+      { q: 'How does navigation work?', a: 'Select Navigate on a spot, search result, or place, then choose Google Maps, Mapy.com, or Apple Maps. SpotFinder sends the selected place’s coordinates directly to that provider. The map app handles directions, live location, and guidance.', steps: [{ label: 'Choose Navigate, then select an external map app.', Graphic: NavigateShareGraphic }] },
     ],
   },
   {
     category: 'Sharing and privacy',
     items: [
       { q: 'How do I share a spot?', a: 'Use Share in Spot Details. SpotFinder opens the device share sheet when supported and otherwise copies a direct spot link.', steps: [{ label: 'Use the Navigate and Share actions in Spot Details.', Graphic: NavigateShareGraphic }] },
-      { q: 'Does SpotFinder use analytics or advertising?', a: 'Google Analytics and Google AdSense are temporarily disabled in this release. Essential Firebase authentication and reCAPTCHA, maps, routing, search, and user-requested embeds can still contact their providers. See the Privacy and Cookie policies for details.' },
+      { q: 'Does SpotFinder use analytics or advertising?', a: 'Google Analytics and Google AdSense are temporarily disabled in this release. Essential Firebase authentication and reCAPTCHA, maps, search, and user-requested embeds can still contact their providers. Opening directions contacts the selected external map provider. See the Privacy and Cookie policies for details.' },
     ],
   },
 ];
@@ -167,12 +167,12 @@ function AccordionItem({ q, a, steps }) {
 }
 
 function AboutSection() {
-  const features = ['Guest browsing and contributions', 'Verified-account ratings and collections', 'Voice input where the browser supports it', 'MapLibre maps with multiple provider-backed layers', 'Driving, cycling, and walking routes', 'Optional plan previews; checkout disabled by default'];
+  const features = ['Guest browsing and contributions', 'Verified-account ratings and collections', 'Voice input where the browser supports it', 'MapLibre maps with multiple provider-backed layers', 'Directions through Google Maps, Mapy.com, or Apple Maps', 'Optional plan previews; checkout disabled by default'];
   return (
     <section className="sf-surface overflow-hidden">
-      <div className="border-b border-border bg-primary/[0.055] px-5 py-5 sm:px-6"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><MapPin className="h-5 w-5" /></span><div><h2 className="text-xl font-bold">About SpotFinder</h2><p className="text-sm text-muted-foreground">Community-powered place discovery and routing.</p></div></div></div>
+      <div className="border-b border-border bg-primary/[0.055] px-5 py-5 sm:px-6"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><MapPin className="h-5 w-5" /></span><div><h2 className="text-xl font-bold">About SpotFinder</h2><p className="text-sm text-muted-foreground">Community-powered place discovery and external directions.</p></div></div></div>
       <ul className="grid gap-2 px-5 py-5 sm:grid-cols-2 sm:px-6">{features.map(feature => <li key={feature} className="flex items-start gap-2.5 text-sm text-muted-foreground"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />{feature}</li>)}</ul>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/40 px-5 py-4 text-xs text-muted-foreground sm:px-6"><span>React, MapLibre, Firebase, and provider-backed routing</span><a href="/updates" className="inline-flex items-center gap-1.5 font-bold text-primary hover:underline">Version {APP_VERSION} · What’s new <ExternalLink className="h-3.5 w-3.5" /></a></div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/40 px-5 py-4 text-xs text-muted-foreground sm:px-6"><span>React, MapLibre, Firebase, and external map directions</span><a href="/updates" className="inline-flex items-center gap-1.5 font-bold text-primary hover:underline">Version {APP_VERSION} · What’s new <ExternalLink className="h-3.5 w-3.5" /></a></div>
     </section>
   );
 }

@@ -5,7 +5,6 @@ import LabeledRatingScale from './LabeledRatingScale';
 import { submitCategoryRatings, getSpotSocialState, toggleSpotLike, toggleSpotSave } from '@/api/firebaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import ReportDialog from '@/components/moderation/ReportDialog';
-import NavigationProviderSheet from '@/components/navigation/NavigationProviderSheet';
 import { localizedShareMessage, reversePlaceContext } from '@/lib/placeContext';
 import { getSpotDisplayName, getSpotLocationLabel } from '@/lib/spotPresentation';
 import SpotImage from './SpotImage';
@@ -21,7 +20,6 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
   const [shareTooltip, setShareTooltip] = useState('');
   const [social, setSocial] = useState({ liked: false, saved: false, likesCount: spot.likes_count || 0, savesCount: spot.saves_count || 0 });
   const [socialBusy, setSocialBusy] = useState('');
-  const [showNavigationProviders, setShowNavigationProviders] = useState(false);
   const displayName = getSpotDisplayName(localSpot, language);
   const creatorName = localSpot.created_by_name || (String(localSpot.created_by || '').includes('@') ? 'Community contributor' : localSpot.created_by) || 'Community contributor';
 
@@ -418,8 +416,8 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
           )}
 
           <button
-            onClick={() => setShowNavigationProviders(true)}
-            className="flex-1 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-2xl flex items-center justify-center gap-2 transition-colors"
+            onClick={() => onNavigate?.(localSpot)}
+            className="flex-1 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-2xl flex items-center justify-center gap-2 transition-colors"
           >
             <Navigation className="w-5 h-5" />
             {t('spotDetail.navigateHere')}
@@ -427,12 +425,6 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
         </div>
       </div>
       <ReportDialog open={showReport} onClose={() => setShowReport(false)} user={user} targetType="spot" targetId={String(spot.id)} targetLabel={displayName} targetSnapshot={{ title: displayName, lat: localSpot.lat || '', lon: localSpot.lng || localSpot.lon || '', created_by: localSpot.created_by || '' }} />
-      <NavigationProviderSheet
-        open={showNavigationProviders}
-        destination={localSpot}
-        onClose={() => setShowNavigationProviders(false)}
-        onInternalNavigate={onNavigate}
-      />
     </div>
   );
 }

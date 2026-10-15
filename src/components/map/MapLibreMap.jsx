@@ -2,7 +2,7 @@
  * MapLibreMap.jsx
  * Replaces: MapContainer, TileLayer, SpotMarker,
  *           UserLocationMarker, AmbientPOILayer, POILayer,
- *           RoadClosureLayer, RouteOverlay, MapController, MapClickHandler
+ *           RoadClosureLayer, MapController, MapClickHandler
  *
  * OpenFreeMap vector tiles — styled to match Mapy.cz
  * Dark: full dark variant, switches instantly via setStyle()
@@ -17,7 +17,7 @@ import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { Protocol } from 'pmtiles';
 import { Minus, Plus } from 'lucide-react';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { lightStyle, darkStyle, outdoorStyle, winterStyle } from '../../lib/mapStyle.js';
+import { getBaseStyle } from '../../lib/mapStyle.js';
 import { AMBIENT_CATEGORIES } from '../../lib/ambientCategories.js';
 import { badgeSVG, iconGlyphSVG } from '../../lib/mapIcons.js';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -315,12 +315,8 @@ function ensureProtocols() {
 
 // ── Style selector ────────────────────────────────────────────────────────────
 function getMapStyle(isDark, mapLayer) {
-  // If a special layer is selected, use that, otherwise use dark/light
-  let selectedStyle;
-  if (mapLayer === 'outdoor') selectedStyle = outdoorStyle;
-  else if (mapLayer === 'winter') selectedStyle = winterStyle;
-  // For 'basic', 'aerial', 'traffic' — use light/dark base
-  else selectedStyle = isDark ? darkStyle : lightStyle;
+  const selectedStyle = getBaseStyle(isDark, mapLayer);
+  if (mapLayer === 'aerial') return selectedStyle;
   return withHighZoomRoadGeometry(selectedStyle);
 }
 
@@ -463,6 +459,7 @@ function applyTerrain(map, enabled) {
 function apply3DBuildings(map, enabled) {
   try {
     if (enabled) {
+      if (!map.getSource('v')) return;
       if (!map.getLayer('bldg-3d')) {
         const beforeId = map.getLayer('bldg-fill') ? 'bldg-fill' : undefined;
         map.addLayer({
@@ -805,7 +802,6 @@ export default function MapLibreMap({
   spots, showSpots, onSelectSpot,
   userPos, userAccuracy,
   selectedPOICategory, onSelectPOI, onPOIsLoaded, onLoadingChange,
-  navTarget, navRouteData,
   isDark, mapLayer,
   terrainEnabled,
   adminPOIs, adminClosures, adminNavMode, onAdminMapClick,
@@ -829,7 +825,6 @@ export default function MapLibreMap({
     else map.once('idle', () => { applyTerrain(map, terrainEnabled); apply3DBuildings(map, terrainEnabled); });
   }, [terrainEnabled]);
   const markers = useRef({ spots: new Map(), ambient: new Map(), pois: new Map(), user: null });
-  const routeAdded = useRef(false);
   const poiAbort = useRef(null);
   const categoryPoiAbort = useRef(null);
   const poiTimer = useRef(null);
@@ -1212,32 +1207,6 @@ export default function MapLibreMap({
   }, [selectedPOICategory, language, userPos]);
 
   // ── Route overlay ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    const removeRoute = () => {
-      if (!routeAdded.current) return;
-      ['route-outline', 'route-line'].forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch (_) { } });
-      try { if (map.getSource('route')) map.removeSource('route'); } catch (_) { }
-      routeAdded.current = false;
-    };
-
-    if (!navTarget || !navRouteData?.coordinates?.length) { removeRoute(); return; }
-
-    const coords = navRouteData.coordinates.map(c => [c[1] ?? c.lng, c[0] ?? c.lat]);
-    const addRoute = () => {
-      removeRoute();
-      try {
-        map.addSource('route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } } });
-        map.addLayer({ id: 'route-outline', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#1d4ed8', 'line-width': 8, 'line-opacity': 0.5 } });
-        map.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#3b82f6', 'line-width': 5, 'line-opacity': 0.9 } });
-        routeAdded.current = true;
-      } catch (_) { }
-    };
-    if (map.isStyleLoaded()) addRoute(); else map.once('styledata', addRoute);
-  }, [navTarget, navRouteData, styleRevision]);
-
   // ── Traffic incident markers (TomTom incidents → MapLibre markers) ───────────
   useEffect(() => {
     const map = mapRef.current;
@@ -1536,24 +1505,6 @@ const addAdminMarkers = () => {
       map.once('idle', add);
     }
   }, [mapLayer, isDark, styleRevision]);
-
-  // ── Aerial layer (Mapy.cz satellite) ──────────────────────────────────────
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    const remove = () => { try { if (map.getLayer('aerial')) map.removeLayer('aerial'); if (map.getSource('aerial')) map.removeSource('aerial'); } catch (_) { } };
-    if (mapLayer !== 'aerial') { remove(); return; }
-    const add = () => {
-      remove();
-      try {
-        map.addSource('aerial', { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 19, attribution: '© Esri © OpenStreetMap' });
-        // Insert BEFORE road labels so labels still show
-        const firstSymbol = map.getStyle().layers.find(l => l.type === 'symbol')?.id;
-        map.addLayer({ id: 'aerial', type: 'raster', source: 'aerial', paint: { 'raster-opacity': 1 } }, firstSymbol);
-      } catch (_) { }
-    };
-    if (map.isStyleLoaded()) add(); else map.once('styledata', add);
-  }, [mapLayer, styleRevision]);
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>

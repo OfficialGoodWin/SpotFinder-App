@@ -11,10 +11,12 @@ import { useLanguage } from '@/lib/LanguageContext';
 import MapLayerSwitcher from '../components/map/MapLayerSwitcher';
 import SearchBar from '../components/map/SearchBar';
 import MapLibreMap from '../components/map/MapLibreMap';
+import NavigationProviderSheet from '../components/navigation/NavigationProviderSheet';
 import ProfileMenu from '../components/ProfileMenu';
 import WelcomeDiscoveryCard from '../components/WelcomeDiscoveryCard';
 import MapExploreStrip from '../components/MapExploreStrip';
 import { getSpotDisplayName } from '@/lib/spotPresentation';
+import { navigationCoordinates } from '@/lib/externalNavigation';
 import { useSpotOpenFocus } from '@/hooks/useSpotOpenFocus';
 import { getConsent } from '@/lib/consent';
 import { shouldShowWelcome } from '@/lib/discoveryExperience';
@@ -26,7 +28,6 @@ const SuperAdminEditor = React.lazy(() => import('../components/map/SuperAdminEd
 const AddSpotModal = React.lazy(() => import('../components/spots/AddSpotModal'));
 const EditSpotModal = React.lazy(() => import('../components/spots/EditSpotModal'));
 const SpotDetailModal = React.lazy(() => import('../components/spots/SpotDetailModal'));
-const NavigationPanel = React.lazy(() => import('../components/navigation/NavigationPanel'));
 const AuthModal = React.lazy(() => import('../components/auth/AuthModal'));
 const MySpotsPanel = React.lazy(() => import('../components/spots/MySpotsPanel'));
 const NearbySpotsPanel = React.lazy(() => import('../components/spots/NearbySpotsPanel'));
@@ -52,9 +53,7 @@ export default function Home() {
   const { closeSpot, openSpot, spotFocus } = useSpotOpenFocus({ selectedSpot, setSelectedSpot });
   const openMarkerSpot = useCallback((spot) => openSpot(spot, { source: 'marker' }), [openSpot]);
   const [editingSpot, setEditingSpot] = useState(null);
-  const [navTarget, setNavTarget] = useState(null);
-  const [isActivelyNavigating, setIsActivelyNavigating] = useState(false);
-  const [navFrom, setNavFrom] = useState(null); // snapshot of start position, never changes mid-nav
+  const [navigationDestination, setNavigationDestination] = useState(null);
   const [flyTo, setFlyTo] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
   const [showMySpots, setShowMySpots] = useState(false);
@@ -98,9 +97,7 @@ export default function Home() {
     return () => window.removeEventListener('spotfinder:consent-changed', handleConsent);
   }, []);
 
-  const [navRouteData, setNavRouteData] = useState({ coordinates: [], turns: [], currentStep: 0 });
   const [showSpots, setShowSpots] = useState(true);
-  const [fitBoundsData, setFitBoundsData] = useState(null);
   const [zoomToArea, setZoomToArea] = useState(null);
   const [deleteInput, setDeleteInput] = useState('');
   const [deletePassword, setDeletePassword] = useState('');
@@ -291,12 +288,9 @@ export default function Home() {
     closeSpot();
   };
  
-  const handleNavigate = async (spot) => {
-    const position = userPos || await requestLocation();
-    if (!position) return toast.error(t('home.locationUnavailable'));
-    setNavFrom({ lat: position[0], lng: position[1] });
-    setNavTarget({ lat: spot.lat, lng: spot.lng, label: getSpotDisplayName(spot, language) });
-    closeSpot();
+  const openNavigation = (destination) => {
+    if (!navigationCoordinates(destination)) return toast.error('This place has no valid map location.');
+    setNavigationDestination({ ...destination, title: destination.title || destination.label || getSpotDisplayName(destination, language) });
   };
  
   const handleSearchSelect = ({ lat, lng, label }) => {
@@ -352,14 +346,6 @@ export default function Home() {
     }
   };
  
-  // Stable nav start — set both target and snapshot from-position together
-  const startNavTo = async (destination) => {
-    const position = userPos || await requestLocation();
-    if (!position) return toast.error(t('home.locationRequestFailed', 'Location is unavailable. Check browser permissions or search the map instead.'));
-    setNavFrom({ lat: position[0], lng: position[1] });
-    setNavTarget(destination);
-  };
-
   const mapCenter = viewportCenter || (userPos
     ? { lat: userPos[0], lng: userPos[1] }
     : { lat: 50.0755, lng: 14.4378 });
@@ -398,7 +384,6 @@ export default function Home() {
         flyTo={flyTo}
         spotFocus={spotFocus}
         selectedSpotId={selectedSpot?.id}
-        fitBoundsData={fitBoundsData}
         zoomToArea={zoomToArea}
         setMapRef={handleMapReady}
         addMode={addMode}
@@ -423,8 +408,6 @@ export default function Home() {
           setCurrentPOIs(pois);
         }}
         onLoadingChange={(loading) => setPoiLoading(loading)}
-        navTarget={navTarget}
-        navRouteData={navRouteData}
         isDark={isDark}
         mapLayer={mapLayer}
         terrainEnabled={terrainEnabled}
@@ -446,7 +429,7 @@ export default function Home() {
         onNearby={openNearby}
         onRequestLocation={requestLocation}
         onSelectSpot={(spot) => openSpot(spot, { source: 'search' })}
-        onNavigate={startNavTo}
+        onNavigate={openNavigation}
         onSelectCategory={async (category) => {
           const position = userPos || await requestLocation();
           if (!position) return toast.error(t('home.locationRequestFailed', 'Location is unavailable. Check browser permissions or search the map instead.'));
@@ -465,7 +448,7 @@ export default function Home() {
         }}
       />
 
-      {mapExploreEnabled && !mapExploreDismissed && !showWelcome && !selectedSpot && !selectedPOI && !showNearbySpots && !pendingLatlng && !isActivelyNavigating && (
+      {mapExploreEnabled && !mapExploreDismissed && !showWelcome && !selectedSpot && !selectedPOI && !showNearbySpots && !pendingLatlng && (
         <MapExploreStrip
           spots={spots}
           language={language}
@@ -493,7 +476,7 @@ export default function Home() {
       />
 
       {/* Mobile map tools — a thumb-friendly vertical rail that leaves the bottom navigation clear. */}
-      <div className={`absolute left-3 top-[max(7rem,calc(env(safe-area-inset-top)+6rem))] z-[1000] sm:hidden transition-all duration-300 ${isActivelyNavigating ? '-translate-x-20 opacity-0 pointer-events-none' : ''}`}>
+      <div className="absolute left-3 top-[max(7rem,calc(env(safe-area-inset-top)+6rem))] z-[1000] sm:hidden transition-all duration-300">
         <div className="flex flex-col overflow-visible rounded-2xl border border-white/70 bg-white/90 p-1.5 text-slate-700 shadow-[0_10px_32px_rgba(15,23,42,0.2)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-100">
           <MapLayerSwitcher activeLayer={mapLayer} onLayerChange={setMapLayer} menuPlacement="right" />
           <div className="mx-1.5 my-1 h-px bg-slate-200/80 dark:bg-white/10" />
@@ -553,7 +536,7 @@ export default function Home() {
           initialFilters={nearbyFilters}
           onFiltersChange={openNearby}
           onSelectSpot={(spot) => openSpot(spot, { source: 'nearby' })}
-          onNavigate={(spot) => handleNavigate(spot)}
+          onNavigate={openNavigation}
           onClose={() => setShowNearbySpots(false)}
         />
       )}
@@ -566,7 +549,7 @@ export default function Home() {
       {/* Zoom half-circle slider — right edge (removed, file missing) */}
 
       {/* Bottom bar — hidden during active navigation (drawer replaces it) */}
-      <div className={`absolute bottom-0 inset-x-0 z-[1000] transition-transform duration-300 ${isActivelyNavigating ? 'translate-y-full pointer-events-none' : ''}`}>
+      <div className="absolute bottom-0 inset-x-0 z-[1000] transition-transform duration-300">
         {/* FAB — green + floating above bar */}
         <div className="absolute left-1/2 -translate-x-1/2 z-10 pointer-events-none" style={{ bottom: '100%', marginBottom: '-36px' }}>
           <button
@@ -672,7 +655,7 @@ export default function Home() {
           user={user}
           isAdmin={isAdmin}
           onClose={closeSpot}
-          onNavigate={handleNavigate}
+          onNavigate={openNavigation}
           onEdit={() => { setEditingSpot(selectedSpot); closeSpot(); }}
           onDelete={() => handleDeleteSpot(selectedSpot)}
           onShowAuth={() => setShowAuth(true)}
@@ -692,29 +675,7 @@ export default function Home() {
         />
       )}
  
-      {navTarget && navFrom && (
-        <NavigationPanel
-          from={navFrom}
-          to={{ lat: navTarget.lat, lng: navTarget.lng }}
-          toLabel={navTarget.label}
-          onClose={(clearRoute) => { setNavTarget(null); setNavFrom(null); if (clearRoute) setNavRouteData({ coordinates: [], turns: [], currentStep: 0 }); setIsActivelyNavigating(false); }}
-          onRouteReady={() => {}}
-          onNavigatingChange={setIsActivelyNavigating}
-          isSuperAdmin={isSuperAdmin}
-          userSubscription={null}
-          onOpenSettings={() => setShowSettings(true)}
-          onChangeMapLayer={() => {/* MapLayerSwitcher is in toolbar — just open it */}}
-          onRouteData={(data) => {
-            setNavRouteData(data);
-            // Fit map to show full route
-            if (data.coordinates && data.coordinates.length >= 2) {
-              setFitBoundsData([...data.coordinates]);
-              setTimeout(() => setFitBoundsData(null), 300);
-            }
-          }}
-          userPosition={userPos}
-        />
-      )}
+      <NavigationProviderSheet destination={navigationDestination} onClose={() => setNavigationDestination(null)} />
  
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
  
@@ -740,7 +701,7 @@ export default function Home() {
           userPos={userPos}
           loading={poiLoading}
           onFlyTo={(pos) => setFlyTo(pos)}
-          onNavigate={(poi) => startNavTo({ lat: poi.lat, lng: poi.lon, label: poi.name })}
+          onNavigate={(poi) => openNavigation({ lat: poi.lat, lng: poi.lon, label: poi.name })}
           onSelect={(poi) => setSelectedPOI(poi)}
           onClose={() => { setShowPOIPanel(false); setSelectedPOICategory(null); setSelectedPOI(null); }}
         />
@@ -753,7 +714,7 @@ export default function Home() {
           user={user}
           isSuperAdmin={isSuperAdmin}
           onClose={() => { setSelectedPOI(null); setSelectedPOIDirectCat(null); if (!showPOIPanel) setSelectedPOICategory(null); }}
-          onNavigate={startNavTo}
+          onNavigate={openNavigation}
           onBlockPOI={handleBlockAmbientPOI}
         />
       )}

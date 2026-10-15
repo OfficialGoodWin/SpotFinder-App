@@ -1055,4 +1055,30 @@ export const winterStyle = {
 
 export const lightStyle = style(false);
 export const darkStyle  = style(true);
+// Satellite stands alone so unavailable tiles reveal only a neutral background.
+// The Basic vector source and its symbols must not load beneath the imagery.
+export const satelliteStyle = {
+  version: 8,
+  name: 'SpotFinder Satellite',
+  sources: {
+    aerial: {
+      type: 'raster',
+      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+      tileSize: 256,
+      maxzoom: 19,
+      attribution: '© Esri © OpenStreetMap',
+    },
+  },
+  layers: [
+    { id: 'satellite-background', type: 'background', paint: { 'background-color': '#30353a' } },
+    { id: 'aerial', type: 'raster', source: 'aerial', paint: { 'raster-opacity': 1 } },
+  ],
+};
+
+export function getBaseStyle(isDark, mapLayer) {
+  if (mapLayer === 'aerial') return satelliteStyle;
+  if (mapLayer === 'outdoor') return outdoorStyle;
+  if (mapLayer === 'winter') return winterStyle;
+  return isDark ? darkStyle : lightStyle;
+}
 export default lightStyle;
