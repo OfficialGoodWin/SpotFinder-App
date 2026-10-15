@@ -36,6 +36,7 @@ import {
   where,
   orderBy,
   limit,
+  startAfter,
   setDoc,
   getDoc,
   documentId,
@@ -46,7 +47,7 @@ import { getStorage, ref as storageRef, uploadBytes, uploadBytesResumable, getDo
 import { validateImageDimensions, validateImageFile } from '@/lib/imageUploadValidation';
 import { firebaseConfig } from './firebaseConfig';
 import { getRecaptchaToken } from '@/lib/recaptcha';
-import { filterAndSortNearbySpots, normalizeLatLng } from '@/lib/spotDiscovery';
+import { filterAndSortNearbySpots, nearbyBounds, normalizeLatLng } from '@/lib/spotDiscovery';
 import { applyReviewedLegacyIdentity } from '@/lib/reviewedLegacySpots';
 import { normalizeSpotDraft } from '@/lib/spotDrafts';
 import { isEligibleBirthDate } from '@/lib/ageEligibility';
@@ -517,27 +518,50 @@ export const getPublicSpotById = async (spotId) => {
   return spot.is_public && ['published', 'pending_trust'].includes(spot.status) ? spot : null;
 };
 
-// Nearby discovery is independent from the visible viewport. For an unlimited
-// search, expand progressively and stop as soon as the nearest 20 are known.
-export const getPublicSpotsNear = async (origin, maxDistance = Infinity, targetCount = 100, minRating = 0) => {
+// Firestore has no native radius query. Read bounded latitude/longitude pages,
+// then apply the exact circle in memory. The result flags when the safety cap
+// prevents a complete count; no arbitrary first batch is presented as total.
+export const getPublicSpotsNear = async (origin, maxDistance = Infinity, { maxCandidates = 1500 } = {}) => {
   const normalized = normalizeLatLng(origin);
-  if (!normalized) return [];
-  const [lat, lng] = normalized;
-  const radii = Number.isFinite(maxDistance) ? [Math.max(1, maxDistance)] : [25, 100, 400, 1600, 5000];
+  if (!normalized) return { spots: [], complete: true, scanned: 0 };
+  const { db } = getFirebaseServices();
+  const radii = Number.isFinite(maxDistance) ? [maxDistance] : [25, 100, 400, 1600, 5000];
   const found = new Map();
+  let complete = Number.isFinite(maxDistance);
   for (const radius of radii) {
-    const latDelta = Math.min(89, radius / 111);
-    const lngDelta = Math.min(180, radius / Math.max(12, 111 * Math.cos(lat * Math.PI / 180)));
-    const rows = await getPublicSpotsInBounds({
-      south: Math.max(-90, lat - latDelta), north: Math.min(90, lat + latDelta),
-      west: lng - lngDelta, east: lng + lngDelta,
-    }, 500);
-    rows.forEach(row => found.set(row.id, row));
-    if (Number.isFinite(maxDistance) || found.size >= targetCount) break;
+    const bounds = nearbyBounds(normalized, radius);
+    const longitudeRanges = bounds.west < -180
+      ? [[bounds.west + 360, 180], [-180, bounds.east]]
+      : bounds.east > 180
+        ? [[bounds.west, 180], [-180, bounds.east - 360]]
+        : [[bounds.west, bounds.east]];
+    for (const [west, east] of longitudeRanges) {
+      let cursor = null;
+      while (found.size < maxCandidates) {
+        const pageSize = Math.min(250, maxCandidates - found.size);
+        const clauses = [
+          where('is_public', '==', true),
+          where('status', 'in', ['published', 'pending_trust']),
+          where('lat', '>=', bounds.south), where('lat', '<=', bounds.north),
+          where('lng', '>=', west), where('lng', '<=', east),
+          orderBy('lat'), orderBy('lng'),
+          limit(pageSize),
+        ];
+        if (cursor) clauses.push(startAfter(cursor));
+        const snapshot = await getDocs(query(collection(db, SPOTS_COLLECTION), ...clauses));
+        snapshot.docs.forEach(item => found.set(item.id, spotFromSnapshot(item)));
+        if (snapshot.docs.length < pageSize) break;
+        cursor = snapshot.docs.at(-1);
+      }
+      if (found.size >= maxCandidates) { complete = false; break; }
+    }
+    if (Number.isFinite(maxDistance) || found.size >= maxCandidates || found.size >= 100) break;
   }
-  return filterAndSortNearbySpots([...found.values()], {
-    origin: [lat, lng], maxDistance, minRating, sort: 'distance',
-  }).slice(0, targetCount);
+  return {
+    spots: filterAndSortNearbySpots([...found.values()], { origin: normalized, maxDistance, sort: 'distance' }),
+    complete,
+    scanned: found.size,
+  };
 };
  
 export const getUserSpots = async (userEmail, maxCount = 50, userId = '') => {

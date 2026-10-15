@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  createSpotSelection, filterAndSortNearbySpots, getSpotRating, haversineKm, normalizeLatLng, sortSpotCollection,
+  createSpotSelection, filterAndSortNearbySpots, getSpotRating, haversineKm, nearbyBounds, normalizeLatLng, sortSpotCollection,
 } from '../src/lib/spotDiscovery.js';
 
 const origin = [50.0755, 14.4378];
@@ -27,6 +27,19 @@ test('enforces 1 km and 50 km boundaries while unlimited keeps distant results',
   assert.equal(filterAndSortNearbySpots(spots, { origin, maxDistance: Infinity }).at(-1).id, 'far');
 });
 
+test('a Czech-German border search uses geographic distance, not country or coordinate order', () => {
+  const originNearAs = [50.223, 12.195];
+  const acrossBorderNearSelb = { id: 'de', lat: 50.171, lng: 12.130, rating_count: 0 };
+  const distance = haversineKm(originNearAs, acrossBorderNearSelb);
+  assert.ok(distance > 7 && distance < 8);
+  assert.deepEqual(filterAndSortNearbySpots([acrossBorderNearSelb], { origin: originNearAs, maxDistance: 8 }).map(spot => spot.id), ['de']);
+  assert.deepEqual(filterAndSortNearbySpots([acrossBorderNearSelb], { origin: originNearAs, maxDistance: 7 }).map(spot => spot.id), []);
+  const bounds = nearbyBounds(originNearAs, 8);
+  assert.ok(bounds.south <= acrossBorderNearSelb.lat && bounds.north >= acrossBorderNearSelb.lat);
+  assert.ok(bounds.west <= acrossBorderNearSelb.lng && bounds.east >= acrossBorderNearSelb.lng);
+  assert.equal(Math.round(bounds.south * 100), bounds.south * 100);
+});
+
 test('distinguishes unrated spots from low ratings and filters before sorting', () => {
   const spots = [
     { id: 'unrated', lat: 50.08, lng: 14.44, rating: 0, rating_count: 0 },
@@ -39,12 +52,39 @@ test('distinguishes unrated spots from low ratings and filters before sorting', 
   assert.deepEqual(filterAndSortNearbySpots(spots, { origin, maxDistance: 50, minRating: 4, sort: 'rating' }).map(s => s.id), ['high-farther', 'high-nearer']);
 });
 
+test('every minimum-rating threshold excludes lower and malformed community ratings', () => {
+  const spots = [
+    { id: 'unrated', lat: 50, lng: 14, rating: 0, rating_count: 0 },
+    { id: 'missing-count', lat: 50, lng: 14, rating: 5 },
+    { id: 'malformed', lat: 50, lng: 14, rating: 5, rating_count: 'unknown' },
+    ...[2.9, 3, 3.5, 4, 4.5].map((rating, index) => ({ id: String(rating), lat: 50 + index / 100, lng: 14, rating, rating_count: index + 1 })),
+  ];
+  assert.equal(filterAndSortNearbySpots(spots, { origin: [50, 14], maxDistance: 50 }).length, spots.length);
+  for (const threshold of [3, 3.5, 4, 4.5]) {
+    const results = filterAndSortNearbySpots(spots, { origin: [50, 14], maxDistance: 50, minRating: threshold });
+    assert.deepEqual(results.map(spot => spot.id), [3, 3.5, 4, 4.5].filter(value => value >= threshold).map(String));
+  }
+  assert.equal(getSpotRating(spots[1]), null);
+  assert.equal(getSpotRating(spots[2]), null);
+});
+
 test('deduplicates stale list entries and produces the exact list selection', () => {
   const spot = { id: 'castle-1', lat: 50.2, lng: 14.3, title: 'Castle' };
   const results = filterAndSortNearbySpots([spot, { ...spot, title: 'stale' }], { origin, maxDistance: Infinity });
   assert.equal(results.length, 1);
   assert.deepEqual(createSpotSelection(spot), { id: 'castle-1', spot, position: [50.2, 14.3] });
   assert.equal(createSpotSelection({ id: 'broken', lat: 999, lng: 14 }), null);
+});
+
+test('nearby sorting uses actual distance, rating and newest date before client paging', () => {
+  const spots = [
+    { id: 'near', lat: 50.001, lng: 14, rating: 3.5, rating_count: 1, created_date: '2026-01-01' },
+    { id: 'far', lat: 50.03, lng: 14, rating: 4.5, rating_count: 2, created_date: '2026-03-01' },
+    { id: 'middle', lat: 50.02, lng: 14, rating: 4, rating_count: 1, created_date: '2026-02-01' },
+  ];
+  assert.deepEqual(filterAndSortNearbySpots(spots, { origin: [50, 14], maxDistance: 10 }).map(spot => spot.id), ['near', 'middle', 'far']);
+  assert.deepEqual(filterAndSortNearbySpots(spots, { origin: [50, 14], maxDistance: 10, sort: 'rating' }).map(spot => spot.id), ['far', 'middle', 'near']);
+  assert.deepEqual(filterAndSortNearbySpots(spots, { origin: [50, 14], maxDistance: 10, sort: 'newest' }).map(spot => spot.id), ['far', 'middle', 'near']);
 });
 
 test('collection sorting follows the selected order and relation date where applicable', () => {

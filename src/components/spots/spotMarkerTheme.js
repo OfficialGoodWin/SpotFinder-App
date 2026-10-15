@@ -9,6 +9,7 @@ import {
   Sunrise,
   Waves,
 } from 'lucide-react';
+import { getSpotRating as getCommunitySpotRating } from '@/lib/spotDiscovery';
 
 const THEMES = {
   sunset: {
@@ -103,7 +104,8 @@ export function getSpotMarkerTheme(category) {
 }
 
 export function getSpotRating(spot) {
-  const rating = Number(spot?.rating);
-  return Number.isFinite(rating) && rating > 0 ? Math.min(5, Math.max(0, rating)).toFixed(1) : 'New';
+  const rating = getCommunitySpotRating(spot);
+  return rating === null ? 'New' : rating.toFixed(1);
 }
+
 

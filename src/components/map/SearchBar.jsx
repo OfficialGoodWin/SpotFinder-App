@@ -1,13 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Search, X, Navigation, Mic, Compass, SlidersHorizontal, AlertCircle } from 'lucide-react';
+import { Search, X, Navigation, Mic, Compass, AlertCircle } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { filterCategories, getCategoryName } from '@/lib/POICategories';
 import { iconGlyphSVG } from '@/lib/mapIcons';
 import { searchPlaces } from '@/lib/placeSearch';
-import { NEARBY_DEFAULT_KM, NEARBY_SLIDER_MAX, sliderToKm, kmToSlider, formatMaxDistance } from '@/lib/nearbyFilters';
-import LiquidSegmentedControl from '@/components/ui/LiquidSegmentedControl';
 import { getSpotDisplayName, spotMatchesSearch } from '@/lib/spotPresentation';
-import { toast } from 'sonner';
 import { searchFailureMessage, voiceErrorMessage } from '@/lib/contributionFlow';
 
 
@@ -17,7 +14,7 @@ const LANG_TO_BCP47 = {
   ro: 'ro-RO', es: 'es-ES', bg: 'bg-BG',
 };
 
-export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCategory, spots = [], onSelectSpot, userPos, onNearby, onRequestLocation }) {
+export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCategory, spots = [], onSelectSpot, onOpenNearbyFilters }) {
   const { t, language } = useLanguage();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
@@ -28,8 +25,6 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
   const [listening, setListening] = useState(false);
   const [micError, setMicError] = useState('');
   const [searchError, setSearchError] = useState('');
-  const [showNearbyFilter, setShowNearbyFilter] = useState(false);
-  const [nearbyDraft, setNearbyDraft] = useState({ maxDistance: NEARBY_DEFAULT_KM, minRating: 0 });
   const debounce = useRef(null);
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -42,7 +37,6 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
     const handleOutside = (e) => {
       if (containerRef.current && !containerRef.current.contains(e.target)) {
         closeDropdown();
-        setShowNearbyFilter(false);
       }
     };
     document.addEventListener('mousedown', handleOutside);
@@ -191,85 +185,9 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
           </button>
           <div className="w-px h-5 bg-gray-200 dark:bg-border flex-shrink-0" />
 
-          {/* Nearby spots — opens a quick filter popover on click */}
-          <div className="relative">
-            <button
-              onClick={async () => {
-                if (!userPos) {
-                  const position = await onRequestLocation?.();
-                  if (!position) toast.error(t('home.locationRequestFailed', 'Location is unavailable. Check browser permissions or search the map instead.'));
-                  else setShowNearbyFilter(true);
-                  return;
-                }
-                setShowNearbyFilter(v => !v);
-              }}
-              className={`px-2 py-1.5 rounded-lg flex-shrink-0 transition-all active:scale-95 ${
-                showNearbyFilter
-                  ? 'text-emerald-600 bg-emerald-500/15 ring-1 ring-emerald-500/20'
-                  : 'text-gray-500 dark:text-muted-foreground hover:text-gray-700'
-              }`}
-              title="Nearby spots"
-              aria-label="Nearby spots filters"
-              aria-expanded={showNearbyFilter}
-            >
-              <Compass className="w-5 h-5" />
-            </button>
-            {showNearbyFilter && (
-                <div className="sf-nearby-filter-card absolute top-full right-0 mt-3 z-[1600] w-[min(19rem,calc(100vw-1.5rem))] overflow-y-auto overscroll-contain p-4 sm:p-5">
-                  <div className="flex justify-between items-center mb-5">
-                    <div className="flex items-center gap-3">
-                      <span className="grid h-10 w-10 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-500 ring-1 ring-emerald-500/20"><SlidersHorizontal className="h-5 w-5" /></span>
-                      <div><p className="text-sm font-bold text-gray-900 dark:text-foreground">Nearby spots</p><p className="text-[11px] text-gray-500 dark:text-muted-foreground">Fine-tune what appears</p></div>
-                    </div>
-                    <button onClick={() => setShowNearbyFilter(false)} className="sf-filter-icon-button" aria-label="Close nearby filters">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <div className="sf-nearby-filter-grid">
-                  <div className="sf-filter-section">
-                    <div className="flex justify-between items-center text-xs font-semibold text-gray-600 dark:text-muted-foreground mb-2">
-                      <span>Maximum distance</span>
-                      <output className="sf-filter-value">{formatMaxDistance(nearbyDraft.maxDistance)}</output>
-                    </div>
-                    <input
-                      type="range" min="1" max={NEARBY_SLIDER_MAX} value={kmToSlider(nearbyDraft.maxDistance)}
-                      onChange={(e) => setNearbyDraft(d => ({ ...d, maxDistance: sliderToKm(e.target.value) }))}
-                      className="sf-glass-range w-full"
-                      style={{ '--sf-range-progress': `${((kmToSlider(nearbyDraft.maxDistance) - 1) / (NEARBY_SLIDER_MAX - 1)) * 100}%` }}
-                    />
-                    <div className="flex justify-between text-[10px] text-gray-400 dark:text-muted-foreground mt-1 px-0.5">
-                      <span>1 km</span><span>50 km</span><span>∞</span>
-                    </div>
-                  </div>
-                  <div className="sf-filter-section mt-3">
-                    <label className="block text-xs font-semibold text-gray-600 dark:text-muted-foreground mb-2">Minimum rating</label>
-                    <LiquidSegmentedControl
-                      ariaLabel="Minimum rating"
-                      equal
-                      tone="green"
-                      value={String(nearbyDraft.minRating)}
-                      onChange={rating => setNearbyDraft(d => ({ ...d, minRating: Number(rating) }))}
-                      options={[0, 3, 3.5, 4, 4.5].map(rating => ({ value: String(rating), label: rating === 0 ? 'Any' : `${rating}★` }))}
-                    />
-                  </div>
-                  </div>
-                  <div className="sf-nearby-filter-actions grid grid-cols-[.8fr_1.2fr] gap-2 mt-4">
-                    <button
-                      onClick={() => setShowNearbyFilter(false)}
-                      className="sf-filter-secondary"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={() => { onNearby?.(nearbyDraft); setShowNearbyFilter(false); }}
-                      className="sf-filter-primary"
-                    >
-                      Show Nearby
-                    </button>
-                  </div>
-                </div>
-            )}
-          </div>
+          <button type="button" onClick={() => onOpenNearbyFilters?.()} className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:ring-2 focus-visible:ring-primary" title="Nearby spots" aria-label="Open nearby spots filters">
+            <Compass className="h-5 w-5" />
+          </button>
         </div>
 
         {listening && (

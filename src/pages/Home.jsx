@@ -11,12 +11,17 @@ import { useLanguage } from '@/lib/LanguageContext';
 import MapLayerSwitcher from '../components/map/MapLayerSwitcher';
 import SearchBar from '../components/map/SearchBar';
 import MapLibreMap from '../components/map/MapLibreMap';
+import NearbySpotsFilterModal from '../components/spots/NearbySpotsFilterModal';
 import NavigationProviderSheet from '../components/navigation/NavigationProviderSheet';
 import ProfileMenu from '../components/ProfileMenu';
 import WelcomeDiscoveryCard from '../components/WelcomeDiscoveryCard';
 import MapExploreStrip from '../components/MapExploreStrip';
 import { getSpotDisplayName } from '@/lib/spotPresentation';
 import { navigationCoordinates } from '@/lib/externalNavigation';
+import { normalizeLatLng } from '@/lib/spotDiscovery';
+import { freshNearbyFix, nearbyLocationFailure } from '@/lib/nearbyLocation';
+import { createNearbyRequestGate } from '@/lib/nearbySearch';
+import { NEARBY_DEFAULT_KM } from '@/lib/nearbyFilters';
 import { useSpotOpenFocus } from '@/hooks/useSpotOpenFocus';
 import { getConsent } from '@/lib/consent';
 import { shouldShowWelcome } from '@/lib/discoveryExperience';
@@ -58,9 +63,22 @@ export default function Home() {
   const [showAuth, setShowAuth] = useState(false);
   const [showMySpots, setShowMySpots] = useState(false);
   const [showNearbySpots, setShowNearbySpots] = useState(false);
-  const [nearbyFilters, setNearbyFilters] = useState({ maxDistance: 50, minRating: 0 }); // maxDistance may be Infinity (= unlimited)
+  const [showNearbyFilter, setShowNearbyFilter] = useState(false);
+  const [nearbyFilters, setNearbyFilters] = useState({ maxDistance: NEARBY_DEFAULT_KM, minRating: 0 });
+  const [nearbyFilterPreset, setNearbyFilterPreset] = useState(null);
+  const [nearbyMode, setNearbyMode] = useState('gps');
+  const [nearbyOrigin, setNearbyOrigin] = useState(null);
+  const [nearbyLocationError, setNearbyLocationError] = useState('');
+  const [nearbyLocating, setNearbyLocating] = useState(false);
+  const [nearbyComplete, setNearbyComplete] = useState(true);
   const [nearbySpots, setNearbySpots] = useState([]);
   const [nearbyLoading, setNearbyLoading] = useState(false);
+  const [nearbySearchError, setNearbySearchError] = useState('');
+  const nearbyRequestGate = useRef(null);
+  if (!nearbyRequestGate.current) nearbyRequestGate.current = createNearbyRequestGate();
+  const nearbyFixRef = useRef(null);
+  const nearbyCacheRef = useRef(null);
+  useEffect(() => () => { nearbyRequestGate.current.cancel(); nearbyCacheRef.current = null; }, []);
   const [terrainEnabled, setTerrainEnabled] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -198,6 +216,7 @@ export default function Home() {
       navigator.geolocation.getCurrentPosition(
         position => {
           const next = [position.coords.latitude, position.coords.longitude];
+          nearbyFixRef.current = { position: next, timestamp: position.timestamp || Date.now() };
           setUserPos(next);
           setUserAccuracy(position.coords.accuracy);
           setLocationStatus('granted');
@@ -208,7 +227,9 @@ export default function Home() {
           }
           if (locationWatchRef.current == null) {
             locationWatchRef.current = navigator.geolocation.watchPosition(update => {
-              setUserPos([update.coords.latitude, update.coords.longitude]);
+              const updated = [update.coords.latitude, update.coords.longitude];
+              nearbyFixRef.current = { position: updated, timestamp: update.timestamp || Date.now() };
+              setUserPos(updated);
               setUserAccuracy(update.coords.accuracy);
             }, () => {}, { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 });
           }
@@ -298,25 +319,75 @@ export default function Home() {
     setTimeout(() => setFlyTo(null), 1000);
   };
 
-  const openNearby = useCallback(async (filters, suppliedPosition = null) => {
-    const position = suppliedPosition || userPos || await requestLocation();
-    if (!position) return;
+  const openNearbyFilters = (preset = null) => {
+    setNearbyFilterPreset(preset);
+    setNearbyLocationError('');
+    setShowNearbyFilter(true);
+  };
+
+  const runNearby = async (filters, mode) => {
+    const requestId = nearbyRequestGate.current.next();
+    setNearbyLocationError('');
+    setNearbyLocating(true);
+    let origin = null;
+    if (mode === 'map') {
+      const center = mapRef.current?.getCenter();
+      origin = normalizeLatLng(center ? { lat: center.lat, lng: center.lng } : viewportCenter);
+      if (!origin) setNearbyLocationError('Move the map to a place first, then try again.');
+    } else {
+      origin = freshNearbyFix(nearbyFixRef.current);
+      if (!origin && !navigator.geolocation) setNearbyLocationError(nearbyLocationFailure(0, Boolean(nearbyFixRef.current)));
+      if (!origin && navigator.geolocation) {
+        const hadStaleFix = Boolean(nearbyFixRef.current);
+        try {
+          const fix = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: false, maximumAge: 120000, timeout: 10000,
+          }));
+          if (!nearbyRequestGate.current.isCurrent(requestId)) return;
+          const fixTimestamp = Number.isFinite(fix.timestamp) ? fix.timestamp : Date.now();
+          origin = freshNearbyFix({ position: [fix.coords.latitude, fix.coords.longitude], timestamp: fixTimestamp });
+          if (origin) {
+            nearbyFixRef.current = { position: origin, timestamp: fixTimestamp };
+            setUserPos(origin);
+            setUserAccuracy(fix.coords.accuracy);
+            setLocationStatus('granted');
+          } else setNearbyLocationError('The device returned an invalid or out-of-date location. Try again or choose the map center.');
+        } catch (error) {
+          if (!nearbyRequestGate.current.isCurrent(requestId)) return;
+          setNearbyLocationError(nearbyLocationFailure(error.code, hadStaleFix));
+        }
+      }
+    }
+    if (!nearbyRequestGate.current.isCurrent(requestId)) return;
+    setNearbyLocating(false);
+    if (!origin) return;
+
     setNearbyFilters(filters);
+    setNearbyMode(mode);
+    setNearbyOrigin(origin);
+    setShowNearbyFilter(false);
     setShowNearbySpots(true);
     setNearbyLoading(true);
+    setNearbySearchError('');
+    setNearbySpots([]);
+    const cacheKey = `${origin[0]}:${origin[1]}:${filters.maxDistance}`;
     try {
-      // Fetch the bounded candidate set before paginating in the panel. Rating
-      // filtering inside the data layer prevents nearer unrated rows from
-      // crowding qualifying results out of the result limit.
-      const rows = await getPublicSpotsNear(position, filters.maxDistance, 500, filters.minRating);
-      setNearbySpots(rows);
+      const cached = nearbyCacheRef.current?.key === cacheKey ? nearbyCacheRef.current : null;
+      const result = cached && Date.now() - cached.at < 120000
+        ? cached.result
+        : await getPublicSpotsNear(origin, filters.maxDistance);
+      if (!nearbyRequestGate.current.isCurrent(requestId)) return;
+      if (!cached || Date.now() - cached.at >= 120000) nearbyCacheRef.current = { key: cacheKey, at: Date.now(), result };
+      setNearbySpots(result.spots);
+      setNearbyComplete(result.complete);
     } catch (error) {
+      if (!nearbyRequestGate.current.isCurrent(requestId)) return;
       console.error('Failed to load nearby spots:', error);
-      toast.error('Nearby spots could not be loaded. Please try again.');
+      setNearbySearchError('Nearby spots could not be loaded. Check your connection and try again.');
     } finally {
-      setNearbyLoading(false);
+      if (nearbyRequestGate.current.isCurrent(requestId)) setNearbyLoading(false);
     }
-  }, [requestLocation, userPos]);
+  };
  
   const handleSignOut = async () => {
     await logout();
@@ -357,13 +428,7 @@ export default function Home() {
         <WelcomeDiscoveryCard
           locationStatus={locationStatus}
           onDismiss={dismissWelcome}
-          onUseLocation={async () => {
-            const position = await requestLocation();
-            if (position) {
-              dismissWelcome();
-              await openNearby(nearbyFilters, position);
-            }
-          }}
+          onUseLocation={() => { dismissWelcome(); openNearbyFilters(); }}
         />
       )}
       {/* Cursor overlay in add mode */}
@@ -425,9 +490,7 @@ export default function Home() {
         onSelect={handleSearchSelect}
         mapCenter={mapCenter}
         spots={spots}
-        userPos={userPos}
-        onNearby={openNearby}
-        onRequestLocation={requestLocation}
+        onOpenNearbyFilters={openNearbyFilters}
         onSelectSpot={(spot) => openSpot(spot, { source: 'search' })}
         onNavigate={openNavigation}
         onSelectCategory={async (category) => {
@@ -465,7 +528,7 @@ export default function Home() {
         onToggleMenu={() => setShowAccountMenu(v => !v)}
         onShowMySpots={() => setShowMySpots(true)}
         onShowDrafts={() => setShowMySpots(true)}
-        onShowNearby={() => openNearby(nearbyFilters)}
+        onShowNearby={() => openNearbyFilters()}
         onShowSettings={() => setShowSettings(true)}
         guestDraftCount={guestDraftCount}
         onSignOut={handleSignOut}
@@ -531,15 +594,31 @@ export default function Home() {
       {showNearbySpots && (
         <NearbySpotsPanel
           spots={nearbySpots}
-          userPos={userPos}
+          origin={nearbyOrigin}
+          originMode={nearbyMode}
           loading={nearbyLoading}
-          initialFilters={nearbyFilters}
-          onFiltersChange={openNearby}
+          complete={nearbyComplete}
+          error={nearbySearchError}
+          filters={nearbyFilters}
+          onOpenFilters={() => openNearbyFilters()}
+          onExploreMap={() => { nearbyRequestGate.current.cancel(); setShowNearbySpots(false); }}
+          onIncreaseRadius={() => openNearbyFilters({ maxDistance: nearbyFilters.maxDistance === Infinity ? Infinity : nearbyFilters.maxDistance >= 50 ? Infinity : Math.min(50, nearbyFilters.maxDistance + 10) })}
           onSelectSpot={(spot) => openSpot(spot, { source: 'nearby' })}
           onNavigate={openNavigation}
-          onClose={() => setShowNearbySpots(false)}
+          onClose={() => { nearbyRequestGate.current.cancel(); setShowNearbySpots(false); }}
         />
       )}
+
+      <NearbySpotsFilterModal
+        isOpen={showNearbyFilter}
+        currentFilters={nearbyFilters}
+        currentMode={nearbyMode}
+        suggestedFilters={nearbyFilterPreset}
+        locationError={nearbyLocationError}
+        busy={nearbyLocating}
+        onApply={runNearby}
+        onClose={() => { nearbyRequestGate.current.cancel(); setNearbyLocating(false); setShowNearbyFilter(false); setNearbyFilterPreset(null); setNearbyLocationError(''); }}
+      />
  
  
 

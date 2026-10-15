@@ -66,6 +66,7 @@ export default function ProfileMenu({ user, isAuthenticated, showMenu, onToggleM
         </>
       ) : (
         <div className="flex flex-col gap-2">
+          <button onClick={() => onShowNearby?.()} className="grid h-11 w-11 place-items-center rounded-full border border-border bg-card shadow-lg focus-visible:ring-2 focus-visible:ring-primary" title="Nearby spots" aria-label="Open nearby spots filters"><MapPinned className="h-5 w-5 text-primary" /></button>
           <button onClick={onShowAuth} className="w-10 h-10 rounded-full shadow-lg border border-gray-200 dark:border-border bg-white dark:bg-card flex items-center justify-center active:scale-95 transition-transform" title={t('profile.signIn')} aria-label={t('profile.signIn')}><User className="w-5 h-5 text-gray-500 dark:text-muted-foreground" /></button>
           <button onClick={onShowDrafts} className="relative w-10 h-10 rounded-full shadow-lg border border-gray-200 dark:border-border bg-white dark:bg-card flex items-center justify-center active:scale-95 transition-transform" title="Drafts" aria-label={`Drafts${guestDraftCount ? `, ${guestDraftCount} saved` : ''}`}><FilePenLine className="w-5 h-5 text-gray-500 dark:text-muted-foreground" />{guestDraftCount > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-green-600 px-1 text-[10px] font-bold text-white">{guestDraftCount}</span>}</button>
         </div>

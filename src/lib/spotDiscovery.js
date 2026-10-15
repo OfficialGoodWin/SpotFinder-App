@@ -1,8 +1,11 @@
 const EARTH_RADIUS_KM = 6371.0088;
 
 export function normalizeLatLng(value) {
-  const lat = Number(Array.isArray(value) ? value[0] : value?.lat);
-  const lng = Number(Array.isArray(value) ? value[1] : value?.lng ?? value?.lon);
+  const rawLat = Array.isArray(value) ? value[0] : value?.lat;
+  const rawLng = Array.isArray(value) ? value[1] : value?.lng ?? value?.lon;
+  if (rawLat == null || rawLng == null || String(rawLat).trim() === '' || String(rawLng).trim() === '') return null;
+  const lat = Number(rawLat);
+  const lng = Number(rawLng);
   return Number.isFinite(lat) && lat >= -90 && lat <= 90 && Number.isFinite(lng) && lng >= -180 && lng <= 180
     ? [lat, lng]
     : null;
@@ -17,14 +20,31 @@ export function haversineKm(origin, destination) {
   const dLng = toRad(to[1] - from[1]);
   const a = Math.sin(dLat / 2) ** 2
     + Math.cos(toRad(from[0])) * Math.cos(toRad(to[0])) * Math.sin(dLng / 2) ** 2;
-  return EARTH_RADIUS_KM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return EARTH_RADIUS_KM * 2 * Math.atan2(Math.sqrt(Math.min(1, a)), Math.sqrt(Math.max(0, 1 - a)));
+}
+
+export function nearbyBounds(origin, radiusKm) {
+  const normalized = normalizeLatLng(origin);
+  const radius = Number(radiusKm);
+  if (!normalized || !Number.isFinite(radius) || radius < 0) return null;
+  const [lat, lng] = normalized;
+  // A generous rectangle selects candidates; Haversine applies the exact circle.
+  const latDelta = radius / 110.5;
+  const lngDelta = Math.min(180, radius / (111.32 * Math.max(0.001, Math.cos(lat * Math.PI / 180))));
+  // Coarse outward rounding avoids sending an exact GPS-derived rectangle to Firestore.
+  const floor = value => Math.floor(value * 100) / 100;
+  const ceil = value => Math.ceil(value * 100) / 100;
+  return {
+    south: Math.max(-90, floor(lat - latDelta)), north: Math.min(90, ceil(lat + latDelta)),
+    west: floor(lng - lngDelta), east: ceil(lng + lngDelta),
+  };
 }
 
 export function getSpotRating(spot) {
   const rating = Number(spot?.rating);
   const count = Number(spot?.rating_count);
-  if (!Number.isFinite(rating) || rating <= 0 || (Number.isFinite(count) && count === 0)) return null;
-  return Math.min(5, rating);
+  if (!Number.isFinite(rating) || rating < 1 || rating > 5 || !Number.isInteger(count) || count < 1) return null;
+  return rating;
 }
 
 export function createSpotSelection(spot) {
@@ -70,14 +90,14 @@ export function filterAndSortNearbySpots(spots, {
     if (unique.has(key)) continue;
     const distance = normalizedOrigin ? haversineKm(normalizedOrigin, coordinates) : null;
     const rating = getSpotRating(spot);
-    if (Number.isFinite(radius) && (!Number.isFinite(distance) || distance > radius)) continue;
+    if (Number.isFinite(radius) && (!Number.isFinite(distance) || distance > radius + 0.001)) continue;
     if (minimum > 0 && (rating === null || rating < minimum)) continue;
     unique.set(key, { ...spot, _km: distance, _rating: rating });
   }
 
   return [...unique.values()].sort((a, b) => {
-    if (sort === 'rating') return (b._rating ?? -1) - (a._rating ?? -1) || (a._km ?? Infinity) - (b._km ?? Infinity);
-    if (sort === 'newest') return timestamp(b) - timestamp(a) || (a._km ?? Infinity) - (b._km ?? Infinity);
-    return (a._km ?? Infinity) - (b._km ?? Infinity);
+    if (sort === 'rating') return (b._rating ?? -1) - (a._rating ?? -1) || (a._km ?? Infinity) - (b._km ?? Infinity) || String(a.id || '').localeCompare(String(b.id || ''));
+    if (sort === 'newest') return timestamp(b) - timestamp(a) || (a._km ?? Infinity) - (b._km ?? Infinity) || String(a.id || '').localeCompare(String(b.id || ''));
+    return (a._km ?? Infinity) - (b._km ?? Infinity) || String(a.id || '').localeCompare(String(b.id || ''));
   });
 }
