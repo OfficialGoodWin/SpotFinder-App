@@ -4,8 +4,8 @@ import { reopenCookieSettings } from '@/components/CookieConsentBanner';
 
 export default function CookiePolicy() {
   return (
-    <LegalPageLayout title="Cookie Policy" lastUpdated="13 October 2026">
-      <LegalNote><LegalStrong>Review status:</LegalStrong> This privacy hotfix draft is pending legal review and an owner-run production browser/tag inventory after deployment. Provider behavior can change independently of SpotFinder.</LegalNote>
+    <LegalPageLayout title="Cookie Policy" lastUpdated="17 October 2026">
+      <LegalNote><LegalStrong>Review status:</LegalStrong> This policy is pending legal and operator review, including a production browser and provider inventory. Provider behavior can change independently of SpotFinder.</LegalNote>
       <LegalP>This policy covers cookies and similar browser storage. It does not claim that a consent banner alone establishes compliance.</LegalP>
       <button onClick={reopenCookieSettings} className="px-4 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">Manage cookie preferences</button>
 
@@ -27,7 +27,7 @@ export default function CookiePolicy() {
       <LegalP>Core map/search/routing requests can transmit IP address, search text, map context, and route coordinates regardless of optional analytics/advertising choices. Instagram/TikTok iframes are not created until the user explicitly chooses to load an individual post. These network requests are described in the Privacy Policy and need their own legal assessment.</LegalP>
 
       <LegalH2>5. Changing or withdrawing consent</LegalH2>
-      <LegalP>Use the button above or Settings to review the current necessary-only state. Previously saved choices remain in the existing <code>spotfinder_cookie_consent_v1</code> record for migration history but have no effect; selecting “Keep optional services off” replaces them with an explicit rejection. The app removes legacy tag elements and expires known first-party <code>_ga*</code>, <code>__gads</code>, <code>__gpi</code>, and <code>__eoi</code> cookies without clearing Firebase authentication state. Browser or provider storage and data collected before this hotfix may remain.</LegalP>
+      <LegalP>Use the button above or Settings to review the current optional-tracking-off state. Previously saved choices remain in the existing <code>spotfinder_cookie_consent_v1</code> record for migration history but have no effect; selecting “Keep optional services off” replaces them with an explicit rejection. The app removes legacy tag elements and expires known first-party <code>_ga*</code>, <code>__gads</code>, <code>__gpi</code>, and <code>__eoi</code> cookies without clearing Firebase authentication state. Browser or provider storage and data collected before this change may remain.</LegalP>
       <LegalP>If optional integrations return, they must use a new, explicit opt-in. A historical acceptance will not be treated as consent for a restored service.</LegalP>
 
       <LegalH2>6. Verification and contact</LegalH2>

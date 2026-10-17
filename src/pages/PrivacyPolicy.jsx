@@ -3,8 +3,8 @@ import LegalPageLayout, { LegalH2, LegalP, LegalUl, LegalStrong, LegalNote } fro
 
 export default function PrivacyPolicy() {
   return (
-    <LegalPageLayout title="Privacy Policy" lastUpdated="13 October 2026">
-      <LegalNote><LegalStrong>Review status:</LegalStrong> This engineering draft is pending qualified legal and operator review. It is not legal advice or a claim of compliance.</LegalNote>
+    <LegalPageLayout title="Privacy Policy" lastUpdated="17 October 2026">
+      <LegalNote><LegalStrong>Review status:</LegalStrong> This policy is pending qualified legal and operator review. It is not a claim of compliance.</LegalNote>
 
       <LegalH2>1. Controller and contact</LegalH2>
       <LegalP>Michael Neděle is currently identified as the individual operating SpotFinder. Contact: spotfinder@icloud.com. The operator's legal status, service address, and required registration disclosures remain to be confirmed before publication.</LegalP>
@@ -14,7 +14,7 @@ export default function PrivacyPolicy() {
         <li><LegalStrong>Authentication and profile:</LegalStrong> Firebase Authentication handles the email/password credential or Google identity data (name, email, profile photo). SpotFinder does not receive a plaintext password. An optional display name is stored with Firebase Auth.</li>
         <li><LegalStrong>Date of birth:</LegalStrong> the full date is stored in a private Firestore user document to enforce the current minimum age of 16. It is not displayed publicly. Whether a less intrusive age-proof should replace full-date storage remains under review.</li>
         <li><LegalStrong>SMS two-factor authentication:</LegalStrong> only after completed enrollment, Firebase Authentication stores the enrolled phone number and uses it to deliver sign-in codes.</li>
-        <li><LegalStrong>Location:</LegalStrong> with device permission, precise GPS is used for map centering, nearby results, and routes. Searches, reverse-geocoding requests, and route start/destination coordinates are transmitted to the selected external provider. SpotFinder does not intentionally write live GPS history to a user profile.</li>
+        <li><LegalStrong>Location:</LegalStrong> with device permission, the browser supplies GPS for map centering and device-based Nearby searches. Map-center Nearby searches do not request GPS. Live location watching starts after a location action and pauses when the app is hidden. SpotFinder does not store a live GPS history in Firestore or provide in-app turn-by-turn guidance. Opening directions hands the selected destination to an external map provider, which handles routing and any location permission in its own app. Search and reverse-geocoding requests may send the selected place or map context to their provider.</li>
         <li><LegalStrong>Public contributions:</LegalStrong> spots, coordinates, descriptions, ratings/reviews, social links, and uploaded photos. These are public by design. New photos are re-encoded as JPEG, which removes ordinary embedded metadata, before Firebase Storage upload.</li>
         <li><LegalStrong>Private activity:</LegalStrong> drafts and draft photos, saved/liked spots, and per-account rating records.</li>
         <li><LegalStrong>Feedback, reports, and abuse prevention:</LegalStrong> submitted text, optional contact email, reCAPTCHA result, account/session identifiers, and a salted hash derived from the request IP. Infrastructure and external providers also receive ordinary network data such as an IP address.</li>

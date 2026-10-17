@@ -123,6 +123,7 @@ const FAQ_SECTIONS = [
         { label: 'Confirm the contribution statement and publish. A success message appears after the server accepts it.', Graphic: PublishGraphic },
       ] },
       { q: 'Which photos and social links can I add?', a: 'You may select up to three supported image files. The app validates and re-encodes accepted images before upload. Only share images you have the right to publish. Social links are optional and limited to recognized Instagram posts/reels or TikTok videos; attaching one requires a verified account.' },
+      { q: 'Can I save a spot for later?', a: 'Yes. Save Draft keeps an unfinished spot so you can resume it later. Signed-in drafts are private to that account; guest drafts stay in this browser and are not synced across devices. Keep this browser’s site data if you need to return to a guest draft.' },
       { q: 'How does voice dictation work?', a: 'Use the microphone beside Description. When the browser supports speech recognition and microphone permission is granted, SpotFinder uses the selected app language and inserts recognized speech into the field. You can stop listening or type instead if recognition is unavailable.', steps: [{ label: 'Tap the microphone beside Description; tap it again to stop.', Graphic: VoiceGraphic }] },
     ],
   },
@@ -130,12 +131,14 @@ const FAQ_SECTIONS = [
     category: 'Ratings',
     items: [
       { q: 'How do I rate a spot?', a: 'Sign in with a verified account and open a spot you did not create. The current form includes Overall experience plus optional Ease of access, Condition & cleanliness, Safety & comfort, and Crowdedness scales. Crowdedness describes how busy a place feels; a low value does not mean poor quality.', steps: [{ label: 'Open Spot Details and complete the current rating scales.', Graphic: RatingsGraphic }] },
+      { q: 'How do I save or like a spot?', a: 'Open Spot Details and use Save or Like. Both actions need a verified account. Your saved and liked places appear in My Collection.' },
     ],
   },
   {
     category: 'Map, traffic, and navigation',
     items: [
       { q: 'Which map styles are available?', a: 'Open Map layers to choose Basic, Outdoor, Aerial, Winter, or Traffic. Provider availability and network access can affect individual layers.', steps: [{ label: 'Open Map layers and choose the view that suits the trip.', Graphic: LayersGraphic }] },
+      { q: 'How do Nearby and Featured places work?', a: 'Open Nearby from the search bar, choose a distance, Current device location or Current map center, and a minimum rating, then select Show Nearby. Device location asks for permission; map center does not. Featured places highlight public community spots and open their details.' },
       { q: 'What does the Traffic layer show?', a: 'When the TomTom integration is configured and reachable, Traffic displays provider flow tiles and current incident markers such as closures, works, accidents, lane restrictions, and jams. SpotFinder can also display operator-entered closures. This data may be delayed or incomplete and should not replace official road information.' },
       { q: 'How does navigation work?', a: 'Select Navigate on a spot, search result, or place, then choose Google Maps, Mapy.com, or Apple Maps. SpotFinder sends the selected place’s coordinates directly to that provider. The map app handles directions, live location, and guidance.', steps: [{ label: 'Choose Navigate, then select an external map app.', Graphic: NavigateShareGraphic }] },
     ],
@@ -144,6 +147,7 @@ const FAQ_SECTIONS = [
     category: 'Sharing and privacy',
     items: [
       { q: 'How do I share a spot?', a: 'Use Share in Spot Details. SpotFinder opens the device share sheet when supported and otherwise copies a direct spot link.', steps: [{ label: 'Use the Navigate and Share actions in Spot Details.', Graphic: NavigateShareGraphic }] },
+      { q: 'What happens when I delete my account?', a: 'Settings requires recent sign-in before deletion. Private account data and drafts are removed, while public spots and their photos may remain with a former-contributor label. An unresolved subscription blocks deletion until support resolves billing. See the Privacy Policy for details.' },
       { q: 'Does SpotFinder use analytics or advertising?', a: 'Google Analytics and Google AdSense are temporarily disabled in this release. Essential Firebase authentication and reCAPTCHA, maps, search, and user-requested embeds can still contact their providers. Opening directions contacts the selected external map provider. See the Privacy and Cookie policies for details.' },
     ],
   },

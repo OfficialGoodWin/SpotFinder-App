@@ -56,6 +56,13 @@ try {
     const statusText = await page.locator('body').innerText();
     if (/All systems operational|NaN%/.test(statusText)) failures.push(`${colorScheme}: unsupported status claim`);
 
+    await page.goto(`${baseURL}/TermsAndConditions`, { waitUntil: 'networkidle' });
+    const termsText = await page.locator('body').innerText();
+    if (!termsText.includes('Review status:') || !termsText.includes('no advertising slots') ||
+        /The free tier may request Google|ads only after advertising consent|If you do not cancel your subscription before you delete/.test(termsText)) {
+      failures.push(`${colorScheme}: Terms still contain broken or contradictory release copy`);
+    }
+
     await page.goto(baseURL, { waitUntil: 'networkidle' });
     await page.waitForTimeout(500);
     const home = await page.evaluate(() => ({

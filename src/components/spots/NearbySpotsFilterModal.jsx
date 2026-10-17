@@ -35,7 +35,9 @@ export default function NearbySpotsFilterModal({ isOpen, onClose, onApply, curre
     const syncViewport = () => {
       if (!overlayRef.current) return;
       overlayRef.current.style.top = `${viewport?.offsetTop ?? 0}px`;
-      overlayRef.current.style.height = `${viewport?.height ?? window.innerHeight}px`;
+      const availableHeight = viewport?.height ?? window.innerHeight;
+      const shortLandscape = window.matchMedia('(orientation: landscape) and (max-height: 430px)').matches;
+      overlayRef.current.style.height = `${Math.max(0, availableHeight - (shortLandscape ? 56 : 0))}px`;
     };
     syncViewport();
     viewport?.addEventListener('resize', syncViewport);

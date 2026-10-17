@@ -3,7 +3,7 @@ import LegalPageLayout, { LegalH2, LegalP, LegalUl, LegalStrong, LegalNote } fro
 
 export default function RefundPolicy() {
   return (
-    <LegalPageLayout title="Refund Policy" lastUpdated="13 October 2026">
+    <LegalPageLayout title="Refund Policy" lastUpdated="17 October 2026">
       <LegalNote><LegalStrong>Review status:</LegalStrong> This draft is pending legal and operational review. Paid checkout must remain disabled until cancellation, withdrawal, tax, and refund operations are verified.</LegalNote>
       <LegalP>This policy applies only to a subscription actually purchased through an enabled SpotFinder checkout. Plan previews are not purchases.</LegalP>
 

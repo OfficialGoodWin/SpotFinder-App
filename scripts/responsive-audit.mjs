@@ -27,6 +27,18 @@ try {
     if (updates.overflow > 1) failures.push(`Updates ${width}x${height}: ${updates.overflow}px horizontal overflow`);
     if (!updates.version || !updates.timeline) failures.push(`Updates content missing at ${width}x${height}: ${JSON.stringify(updates)}`);
 
+    if (width <= 430) {
+      for (const route of ['TermsAndConditions', 'PrivacyPolicy', 'CookiePolicy', 'RefundPolicy']) {
+        await page.goto(`${baseURL}/${route}`, { waitUntil: 'domcontentloaded' });
+        await page.waitForFunction(() => document.querySelector('article')?.textContent.includes('Review status:'));
+        const legal = await page.evaluate(() => ({
+          overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          reviewStatus: document.body.textContent.includes('Review status:'),
+        }));
+        if (legal.overflow > 1 || !legal.reviewStatus) failures.push(`${route} ${width}x${height}: ${JSON.stringify(legal)}`);
+      }
+    }
+
     await page.goto(baseURL, { waitUntil: 'domcontentloaded' });
     await page.evaluate(() => {
       localStorage.setItem('spotfinder_cookie_consent_v1', JSON.stringify({ necessary: true, analytics: false, ads: false, decided: true }));
@@ -87,7 +99,7 @@ try {
           watchPosition: () => 1,
           clearWatch: () => {},
         } });
-        document.querySelector('button[aria-label="Nearby spots filters"]')?.click();
+        document.querySelector('button[aria-label="Open nearby spots filters"]')?.click();
       });
       await page.waitForTimeout(100);
       const landscapeFilter = await page.evaluate(() => {

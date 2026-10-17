@@ -116,7 +116,9 @@ test('Nearby opens one filter dialog, Cancel preserves applied values, and Show 
       await mobilePage.setViewportSize(viewport);
       await mobilePage.waitForFunction(() => {
         const dialog = document.querySelector('[aria-labelledby="nearby-filter-title"]');
-        return Math.abs(dialog.getBoundingClientRect().height - window.visualViewport.height) < 2;
+        const shortLandscape = matchMedia('(orientation: landscape) and (max-height: 430px)').matches;
+        const expectedHeight = window.visualViewport.height - (shortLandscape ? 56 : 0);
+        return Math.abs(dialog.getBoundingClientRect().height - expectedHeight) < 2;
       });
       assertAccessible(await measureDialog());
     }

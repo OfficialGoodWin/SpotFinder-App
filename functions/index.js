@@ -116,7 +116,7 @@ async function cleanupAccountData(uid, email) {
     ]);
   }
 
-  await db.collection('users').doc(uid).delete().catch(() => {});
+  await db.collection('users').doc(uid).delete();
   await Promise.all(['add_spot', 'feedback', 'social_post', 'content_report', 'account_deletion']
     .map(action => db.collection('rate_limits').doc(`${uid}_${action}`).delete().catch(() => {})));
   await getStorage().bucket().deleteFiles({ prefix: `drafts/${uid}/` });
@@ -192,12 +192,18 @@ exports.requestAccountDeletion = functions.runWith({ timeoutSeconds: 120, memory
     await cleanupAccountData(uid, account.email || context.auth.token.email || null);
     await requestRef.set({ status: 'auth_deletion_started', updated_at: new Date().toISOString() }, { merge: true });
     await adminAuth.deleteUser(uid);
-    await requestRef.set({ status: 'complete', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { merge: true });
+    try {
+      await requestRef.set({ status: 'complete', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { merge: true });
+    } catch (statusError) {
+      // Auth deletion already succeeded. A status-record failure cannot be
+      // reported to the caller as an account deletion failure.
+      console.error('Account deletion status update failed', { uid, code: statusError?.code || 'unknown' });
+    }
     return { status: 'complete' };
   } catch (error) {
     await requestRef.set({ status: 'failed', updated_at: new Date().toISOString() }, { merge: true }).catch(() => {});
     console.error('Account deletion failed', { uid, code: error?.code || 'unknown' });
-    throw new functions.https.HttpsError('internal', 'Account deletion could not be completed. Your account remains available; retry or contact support.');
+    throw new functions.https.HttpsError('internal', 'Account deletion could not be completed. Some private data may already have been removed; retry or contact support.');
   }
 });
 

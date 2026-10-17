@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Flag, X } from 'lucide-react';
 import { submitGeneralReport } from '@/api/firebaseClient';
 import SmoothSelect from '@/components/ui/SmoothSelect';
+import { toast } from 'sonner';
 
 function deviceId() {
   let id = localStorage.getItem('sf_device_id');
@@ -21,7 +22,7 @@ export default function ReportAnythingButton() {
     try {
       await submitGeneralReport({ ...form, deviceId: deviceId() });
       setDone(true); setForm({ category: 'bug', subject: '', message: '' });
-    } catch (err) { alert(err?.message || 'Could not send report.'); }
+    } catch (err) { toast.error('Could not send report', { description: err?.message || 'Please try again.' }); }
     finally { setBusy(false); }
   };
   return <>

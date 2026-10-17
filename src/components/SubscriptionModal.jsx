@@ -80,7 +80,6 @@ const PLANS = [
       'AI-powered spot recommendations',
       'Share private spots with friends',
     ],
-    popular: true,
   },
 ];
 
@@ -157,16 +156,6 @@ function PlanCard({ plan, user, onClose }) {
         minHeight: 520,
       }}
     >
-      {/* Popular badge */}
-      {plan.popular && (
-        <div
-          className="absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-bold tracking-wide z-10"
-          style={{ background: plan.badgeBg, color: plan.accentColor, border: `1px solid ${plan.borderColor}` }}
-        >
-          ✦ MOST POPULAR
-        </div>
-      )}
-
       {/* Header */}
       <div className="p-6 pb-4">
         <div className="flex items-center gap-3 mb-2">

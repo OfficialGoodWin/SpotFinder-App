@@ -51,7 +51,7 @@ export default function CookieConsentBanner() {
               Cookies &amp; privacy
             </h2>
             <p className="mt-1 text-sm text-gray-600 dark:text-muted-foreground">
-              SpotFinder currently uses necessary storage only. Google Analytics and Google
+              SpotFinder uses storage for sign-in, preferences, and guest drafts. Google Analytics and Google
               advertising are temporarily disabled, regardless of any choice saved previously.
               Essential Firebase authentication and reCAPTCHA may still contact Google.{' '}
               <a href="/CookiePolicy" className="font-medium underline" target="_blank" rel="noopener noreferrer">
@@ -66,7 +66,7 @@ export default function CookieConsentBanner() {
         </div>
 
         <div className="rounded-xl border border-border bg-muted/40 px-3 py-2 text-sm text-foreground">
-          Strictly necessary storage is active. Analytics and advertising controls are unavailable
+          Functional storage is active. Analytics and advertising controls are unavailable
           because those services cannot be enabled in this release.
         </div>
 

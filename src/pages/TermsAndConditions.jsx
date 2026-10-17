@@ -3,7 +3,7 @@ import LegalPageLayout, { LegalH2, LegalP, LegalUl, LegalStrong, LegalNote } fro
 
 export default function TermsAndConditions() {
   return (
-    <LegalPageLayout title="Terms & Conditions" lastUpdated="13 October 2026">
+    <LegalPageLayout title="Terms & Conditions" lastUpdated="17 October 2026">
       <LegalNote><LegalStrong>Review status:</LegalStrong> This draft is pending qualified legal review, including operator identity, governing law, subscriptions, and consumer rights.</LegalNote>
       <LegalP>These terms govern SpotFinder, currently identified as operated by Michael Neděle. Contact: spotfinder@icloud.com. Required operator registration, address, and tax disclosures have not been confirmed.</LegalP>
 
@@ -15,7 +15,6 @@ export default function TermsAndConditions() {
         <li>Keep credentials secure and provide accurate information.</li>
         <li>The current minimum registration age is 16. New email/password registrations must provide a valid date of birth. No legacy-account DOB completion migration is currently active.</li>
         <li>You may request deletion in Settings after recent reauthentication. An active or unresolved subscription must first be cancelled through support so billing is not orphaned. Private data is removed while public geographic contributions may be retained under a former-contributor label as described in the Privacy Policy.</li>
-        <li>If you do not cancel your subscription before you delete the account from our service, then you can contact support to cancel the subscription.</li>
       </LegalUl>
 
       <LegalH2>3. User content</LegalH2>
@@ -37,8 +36,7 @@ export default function TermsAndConditions() {
       </LegalUl>
 
       <LegalH2>6. Advertising</LegalH2>
-      <LegalP>The free tier may request Google . Any promise that paid tiers remove ads applies only if paid subscriptions are actually enabled and the entitlement is active.</LegalP>
-ads only after advertising consent
+      <LegalP>SpotFinder currently has no advertising slots. Google AdSense and optional analytics are temporarily disabled, and Elite and Ultra are previews rather than active paid subscriptions. Any future advertising or paid ad-free benefit requires a separately reviewed launch and applicable consent before it is offered.</LegalP>
       <LegalH2>7. Disclaimers and liability</LegalH2>
       <LegalP>The Service is provided without a guarantee that community or third-party information is accurate, complete, available, lawful to access, or safe. Nothing in these terms excludes rights or liability that applicable law does not permit us to exclude. The appropriate liability wording requires qualified review.</LegalP>
 

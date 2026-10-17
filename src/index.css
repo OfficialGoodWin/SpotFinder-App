@@ -464,6 +464,9 @@ html[data-sf-text-scale='large'] .sf-collection-thumb { width: 100%; height: 160
   overflow: hidden;
   overscroll-behavior: contain;
 }
+@media (orientation: landscape) and (max-height: 430px) {
+  .sf-nearby-filter-overlay { height: calc(100dvh - 56px); }
+}
 .sf-nearby-filter-card {
   max-height: 100%;
   overflow: hidden;
