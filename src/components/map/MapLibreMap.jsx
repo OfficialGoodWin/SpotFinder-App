@@ -13,6 +13,7 @@ import * as maplibregl from 'maplibre-gl';
 import { getSpotDisplayName, getSpotImageInfo } from '@/lib/spotPresentation';
 import { clampMapZoom, getSpotCameraOptions, MAP_MAX_ZOOM } from '@/lib/mapSpotFocus';
 import { registerSingleMapListener } from '@/lib/mapLifecycle';
+import { attachMarkerAt, validMarkerLngLat } from '@/lib/mapMarkerCoordinates';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { Protocol } from 'pmtiles';
 import { Minus, Plus } from 'lucide-react';
@@ -1049,10 +1050,11 @@ export default function MapLibreMap({
     if (!map) return;
     const m = markers.current.spots;
     if (!showSpots) { m.forEach(removeSpotMarker); m.clear(); return; }
-    const ids = new Set(spots.map(s => s.id).filter(Boolean).map(String));
+    const ids = new Set(spots.filter(s => s.id && validMarkerLngLat(s.lng, s.lat)).map(s => String(s.id)));
     m.forEach((x, id) => { if (!ids.has(id)) { removeSpotMarker(x); m.delete(id); } });
     for (const spot of spots) {
-      if (!spot.id || !Number.isFinite(Number(spot.lat)) || !Number.isFinite(Number(spot.lng))) continue;
+      const lngLat = validMarkerLngLat(spot.lng, spot.lat);
+      if (!spot.id || !lngLat) continue;
       const spotId = String(spot.id);
       const signature = JSON.stringify([
         Number(spot.lat), Number(spot.lng), getSpotDisplayName(spot, language), spot.image_url || '',
@@ -1064,7 +1066,7 @@ export default function MapLibreMap({
       if (existing) removeSpotMarker(existing);
       const el = makeSpotDom(spot, language, selected => onSelectSpotRef.current?.(selected));
       el.classList.toggle('is-selected', String(selectedSpotId || '') === String(spot.id));
-      const mk = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([spot.lng, spot.lat]).addTo(map);
+      const mk = attachMarkerAt(new maplibregl.Marker({ element: el, anchor: 'bottom' }), map, lngLat);
       mk.__spotSignature = signature;
       m.set(spotId, mk);
     }
@@ -1080,7 +1082,8 @@ export default function MapLibreMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    if (!userPos) {
+    const lngLat = validMarkerLngLat(userPos?.[1], userPos?.[0]);
+    if (!lngLat) {
       markers.current.user?.remove();
       markers.current.user = null;
       ['user-acc-fill', 'user-acc-stroke'].forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch (_) { } });
@@ -1090,7 +1093,7 @@ export default function MapLibreMap({
 
     if (userAccuracy && map.isStyleLoaded()) {
       try {
-        const data = { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [userPos[1], userPos[0]] } }] };
+        const data = { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: lngLat } }] };
         if (!map.getSource('user-acc')) map.addSource('user-acc', { type: 'geojson', data });
         else map.getSource('user-acc').setData(data);
         for (const [id, stroke] of [['user-acc-fill', false], ['user-acc-stroke', true]]) {
@@ -1103,10 +1106,13 @@ export default function MapLibreMap({
     if (!markers.current.user) {
       const el = document.createElement('div');
       el.style.cssText = 'width:22px;height:22px;';
+      el.setAttribute('aria-label', 'Current device location');
+      el.setAttribute('role', 'img');
       el.innerHTML = '<div style="width:22px;height:22px;background:white;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.25);"><div style="width:12px;height:12px;background:#3B82F6;border-radius:50%;"></div></div>';
-      markers.current.user = new maplibregl.Marker({ element: el, anchor: 'center' }).addTo(map);
+      markers.current.user = attachMarkerAt(new maplibregl.Marker({ element: el, anchor: 'center' }), map, lngLat);
+    } else {
+      markers.current.user.setLngLat(lngLat);
     }
-    markers.current.user.setLngLat([userPos[1], userPos[0]]);
   }, [userPos, userAccuracy, styleRevision]);
 
   // ── Ambient POIs ───────────────────────────────────────────────────────────
@@ -1146,7 +1152,7 @@ export default function MapLibreMap({
             const feats = await fetchAmbientPOIs(s, w, n, e, zoom, poiAbort.current.signal);
             pois = feats.map(feat => {
               const [lon, lat] = feat.geometry?.coordinates || [];
-              if (!lat || !lon) return null;
+              if (!validMarkerLngLat(lon, lat)) return null;
               const cat = detectCat(feat);
               if (!cat) return null;
               const p = feat.properties || {};
@@ -1159,9 +1165,11 @@ export default function MapLibreMap({
 
       clear();
       for (const poi of pois) {
+        const lngLat = validMarkerLngLat(poi.lon, poi.lat);
+        if (!lngLat) continue;
         const size = zoom >= 16 ? 44 : zoom >= 14 ? 40 : 34;
         const el = makeDot(poi._cat.key, poi._cat.color, size, zoom >= 14 ? poi.name : '');
-        const mk = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([poi.lon, poi.lat]).addTo(map);
+        const mk = attachMarkerAt(new maplibregl.Marker({ element: el, anchor: 'bottom' }), map, lngLat);
         el.addEventListener('click', e => { e.stopPropagation(); onSelectPOI?.(poi, poi._cat); });
         m.set(poi.id, mk);
       }
@@ -1202,7 +1210,8 @@ export default function MapLibreMap({
         const pois = [];
         for (const feat of data.features || []) {
           const [poiLon, poiLat] = feat.geometry?.coordinates || [];
-          if (!Number.isFinite(poiLat) || !Number.isFinite(poiLon)) continue;
+          const lngLat = validMarkerLngLat(poiLon, poiLat);
+          if (!lngLat) continue;
           const dLat = (poiLat - lat) * Math.PI / 180;
           const dLon = (poiLon - lon) * Math.PI / 180;
           const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat * Math.PI / 180) * Math.cos(poiLat * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
@@ -1212,7 +1221,7 @@ export default function MapLibreMap({
           pois.push(poi);
           const size = zoom >= 16 ? 46 : zoom >= 14 ? 40 : 34;
           const el = makeDot(selectedPOICategory.key, selectedPOICategory.color, size, zoom >= 14 ? poi.name : '');
-          const mk = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([poiLon, poiLat]).addTo(map);
+          const mk = attachMarkerAt(new maplibregl.Marker({ element: el, anchor: 'bottom' }), map, lngLat);
           el.addEventListener('click', e => { e.stopPropagation(); onSelectPOI?.(poi); });
           m.set(poi.id, mk);
         }
@@ -1277,14 +1286,15 @@ export default function MapLibreMap({
           if (!isClosure(cat) && !isJam(cat) && !isAccident(cat) && !isWorks(cat) && !isLane(cat)) continue;
           const geo = inc.geometry;
           if (!geo) continue;
-          const coords = geo.type === 'Point' ? geo.coordinates : geo.coordinates[Math.floor(geo.coordinates.length / 2)];
-          const [lng, lat] = coords;
+          const coords = geo.type === 'Point' ? geo.coordinates : geo.coordinates?.[Math.floor(geo.coordinates.length / 2)];
+          const lngLat = validMarkerLngLat(coords?.[0], coords?.[1]);
+          if (!lngLat) continue;
           const type = isClosure(cat) ? 'closure' : isWorks(cat) ? 'works' : isLane(cat) ? 'lane' : isAccident(cat) ? 'accident' : 'jam';
           const el = makeEl(type);
           const p = inc.properties || {};
           const road = p.roadNumbers?.[0] || '';
           const popup = `<div style="font-size:13px;max-width:200px"><strong style="color:#CC1111">${type === 'closure' ? '⛔ Road Closed' : type === 'works' ? '🚧 Road Works' : type === 'lane' ? 'Lane Closed' : type === 'accident' ? '🚨 Accident' : '🚗 Traffic Jam'}</strong>${road ? `<div>🛣️ ${road}</div>` : ''}${p.from ? `<div>From: ${p.from}</div>` : ''}${p.to ? `<div>To: ${p.to}</div>` : ''}</div>`;
-          const mk = new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).setPopup(new maplibregl.Popup({ offset: 10 }).setHTML(popup)).addTo(map);
+          const mk = attachMarkerAt(new maplibregl.Marker({ element: el }).setPopup(new maplibregl.Popup({ offset: 10 }).setHTML(popup)), map, lngLat);
           incidentMarkers.push(mk);
         }
       } catch (e) { if (e.name !== 'AbortError') console.warn('Incident fetch:', e.message); }
@@ -1313,6 +1323,8 @@ const addAdminMarkers = () => {
   if (zoom < 13) return;
 
   for (const poi of adminPOIs || []) {
+    const lngLat = validMarkerLngLat(poi.lon, poi.lat);
+    if (!lngLat) continue;
     const categoryKey = (poi.category || '').toLowerCase().trim();
 
     // First try matching by key (preferred - admin panel stores exact keys)
@@ -1391,10 +1403,8 @@ const addAdminMarkers = () => {
       _isAdminPOI: true,
     };
 
-    const mk = new maplibregl.Marker({ element: el, anchor: 'bottom' })
-      .setLngLat([poi.lon, poi.lat])
-      .setPopup(new maplibregl.Popup({ offset: [0, -size/2], className: 'admin-poi-popup' }).setHTML(tooltipHTML))
-      .addTo(map);
+    const mk = attachMarkerAt(new maplibregl.Marker({ element: el, anchor: 'bottom' })
+      .setPopup(new maplibregl.Popup({ offset: [0, -size/2], className: 'admin-poi-popup' }).setHTML(tooltipHTML)), map, lngLat);
 
     el.addEventListener('click', e => { e.stopPropagation(); onSelectPOI?.(syntheticPOI, syntheticCat); });
     adminMarkers.push(mk);
@@ -1432,7 +1442,8 @@ const addAdminMarkers = () => {
       // E-route point markers (type === 'marker')
       for (const ov of adminERouteOverrides || []) {
         if (ov.type !== 'marker') continue;
-        if (!ov.lat || !ov.lon || !ov.eRoute) continue;
+        const lngLat = validMarkerLngLat(ov.lon, ov.lat);
+        if (!lngLat || !ov.eRoute) continue;
 
         // Draw a green E-route shield
         const el = document.createElement('div');
@@ -1447,15 +1458,14 @@ const addAdminMarkers = () => {
           el.title = [ov.roadRef ? `Road ${ov.roadRef}` : '', ov.note].filter(Boolean).join(' — ');
         }
 
-        const mk = new maplibregl.Marker({ element: el, anchor: 'center' })
-          .setLngLat([ov.lon, ov.lat])
-          .addTo(map);
+        const mk = attachMarkerAt(new maplibregl.Marker({ element: el, anchor: 'center' }), map, lngLat);
         overlayMarkers.push(mk);
       }
 
       // Custom road shield markers (adminRoadOverrides — each has lat/lon)
       for (const ov of adminRoadOverrides || []) {
-        if (!ov.lat || !ov.lon || !ov.roadRef) continue;
+        const lngLat = validMarkerLngLat(ov.lon, ov.lat);
+        if (!lngLat || !ov.roadRef) continue;
 
         // Determine color by roadClass
         const bgColors = {
@@ -1474,9 +1484,7 @@ const addAdminMarkers = () => {
         el.textContent = ov.roadRef;
         if (ov.notes) el.title = ov.notes;
 
-        const mk = new maplibregl.Marker({ element: el, anchor: 'center' })
-          .setLngLat([ov.lon, ov.lat])
-          .addTo(map);
+        const mk = attachMarkerAt(new maplibregl.Marker({ element: el, anchor: 'center' }), map, lngLat);
         overlayMarkers.push(mk);
       }
     };
