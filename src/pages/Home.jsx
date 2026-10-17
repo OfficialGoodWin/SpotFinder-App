@@ -18,8 +18,10 @@ import WelcomeDiscoveryCard from '../components/WelcomeDiscoveryCard';
 import FeaturedDiscoveryPanel from '../components/FeaturedDiscoveryPanel';
 import { getSpotDisplayName } from '@/lib/spotPresentation';
 import { navigationCoordinates } from '@/lib/externalNavigation';
-import { normalizeLatLng } from '@/lib/spotDiscovery';
+import { filterAndSortNearbySpots, normalizeLatLng } from '@/lib/spotDiscovery';
+import { cachedViewportRows, canReuseNearby, filterViewportRows } from '@/lib/mapQueryCache';
 import { freshNearbyFix, nearbyLocationFailure } from '@/lib/nearbyLocation';
+import { createLiveLocationController, normalizeDeviceFix } from '@/lib/liveLocation';
 import { createNearbyRequestGate } from '@/lib/nearbySearch';
 import { NEARBY_DEFAULT_KM } from '@/lib/nearbyFilters';
 import { useSpotOpenFocus } from '@/hooks/useSpotOpenFocus';
@@ -100,6 +102,7 @@ export default function Home() {
   const [showSubscription, setShowSubscription] = useState(false);
   const [showMobileMore, setShowMobileMore] = useState(false);
   const [locationStatus, setLocationStatus] = useState('idle');
+  const [liveTracking, setLiveTracking] = useState(false);
   const [showWelcome, setShowWelcome] = useState(() => {
     if (spotIdFromLocation(window.location.pathname, window.location.search).isSpotLink) return false;
     try { return localStorage.getItem('spotfinder_welcome_dismissed_v1') !== '1'; }
@@ -177,6 +180,7 @@ export default function Home() {
   const spotRefreshTimer = useRef(null);
   const spotRequestSequence = useRef(0);
   const moveEndMapRef = useRef(null);
+  const viewportCacheRef = useRef(null);
 
   const refreshSpotsInViewport = useCallback(async () => {
     const map = mapRef.current;
@@ -184,15 +188,31 @@ export default function Home() {
     const center = map.getCenter();
     setViewportCenter({ lat: center.lat, lng: center.lng });
     if (spotRefreshTimer.current) clearTimeout(spotRefreshTimer.current);
+    const sequence = ++spotRequestSequence.current;
     spotRefreshTimer.current = setTimeout(async () => {
-      const sequence = ++spotRequestSequence.current;
+      const b = map.getBounds();
+      const view = { south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() };
+      const cachedRows = cachedViewportRows(viewportCacheRef.current, view);
+      if (cachedRows) {
+        setSpots(cachedRows);
+        setSpotsLoading(false);
+        return;
+      }
       setSpotsLoading(true);
       try {
-        const b = map.getBounds();
-        const rows = await getPublicSpotsInBounds({
-          south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast(),
-        }, 500);
-        if (sequence === spotRequestSequence.current) setSpots(rows);
+        const latPad = Math.min(10, (view.north - view.south) * 0.25);
+        const lngPad = Math.min(10, (view.east - view.west) * 0.25);
+        const bounds = { south: Math.max(-90, view.south - latPad), north: Math.min(90, view.north + latPad), west: view.west - lngPad, east: view.east + lngPad };
+        let rows = await getPublicSpotsInBounds(bounds, 500);
+        // Padding must never crowd visible records out of the bounded page.
+        if (rows.length >= 500) {
+          rows = await getPublicSpotsInBounds(view, 500);
+          Object.assign(bounds, view);
+        }
+        if (sequence === spotRequestSequence.current) {
+          viewportCacheRef.current = { bounds, rows, at: Date.now() };
+          setSpots(filterViewportRows(rows, view));
+        }
       } catch (err) {
         console.error('Failed to load visible spots:', err);
       } finally {
@@ -219,54 +239,52 @@ export default function Home() {
     moveEndMapRef.current = null;
   }, [refreshSpotsInViewport]);
  
-  // Track if we've centered to user location once
-  const hasCenteredToUser = useRef(false);
-  const locationWatchRef = useRef(null);
-
-  const requestLocation = useCallback(() => {
-    if (userPos) return Promise.resolve(userPos);
-    if (!navigator.geolocation) {
-      setLocationStatus('unsupported');
-      toast.error('This browser does not provide location access. You can still search the map.');
-      return Promise.resolve(null);
-    }
+  const locationControllerRef = useRef(null);
+  if (!locationControllerRef.current) locationControllerRef.current = createLiveLocationController({
+    geolocation: navigator.geolocation, document,
+    onFix: fix => {
+      nearbyFixRef.current = fix;
+      setUserPos(fix.position);
+      setUserAccuracy(fix.accuracy);
+      setLocationStatus('granted');
+    },
+    onError: error => {
+      setLocationStatus(error?.code === 1 ? 'denied' : 'unavailable');
+      if (error?.code === 1 || error?.code === 2) setLiveTracking(false);
+      if (error?.code === 1) {
+        nearbyFixRef.current = null;
+        setUserPos(null);
+        setUserAccuracy(null);
+      }
+    },
+  });
+  const requestLocation = useCallback(async () => {
     setLocationStatus('requesting');
-    return new Promise(resolve => {
-      navigator.geolocation.getCurrentPosition(
-        position => {
-          const next = [position.coords.latitude, position.coords.longitude];
-          nearbyFixRef.current = { position: next, timestamp: position.timestamp || Date.now() };
-          setUserPos(next);
-          setUserAccuracy(position.coords.accuracy);
-          setLocationStatus('granted');
-          if (!hasCenteredToUser.current) {
-            hasCenteredToUser.current = true;
-            setFlyTo(next);
-            window.setTimeout(() => setFlyTo(null), 1000);
-          }
-          if (locationWatchRef.current == null) {
-            locationWatchRef.current = navigator.geolocation.watchPosition(update => {
-              const updated = [update.coords.latitude, update.coords.longitude];
-              nearbyFixRef.current = { position: updated, timestamp: update.timestamp || Date.now() };
-              setUserPos(updated);
-              setUserAccuracy(update.coords.accuracy);
-            }, () => {}, { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 });
-          }
-          resolve(next);
-        },
-        error => {
-          console.warn('Geolocation request failed:', error.message);
-          setLocationStatus(error.code === error.PERMISSION_DENIED ? 'denied' : 'unavailable');
-          resolve(null);
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
-      );
-    });
-  }, [userPos]);
-
-  useEffect(() => () => {
-    if (locationWatchRef.current != null) navigator.geolocation?.clearWatch(locationWatchRef.current);
+    const fix = await locationControllerRef.current.start();
+    if (!fix) return null;
+    setLiveTracking(true);
+    setLocationStatus('granted');
+    return fix.position;
   }, []);
+  useEffect(() => {
+    const onVisibility = () => {
+      locationControllerRef.current.onVisibilityChange();
+      if (!document.hidden && !freshNearbyFix(nearbyFixRef.current)) {
+        setUserPos(null);
+        setUserAccuracy(null);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => { document.removeEventListener('visibilitychange', onVisibility); locationControllerRef.current?.stop(); };
+  }, []);
+  const stopLiveLocation = () => {
+    locationControllerRef.current.stop();
+    nearbyFixRef.current = null;
+    setUserPos(null);
+    setUserAccuracy(null);
+    setLocationStatus('idle');
+    setLiveTracking(false);
+  };
 
   const dismissWelcome = useCallback(() => {
     setShowWelcome(false);
@@ -292,6 +310,8 @@ export default function Home() {
         }
       }
       setSpots(prev => [spot, ...prev.filter(item => item.id !== spot.id)]);
+      viewportCacheRef.current = null;
+      nearbyCacheRef.current = null;
       window.dispatchEvent(new CustomEvent('spotfinder:collection-changed', { detail: { tabs: ['created', 'drafts'] } }));
       return spot;
     } catch (err) {
@@ -364,6 +384,8 @@ export default function Home() {
   const handleDeleteSpot = async (spot) => {
     await deleteSpot(spot.id);
     setSpots(prev => prev.filter(s => s.id !== spot.id));
+    viewportCacheRef.current = null;
+    nearbyCacheRef.current = null;
     closeSpot();
     window.dispatchEvent(new CustomEvent('spotfinder:collection-changed', { detail: { tabs: ['created', 'saved', 'liked'] } }));
     toast.success('Spot deleted');
@@ -372,6 +394,8 @@ export default function Home() {
   const handleEditSpot = async (updatedSpot) => {
     await updateSpot(updatedSpot.id, updatedSpot);
     setSpots(prev => prev.map(s => s.id === updatedSpot.id ? updatedSpot : s));
+    viewportCacheRef.current = null;
+    nearbyCacheRef.current = null;
     setEditingSpot(null);
     closeSpot();
     window.dispatchEvent(new CustomEvent('spotfinder:collection-changed', { detail: { tabs: ['created', 'saved', 'liked'] } }));
@@ -413,12 +437,12 @@ export default function Home() {
             enableHighAccuracy: false, maximumAge: 120000, timeout: 10000,
           }));
           if (!nearbyRequestGate.current.isCurrent(requestId)) return;
-          const fixTimestamp = Number.isFinite(fix.timestamp) ? fix.timestamp : Date.now();
-          origin = freshNearbyFix({ position: [fix.coords.latitude, fix.coords.longitude], timestamp: fixTimestamp });
+          const validFix = normalizeDeviceFix(fix);
+          origin = validFix ? freshNearbyFix(validFix) : null;
           if (origin) {
-            nearbyFixRef.current = { position: origin, timestamp: fixTimestamp };
+            nearbyFixRef.current = validFix;
             setUserPos(origin);
-            setUserAccuracy(fix.coords.accuracy);
+            setUserAccuracy(validFix.accuracy);
             setLocationStatus('granted');
           } else setNearbyLocationError('The device returned an invalid or out-of-date location. Try again or choose the map center.');
         } catch (error) {
@@ -439,15 +463,15 @@ export default function Home() {
     setNearbyLoading(true);
     setNearbySearchError('');
     setNearbySpots([]);
-    const cacheKey = `${origin[0]}:${origin[1]}:${filters.maxDistance}`;
     try {
-      const cached = nearbyCacheRef.current?.key === cacheKey ? nearbyCacheRef.current : null;
-      const result = cached && Date.now() - cached.at < 120000
-        ? cached.result
-        : await getPublicSpotsNear(origin, filters.maxDistance);
+      const cached = nearbyCacheRef.current;
+      const radius = filters.maxDistance;
+      const canReuse = canReuseNearby(cached, origin, radius);
+      const coverageRadius = mode === 'gps' && Number.isFinite(radius) ? radius + Math.min(1, Math.max(0.25, radius * 0.1)) : radius;
+      const result = canReuse ? cached.result : await getPublicSpotsNear(origin, coverageRadius);
       if (!nearbyRequestGate.current.isCurrent(requestId)) return;
-      if (!cached || Date.now() - cached.at >= 120000) nearbyCacheRef.current = { key: cacheKey, at: Date.now(), result };
-      setNearbySpots(result.spots);
+      if (!canReuse) nearbyCacheRef.current = { origin, radius: coverageRadius, at: Date.now(), result };
+      setNearbySpots(filterAndSortNearbySpots(result.spots, { origin, maxDistance: radius, sort: 'distance' }));
       setNearbyComplete(result.complete);
     } catch (error) {
       if (!nearbyRequestGate.current.isCurrent(requestId)) return;
@@ -459,6 +483,7 @@ export default function Home() {
   };
  
   const handleSignOut = async () => {
+    stopLiveLocation();
     await logout();
   };
  
@@ -563,7 +588,7 @@ export default function Home() {
         onSelectSpot={(spot) => openLinkedSpot(spot, 'search')}
         onNavigate={openNavigation}
         onSelectCategory={async (category) => {
-          const position = userPos || await requestLocation();
+          const position = await requestLocation();
           if (!position) return toast.error(t('home.locationRequestFailed', 'Location is unavailable. Check browser permissions or search the map instead.'));
           setSelectedPOICategory(category);
           setShowPOIPanel(true);
@@ -623,7 +648,7 @@ export default function Home() {
           <div className="mx-1.5 my-1 h-px bg-slate-200/80 dark:bg-white/10" />
           <button
             type="button"
-            onClick={async () => { const position = userPos || await requestLocation(); if (position) setFlyTo([...position]); }}
+            onClick={async () => { const position = await requestLocation(); if (position) setFlyTo([...position]); }}
             className="grid h-11 w-11 place-items-center rounded-xl transition-colors hover:bg-slate-100 active:scale-95 dark:hover:bg-white/10"
             aria-label="Center on my location"
             title="Center location"
@@ -651,6 +676,7 @@ export default function Home() {
                   <button type="button" onClick={() => { setShowSettings(true); setShowMobileMore(false); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium hover:bg-accent">
                     <Settings className="h-5 w-5 text-muted-foreground" /> Settings
                   </button>
+                  {liveTracking && <button type="button" onClick={() => { stopLiveLocation(); setShowMobileMore(false); }} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium hover:bg-accent"><Crosshair className="h-5 w-5 text-muted-foreground" /> Stop live location</button>}
                 </div>
               </>
             )}
@@ -726,13 +752,14 @@ export default function Home() {
           <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
             <MapLayerSwitcher activeLayer={mapLayer} onLayerChange={setMapLayer} />
             <button
-              onClick={async () => { const position = userPos || await requestLocation(); if (position) setFlyTo([...position]); }}
+              onClick={async () => { const position = await requestLocation(); if (position) setFlyTo([...position]); }}
               className="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-100 text-gray-600 transition-all hover:bg-gray-200 active:scale-95 dark:bg-accent/60 dark:text-foreground dark:hover:bg-accent"
               title="Center location"
               aria-label="Center map on my location"
             >
               <Crosshair className="w-5 h-5" />
             </button>
+            {liveTracking && <button type="button" onClick={stopLiveLocation} className="min-h-11 rounded-xl px-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 dark:text-foreground dark:hover:bg-accent" aria-label="Stop live location">Stop GPS</button>}
 
             {/* 3D Terrain toggle */}
             <button

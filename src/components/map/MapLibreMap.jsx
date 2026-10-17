@@ -825,12 +825,22 @@ export default function MapLibreMap({
     else map.once('idle', () => { applyTerrain(map, terrainEnabled); apply3DBuildings(map, terrainEnabled); });
   }, [terrainEnabled]);
   const markers = useRef({ spots: new Map(), ambient: new Map(), pois: new Map(), user: null });
+  const onSelectSpotRef = useRef(onSelectSpot);
+  onSelectSpotRef.current = onSelectSpot;
+  const onAdminMapClickRef = useRef(onAdminMapClick);
+  onAdminMapClickRef.current = onAdminMapClick;
   const poiAbort = useRef(null);
   const categoryPoiAbort = useRef(null);
+  const categoryOriginRef = useRef({ key: null, position: null });
   const poiTimer = useRef(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [mapZoom, setMapZoom] = useState(13);
   const [styleRevision, setStyleRevision] = useState(0);
+  if (!selectedPOICategory) categoryOriginRef.current = { key: null, position: null };
+  else if (categoryOriginRef.current.key !== selectedPOICategory.key) {
+    categoryOriginRef.current = { key: selectedPOICategory.key, position: userPos };
+  }
+  const categoryOrigin = categoryOriginRef.current.position;
 
   // ── Apply admin E-route shield removals ───────────────────────────────────
   useEffect(() => {
@@ -961,6 +971,8 @@ export default function MapLibreMap({
       removeStyleRestoration();
       markers.current.spots.forEach(removeSpotMarker);
       markers.current.spots.clear();
+      markers.current.user?.remove();
+      markers.current.user = null;
       map.remove();
       mapRef.current = null;
     };
@@ -1050,13 +1062,13 @@ export default function MapLibreMap({
       const existing = m.get(spotId);
       if (existing?.__spotSignature === signature) continue;
       if (existing) removeSpotMarker(existing);
-      const el = makeSpotDom(spot, language, onSelectSpot);
+      const el = makeSpotDom(spot, language, selected => onSelectSpotRef.current?.(selected));
       el.classList.toggle('is-selected', String(selectedSpotId || '') === String(spot.id));
       const mk = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([spot.lng, spot.lat]).addTo(map);
       mk.__spotSignature = signature;
       m.set(spotId, mk);
     }
-  }, [language, onSelectSpot, selectedSpotId, spots, showSpots]);
+  }, [language, spots, showSpots]);
 
   useEffect(() => {
     markers.current.spots.forEach((marker, id) => {
@@ -1068,22 +1080,33 @@ export default function MapLibreMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    markers.current.user?.remove();
-    ['user-acc-fill', 'user-acc-stroke'].forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch (_) { } });
-    try { if (map.getSource('user-acc')) map.removeSource('user-acc'); } catch (_) { }
-    if (!userPos) return;
+    if (!userPos) {
+      markers.current.user?.remove();
+      markers.current.user = null;
+      ['user-acc-fill', 'user-acc-stroke'].forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch (_) { } });
+      try { if (map.getSource('user-acc')) map.removeSource('user-acc'); } catch (_) { }
+      return;
+    }
 
     if (userAccuracy && map.isStyleLoaded()) {
       try {
-        map.addSource('user-acc', { type: 'geojson', data: { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [userPos[1], userPos[0]] } }] } });
-        map.addLayer({ id: 'user-acc-fill', type: 'circle', source: 'user-acc', paint: { 'circle-radius': { stops: [[0, 0], [20, userAccuracy / 0.075]], base: 2 }, 'circle-color': '#3B82F6', 'circle-opacity': 0.08, 'circle-pitch-alignment': 'map' } });
-        map.addLayer({ id: 'user-acc-stroke', type: 'circle', source: 'user-acc', paint: { 'circle-radius': { stops: [[0, 0], [20, userAccuracy / 0.075]], base: 2 }, 'circle-color': 'transparent', 'circle-stroke-color': '#3B82F6', 'circle-stroke-width': 1, 'circle-pitch-alignment': 'map' } });
+        const data = { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [userPos[1], userPos[0]] } }] };
+        if (!map.getSource('user-acc')) map.addSource('user-acc', { type: 'geojson', data });
+        else map.getSource('user-acc').setData(data);
+        for (const [id, stroke] of [['user-acc-fill', false], ['user-acc-stroke', true]]) {
+          const radius = { stops: [[0, 0], [20, userAccuracy / 0.075]], base: 2 };
+          if (!map.getLayer(id)) map.addLayer({ id, type: 'circle', source: 'user-acc', paint: { 'circle-radius': radius, 'circle-color': stroke ? 'transparent' : '#3B82F6', ...(stroke ? { 'circle-stroke-color': '#3B82F6', 'circle-stroke-width': 1 } : { 'circle-opacity': 0.08 }), 'circle-pitch-alignment': 'map' } });
+          else map.setPaintProperty(id, 'circle-radius', radius);
+        }
       } catch (_) { }
     }
-    const el = document.createElement('div');
-    el.style.cssText = 'width:22px;height:22px;';
-    el.innerHTML = '<div style="width:22px;height:22px;background:white;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.25);"><div style="width:12px;height:12px;background:#3B82F6;border-radius:50%;"></div></div>';
-    markers.current.user = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat([userPos[1], userPos[0]]).addTo(map);
+    if (!markers.current.user) {
+      const el = document.createElement('div');
+      el.style.cssText = 'width:22px;height:22px;';
+      el.innerHTML = '<div style="width:22px;height:22px;background:white;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.25);"><div style="width:12px;height:12px;background:#3B82F6;border-radius:50%;"></div></div>';
+      markers.current.user = new maplibregl.Marker({ element: el, anchor: 'center' }).addTo(map);
+    }
+    markers.current.user.setLngLat([userPos[1], userPos[0]]);
   }, [userPos, userAccuracy, styleRevision]);
 
   // ── Ambient POIs ───────────────────────────────────────────────────────────
@@ -1158,11 +1181,11 @@ export default function MapLibreMap({
     if (!map) return;
     const m = markers.current.pois;
     const clear = () => { m.forEach(x => x.remove()); m.clear(); };
-    if (!selectedPOICategory || !userPos) { clear(); onPOIsLoaded?.([]); return; }
+    if (!selectedPOICategory || !categoryOrigin) { clear(); onPOIsLoaded?.([]); return; }
 
     const load = async () => {
       const zoom = map.getZoom();
-      const [lat, lon] = userPos;
+      const [lat, lon] = categoryOrigin;
       const radiusMeters = 20_000;
       categoryPoiAbort.current?.abort();
       const controller = new AbortController();
@@ -1204,7 +1227,7 @@ export default function MapLibreMap({
     clearTimeout(poiTimer.current);
     poiTimer.current = setTimeout(load, 300);
     return () => { clearTimeout(poiTimer.current); categoryPoiAbort.current?.abort(); };
-  }, [selectedPOICategory, language, userPos]);
+  }, [selectedPOICategory, language, categoryOrigin]);
 
   // ── Route overlay ──────────────────────────────────────────────────────────
   // ── Traffic incident markers (TomTom incidents → MapLibre markers) ───────────
@@ -1468,11 +1491,11 @@ const addAdminMarkers = () => {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !adminNavMode) return;
-    const handler = (e) => { onAdminMapClick?.({ lat: e.lngLat.lat, lon: e.lngLat.lng }); };
+    const handler = (e) => { onAdminMapClickRef.current?.({ lat: e.lngLat.lat, lon: e.lngLat.lng }); };
     map.on('click', handler);
     map.getCanvas().style.cursor = 'crosshair';
     return () => { map.off('click', handler); map.getCanvas().style.cursor = ''; };
-  }, [adminNavMode, onAdminMapClick]);
+  }, [adminNavMode]);
 
   // ── Traffic overlay (TomTom raster on top) ─────────────────────────────────
   useEffect(() => {
