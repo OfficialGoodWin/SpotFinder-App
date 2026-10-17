@@ -6,7 +6,7 @@ import { submitCategoryRatings, getSpotSocialState, toggleSpotLike, toggleSpotSa
 import { useLanguage } from '@/lib/LanguageContext';
 import ReportDialog from '@/components/moderation/ReportDialog';
 import { canonicalSpotUrl, shareSpotLink } from '@/lib/spotLinks';
-import { getSpotDisplayName, getSpotLocationLabel } from '@/lib/spotPresentation';
+import { getPublicSpotPhotos, getSpotDisplayName, getSpotLocationLabel } from '@/lib/spotPresentation';
 import SpotImage from './SpotImage';
 import { setSpotRelationState } from '@/lib/spotSocialState';
 
@@ -156,7 +156,9 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
   // Only community uploads are documentary spot photos here. A nearby POI
   // image is not promoted into the gallery unless its identity and full
   // licence metadata have been independently reviewed.
-  const detailPhotos = uploadedPhotos.map(url => ({
+  const detailPhotos = localSpot.is_public === true && localSpot.status === 'published'
+    ? getPublicSpotPhotos(localSpot).map(photo => ({ ...photo, source: 'community' }))
+    : uploadedPhotos.map(url => ({
     url,
     source: 'community',
     metadata: localSpot.photo_metadata?.find?.(item => item.url === url),

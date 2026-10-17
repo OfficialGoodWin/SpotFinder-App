@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { shouldShowWelcome } from '../src/lib/discoveryExperience.js';
 import { isFeaturedEligible, selectFeaturedSpots } from '../src/lib/featuredDiscovery.js';
+import { getPublicSpotPhotos } from '../src/lib/spotPresentation.js';
 import { canonicalSpotUrl, shareSpotLink, spotIdFromLocation, validSpotId } from '../src/lib/spotLinks.js';
 import { createSpotFocusRequest, getSpotCameraOptions } from '../src/lib/mapSpotFocus.js';
 
@@ -30,7 +31,18 @@ test('featured selection keeps real published public destinations and approved p
   ];
   assert.equal(isFeaturedEligible(spot), true);
   assert.deepEqual(selectFeaturedSpots(candidates).map(item => item.id), ['castle_01', 'ruin_02']);
-  assert.equal(selectFeaturedSpots([{ ...spot, id: 'legacy', photo_metadata: [] }])[0].image_url, null);
+  assert.equal(getPublicSpotPhotos(selectFeaturedSpots([{ ...spot, id: 'legacy', photo_metadata: [] }])[0])[0].url, photo);
+});
+
+test('featured photographs follow the public gallery order, including legacy data', () => {
+  const legacy = { ...spot, id: 'legacy', image_urls: ['javascript:bad', photo], photo_metadata: [] };
+  assert.deepEqual(getPublicSpotPhotos(legacy).map(item => item.url), [photo]);
+  assert.equal(getPublicSpotPhotos({ ...spot, image_url: null, image_urls: [] }).length, 0);
+  assert.equal(getPublicSpotPhotos({ ...spot, is_public: false }).length, 0);
+  assert.equal(getPublicSpotPhotos({ ...spot, status: 'draft' }).length, 0);
+  assert.equal(getPublicSpotPhotos({ ...spot, image_url: 'https://example.test/drafts%2Fowner%2Fprivate.jpg', image_urls: [] }).length, 0);
+  assert.equal(getPublicSpotPhotos({ ...spot, photo_metadata: [{ url: photo, source: 'poi_enrichment' }] }).length, 0);
+  assert.equal(getPublicSpotPhotos({ ...spot, photo_metadata: [{ url: photo, source: 'user_upload', restricted: true }] }).length, 0);
 });
 
 test('canonical and legacy links identify the immutable spot ID across reloads', () => {

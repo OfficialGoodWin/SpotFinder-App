@@ -151,6 +151,25 @@ export function getSpotImageInfo(spot = {}) {
   };
 }
 
+// The public gallery and featured cards use the same stored community photo
+// order. Legacy public spots may predate photo_metadata entirely.
+export function getPublicSpotPhotos(spot = {}) {
+  if (spot.is_public !== true || spot.status !== 'published') return [];
+  const urls = Array.isArray(spot.image_urls) && spot.image_urls.length
+    ? spot.image_urls : [spot.image_url];
+  return [...new Set(urls)].filter(url => {
+    if (!isUsableSpotImageUrl(url)) return false;
+    if (/drafts(?:%2f|\/)/i.test(url)) return false;
+    const metadata = spot.photo_metadata?.find?.(item => item?.url === url);
+    if (metadata?.is_private || metadata?.restricted || metadata?.needs_review || metadata?.visibility === 'private' || metadata?.access === 'restricted' || metadata?.location_match_confidence === 'unverified') return false;
+    if (metadata?.source && !['user_upload', 'legacy_embedded_upload', 'legacy_unknown'].includes(metadata.source)) return false;
+    return true;
+  }).map(url => {
+    const metadata = spot.photo_metadata?.find?.(item => item?.url === url);
+    return { url, metadata };
+  });
+}
+
 export function getSpotImagePresentation(spot = {}, { src, loadFailed = false } = {}) {
   if (loadFailed) return { kind: 'fallback', reason: 'load-error' };
   const hasCandidate = Boolean(src || spot?.image_url || spot?.image_urls?.length);

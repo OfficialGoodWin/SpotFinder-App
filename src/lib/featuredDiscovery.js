@@ -1,4 +1,4 @@
-import { getSpotImageInfo, getVerifiedSpotCategory } from './spotPresentation.js';
+import { getPublicSpotPhotos, getVerifiedSpotCategory } from './spotPresentation.js';
 
 const PROMOTABLE_CATEGORIES = new Set(['viewpoint', 'castle', 'historic site', 'historic ruin', 'mountain', 'mountain spot', 'waterfall', 'sunset spot', 'sunrise spot', 'photo spot', 'hiking spot']);
 const PROMOTABLE_STATES = new Set(['approved', 'featured', 'public', 'discoverable']);
@@ -16,10 +16,7 @@ export function isFeaturedEligible(spot) {
 }
 
 export function selectFeaturedSpots(spots, maxCount = 3) {
-  return spots.filter(isFeaturedEligible).map(spot => {
-    const image = getSpotImageInfo(spot);
-    const approvedPhoto = image && image.permissionBasis === 'uploader_attestation'
-      && image.source === 'user_upload' && !image.needsReview;
-    return approvedPhoto ? spot : { ...spot, image_url: null, image_urls: [], photo_metadata: [] };
-  }).sort((a, b) => Number(Boolean(getSpotImageInfo(b))) - Number(Boolean(getSpotImageInfo(a)))).slice(0, maxCount);
+  return spots.filter(isFeaturedEligible)
+    .sort((a, b) => Number(getPublicSpotPhotos(b).length > 0) - Number(getPublicSpotPhotos(a).length > 0))
+    .slice(0, maxCount);
 }

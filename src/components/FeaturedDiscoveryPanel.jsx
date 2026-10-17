@@ -1,7 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Compass, Search, X } from 'lucide-react';
 import SpotImage from './spots/SpotImage';
-import { getSpotDisplayName, getSpotImageInfo, getSpotLocationLabel } from '@/lib/spotPresentation';
+import { getPublicSpotPhotos, getSpotDisplayName, getSpotLocationLabel } from '@/lib/spotPresentation';
+
+function FeaturedSpotThumbnail({ spot }) {
+  const photos = getPublicSpotPhotos(spot);
+  const [index, setIndex] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+  const photo = photos[index];
+  return <>
+    <div className="h-24 overflow-hidden bg-emerald-50 dark:bg-slate-900">
+      {photo ? <img key={photo.url} src={photo.url} alt="" loading="lazy" decoding="async"
+        onLoad={() => setLoaded(true)}
+        onError={() => { setLoaded(false); setIndex(value => value + 1); }}
+        className={`h-full w-full object-cover transition-transform duration-200 group-hover:scale-105 motion-reduce:transition-none ${loaded ? '' : 'invisible'}`} />
+        : <SpotImage spot={{ ...spot, image_url: null, image_urls: [] }} alt="" fallbackClassName="h-full" />}
+    </div>
+    {loaded && (photo?.metadata?.attribution || photo?.metadata?.creator || photo?.metadata?.license) && <span className="block truncate px-2 pb-2 text-[10px] text-slate-500 dark:text-slate-400" title={[photo.metadata.attribution || photo.metadata.creator, photo.metadata.license].filter(Boolean).join(' · ')}>Photo: {[photo.metadata.attribution || photo.metadata.creator, photo.metadata.license].filter(Boolean).join(' · ')}</span>}
+  </>;
+}
 
 export default function FeaturedDiscoveryPanel({ spots, language, loading, error, emptyView, onSelectSpot, onSearch, onDismiss }) {
   return (
@@ -18,11 +35,9 @@ export default function FeaturedDiscoveryPanel({ spots, language, loading, error
       {!loading && error && <p role="status" className="py-3 text-sm">Featured places are unavailable right now. You can still explore the map.</p>}
       {!loading && !error && spots.length > 0 && <div className="mt-2 flex snap-x gap-3 overflow-x-auto pb-1" aria-label="Featured places">
         {spots.map(spot => {
-          const image = getSpotImageInfo(spot);
           return <button key={spot.id} type="button" onClick={() => onSelectSpot(spot)} className="group w-40 shrink-0 snap-start overflow-hidden rounded-xl border border-slate-200 bg-slate-50 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 dark:border-white/10 dark:bg-white/10 sm:w-44" aria-label={`Open ${getSpotDisplayName(spot, language)}`}>
-            <div className="h-24 overflow-hidden"><SpotImage spot={spot} alt="" className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105 motion-reduce:transition-none" fallbackClassName="h-full" /></div>
+            <FeaturedSpotThumbnail spot={spot} />
             <div className="px-2 py-2"><span className="line-clamp-1 text-xs font-bold">{getSpotDisplayName(spot, language)}</span><span className="mt-0.5 line-clamp-1 text-[11px] text-slate-600 dark:text-slate-300">{getSpotLocationLabel(spot, 2)}</span></div>
-            {(image?.attribution || image?.creator) && <span className="block truncate px-2 pb-2 text-[10px] text-slate-500 dark:text-slate-400" title={image.attribution || image.creator}>Photo: {image.attribution || image.creator}</span>}
           </button>;
         })}
       </div>}

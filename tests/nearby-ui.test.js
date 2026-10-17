@@ -19,6 +19,10 @@ test('Nearby opens one filter dialog, Cancel preserves applied values, and Show 
     await page.addInitScript(() => localStorage.setItem('spotfinder_welcome_dismissed_v1', '1'));
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => Boolean(document.querySelector('button[title="Nearby spots"]')));
+    assert.equal(await page.locator('button[title="Nearby spots"]').count(), 1);
+    assert.equal(await page.locator('button[aria-label="Center on my location"]').count(), 1);
+    assert.equal(await page.locator('button[title="Drafts"]').count(), 1);
+    assert.equal(await page.locator('button[title="Nearby spots"]').getAttribute('aria-label'), 'Open nearby spots filters');
     const click = selector => page.evaluate(value => document.querySelector(value)?.click(), selector);
     const dialogCount = () => page.evaluate(() => document.querySelectorAll('[aria-labelledby="nearby-filter-title"]').length);
     await click('button[title="Nearby spots"]');
@@ -67,6 +71,7 @@ test('Nearby opens one filter dialog, Cancel preserves applied values, and Show 
     });
     await mobilePage.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
     await mobilePage.waitForFunction(() => Boolean(document.querySelector('button[title="Nearby spots"]')));
+    assert.equal(await mobilePage.locator('button[title="Nearby spots"]').count(), 1);
     await mobilePage.evaluate(() => document.querySelector('button[title="Nearby spots"]').click());
     const measureDialog = () => mobilePage.evaluate(() => {
       const dialog = document.querySelector('[aria-labelledby="nearby-filter-title"]');
