@@ -37,7 +37,7 @@ export default function FeaturedDiscoveryPanel({ spots, language, loading, error
         {spots.map(spot => {
           return <button key={spot.id} type="button" onClick={() => onSelectSpot(spot)} className="group w-40 shrink-0 snap-start overflow-hidden rounded-xl border border-slate-200 bg-slate-50 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 dark:border-white/10 dark:bg-white/10 sm:w-44" aria-label={`Open ${getSpotDisplayName(spot, language)}`}>
             <FeaturedSpotThumbnail spot={spot} />
-            <div className="px-2 py-2"><span className="line-clamp-1 text-xs font-bold">{getSpotDisplayName(spot, language)}</span><span className="mt-0.5 line-clamp-1 text-[11px] text-slate-600 dark:text-slate-300">{getSpotLocationLabel(spot, 2)}</span></div>
+            <div className="px-2 py-2"><span className="line-clamp-2 break-words text-xs font-bold">{getSpotDisplayName(spot, language)}</span><span className="mt-0.5 line-clamp-1 text-[11px] text-slate-600 dark:text-slate-300">{getSpotLocationLabel(spot, 2)}</span></div>
           </button>;
         })}
       </div>}

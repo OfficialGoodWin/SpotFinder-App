@@ -47,7 +47,9 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
   const [rating, setRating] = useState({ overall: 0, access: 0, condition: 0, safety: 0, crowdedness: 0 });
 
   const toggleTag = (tag) => setTags(t => t.includes(tag) ? t.filter(x => x !== tag) : [...t, tag]);
-  const toggleBestTime = (val) => setBestTime(t => t.includes(val) ? t.filter(x => x !== val) : [...t, val]);
+  const toggleBestTime = (val) => setBestTime(times => val === 'anytime'
+    ? (times.includes('anytime') ? [] : ['anytime'])
+    : (times.includes(val) ? times.filter(item => item !== val) : [...times.filter(item => item !== 'anytime'), val]));
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];

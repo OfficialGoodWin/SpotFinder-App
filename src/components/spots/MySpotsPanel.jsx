@@ -16,12 +16,13 @@ import LiquidSegmentedControl from '../ui/LiquidSegmentedControl';
 import SmoothSelect from '../ui/SmoothSelect';
 import { getSpotDisplayName, getSpotLocationLabel } from '@/lib/spotPresentation';
 import SpotImage from './SpotImage';
-import { sortSpotCollection } from '@/lib/spotDiscovery';
+import { getSpotRating, sortSpotCollection } from '@/lib/spotDiscovery';
 import { useLanguage } from '@/lib/LanguageContext';
 import { deleteGuestDraft, draftDisplayName, listGuestDrafts } from '@/lib/spotDrafts';
 import { deleteGuestDraftPhotos, loadGuestDraftPhoto } from '@/lib/guestDraftPhotos';
 import DraftConfirmationDialog from '../ui/DraftConfirmationDialog';
 import { draftToast } from '../ui/draftToast';
+import { toast } from 'sonner';
 
 const TABS = [
   { id: 'saved', label: 'Favorites', icon: Bookmark },
@@ -73,6 +74,7 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
   const [sort, setSort] = useState('newest');
   const [deletingId, setDeletingId] = useState('');
   const [confirmDraftId, setConfirmDraftId] = useState('');
+  const [confirmSpotId, setConfirmSpotId] = useState('');
   const draftScope = user?.id || `guest:${draftOwnerKey}`;
   const draftScopeRef = useRef(draftScope);
   draftScopeRef.current = draftScope;
@@ -131,7 +133,7 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
     const isDraft = tab === 'drafts';
     if (deletingId) return;
     if (isDraft && confirmDraftId !== id) { setConfirmDraftId(id); return; }
-    if (!isDraft && !window.confirm('Delete this spot permanently?')) return;
+    if (!isDraft && confirmSpotId !== id) { setConfirmSpotId(id); return; }
     setDeletingId(id);
     try {
       if (isDraft) {
@@ -149,10 +151,11 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
       if (isDraft) {
         console.error('Draft delete failed:', error);
         draftToast.deleteFailed();
-      } else window.alert(error?.message || 'Could not delete this spot.');
+      } else toast.error(error?.message || 'Could not delete this spot.');
     } finally {
       setDeletingId('');
       if (isDraft) setConfirmDraftId('');
+      else setConfirmSpotId('');
     }
   };
 
@@ -241,11 +244,11 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
                       <SpotImage spot={spot} alt="" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
                     </div>
                     <div className="p-3 min-w-0 flex-1 flex flex-col">
-                      <h3 className="font-semibold truncate text-gray-900 dark:text-foreground">{getSpotDisplayName(spot, language)}</h3>
+                      <h3 className="line-clamp-2 break-words font-semibold text-gray-900 dark:text-foreground">{getSpotDisplayName(spot, language)}</h3>
                       <p className="text-xs text-gray-500 dark:text-muted-foreground truncate mt-1 flex items-center gap-1"><MapPin className="w-3.5 h-3.5 shrink-0" />{getSpotLocationLabel(spot)}</p>
                       <p className="text-xs text-gray-500 dark:text-muted-foreground line-clamp-2 mt-1.5 flex-1">{spot.description || 'No description'}</p>
-                      {(spot.rating_count > 0 || spot.likes_count > 0 || spot.saves_count > 0) && <div className="flex items-center gap-3 text-xs text-gray-500 mt-2" aria-label="Spot statistics">
-                        {spot.rating_count > 0 && <span className="flex items-center gap-1"><Star className="w-3.5 h-3.5 text-amber-500" />{Number(spot.rating).toFixed(1)}</span>}
+                      {(getSpotRating(spot) !== null || spot.likes_count > 0 || spot.saves_count > 0) && <div className="flex items-center gap-3 text-xs text-gray-500 mt-2" aria-label="Spot statistics">
+                        {getSpotRating(spot) !== null && <span className="flex items-center gap-1"><Star className="w-3.5 h-3.5 text-amber-500" />{getSpotRating(spot).toFixed(1)}</span>}
                         {spot.likes_count > 0 && <span className="flex items-center gap-1"><Heart className="w-3.5 h-3.5" />{spot.likes_count}</span>}
                         {spot.saves_count > 0 && <span className="flex items-center gap-1"><Bookmark className="w-3.5 h-3.5" />{spot.saves_count}</span>}
                       </div>}
@@ -273,6 +276,11 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
         destructive
         busy={Boolean(deletingId)}
       />
+      <DraftConfirmationDialog open={Boolean(confirmSpotId)}
+        onOpenChange={open => { if (!open) setConfirmSpotId(''); }}
+        title="Delete this spot?" description="This public spot will be permanently removed. This action cannot be undone."
+        cancelLabel="Keep spot" confirmLabel={deletingId ? 'Deleting…' : 'Delete spot'}
+        onConfirm={() => handleDelete(confirmSpotId)} destructive busy={Boolean(deletingId)} />
     </div>
   );
 }

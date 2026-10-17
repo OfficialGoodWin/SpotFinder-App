@@ -10,14 +10,14 @@ function fallbackFor(spot) {
   return { Icon: MapPin, label: 'Photo unavailable' };
 }
 
-export default function SpotImage({ spot, src, alt = '', className = '', fallbackClassName = '' }) {
+export default function SpotImage({ spot, src, alt = '', className = '', fallbackClassName = '', onImageError }) {
   const [failed, setFailed] = useState(false);
   const presentation = getSpotImagePresentation(spot, { src, loadFailed: failed });
   const image = presentation.kind === 'image' ? presentation.imageInfo : null;
   useEffect(() => setFailed(false), [src, spot?.image_url]);
 
   if (image?.url && !failed) {
-    return <img src={image.url} alt={alt} loading="lazy" decoding="async" className={className} onError={() => setFailed(true)} />;
+    return <img src={image.url} alt={alt} loading="lazy" decoding="async" className={className} onError={() => { setFailed(true); onImageError?.(image.url); }} />;
   }
 
   const { Icon, label } = fallbackFor(spot);

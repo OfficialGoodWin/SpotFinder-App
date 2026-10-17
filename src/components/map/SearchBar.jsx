@@ -270,13 +270,14 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
                 <button
                   onMouseDown={e => { e.preventDefault(); onSelectSpot?.(spot); setQuery(getSpotDisplayName(spot, language)); closeDropdown(); }}
                   onTouchEnd={e => { e.preventDefault(); onSelectSpot?.(spot); setQuery(getSpotDisplayName(spot, language)); closeDropdown(); }}
+                  aria-label={`Open ${getSpotDisplayName(spot, language)}`}
                   className="flex-1 text-left px-4 py-2.5 flex items-center gap-3"
                 >
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-green-100 dark:bg-green-900/30">
                     <span className="text-lg">📍</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 dark:text-foreground truncate">{getSpotDisplayName(spot, language)}</p>
+                    <p className="line-clamp-2 break-words text-sm font-medium text-gray-800 dark:text-foreground">{getSpotDisplayName(spot, language)}</p>
                     {spot.description && (
                       <p className="text-xs text-gray-400 dark:text-muted-foreground truncate">{spot.description}</p>
                     )}

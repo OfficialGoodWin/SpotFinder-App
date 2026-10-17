@@ -90,7 +90,9 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
   // Duplicate detection disabled for now (requires findNearbySpots in firebaseClient.js)
 
   const toggleTag = (tag) => setTags(t => t.includes(tag) ? t.filter(x => x !== tag) : [...t, tag]);
-  const toggleBestTime = (val) => setBestTime(t => t.includes(val) ? t.filter(x => x !== val) : [...t, val]);
+  const toggleBestTime = (val) => setBestTime(times => val === 'anytime'
+    ? (times.includes('anytime') ? [] : ['anytime'])
+    : (times.includes(val) ? times.filter(item => item !== val) : [...times.filter(item => item !== 'anytime'), val]));
 
   const recognitionRef = useRef(null);
   const submitLockRef = useRef(false);

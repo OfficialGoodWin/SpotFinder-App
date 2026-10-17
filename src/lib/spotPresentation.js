@@ -72,7 +72,7 @@ export function getVerifiedSpotCategory(spot = {}) {
 }
 
 export function resolveSpotTitle(spot = {}, language = 'en') {
-  const explicit = [spot.title, spot.resolved_title, spot.displayName, spot.display_name, spot.spot_name, spot.name]
+  const explicit = [spot.title, spot.resolved_title, spot.displayName, spot.display_name, spot.spot_name, spot.place_name, spot.name]
     .map(cleanText).find(isMeaningfulSpotTitle);
   if (explicit) return { title: explicit, source: 'user_or_legacy_name', confidence: 'high' };
 
@@ -85,7 +85,7 @@ export function resolveSpotTitle(spot = {}, language = 'en') {
 
   const category = getVerifiedSpotCategory(spot);
   return {
-    title: `Unnamed ${category || 'place'}`,
+    title: category && category !== 'place' ? category.replace(/^./, letter => letter.toUpperCase()) : 'Community spot',
     source: category ? 'verified_category_fallback' : 'neutral_fallback',
     confidence: category ? 'medium' : 'low',
   };
@@ -132,7 +132,9 @@ export function isUsableSpotImageUrl(value) {
 }
 
 export function getSpotImageInfo(spot = {}) {
-  const candidates = [...(Array.isArray(spot.image_urls) ? spot.image_urls : []), spot.image_url].filter(Boolean);
+  const candidates = spot.is_public === true && spot.status === 'published'
+    ? getPublicSpotPhotos(spot).map(photo => photo.url)
+    : [...(Array.isArray(spot.image_urls) ? spot.image_urls : []), spot.image_url].filter(Boolean);
   const url = candidates.find(isUsableSpotImageUrl);
   if (!url) return null;
   const embedded = url.startsWith('data:');
@@ -155,17 +157,40 @@ export function getSpotImageInfo(spot = {}) {
 // order. Legacy public spots may predate photo_metadata entirely.
 export function getPublicSpotPhotos(spot = {}) {
   if (spot.is_public !== true || spot.status !== 'published') return [];
-  const urls = Array.isArray(spot.image_urls) && spot.image_urls.length
-    ? spot.image_urls : [spot.image_url];
-  return [...new Set(urls)].filter(url => {
+  return normalizeSpotPhotos(spot, true);
+}
+
+export function spotPhotoIdentity(value) {
+  if (typeof value !== 'string') return '';
+  if (value.startsWith('data:')) return value;
+  try {
+    const parsed = new URL(value);
+    if (parsed.hostname === 'firebasestorage.googleapis.com') {
+      const match = parsed.pathname.match(/\/o\/(.+)$/);
+      if (match) return `firebase:${decodeURIComponent(match[1])}`;
+    }
+    if (parsed.hostname === 'commons.wikimedia.org' && parsed.pathname.startsWith('/wiki/Special:FilePath/')) return `commons:${decodeURIComponent(parsed.pathname)}`;
+    parsed.hash = '';
+    return parsed.href;
+  } catch { return value; }
+}
+
+export function normalizeSpotPhotos(spot = {}, publicOnly = false) {
+  const urls = [...(Array.isArray(spot.image_urls) ? spot.image_urls : []), spot.image_url];
+  const seen = new Set();
+  return urls.filter(url => {
     if (!isUsableSpotImageUrl(url)) return false;
     if (/drafts(?:%2f|\/)/i.test(url)) return false;
-    const metadata = spot.photo_metadata?.find?.(item => item?.url === url);
-    if (metadata?.is_private || metadata?.restricted || metadata?.needs_review || metadata?.visibility === 'private' || metadata?.access === 'restricted' || metadata?.location_match_confidence === 'unverified') return false;
-    if (metadata?.source && !['user_upload', 'legacy_embedded_upload', 'legacy_unknown'].includes(metadata.source)) return false;
+    const identity = spotPhotoIdentity(url);
+    const records = Array.isArray(spot.photo_metadata)
+      ? spot.photo_metadata.filter(item => item?.url && spotPhotoIdentity(item.url) === identity) : [];
+    if (publicOnly && records.some(item => item.is_private || item.restricted || item.needs_review || item.visibility === 'private' || item.access === 'restricted' || item.location_match_confidence === 'unverified' || (item.source && !['user_upload', 'legacy_embedded_upload', 'legacy_unknown'].includes(item.source)))) return false;
+    if (seen.has(identity)) return false;
+    seen.add(identity);
     return true;
   }).map(url => {
-    const metadata = spot.photo_metadata?.find?.(item => item?.url === url);
+    const metadata = spot.photo_metadata?.find?.(item => item?.url === url)
+      || spot.photo_metadata?.find?.(item => item?.url && spotPhotoIdentity(item.url) === spotPhotoIdentity(url));
     return { url, metadata };
   });
 }

@@ -18,8 +18,8 @@ test('replaces legacy generic titles with verified POI names', () => {
 });
 
 test('uses an honest category fallback without inventing a proper name', () => {
-  assert.equal(getSpotDisplayName({ title: '', tags: ['Viewpoint'] }), 'Unnamed viewpoint');
-  assert.equal(getSpotDisplayName({ spot_type: 'general' }), 'Unnamed place');
+  assert.equal(getSpotDisplayName({ title: '', tags: ['Viewpoint'] }), 'Viewpoint');
+  assert.equal(getSpotDisplayName({ spot_type: 'general' }), 'Community spot');
   assert.equal(isMeaningfulSpotTitle(' Location '), false);
   assert.equal(isMeaningfulSpotTitle('Unnamed viewpoint'), false);
 });
@@ -32,15 +32,15 @@ test('verified castle identity wins over a subjective viewpoint tag', () => {
   };
   assert.equal(getVerifiedSpotCategory(castle), 'castle');
   assert.deepEqual(resolveSpotTitle(castle), {
-    title: 'Unnamed castle', source: 'verified_category_fallback', confidence: 'medium',
+    title: 'Castle', source: 'verified_category_fallback', confidence: 'medium',
   });
 });
 
 test('uses localized OSM names and geographically verified Wikidata labels only', () => {
   assert.equal(getSpotDisplayName({ poi_match: { tags: { 'name:cs': 'Hrad Loket', 'name:en': 'Loket Castle' } } }, 'cs'), 'Hrad Loket');
-  assert.equal(getSpotDisplayName({ poi_match: { wikidata_label: 'Distant Castle', wikidata: 'Q1', distance_m: 900 } }), 'Unnamed place');
+  assert.equal(getSpotDisplayName({ poi_match: { wikidata_label: 'Distant Castle', wikidata: 'Q1', distance_m: 900 } }), 'Community spot');
   assert.equal(getSpotDisplayName({ poi_match: { wikidata_label: 'Matched Castle', wikidata: 'Q2', distance_m: 20 } }), 'Matched Castle');
-  assert.equal(getSpotDisplayName({ tags: ['Viewpoint'], poi_match: { name: 'Nearby unrelated castle', match_confidence: 'review', tags: { historic: 'castle' } } }), 'Unnamed viewpoint');
+  assert.equal(getSpotDisplayName({ tags: ['Viewpoint'], poi_match: { name: 'Nearby unrelated castle', match_confidence: 'review', tags: { historic: 'castle' } } }), 'Viewpoint');
 });
 
 test('prefers human location labels and keeps coordinates as a fallback', () => {
@@ -68,7 +68,7 @@ test('reviewed legacy identities repair known generic records without replacing 
   assert.equal(hlavatice.locality, 'Turnov');
   assert.equal(hlavatice.identity_evidence.distance_m, 2);
   assert.equal(applyReviewedLegacyIdentity({ id: 'K20qivFHwrGzBgBoYZW2', title: 'My own tower' }).title, 'My own tower');
-  assert.equal(getSpotDisplayName(applyReviewedLegacyIdentity({ id: 'unknown', title: 'Spot', spot_type: 'general' })), 'Unnamed place');
+  assert.equal(getSpotDisplayName(applyReviewedLegacyIdentity({ id: 'unknown', title: 'Spot', spot_type: 'general' })), 'Community spot');
   assert.equal(spotMatchesSearch(hlavatice, 'Hlavatice'), true);
   assert.equal(spotMatchesSearch(hlavatice, 'Turnov'), true);
   for (const [id, expected] of Object.entries({

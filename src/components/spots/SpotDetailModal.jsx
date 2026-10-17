@@ -6,9 +6,13 @@ import { submitCategoryRatings, getSpotSocialState, toggleSpotLike, toggleSpotSa
 import { useLanguage } from '@/lib/LanguageContext';
 import ReportDialog from '@/components/moderation/ReportDialog';
 import { canonicalSpotUrl, shareSpotLink } from '@/lib/spotLinks';
-import { getPublicSpotPhotos, getSpotDisplayName, getSpotLocationLabel } from '@/lib/spotPresentation';
-import SpotImage from './SpotImage';
+import { getPublicSpotPhotos, getSpotDisplayName, getSpotLocationLabel, normalizeSpotPhotos } from '@/lib/spotPresentation';
+import CommunityPhotoGallery from './CommunityPhotoGallery';
 import { setSpotRelationState } from '@/lib/spotSocialState';
+import { toast } from 'sonner';
+import { getSpotRating } from '@/lib/spotDiscovery';
+import DraftConfirmationDialog from '@/components/ui/DraftConfirmationDialog';
+import { safeWebsite } from '@/lib/poiPresentation';
 
 const SocialPostsSection = React.lazy(() => import('@/components/social/SocialPostsSection'));
 
@@ -23,11 +27,15 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
   const closeButtonRef = useRef(null);
   useEffect(() => {
     const prior = document.activeElement;
+    const priorOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     closeButtonRef.current?.focus();
-    return () => { if (prior?.isConnected && prior !== document.body) prior.focus(); };
+    return () => { document.body.style.overflow = priorOverflow; if (prior?.isConnected && prior !== document.body) prior.focus(); };
   }, []);
   const [social, setSocial] = useState({ liked: false, saved: false, likesCount: spot.likes_count || 0, savesCount: spot.saves_count || 0 });
   const [socialBusy, setSocialBusy] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const displayName = getSpotDisplayName(localSpot, language);
   const creatorName = localSpot.created_by_name || (String(localSpot.created_by || '').includes('@') ? 'Community contributor' : localSpot.created_by) || 'Community contributor';
 
@@ -43,7 +51,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
 
   const requireVerified = () => {
     if (!user) { onShowAuth?.(); return false; }
-    if (!user.emailVerified) { alert('Please verify your email before liking or saving spots.'); return false; }
+    if (!user.emailVerified) { toast.error('Please verify your email before liking or saving spots.'); return false; }
     return true;
   };
   const handleLike = async () => {
@@ -51,7 +59,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
     const old = social.liked; setSocialBusy('like');
     setSocial(value => setSpotRelationState(value, 'like', !old));
     try { await toggleSpotLike(spot.id, user, old); }
-    catch (e) { setSocial(value => setSpotRelationState(value, 'like', old)); alert(e.message || 'Could not update like'); }
+    catch (e) { setSocial(value => setSpotRelationState(value, 'like', old)); toast.error(e.message || 'Could not update like'); }
     finally { setSocialBusy(''); }
   };
   const handleSave = async () => {
@@ -59,7 +67,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
     const old = social.saved; setSocialBusy('save');
     setSocial(value => setSpotRelationState(value, 'save', !old));
     try { await toggleSpotSave(spot.id, user, old); }
-    catch (e) { setSocial(value => setSpotRelationState(value, 'save', old)); alert(e.message || 'Could not update save'); }
+    catch (e) { setSocial(value => setSpotRelationState(value, 'save', old)); toast.error(e.message || 'Could not update save'); }
     finally { setSocialBusy(''); }
   };
 
@@ -79,22 +87,22 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
     } catch (_) {}
   }, [spot.id]);
 
-  const overallRating = localSpot.rating || 0;
-  const overallCount  = localSpot.rating_count || 0;
+  const overallRating = getSpotRating(localSpot);
+  const overallCount = overallRating === null ? 0 : Number(localSpot.rating_count);
 
   const catRows = [
-    { key: 'access', label: 'Ease of access', val: localSpot.access_rating || 0, count: localSpot.access_rating_count || 0, labels: ['Very difficult','Difficult','Moderate','Easy','Very easy'] },
-    { key: 'condition', label: 'Condition & cleanliness', val: localSpot.condition_rating || 0, count: localSpot.condition_rating_count || 0, labels: ['Very poor','Poor','Okay','Good','Excellent'] },
-    { key: 'safety', label: 'Safety & comfort', val: localSpot.safety_rating || 0, count: localSpot.safety_rating_count || 0, labels: ['Very uncomfortable','Uncomfortable','Okay','Comfortable','Very safe'] },
-    { key: 'crowdedness', label: 'Crowdedness', val: localSpot.crowdedness_rating || 0, count: localSpot.crowdedness_rating_count || 0, labels: ['Very quiet','Quiet','Moderate','Busy','Very busy'] },
+    { key: 'access', label: 'Ease of access', val: Number(localSpot.access_rating), count: Number(localSpot.access_rating_count) || 0, labels: ['Very difficult','Difficult','Moderate','Easy','Very easy'] },
+    { key: 'condition', label: 'Condition & cleanliness', val: Number(localSpot.condition_rating), count: Number(localSpot.condition_rating_count) || 0, labels: ['Very poor','Poor','Okay','Good','Excellent'] },
+    { key: 'safety', label: 'Safety & comfort', val: Number(localSpot.safety_rating), count: Number(localSpot.safety_rating_count) || 0, labels: ['Very uncomfortable','Uncomfortable','Okay','Comfortable','Very safe'] },
+    { key: 'crowdedness', label: 'Crowdedness', val: Number(localSpot.crowdedness_rating), count: Number(localSpot.crowdedness_rating_count) || 0, labels: ['Very quiet','Quiet','Moderate','Busy','Very busy'] },
   ];
   const legacyRows = localSpot.rating_schema === 2 ? [] : [
-    { key: 'parking', label: 'Parking quality (legacy)', val: localSpot.parking_rating || 0, count: localSpot.parking_rating_count || 0 },
-    { key: 'beauty', label: 'Scenery (legacy)', val: localSpot.beauty_rating || 0, count: localSpot.beauty_rating_count || 0 },
-    { key: 'privacy', label: 'Privacy (legacy)', val: localSpot.privacy_rating || 0, count: localSpot.privacy_rating_count || 0 },
+    { key: 'parking', label: 'Parking quality (legacy)', val: Number(localSpot.parking_rating), count: Number(localSpot.parking_rating_count) || 0 },
+    { key: 'beauty', label: 'Scenery (legacy)', val: Number(localSpot.beauty_rating), count: Number(localSpot.beauty_rating_count) || 0 },
+    { key: 'privacy', label: 'Privacy (legacy)', val: Number(localSpot.privacy_rating), count: Number(localSpot.privacy_rating_count) || 0 },
   ];
 
-  const hasCategoryRatings = catRows.some(r => r.count > 0) || legacyRows.some(r => r.count > 0);
+  const hasCategoryRatings = [...catRows, ...legacyRows].some(row => row.count > 0 && Number.isFinite(row.val) && row.val >= 1 && row.val <= 5);
 
   // Fractional star display for overall
   const renderOverallStars = (value) =>
@@ -108,10 +116,10 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
       );
     });
 
-  const canSubmit = pendingOverall > 0 && !submitting;
+  const canSubmit = pendingOverall > 0 && !submitting && !isOwner;
 
   const handleSubmitRatings = async () => {
-    if (!canSubmit) return;
+    if (!canSubmit || !user?.emailVerified) return;
     if (!user) { onShowAuth?.(); return; }
     setSubmitting(true);
     try {
@@ -149,35 +157,27 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
   };
 
   const formatDate = (d) => d ? new Date(d).toLocaleDateString() : '';
-  const uploadedPhotos = (Array.isArray(localSpot.image_urls) && localSpot.image_urls.length
-    ? localSpot.image_urls
-    : [localSpot.image_url]).filter(Boolean);
   const poiMatch = localSpot.poi_match?.name ? localSpot.poi_match : null;
   // Only community uploads are documentary spot photos here. A nearby POI
   // image is not promoted into the gallery unless its identity and full
   // licence metadata have been independently reviewed.
-  const detailPhotos = localSpot.is_public === true && localSpot.status === 'published'
-    ? getPublicSpotPhotos(localSpot).map(photo => ({ ...photo, source: 'community' }))
-    : uploadedPhotos.map(url => ({
-    url,
-    source: 'community',
-    metadata: localSpot.photo_metadata?.find?.(item => item.url === url),
-  }));
-  const poiWebsite = poiMatch?.tags?.website || poiMatch?.tags?.['contact:website'];
+  const detailPhotos = localSpot.status === 'published' && localSpot.is_public
+    ? getPublicSpotPhotos(localSpot) : normalizeSpotPhotos(localSpot, localSpot.is_public === true);
+  const poiWebsite = safeWebsite(poiMatch?.tags?.website || poiMatch?.tags?.['contact:website']);
 
   return (
     <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/50 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="spot-detail-title" onKeyDown={event => { if (event.key === 'Escape') onClose(); }}>
       <div className="sf-sheet w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-3xl max-h-[100dvh] sm:max-h-[90dvh] sm:rounded-3xl">
 
         {/* Header */}
-        <div className="sticky top-0 bg-white dark:bg-card px-6 pt-5 pb-3 border-b border-gray-100 dark:border-border">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
+        <div className="sticky top-0 z-30 bg-white dark:bg-card px-4 sm:px-6 pt-[max(1.25rem,env(safe-area-inset-top))] pb-3 border-b border-gray-100 dark:border-border">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
                 <MapPin className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               </div>
-              <div>
-                <h2 id="spot-detail-title" className="text-lg font-bold text-gray-900 dark:text-foreground">{displayName}</h2>
+              <div className="min-w-0">
+                <h2 id="spot-detail-title" className="break-words text-lg font-bold leading-snug text-gray-900 dark:text-foreground">{displayName}</h2>
                 {poiMatch && displayName !== poiMatch.name && (
                   <p className="text-xs font-medium text-blue-600 dark:text-blue-400">Also known as {poiMatch.name}</p>
                 )}
@@ -188,7 +188,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
                 </p>
               </div>
             </div>
-            <button ref={closeButtonRef} onClick={onClose} aria-label={t('common.close')} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-accent">
+            <button ref={closeButtonRef} onClick={onClose} aria-label={t('common.close')} className="min-w-[44px] min-h-[44px] shrink-0 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-accent">
               <X className="w-5 h-5 text-gray-500 dark:text-muted-foreground" />
             </button>
           </div>
@@ -196,24 +196,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
 
         <div className="px-6 py-4 space-y-4">
           {/* Community photos, or an honest category fallback when unavailable. */}
-          {detailPhotos.length > 0 ? (
-            <div className="space-y-2">
-              <div className="relative overflow-hidden rounded-2xl">
-                <SpotImage spot={localSpot} src={detailPhotos[0].url} alt={displayName} className="h-52 w-full object-cover" fallbackClassName="h-52" />
-              </div>
-              {(detailPhotos[0].metadata?.attribution || detailPhotos[0].metadata?.creator) && <p className="text-[11px] text-gray-500 dark:text-slate-400">Photo: {detailPhotos[0].metadata.attribution || detailPhotos[0].metadata.creator}</p>}
-              {detailPhotos.length > 1 && (
-                <div className="grid grid-cols-3 gap-2">
-                  {detailPhotos.slice(1).map((photo, index) => (
-                    <div key={`${photo.url}-${index}`} className="relative aspect-square overflow-hidden rounded-xl">
-                      <SpotImage spot={localSpot} src={photo.url} alt={`${displayName} photo ${index + 2}`} className="h-full w-full object-cover" />
-                      {(photo.metadata?.attribution || photo.metadata?.creator) && <span className="absolute bottom-0 inset-x-0 truncate bg-black/65 px-1 text-[10px] text-white" title={photo.metadata.attribution || photo.metadata.creator}>{photo.metadata.attribution || photo.metadata.creator}</span>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : <div className="h-44 overflow-hidden rounded-2xl"><SpotImage spot={localSpot} /></div>}
+          <CommunityPhotoGallery key={localSpot.id} spot={localSpot} photos={detailPhotos} name={displayName} />
 
           {/* Description */}
           {localSpot.description && (
@@ -246,7 +229,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
                   ))}
                 </div>
               )}
-              {poiWebsite && /^https?:\/\//i.test(poiWebsite) && (
+              {poiWebsite && (
                 <a href={poiWebsite} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex text-xs font-semibold text-blue-600 underline underline-offset-2 dark:text-blue-400">Visit place website</a>
               )}
             </div>
@@ -286,8 +269,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
           )}
 
           {/* Community actions — counts are server-maintained and update live */}
-          <div className="grid grid-cols-4 gap-2" aria-label="Spot actions">
-            <button onClick={() => setShowNavigationProviders(true)} className="min-h-[48px] rounded-2xl bg-blue-500 text-white flex flex-col items-center justify-center gap-0.5 font-semibold text-xs hover:bg-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><Navigation className="h-5 w-5" /><span>Navigate</span></button>
+          <div className="grid grid-cols-3 gap-2" aria-label="Spot actions">
             <button onClick={handleLike} disabled={!!socialBusy} aria-pressed={social.liked} aria-label={`${social.liked ? 'Unlike' : 'Like'} this spot; ${social.likesCount} likes`} className={`min-h-[48px] rounded-2xl border flex items-center justify-center gap-2 font-semibold text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${social.liked ? 'bg-rose-50 border-rose-200 text-rose-600 dark:bg-rose-950/30 dark:border-rose-900' : 'border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent'}`}>
               <Heart className={`w-5 h-5 ${social.liked ? 'fill-current' : ''}`} />
               <span className="sr-only">{social.liked ? 'Liked' : 'Like'} </span><span className="tabular-nums text-xs">{social.likesCount}</span>
@@ -327,13 +309,13 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
               <p className="text-xs font-bold uppercase tracking-wide text-blue-700 dark:text-blue-300 mb-3">
                 {t('spotDetail.detailedRatings')}
               </p>
-              {catRows.filter(r => r.count > 0).map(row => (
+              {catRows.filter(r => r.count > 0 && Number.isFinite(r.val) && r.val >= 1 && r.val <= 5).map(row => (
                 <div key={row.key} className="flex items-center justify-between gap-3 py-1">
                   <span className="text-sm text-gray-700 dark:text-foreground">{row.label}</span>
-                  <span className="text-sm font-semibold text-gray-800 dark:text-foreground text-right">{row.labels[Math.max(0, Math.round(row.val)-1)]} · {row.val.toFixed(1)} <span className="text-xs font-normal text-gray-400">({row.count})</span></span>
+                  <span className="text-sm font-semibold text-gray-800 dark:text-foreground text-right">{row.labels[Math.min(4, Math.max(0, Math.round(row.val)-1))]} · {row.val.toFixed(1)} <span className="text-xs font-normal text-gray-400">({row.count})</span></span>
                 </div>
               ))}
-              {legacyRows.filter(r => r.count > 0).map(row => <div key={row.key} className="flex justify-between text-xs text-gray-400"><span>{row.label}</span><span>{row.val.toFixed(1)} ({row.count})</span></div>)}
+              {legacyRows.filter(row => row.count > 0 && Number.isFinite(row.val) && row.val >= 1 && row.val <= 5).map(row => <div key={row.key} className="flex justify-between text-xs text-gray-500 dark:text-gray-400"><span>{row.label}</span><span>{row.val.toFixed(1)} ({row.count})</span></div>)}
               {catRows.some(row => row.key === 'crowdedness' && row.count > 0) && <p className="pt-2 text-[11px] leading-4 text-blue-600 dark:text-blue-300">Crowdedness describes how busy the place feels. A lower score means quieter, not worse.</p>}
             </div>
           )}
@@ -405,11 +387,11 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
           {(isOwner || isAdmin) && (
             <>
               {isOwner && (
-                <button onClick={onEdit} className="p-3 rounded-2xl border-2 border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent transition-colors">
+                <button onClick={onEdit} aria-label="Edit this spot" className="p-3 rounded-2xl border-2 border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent transition-colors">
                   <Edit2 className="w-5 h-5 text-gray-600 dark:text-foreground" />
                 </button>
               )}
-              <button onClick={onDelete} className="p-3 rounded-2xl border-2 border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+              <button onClick={() => setShowDeleteConfirm(true)} aria-label="Delete this spot" className="p-3 rounded-2xl border-2 border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                 <Trash2 className="w-5 h-5 text-red-500" />
               </button>
             </>
@@ -431,6 +413,15 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
         </div>
       </div>
       <ReportDialog open={showReport} onClose={() => setShowReport(false)} user={user} targetType="spot" targetId={String(spot.id)} targetLabel={displayName} targetSnapshot={{ title: displayName, lat: localSpot.lat || '', lon: localSpot.lng || localSpot.lon || '', created_by: localSpot.created_by || '' }} />
+      <DraftConfirmationDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}
+        title="Delete this spot?" description={`Permanently delete ${displayName}? This cannot be undone.`}
+        confirmLabel={deleting ? 'Deleting…' : 'Delete spot'} cancelLabel="Keep spot" destructive busy={deleting}
+        onConfirm={async () => {
+          setDeleting(true);
+          try { await onDelete?.(); setShowDeleteConfirm(false); }
+          catch (error) { toast.error(error?.message || 'Could not delete this spot.'); }
+          finally { setDeleting(false); }
+        }} />
     </div>
   );
 }

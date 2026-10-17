@@ -7,45 +7,16 @@ import { useLanguage } from '@/lib/LanguageContext';
 import { iconGlyphSVG } from '@/lib/mapIcons';
 import ReportDialog from '@/components/moderation/ReportDialog';
 import { IMAGE_ACCEPT, validateImageFileMetadata } from '@/lib/imageUploadValidation';
+import { normalizePoiPhotos, openingHoursLabel, safeWebsite } from '@/lib/poiPresentation';
 
 const SocialPostsSection = React.lazy(() => import('@/components/social/SocialPostsSection'));
 
 // ─── OSM tag helpers ──────────────────────────────────────────────────────────
 function getPhone(tags = {}) { return tags.phone || tags['contact:phone'] || tags['contact:mobile'] || null; }
-function getWebsite(tags = {}) { return tags.website || tags['contact:website'] || tags.url || null; }
+function getWebsite(tags = {}) { return safeWebsite(tags.website || tags['contact:website'] || tags.url); }
 function getEmail(tags = {}) { return tags.email || tags['contact:email'] || null; }
 function getHours(tags = {}) { return tags.opening_hours || null; }
 function getDescription(tags = {}) { return tags.description || tags.note || null; }
-
-function parseOpenStatus(ohString, t) {
-  if (!ohString) return null;
-  if (ohString.toLowerCase().includes('24/7')) return { isOpen: true, label: t('poiDetail.open247') };
-  try {
-    const now = new Date();
-    const days = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-    const today = days[now.getDay()];
-    const timeNow = now.getHours() * 60 + now.getMinutes();
-    for (const rule of ohString.split(';').map(s => s.trim())) {
-      const match = rule.match(/^([A-Za-z,\-\s]+)\s+(\d{2}:\d{2})-(\d{2}:\d{2})$/);
-      if (!match) continue;
-      const [, dayPart, open, close] = match;
-      let todayMatches = false;
-      for (const seg of dayPart.split(',').map(s => s.trim())) {
-        const range = seg.match(/^([A-Z][a-z])-([A-Z][a-z])$/);
-        if (range) {
-          const s = days.indexOf(range[1]), e = days.indexOf(range[2]), c = days.indexOf(today);
-          if (s !== -1 && e !== -1 && c >= s && c <= e) todayMatches = true;
-        } else if (seg === today) todayMatches = true;
-      }
-      if (!todayMatches) continue;
-      const [oh, om] = open.split(':').map(Number);
-      const [ch, cm] = close.split(':').map(Number);
-      const isOpen = timeNow >= oh * 60 + om && timeNow < ch * 60 + cm;
-      return { isOpen, label: `${isOpen ? t('poiDetail.open') : t('poiDetail.closed')} · ${open}–${close}` };
-    }
-  } catch {}
-  return null;
-}
 
 // ─── Photo fetching ───────────────────────────────────────────────────────────
 // Priority order, each tier only tried if the previous one found nothing:
@@ -88,8 +59,10 @@ async function fetchCommonsCredit(fileTitle) {
     const strip = (html) => (html || '').replace(/<[^>]*>/g, '').trim();
     const author = strip(meta.Artist?.value);
     const license = strip(meta.LicenseShortName?.value);
-    if (!author && !license) return null;
-    return `Photo: ${author || 'Unknown author'}${license ? ` (${license})` : ''}, via Wikimedia Commons`;
+    if (!license) return null;
+    const source = `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(fileTitle.replace(/ /g, '_'))}`;
+    return { credit: `Photo: ${author || 'Unknown author'} (${license}), via Wikimedia Commons`, source,
+      license_url: safeWebsite(meta.LicenseUrl?.value?.startsWith('//') ? `https:${meta.LicenseUrl.value}` : meta.LicenseUrl?.value) };
   } catch { return null; }
 }
 
@@ -98,7 +71,8 @@ async function getTagPhotos(tags = {}) {
   if (tags.wikimedia_commons?.startsWith('File:')) {
     const file = tags.wikimedia_commons.replace('File:', '');
     const url = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}?width=1200`;
-    results.push({ url, credit: await fetchCommonsCredit(file) });
+    const rights = await fetchCommonsCredit(file);
+    if (rights) results.push({ url, ...rights });
   }
   // Arbitrary image URLs have unknown licensing, so they are intentionally
   // not reused here. The build-time enrichment script accepts Wikimedia-hosted
@@ -116,10 +90,10 @@ async function fetchWikidataPhoto(wikidataId) {
     if (!r.ok) return [];
     const claims = (await r.json()).claims?.P18 || [];
     const files = claims.map(c => c.mainsnak?.datavalue?.value).filter(Boolean);
-    return Promise.all(files.map(async file => ({
-      url: `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}?width=1200`,
-      credit: await fetchCommonsCredit(file),
-    })));
+    return (await Promise.all(files.map(async file => {
+      const rights = await fetchCommonsCredit(file);
+      return rights ? { url: `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}?width=1200`, ...rights } : null;
+    }))).filter(Boolean);
   } catch { return []; }
 }
 
@@ -140,9 +114,11 @@ async function fetchWikipediaPhoto(wikipediaTag) {
     const m = src.match(/\/commons\/(?:thumb\/)?[0-9a-f]\/[0-9a-f]{2}\/([^/]+)/);
     if (m) {
       const file = decodeURIComponent(m[1]);
-      return [{ url: `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}?width=1200`, credit: await fetchCommonsCredit(file) }];
+      const rights = await fetchCommonsCredit(file);
+      return rights ? [{ url: `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}?width=1200`, ...rights }] : [];
     }
-    return [{ url: src, credit: `Photo via Wikipedia (${lang})` }];
+    // The summary endpoint does not provide the file's author or license.
+    return [];
   } catch { return []; }
 }
 
@@ -220,10 +196,12 @@ async function reverseGeocodeAddress(lat, lon, lang = 'en') {
 // ─── Lightbox ─────────────────────────────────────────────────────────────────
 function Lightbox({ photos, startIndex, onClose }) {
   const [idx, setIdx] = useState(startIndex);
+  const [failed, setFailed] = useState(false);
   const touchStartX = useRef(null);
 
   const prev = useCallback(() => setIdx(i => (i - 1 + photos.length) % photos.length), [photos.length]);
   const next = useCallback(() => setIdx(i => (i + 1) % photos.length), [photos.length]);
+  useEffect(() => setFailed(false), [idx]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -246,6 +224,7 @@ function Lightbox({ photos, startIndex, onClose }) {
   return (
     <div
       className="fixed inset-0 z-[2000] bg-black flex items-center justify-center"
+      role="dialog" aria-modal="true" aria-label="Photo viewer"
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
@@ -253,7 +232,7 @@ function Lightbox({ photos, startIndex, onClose }) {
       <button
         onClick={onClose}
         aria-label="Close"
-        className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white backdrop-blur-sm transition-colors"
+        className="absolute top-4 right-4 z-10 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white backdrop-blur-sm transition-colors"
       >
         <X className="w-5 h-5" />
       </button>
@@ -274,20 +253,22 @@ function Lightbox({ photos, startIndex, onClose }) {
       )}
 
       {/* Image */}
-      <img
+      {failed ? <p className="text-white">Photo unavailable. Try another image.</p> : <img
         key={idx}
         src={photos[idx].url}
-        alt=""
+        alt={`Photo ${idx + 1} of ${photos.length}`}
         className="max-w-full max-h-full object-contain select-none"
         style={{ maxHeight: '100dvh', maxWidth: '100dvw', padding: '0 60px' }}
-        onError={e => { e.target.src = ''; }}
-      />
+        onError={() => setFailed(true)}
+      />}
 
       {/* Attribution — Google Places Photos and Wikimedia Commons both
           legally require a visible credit; omitted when the source has none. */}
       {photos[idx].credit && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 max-w-[90vw] truncate bg-black/50 backdrop-blur-sm text-white/90 text-xs px-3 py-1 rounded-full">
           {photos[idx].credit}
+          {safeWebsite(photos[idx].source) && <> · <a href={safeWebsite(photos[idx].source)} target="_blank" rel="noopener noreferrer" className="underline">Source</a></>}
+          {safeWebsite(photos[idx].license_url) && <> · <a href={safeWebsite(photos[idx].license_url)} target="_blank" rel="noopener noreferrer" className="underline">License</a></>}
         </div>
       )}
 
@@ -365,7 +346,7 @@ function ContactRow({ icon: Icon, value, href }) {
 }
 
 // ─── Mini bar ─────────────────────────────────────────────────────────────────
-function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavigate, onShare, onAddPhoto, user, onOpenLightbox }) {
+function MiniBar({ poi, category, sfRating, photoUrl, photos, onExpand, onClose, onNavigate, onShare, onAddPhoto, user, onOpenLightbox }) {
   const { t } = useLanguage();
   const avg = sfRating?.count > 0 ? sfRating.avg : 0;
   const count = sfRating?.count || 0;
@@ -378,7 +359,7 @@ function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavig
       </button>
       <button onClick={onClose}
         aria-label="Close"
-        className="absolute top-3 right-3 w-7 h-7 rounded-full bg-gray-100 dark:bg-accent flex items-center justify-center z-10">
+        className="absolute top-2 right-2 w-11 h-11 rounded-full bg-gray-100 dark:bg-accent flex items-center justify-center z-10">
         <X className="w-3.5 h-3.5 text-foreground" />
       </button>
 
@@ -400,8 +381,9 @@ function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavig
             : <span dangerouslySetInnerHTML={{ __html: iconGlyphSVG(category.key, 24, category.color) }} />}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-foreground text-sm leading-tight truncate">{poi.name}</p>
+          <p className="line-clamp-2 break-words font-semibold text-foreground text-sm leading-tight">{poi.name}</p>
           {poi.address && <p className="text-xs text-muted-foreground truncate mt-0.5">{poi.address}</p>}
+          {photos[0]?.credit && <p className="line-clamp-1 text-[10px] text-muted-foreground" title={photos[0].credit}>{photos[0].credit}</p>}
           {avg > 0 && (
             <div className="flex items-center gap-1.5 mt-1">
               <Stars value={avg} size={12} />
@@ -425,6 +407,8 @@ function MiniBar({ poi, category, sfRating, photoUrl, onExpand, onClose, onNavig
 // ─── Full sheet ───────────────────────────────────────────────────────────────
 function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavigate, onShare, onAddPhoto, onSubmitRating, user, onOpenLightbox, onReportPOI, onReportPhoto, socialTargetId }) {
   const { t } = useLanguage();
+  const closeRef = useRef(null);
+  useEffect(() => { closeRef.current?.focus(); }, []);
   const [ratingVal, setRatingVal] = useState(0);
   const [ratingComment, setRatingComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -432,31 +416,27 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
 
   const tags = poi.tags || {};
   const phone = getPhone(tags), website = getWebsite(tags), email = getEmail(tags);
-  const ohRaw = getHours(tags), desc = getDescription(tags), status = parseOpenStatus(ohRaw, t);
+  const ohRaw = getHours(tags), desc = getDescription(tags), hoursLabel = openingHoursLabel(ohRaw);
   const avg = sfRating?.count > 0 ? sfRating.avg : 0;
   const count = sfRating?.count || 0;
 
-  const allPhotos = [
-    ...photos.map(p => ({ url: p.url, credit: p.credit, source: 'remote' })),
-    ...sfPhotos.map(p => ({ url: p.image || p.photo, source: 'sf', photoId: p.id })),
-  ];
+  const allPhotos = normalizePoiPhotos(photos, sfPhotos);
 
   const handleRateSubmit = async () => {
     if (!ratingVal || submitting) return;
     setSubmitting(true);
-    await onSubmitRating(ratingVal, ratingComment);
-    setSubmitting(false);
-    setRatingDone(true);
+    try { await onSubmitRating(ratingVal, ratingComment); setRatingDone(true); }
+    catch (error) { toast.error(error?.message || 'Could not submit rating.'); }
+    finally { setSubmitting(false); }
   };
 
   return (
     <div className="fixed inset-0 z-[1200] flex flex-col bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="sf-sheet mt-auto overflow-hidden rounded-t-3xl sm:mx-auto sm:w-full sm:max-w-2xl sm:rounded-3xl"
-        style={{ maxHeight: '92dvh' }} onClick={e => e.stopPropagation()}>
+      <div className="sf-sheet mt-auto flex max-h-[92dvh] min-h-0 flex-col overflow-hidden rounded-t-3xl sm:mx-auto sm:w-full sm:max-w-2xl sm:rounded-3xl" role="dialog" aria-modal="true" aria-label={`${poi.name} details`} onClick={e => e.stopPropagation()} onKeyDown={e => { if (e.key === 'Escape') onClose(); }}>
 
         {/* Hero — clickable to open lightbox */}
         <div
-          className="relative bg-gray-100 dark:bg-accent cursor-zoom-in"
+          className="relative shrink-0 bg-gray-100 dark:bg-accent cursor-zoom-in"
           style={{ height: 200 }}
           onClick={allPhotos.length ? () => onOpenLightbox(0) : undefined}
         >
@@ -475,17 +455,20 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
             </div>
           )}
           <button
+            ref={closeRef}
             onClick={e => { e.stopPropagation(); onClose(); }}
-            className="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white"
+            aria-label="Close place details"
+            className="absolute top-4 right-4 w-11 h-11 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="overflow-y-auto overscroll-contain" style={{ maxHeight: 'calc(92vh - 200px)' }}>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <div className="px-5 pt-4" style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
-            <h1 className="text-xl font-bold text-foreground leading-tight">{poi.name}</h1>
+            <h1 className="break-words pr-10 text-xl font-bold text-foreground leading-tight">{poi.name}</h1>
             {poi.address && <p className="text-sm text-muted-foreground mt-0.5">{poi.address}</p>}
+            {allPhotos[0]?.credit && <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{allPhotos[0].credit}{safeWebsite(allPhotos[0].source) && <> · <a href={safeWebsite(allPhotos[0].source)} target="_blank" rel="noopener noreferrer" className="underline">Source</a></>}{safeWebsite(allPhotos[0].license_url) && <> · <a href={safeWebsite(allPhotos[0].license_url)} target="_blank" rel="noopener noreferrer" className="underline">License</a></>}</p>}
             <div className="mt-1.5 mb-4">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-white"
                 style={{ background: category.color }}>
@@ -501,18 +484,10 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
 
             <div className="h-px bg-gray-100 dark:bg-border mb-4" />
 
-            {status && (
-              <div className="flex items-center gap-2 mb-4">
-                <Clock className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                <span className={`text-sm font-semibold ${status.isOpen ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
-                  {status.label}
-                </span>
-              </div>
-            )}
-            {ohRaw && !status && (
+            {hoursLabel && (
               <div className="flex items-start gap-2 mb-4">
                 <Clock className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                <span className="text-sm text-muted-foreground">{ohRaw}</span>
+                <span className="text-sm text-muted-foreground">Hours: {hoursLabel}</span>
               </div>
             )}
 
@@ -585,7 +560,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{t('poiDetail.contactInfo')}</p>
                 {phone && <ContactRow icon={Phone} value={phone} href={`tel:${phone}`} />}
                 {email && <ContactRow icon={Mail} value={email} href={`mailto:${email}`} />}
-                {website && <ContactRow icon={Globe} value={website} href={website.startsWith('http') ? website : `https://${website}`} />}
+                {website && <ContactRow icon={Globe} value={website} href={website} />}
                 <ContactRow icon={MapPin} value={`${poi.lat.toFixed(6)}, ${poi.lon.toFixed(6)}`}
                   href={`https://maps.google.com/?q=${poi.lat},${poi.lon}`} />
                 <div className="h-px bg-gray-100 dark:bg-border mt-2 mb-4" />
@@ -595,23 +570,23 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
             <button onClick={onReportPOI} className="w-full mb-4 flex items-center justify-center gap-2 border rounded-xl py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"><Flag className="w-4 h-4"/>Report this place</button>
 
             {/* Photo gallery — full grid, all photos visible */}
-            {allPhotos.length > 0 && (
+            {(allPhotos.length > 1 || (allPhotos.length > 0 && user)) && (
               <>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                   {t('poiDetail.photos')} ({allPhotos.length})
                   {sfPhotos.length > 0 && <span className="text-green-600 dark:text-green-400 normal-case font-normal ml-1">· {sfPhotos.length} {t('poiDetail.fromSpotFinder')}</span>}
                 </p>
                 <div className="grid grid-cols-3 gap-1.5 mb-4">
-                  {allPhotos.map((p, i) => (
+                  {allPhotos.slice(1).map((p, i) => (
                     <button
-                      key={i}
-                      onClick={() => onOpenLightbox(i)}
-                      aria-label={`View photo ${i + 1} of ${allPhotos.length}`}
+                      key={p.url}
+                      onClick={() => onOpenLightbox(i + 1)}
+                      aria-label={`View photo ${i + 2} of ${allPhotos.length}`}
                       className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 dark:bg-accent cursor-zoom-in hover:opacity-90 active:scale-95 transition-all"
                     >
-                      <img src={p.url} alt="" className="w-full h-full object-cover"
+                      <img src={p.thumbnail_url || p.url} alt="" loading="lazy" className="w-full h-full object-cover"
                         onError={e => { e.target.parentNode.style.display = 'none'; }} />
-                      {p.source === 'sf' && (<>
+                      {p.kind === 'sf' && (<>
                         <div className="absolute bottom-1 right-1 bg-green-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">SF</div>
                         <span role="button" tabIndex={0} onClick={(e)=>{e.stopPropagation();onReportPhoto?.(p)}} onKeyDown={(e)=>{if(e.key==='Enter'){e.stopPropagation();onReportPhoto?.(p)}}} className="absolute top-1 right-1 bg-black/70 text-white rounded-full p-1" title="Report this photo"><Flag className="w-3.5 h-3.5"/></span>
                       </>)}
@@ -678,6 +653,12 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
   const [reportTarget, setReportTarget] = useState(null);
   const fileInputRef = useRef(null);
   const { language } = useLanguage();
+  useEffect(() => {
+    if (!expanded) return undefined;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previous; };
+  }, [expanded]);
 
   // Always show a location line: use the tile's address, else reverse-geocode.
   useEffect(() => {
@@ -706,7 +687,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
     // Only fall back to live photo lookups when no enrichment was baked in.
     // Baked-in enrichment photos win; otherwise (including when enrichment exists
     // but found no photo) fall back to the live subject-verified lookup.
-    if (poi.enrichment?.photos?.length) setPhotos(poi.enrichment.photos.map(p => ({ url: p.url, credit: p.credit })));
+    if (poi.enrichment?.photos?.length) setPhotos(poi.enrichment.photos);
     else tryFetchPhotos(poi.name, poi.lat, poi.lon, poi.tags || {}).then(res => { if (res.length) setPhotos(res); });
   }, [poi?.id]);
 
@@ -714,7 +695,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
     const url = `https://maps.google.com/?q=${poi.lat},${poi.lon}`;
     try {
       if (navigator.share) await navigator.share({ title: poi.name, text: poi.address || resolvedAddress || poi.name, url });
-      else if (navigator.clipboard) { await navigator.clipboard.writeText(`${poi.name}\n${url}`); alert(t('poiDetail.linkCopied')); }
+      else if (navigator.clipboard) { await navigator.clipboard.writeText(`${poi.name}\n${url}`); toast.success(t('poiDetail.linkCopied')); }
       else window.open(url, '_blank');
     } catch (e) { if (e.name !== 'AbortError') window.open(url, '_blank'); }
   };
@@ -767,10 +748,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
 
   // All photos merged for lightbox — { url, credit } shape throughout;
   // SpotFinder-hosted photos have no third-party attribution requirement.
-  const allPhotoUrls = [
-    ...photos,
-    ...sfPhotos.map(p => p.image || p.photo).filter(Boolean).map(url => ({ url, credit: null })),
-  ];
+  const allPhotoUrls = normalizePoiPhotos(photos, sfPhotos);
 
   if (!poi) return null;
 

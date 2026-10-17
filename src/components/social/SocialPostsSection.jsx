@@ -139,7 +139,7 @@ export default function SocialPostsSection({ targetType, targetId, targetName, u
             const parsed = safeSocialRecord(post);
             return parsed ? <SocialEmbed key={post.id} post={post} parsed={parsed} onReport={setReportPost} /> : null;
           })}
-          {!posts.length && <p className="rounded-xl border border-dashed px-3 py-2 text-xs text-muted-foreground">No Instagram or TikTok posts have been added.</p>}
+          {!posts.length && !verified && <p className="text-xs text-muted-foreground">No community posts yet.</p>}
         </div>
       )}
 
