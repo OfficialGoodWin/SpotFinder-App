@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { X, Camera, MapPin } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import LiquidSegmentedControl from '../ui/LiquidSegmentedControl';
@@ -8,6 +8,7 @@ import { submitCategoryRatings } from '@/api/firebaseClient';
 import { toast } from 'sonner';
 import { IMAGE_ACCEPT, validateImageFileMetadata } from '@/lib/imageUploadValidation';
 import { getSpotDisplayName, isMeaningfulSpotTitle } from '@/lib/spotPresentation';
+import DraftConfirmationDialog from '../ui/DraftConfirmationDialog';
 
 const AVAILABLE_TAGS = [
   { id: 'Viewpoint', emoji: '🏞️' },
@@ -37,6 +38,8 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
   const existingImageUrls = Array.isArray(spot.image_urls) && spot.image_urls.length ? spot.image_urls : [spot.image_url].filter(Boolean);
   const [imagePreview, setImagePreview] = useState(existingImageUrls[0] || null);
   const [loading, setLoading] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const imageUrlRef = useRef('');
 
   const [tags, setTags] = useState(spot.tags || []);
   const [cost, setCost] = useState(spot.cost || 'free');
@@ -45,6 +48,17 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
   const [bestTime, setBestTime] = useState(spot.best_time || []);
   const [directions, setDirections] = useState(spot.directions || '');
   const [rating, setRating] = useState({ overall: 0, access: 0, condition: 0, safety: 0, crowdedness: 0 });
+  const isOwner = Boolean(user) && (
+    (Boolean(spot.created_by_uid) && spot.created_by_uid === (user.id || user.uid)) ||
+    (Boolean(spot.created_by) && spot.created_by === user.email)
+  );
+  const isDirty = title !== (isMeaningfulSpotTitle(spot.title) ? spot.title : (isMeaningfulSpotTitle(getSpotDisplayName(spot)) ? getSpotDisplayName(spot) : '')) ||
+    description !== (spot.description || '') || Boolean(imageFile) || imagePreview !== (existingImageUrls[0] || null) ||
+    JSON.stringify(tags) !== JSON.stringify(spot.tags || []) || cost !== (spot.cost || 'free') ||
+    accessDifficulty !== (spot.access_difficulty || 'easy') || parking !== (spot.parking || 'yes') ||
+    JSON.stringify(bestTime) !== JSON.stringify(spot.best_time || []) || directions !== (spot.directions || '') || rating.overall > 0;
+  const requestClose = () => { if (!loading) isDirty ? setConfirmDiscard(true) : onClose(); };
+  useEffect(() => () => { if (imageUrlRef.current) URL.revokeObjectURL(imageUrlRef.current); }, []);
 
   const toggleTag = (tag) => setTags(t => t.includes(tag) ? t.filter(x => x !== tag) : [...t, tag]);
   const toggleBestTime = (val) => setBestTime(times => val === 'anytime'
@@ -57,7 +71,9 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
       try { validateImageFileMetadata(file); }
       catch (error) { toast.error(error.message); e.target.value = ''; return; }
       setImageFile(file);
-      setImagePreview(URL.createObjectURL(file));
+      if (imageUrlRef.current) URL.revokeObjectURL(imageUrlRef.current);
+      imageUrlRef.current = URL.createObjectURL(file);
+      setImagePreview(imageUrlRef.current);
     }
   };
 
@@ -84,6 +100,7 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
       image_urls = [];
     }
     
+    try {
     await onSave({
       ...spot,
       title: title.trim(),
@@ -97,10 +114,19 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
       best_time: bestTime,
       directions,
     });
-    if (rating.overall > 0 && user?.emailVerified) {
-      await submitCategoryRatings(spot.id, spot, rating, user.id || user.uid);
+    if (rating.overall > 0 && user?.emailVerified && !isOwner) {
+      try { await submitCategoryRatings(spot.id, spot, rating, user.id || user.uid); }
+      catch (ratingError) {
+        console.error('Spot rating failed:', ratingError);
+        toast.error('Changes saved, but the rating could not be submitted.');
+      }
     }
+    } catch (error) {
+      console.error('Spot edit failed:', error);
+      toast.error(error?.message || 'Changes could not be saved. Your edits are still here.');
+    } finally {
     setLoading(false);
+    }
   };
 
   return (
@@ -111,7 +137,7 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
             <MapPin className="w-5 h-5 text-blue-500" />
             <h2 className="text-lg font-bold text-gray-900 dark:text-foreground">{t('common.edit')} Spot</h2>
           </div>
-          <button onClick={onClose} aria-label={t('common.close')} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-accent">
+          <button onClick={requestClose} aria-label={t('common.close')} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-accent">
             <X className="w-5 h-5 text-gray-500 dark:text-muted-foreground" />
           </button>
         </div>
@@ -133,7 +159,7 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
             />
           </div>
 
-          <div className="rounded-2xl border border-emerald-500/15 bg-emerald-50/60 p-4 dark:bg-emerald-950/15">
+          {!isOwner && <div className="rounded-2xl border border-emerald-500/15 bg-emerald-50/60 p-4 dark:bg-emerald-950/15">
             <p className="text-sm font-bold text-foreground">Your rating</p>
             <p className="mt-1 text-xs text-muted-foreground">Your rating is stored separately from the spot details, so older spots can safely move to the current rating system.</p>
             {user?.emailVerified ? (
@@ -149,7 +175,7 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
                 ))}
               </div>
             ) : <p className="mt-2 text-xs font-medium text-amber-600">Verify your email to submit a rating.</p>}
-          </div>
+          </div>}
 
           {/* Category tags */}
           <div>
@@ -246,7 +272,7 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
         </div>
 
         <div className="px-6 py-4 border-t border-gray-100 dark:border-border flex gap-3">
-          <button onClick={onClose} className="flex-1 py-3 rounded-2xl border-2 border-gray-200 dark:border-border text-gray-600 dark:text-foreground font-semibold text-sm hover:bg-gray-50 dark:hover:bg-accent">
+          <button onClick={requestClose} disabled={loading} className="flex-1 py-3 rounded-2xl border-2 border-gray-200 dark:border-border text-gray-600 dark:text-foreground font-semibold text-sm hover:bg-gray-50 dark:hover:bg-accent">
             {t('common.cancel')}
           </button>
           <button
@@ -258,6 +284,7 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
           </button>
         </div>
       </div>
+      <DraftConfirmationDialog open={confirmDiscard} onOpenChange={setConfirmDiscard} title="Discard unsaved changes?" description="Your edits to this spot have not been saved." cancelLabel="Keep editing" confirmLabel="Discard changes" onConfirm={onClose} destructive />
     </div>
   );
 }

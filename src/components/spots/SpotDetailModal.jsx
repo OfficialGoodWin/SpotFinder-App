@@ -58,7 +58,11 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
     if (!requireVerified() || socialBusy) return;
     const old = social.liked; setSocialBusy('like');
     setSocial(value => setSpotRelationState(value, 'like', !old));
-    try { await toggleSpotLike(spot.id, user, old); }
+    try {
+      await toggleSpotLike(spot.id, user, old);
+      window.dispatchEvent(new CustomEvent('spotfinder:collection-changed', { detail: { tabs: ['liked'] } }));
+      toast.success(old ? 'Like removed' : 'Spot liked');
+    }
     catch (e) { setSocial(value => setSpotRelationState(value, 'like', old)); toast.error(e.message || 'Could not update like'); }
     finally { setSocialBusy(''); }
   };
@@ -66,7 +70,11 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
     if (!requireVerified() || socialBusy) return;
     const old = social.saved; setSocialBusy('save');
     setSocial(value => setSpotRelationState(value, 'save', !old));
-    try { await toggleSpotSave(spot.id, user, old); }
+    try {
+      await toggleSpotSave(spot.id, user, old);
+      window.dispatchEvent(new CustomEvent('spotfinder:collection-changed', { detail: { tabs: ['saved'] } }));
+      toast.success(old ? 'Removed from favorites' : 'Added to favorites');
+    }
     catch (e) { setSocial(value => setSpotRelationState(value, 'save', old)); toast.error(e.message || 'Could not update save'); }
     finally { setSocialBusy(''); }
   };

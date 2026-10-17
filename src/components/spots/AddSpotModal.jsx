@@ -4,7 +4,7 @@ import StarRating from './StarRating';
 import LabeledRatingScale from './LabeledRatingScale';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
-import { deleteCloudSpotDraft, loadDraftImageFile, saveCloudSpotDraft, uploadDraftImage, uploadSpotImage } from '@/api/firebaseClient';
+import { deleteCloudSpotDraft, getFirebaseServices, loadDraftImageFile, saveCloudSpotDraft, uploadDraftImage, uploadSpotImage } from '@/api/firebaseClient';
 import { INVALID_SOCIAL_URL_MESSAGE, validateSocialPostUrl } from '@/lib/socialUrlPolicy';
 import { moderateSubmission } from '@/lib/moderation';
 import { findNearbyPoi } from '@/lib/nearbyPoi';
@@ -16,6 +16,7 @@ import { IMAGE_ACCEPT, validateImageFileMetadata } from '@/lib/imageUploadValida
 import { hasMeaningfulAddSpotDraft, validateRequiredSpotFields, voiceErrorMessage } from '@/lib/contributionFlow';
 import { createDraftId, deleteGuestDraft, getGuestDraftOwnerKey, normalizeSpotDraft, saveGuestDraft } from '@/lib/spotDrafts';
 import { deleteGuestDraftPhotos, loadGuestDraftPhoto, persistGuestDraftPhotos, pruneGuestDraftPhotos } from '@/lib/guestDraftPhotos';
+import { uploadSelectedPhotos } from '@/lib/contributionPhotos';
 
 // Category tags per spec — separate from the existing rating-group `spotType`.
 // A spot can carry several of these. Display uses an emoji + translated label
@@ -96,11 +97,22 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
 
   const recognitionRef = useRef(null);
   const submitLockRef = useRef(false);
+  const draftSaveLockRef = useRef(false);
+  const uploadedPublicPhotosRef = useRef(new Map());
+  const selectedPhotoUrlsRef = useRef(new Set());
   const committedRef = useRef(''); // tracks already-committed final transcript
   const titleRef = useRef(null);
   const descriptionRef = useRef(null);
   const errorSummaryRef = useRef(null);
   const draftIdRef = useRef(draft?.id || createDraftId());
+  const ownerUidRef = useRef(authUid);
+  const assertOwnerSession = () => {
+    const activeUid = getFirebaseServices().auth.currentUser?.uid;
+    if (!ownerUidRef.current) ownerUidRef.current = activeUid;
+    if (!activeUid || activeUid !== ownerUidRef.current) {
+      throw new Error('Your sign-in changed. Your edits are still here; reopen this draft under the original account.');
+    }
+  };
   const currentDraft = normalizeSpotDraft({ id: draftIdRef.current, lat: latlng?.lat, lng: latlng?.lng, title, description, tags, cost, accessDifficulty, parking, bestTime, directions, socialUrl, overallRating, accessRating, conditionRating, safetyRating, crowdednessRating, photo_refs: draftPhotoRefs, created_at: draft?.created_at });
 
   useEffect(() => {
@@ -109,21 +121,23 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
     if (!draft) return undefined;
     const restore = async () => {
       const restored = normalizeSpotDraft(draft);
-      setTitle(restored.title);
-      setDescription(restored.description);
-      setTags(restored.tags);
-      setCost(restored.cost);
-      setAccessDifficulty(restored.accessDifficulty);
-      setParking(restored.parking);
-      setBestTime(restored.bestTime);
-      setDirections(restored.directions);
-      setSocialUrl(restored.socialUrl);
-      setOverallRating(restored.overallRating);
-      setAccessRating(restored.accessRating);
-      setConditionRating(restored.conditionRating);
-      setSafetyRating(restored.safetyRating);
-      setCrowdednessRating(restored.crowdednessRating);
-      setDraftPhotoRefs(restored.photo_refs);
+      if (photoReloadKey === 0) {
+        setTitle(restored.title);
+        setDescription(restored.description);
+        setTags(restored.tags);
+        setCost(restored.cost);
+        setAccessDifficulty(restored.accessDifficulty);
+        setParking(restored.parking);
+        setBestTime(restored.bestTime);
+        setDirections(restored.directions);
+        setSocialUrl(restored.socialUrl);
+        setOverallRating(restored.overallRating);
+        setAccessRating(restored.accessRating);
+        setConditionRating(restored.conditionRating);
+        setSafetyRating(restored.safetyRating);
+        setCrowdednessRating(restored.crowdednessRating);
+        setDraftPhotoRefs(restored.photo_refs);
+      }
       if (restored.photo_refs.length) {
         setDraftPhotosReady(false);
         setDraftError('');
@@ -145,6 +159,10 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
   }, [draft?.id, user?.id, photoReloadKey]);
 
   useEffect(() => () => recognitionRef.current?.stop(), []);
+  useEffect(() => () => {
+    for (const url of selectedPhotoUrlsRef.current) URL.revokeObjectURL(url);
+    selectedPhotoUrlsRef.current.clear();
+  }, []);
 
   const requestClose = () => {
     if (loading || savingDraft) return;
@@ -156,20 +174,23 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
   };
 
   const handleSaveDraft = async () => {
-    if (savingDraft) return;
+    if (draftSaveLockRef.current || submitLockRef.current) return;
+    draftSaveLockRef.current = true;
     setSavingDraft(true);
     setDraftError('');
     try {
       if (!draftPhotosReady) throw new Error('Private draft photos are not available yet. Check your connection and try again.');
       let refs = draftPhotoRefs;
       if (user) {
-        const uploaded = [];
+        assertOwnerSession();
+        const uploaded = [...draftPhotoRefs];
         for (let index = 0; index < imageFiles.length; index += 1) {
-          if (refs[index]?.path) { uploaded.push(refs[index]); continue; }
+          if (refs[index]?.path) continue;
           let lastError;
           for (let attempt = 0; attempt < 2; attempt += 1) {
             try {
-              uploaded.push(await uploadDraftImage(imageFiles[index], draftIdRef.current, fraction => setPhotoProgress(Math.round(((index + fraction) / imageFiles.length) * 100))));
+              uploaded[index] = await uploadDraftImage(imageFiles[index], draftIdRef.current, fraction => setPhotoProgress(Math.round(((index + fraction) / imageFiles.length) * 100)));
+              setDraftPhotoRefs([...uploaded]);
               lastError = null;
               break;
             } catch (error) { lastError = error; }
@@ -178,10 +199,17 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
         }
         refs = uploaded;
         setDraftPhotoRefs(uploaded);
-        await saveCloudSpotDraft({ ...currentDraft, photo_refs: uploaded });
+        assertOwnerSession();
+        await saveCloudSpotDraft({ ...currentDraft, photo_refs: uploaded }, ownerUidRef.current);
       } else {
         const ownerKey = getGuestDraftOwnerKey(localStorage);
-        const localRefs = imageFiles.length ? await persistGuestDraftPhotos(ownerKey, draftIdRef.current, imageFiles) : [];
+        const localRefs = [...draftPhotoRefs];
+        for (let index = 0; index < imageFiles.length; index += 1) {
+          if (!localRefs[index]?.local_id) {
+            [localRefs[index]] = await persistGuestDraftPhotos(ownerKey, draftIdRef.current, [imageFiles[index]]);
+            setDraftPhotoRefs([...localRefs]);
+          }
+        }
         saveGuestDraft(localStorage, ownerKey, { ...currentDraft, photo_refs: localRefs });
         await pruneGuestDraftPhotos(ownerKey, draftIdRef.current, localRefs).catch(error => console.warn('Old guest draft photo cleanup failed:', error));
         setDraftPhotoRefs(localRefs);
@@ -197,6 +225,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
       focusError(errorSummaryRef);
     } finally {
       setSavingDraft(false);
+      draftSaveLockRef.current = false;
       setPhotoProgress(0);
     }
   };
@@ -216,15 +245,19 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
     });
     if (!remaining || !selected.length) return;
     const accepted = selected.slice(0, remaining);
+    const acceptedUrls = accepted.map(file => URL.createObjectURL(file));
+    acceptedUrls.forEach(url => selectedPhotoUrlsRef.current.add(url));
     setImageFiles(current => [...current, ...accepted]);
-    setImagePreviews(current => [...current, ...accepted.map(file => URL.createObjectURL(file))]);
+    setImagePreviews(current => [...current, ...acceptedUrls]);
     setDraftPhotoRefs(current => [...current, ...accepted.map(() => null)]);
     if (selected.length > remaining) toast.info('You can add up to 3 photos per spot.');
     e.target.value = '';
   };
 
   const removeImage = (index) => {
+    uploadedPublicPhotosRef.current.delete(imageFiles[index]);
     URL.revokeObjectURL(imagePreviews[index]);
+    selectedPhotoUrlsRef.current.delete(imagePreviews[index]);
     setImageFiles(current => current.filter((_, itemIndex) => itemIndex !== index));
     setImagePreviews(current => current.filter((_, itemIndex) => itemIndex !== index));
     setDraftPhotoRefs(current => current.filter((_, itemIndex) => itemIndex !== index));
@@ -308,7 +341,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
   const handleSave = async () => {
     if (loading || submitLockRef.current) return;
     setSubmitError('');
-    if (!draftPhotosReady && !(draft && user && draftPhotoRefs.length)) {
+    if (!draftPhotosReady) {
       setSubmitError('Private draft photos could not be loaded. Reconnect and resume the draft before publishing.');
       focusError(errorSummaryRef);
       return;
@@ -361,7 +394,6 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
     submitLockRef.current = true;
     setLoading(true);
     let image_urls = [];
-    let failedImageUploads = 0;
 
     const nearbyPoiPromise = findNearbyPoi(Number(latlng.lat), Number(latlng.lng), language)
       .catch(error => {
@@ -374,9 +406,9 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
     if (draft && user && imageFiles.length && draftPhotosReady) {
       try {
         setUploadingImage(true);
-        const refs = [];
+        const refs = [...draftPhotoRefs];
         for (let index = 0; index < imageFiles.length; index += 1) {
-          if (draftPhotoRefs[index]?.path) { refs.push(draftPhotoRefs[index]); continue; }
+          if (refs[index]?.path) continue;
           let uploaded;
           let lastError;
           for (let attempt = 0; attempt < 2 && !uploaded; attempt += 1) {
@@ -385,10 +417,12 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
             } catch (error) { lastError = error; }
           }
           if (!uploaded) throw lastError;
-          refs.push(uploaded);
+          refs[index] = uploaded;
+          setDraftPhotoRefs([...refs]);
         }
         setDraftPhotoRefs(refs);
-        await saveCloudSpotDraft({ ...currentDraft, photo_refs: refs });
+        assertOwnerSession();
+        await saveCloudSpotDraft({ ...currentDraft, photo_refs: refs }, ownerUidRef.current);
       } catch (error) {
         setSubmitError(error?.message || 'The private photos could not be persisted. Your draft and form are still available.');
         submitLockRef.current = false;
@@ -403,23 +437,17 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
     if (imageFiles.length && !(draft && user)) {
       try {
         setUploadingImage(true);
-        const uploads = await Promise.allSettled(imageFiles.map(file => uploadSpotImage(file)));
-        image_urls = uploads.filter(result => result.status === 'fulfilled').map(result => result.value);
-        failedImageUploads = uploads.length - image_urls.length;
-        if (failedImageUploads) toast.error(`${failedImageUploads} photo${failedImageUploads === 1 ? '' : 's'} could not be uploaded.`);
+        image_urls = await uploadSelectedPhotos(imageFiles, uploadSpotImage, uploadedPublicPhotosRef.current);
       } catch (err) {
         console.error('Image uploads failed:', err);
+        setSubmitError(err?.message || 'The photos could not be uploaded. Your changes are still here.');
+        submitLockRef.current = false;
+        setLoading(false);
+        focusError(errorSummaryRef);
+        return;
       } finally {
         setUploadingImage(false);
       }
-    }
-
-    if (draft && failedImageUploads) {
-      setSubmitError('The draft was not published because one or more saved photos could not be uploaded. Your draft is still available; check your connection and try again.');
-      submitLockRef.current = false;
-      setLoading(false);
-      focusError(errorSummaryRef);
-      return;
     }
 
     const poi_match = await nearbyPoiPromise;
@@ -447,7 +475,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
       poi_match,
       submission_attestation: {
         accepted: true,
-        photo_rights_confirmed: image_urls.length > 0,
+        photo_rights_confirmed: imageFiles.length > 0,
       },
       _draft_id: draftIdRef.current,
     };
@@ -461,6 +489,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
     });
 
     try {
+      assertOwnerSession();
       await onSave(baseData, socialValidation?.canonicalUrl || '');
       if (draft) {
         try {

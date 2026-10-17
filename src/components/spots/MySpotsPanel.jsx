@@ -75,19 +75,39 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
   const [deletingId, setDeletingId] = useState('');
   const [confirmDraftId, setConfirmDraftId] = useState('');
   const [confirmSpotId, setConfirmSpotId] = useState('');
-  const draftScope = user?.id || `guest:${draftOwnerKey}`;
-  const draftScopeRef = useRef(draftScope);
-  draftScopeRef.current = draftScope;
+  const scope = user?.id || `guest:${draftOwnerKey}`;
+  const scopeRef = useRef(scope);
+  scopeRef.current = scope;
+  const requestsRef = useRef({ saved: 0, created: 0, liked: 0, drafts: 0 });
 
   useEffect(() => {
-    setData(current => ({ ...current, drafts: null }));
-    setErrors(current => ({ ...current, drafts: '' }));
-    setLoading(current => ({ ...current, drafts: false }));
+    for (const key of Object.keys(requestsRef.current)) requestsRef.current[key] += 1;
+    setData({ saved: null, created: null, liked: null, drafts: null });
+    setErrors({ saved: '', created: '', liked: '', drafts: '' });
+    setLoading({ saved: false, created: false, liked: false, drafts: false });
   }, [draftOwnerKey, user?.id]);
+
+  useEffect(() => {
+    const invalidate = (event) => {
+      const tabsToClear = event.detail?.tabs || ['saved', 'created', 'liked', 'drafts'];
+      for (const key of tabsToClear) requestsRef.current[key] += 1;
+      setData(current => ({ ...current, ...Object.fromEntries(tabsToClear.map(key => [key, null])) }));
+      setErrors(current => ({ ...current, ...Object.fromEntries(tabsToClear.map(key => [key, ''])) }));
+      setLoading(current => ({ ...current, ...Object.fromEntries(tabsToClear.map(key => [key, false])) }));
+    };
+    window.addEventListener('spotfinder:collection-changed', invalidate);
+    window.addEventListener('spotfinder:drafts-changed', invalidate);
+    return () => {
+      window.removeEventListener('spotfinder:collection-changed', invalidate);
+      window.removeEventListener('spotfinder:drafts-changed', invalidate);
+    };
+  }, []);
 
   const loadTab = useCallback(async (tabId) => {
     if (tabId !== 'drafts' && !user?.id) return;
-    const requestedDraftScope = draftScopeRef.current;
+    const requestedScope = scopeRef.current;
+    const requestId = ++requestsRef.current[tabId];
+    const isCurrent = () => scopeRef.current === requestedScope && requestsRef.current[tabId] === requestId;
     setLoading(current => ({ ...current, [tabId]: true }));
     setErrors(current => ({ ...current, [tabId]: '' }));
     try {
@@ -96,14 +116,14 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
       else if (tabId === 'saved') rows = await getSavedSpots(user.id, 100);
       else if (tabId === 'liked') rows = await getLikedSpots(user.id, 100);
       else rows = await getUserSpots(user.email, 100, user.id);
-      if (tabId !== 'drafts' || draftScopeRef.current === requestedDraftScope) {
+      if (isCurrent()) {
         setData(current => ({ ...current, [tabId]: rows }));
       }
     } catch (error) {
       console.error(`My Spots ${tabId} load failed`, error);
-      setErrors(current => ({ ...current, [tabId]: 'Could not load these spots. Please try again.' }));
+      if (isCurrent()) setErrors(current => ({ ...current, [tabId]: 'Could not load these spots. Please try again.' }));
     } finally {
-      if (tabId !== 'drafts' || draftScopeRef.current === requestedDraftScope) {
+      if (isCurrent()) {
         setLoading(current => ({ ...current, [tabId]: false }));
       }
     }
@@ -137,14 +157,21 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
     setDeletingId(id);
     try {
       if (isDraft) {
-        if (user) await deleteCloudSpotDraft(id);
+        let photoCleanupFailed = false;
+        if (user) ({ photoCleanupFailed } = await deleteCloudSpotDraft(id));
         else {
-          await deleteGuestDraftPhotos(draftOwnerKey, id);
           deleteGuestDraft(localStorage, draftOwnerKey, id);
+          try { await deleteGuestDraftPhotos(draftOwnerKey, id); }
+          catch (error) { console.warn('Guest draft photo cleanup failed:', error); photoCleanupFailed = true; }
         }
         window.dispatchEvent(new CustomEvent('spotfinder:drafts-changed'));
-        draftToast.deleted();
-      } else await firebaseDeleteSpot(id);
+        if (photoCleanupFailed) toast.warning('Draft removed, but some private photo cleanup is pending.');
+        else draftToast.deleted();
+      } else {
+        await firebaseDeleteSpot(id);
+        toast.success('Spot deleted');
+        window.dispatchEvent(new CustomEvent('spotfinder:collection-changed', { detail: { tabs: ['created', 'saved', 'liked'] } }));
+      }
       setData(current => Object.fromEntries(Object.entries(current).map(([key, rows]) =>
         [key, rows?.filter(spot => spot.id !== id) ?? rows])));
     } catch (error) {

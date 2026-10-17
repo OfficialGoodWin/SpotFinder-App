@@ -44,7 +44,7 @@ const SettingsModal = React.lazy(() => import('../components/SettingsModal'));
  
  
 export default function Home() {
-  const { user, authUid, logout, isAuthenticated, isAdmin } = useAuth();
+  const { user, authUid, logout, isAuthenticated, isAdmin, isLoadingAuth } = useAuth();
   const { t, language } = useLanguage();
   const { isDark } = useTheme();
   const navigate = useNavigate();
@@ -112,14 +112,14 @@ export default function Home() {
 
   useEffect(() => {
     const refreshDraftCount = () => {
-      if (!guestDraftOwnerKey || isAuthenticated) { setGuestDraftCount(0); return; }
+      if (!guestDraftOwnerKey || isAuthenticated || isLoadingAuth) { setGuestDraftCount(0); return; }
       try { setGuestDraftCount(listGuestDrafts(localStorage, guestDraftOwnerKey).length); }
       catch { setGuestDraftCount(0); }
     };
     refreshDraftCount();
     window.addEventListener('spotfinder:drafts-changed', refreshDraftCount);
     return () => window.removeEventListener('spotfinder:drafts-changed', refreshDraftCount);
-  }, [guestDraftOwnerKey, isAuthenticated]);
+  }, [guestDraftOwnerKey, isAuthenticated, isLoadingAuth]);
   const [consentDecided, setConsentDecided] = useState(() => getConsent().decided);
 
   useEffect(() => {
@@ -291,8 +291,8 @@ export default function Home() {
           toast.error('Spot saved, but the social post could not be attached. You can add it from the spot details.');
         }
       }
-      setSpots(prev => [spot, ...prev]);
-      setPendingLatlng(null);
+      setSpots(prev => [spot, ...prev.filter(item => item.id !== spot.id)]);
+      window.dispatchEvent(new CustomEvent('spotfinder:collection-changed', { detail: { tabs: ['created', 'drafts'] } }));
       return spot;
     } catch (err) {
       console.error('Failed to create spot:', err);
@@ -365,6 +365,8 @@ export default function Home() {
     await deleteSpot(spot.id);
     setSpots(prev => prev.filter(s => s.id !== spot.id));
     closeSpot();
+    window.dispatchEvent(new CustomEvent('spotfinder:collection-changed', { detail: { tabs: ['created', 'saved', 'liked'] } }));
+    toast.success('Spot deleted');
   };
 
   const handleEditSpot = async (updatedSpot) => {
@@ -372,6 +374,8 @@ export default function Home() {
     setSpots(prev => prev.map(s => s.id === updatedSpot.id ? updatedSpot : s));
     setEditingSpot(null);
     closeSpot();
+    window.dispatchEvent(new CustomEvent('spotfinder:collection-changed', { detail: { tabs: ['created', 'saved', 'liked'] } }));
+    toast.success('Changes saved');
   };
  
   const openNavigation = (destination) => {
@@ -832,8 +836,9 @@ export default function Home() {
  
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
  
-      {showMySpots && ((isAuthenticated && user) || (!isAuthenticated && guestDraftOwnerKey)) && (
+      {showMySpots && !isLoadingAuth && ((isAuthenticated && user) || (!isAuthenticated && guestDraftOwnerKey)) && (
         <MySpotsPanel
+          key={user?.id || `guest:${guestDraftOwnerKey}`}
           user={user}
           draftOwnerKey={guestDraftOwnerKey}
           draftOnly={!isAuthenticated}

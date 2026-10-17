@@ -403,10 +403,11 @@ export const deleteDraftImages = async (draftId) => {
   await Promise.all(listing.items.map(item => deleteObject(item)));
 };
 
-export const saveCloudSpotDraft = async (value) => {
+export const saveCloudSpotDraft = async (value, expectedUid) => {
   const { auth, db } = getFirebaseServices();
   const current = await waitForAuthRestore(auth);
   if (!current || current.isAnonymous) throw new Error('A registered account is required for cloud drafts.');
+  if (expectedUid && current.uid !== expectedUid) throw new Error('The signed-in account changed. Reopen this draft under its original account.');
   const draft = normalizeSpotDraft(value);
   const ref = doc(db, SPOT_DRAFTS_COLLECTION, draft.id);
   // A missing document has no owner for Firestore's owner-only read rule to
@@ -430,7 +431,14 @@ export const deleteCloudSpotDraft = async (draftId, { deletePhotos = true } = {}
   const current = await waitForAuthRestore(auth);
   if (!current || current.isAnonymous) throw new Error('A registered account is required to delete cloud drafts.');
   await deleteDoc(doc(db, SPOT_DRAFTS_COLLECTION, draftId));
-  if (deletePhotos) await deleteDraftImages(draftId).catch(error => console.warn('Draft photo cleanup failed:', error));
+  if (!deletePhotos) return { photoCleanupFailed: false };
+  try {
+    await deleteDraftImages(draftId);
+    return { photoCleanupFailed: false };
+  } catch (error) {
+    console.warn('Draft metadata was deleted, but private photo cleanup failed:', error);
+    return { photoCleanupFailed: true };
+  }
 };
 
  

@@ -120,6 +120,9 @@ service cloud.firestore {
       // or overwrite *their own* rating for a given spot (built-in de-dupe).
       allow create, update: if isAuth()
         && request.auth.token.email_verified == true
+        && exists(/databases/$(database)/documents/spots/$(request.resource.data.spot_id))
+        && get(/databases/$(database)/documents/spots/$(request.resource.data.spot_id)).data.get('created_by_uid', '') != request.auth.uid
+        && get(/databases/$(database)/documents/spots/$(request.resource.data.spot_id)).data.get('created_by', '') != authEmail()
         && ratingId == request.resource.data.spot_id + '_' + request.auth.uid
         && request.resource.data.user_id == request.auth.uid
         && request.resource.data.keys().hasOnly(['spot_id', 'user_id', 'overall', 'access', 'condition', 'safety', 'crowdedness', 'schema', 'updated_date'])

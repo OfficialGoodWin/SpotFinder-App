@@ -48,6 +48,9 @@ test('Firestore rules enforce private profiles, ownership, and verified interact
     await assertFails(deleteDoc(doc(other, 'spots', 'spot-one')));
     await assertSucceeds(getDoc(doc(owner, 'spot_ratings', 'spot-one_owner')));
     await assertFails(getDoc(doc(other, 'spot_ratings', 'spot-one_owner')));
+    const ownRating = { spot_id: 'spot-one', user_id: 'owner', overall: 4, access: 0, condition: 0, safety: 0, crowdedness: 1, schema: 2 };
+    await assertFails(setDoc(doc(owner, 'spot_ratings', 'spot-one_owner'), ownRating));
+    await assertSucceeds(setDoc(doc(other, 'spot_ratings', 'spot-one_other'), { ...ownRating, user_id: 'other' }));
     await assertSucceeds(getDoc(doc(owner, 'spot_drafts', 'draft-one')));
     await assertFails(getDoc(doc(other, 'spot_drafts', 'draft-one')));
     await assertSucceeds(getDocs(query(collection(owner, 'spot_drafts'), where('owner_uid', '==', 'owner'))));
