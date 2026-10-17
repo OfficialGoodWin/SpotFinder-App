@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Navigation, MapPin, Edit2, Trash2, Share2, Check, Flag, Heart, Bookmark } from 'lucide-react';
 import StarRating from './StarRating';
 import LabeledRatingScale from './LabeledRatingScale';
 import { submitCategoryRatings, getSpotSocialState, toggleSpotLike, toggleSpotSave } from '@/api/firebaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import ReportDialog from '@/components/moderation/ReportDialog';
-import { localizedShareMessage, reversePlaceContext } from '@/lib/placeContext';
+import { canonicalSpotUrl, shareSpotLink } from '@/lib/spotLinks';
 import { getSpotDisplayName, getSpotLocationLabel } from '@/lib/spotPresentation';
 import SpotImage from './SpotImage';
 import { setSpotRelationState } from '@/lib/spotSocialState';
@@ -17,7 +17,15 @@ const RATED_KEY = (spotId, userId) => `sf_rated_${spotId}_${userId || 'guest'}`;
 export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, onNavigate, onEdit, onDelete, onSpotUpdate, onShowAuth }) {
   const { t, language } = useLanguage();
   const [localSpot, setLocalSpot] = useState(spot);
+  useEffect(() => setLocalSpot(spot), [spot]);
   const [shareTooltip, setShareTooltip] = useState('');
+  const [manualShareUrl, setManualShareUrl] = useState('');
+  const closeButtonRef = useRef(null);
+  useEffect(() => {
+    const prior = document.activeElement;
+    closeButtonRef.current?.focus();
+    return () => { if (prior?.isConnected && prior !== document.body) prior.focus(); };
+  }, []);
   const [social, setSocial] = useState({ liked: false, saved: false, likesCount: spot.likes_count || 0, savesCount: spot.saves_count || 0 });
   const [socialBusy, setSocialBusy] = useState('');
   const displayName = getSpotDisplayName(localSpot, language);
@@ -128,25 +136,16 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
   const [showReport, setShowReport] = useState(false);
 
   const handleShare = async () => {
-    const url = new URL('/', window.location.origin);
-    url.searchParams.set('spot', spot.id);
-    const place = await reversePlaceContext(Number(localSpot.lat), Number(localSpot.lng ?? localSpot.lon), language);
-    const message = localizedShareMessage(language, place, displayName);
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: displayName, text: message, url: url.toString() });
-      } else {
-        if (!navigator.clipboard?.writeText) throw new Error('clipboard-unavailable');
-        await navigator.clipboard.writeText(`${message} ${url}`);
-        setShareTooltip('Link copied');
-        setTimeout(() => setShareTooltip(''), 2000);
-      }
-    } catch (error) {
-      if (error?.name === 'AbortError') return;
-      const copied = await navigator.clipboard?.writeText?.(`${message} ${url}`).then(() => true).catch(() => false);
-      setShareTooltip(copied ? 'Link copied' : 'Sharing unavailable');
+    if (!localSpot.is_public || !['published', 'pending_trust'].includes(localSpot.status)) {
+      setShareTooltip('Sharing unavailable');
       setTimeout(() => setShareTooltip(''), 2000);
+      return;
     }
+    const result = await shareSpotLink({ id: String(spot.id), title: displayName });
+    if (result === 'shared' || result === 'cancelled') return;
+    setManualShareUrl(result === 'unavailable' ? canonicalSpotUrl(String(spot.id)) || '' : '');
+    setShareTooltip(result === 'copied' ? 'Link copied' : 'Select and copy the link below');
+    setTimeout(() => setShareTooltip(''), 2000);
   };
 
   const formatDate = (d) => d ? new Date(d).toLocaleDateString() : '';
@@ -187,7 +186,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
                 </p>
               </div>
             </div>
-            <button onClick={onClose} aria-label={t('common.close')} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-accent">
+            <button ref={closeButtonRef} onClick={onClose} aria-label={t('common.close')} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-accent">
               <X className="w-5 h-5 text-gray-500 dark:text-muted-foreground" />
             </button>
           </div>
@@ -200,11 +199,13 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
               <div className="relative overflow-hidden rounded-2xl">
                 <SpotImage spot={localSpot} src={detailPhotos[0].url} alt={displayName} className="h-52 w-full object-cover" fallbackClassName="h-52" />
               </div>
+              {(detailPhotos[0].metadata?.attribution || detailPhotos[0].metadata?.creator) && <p className="text-[11px] text-gray-500 dark:text-slate-400">Photo: {detailPhotos[0].metadata.attribution || detailPhotos[0].metadata.creator}</p>}
               {detailPhotos.length > 1 && (
                 <div className="grid grid-cols-3 gap-2">
                   {detailPhotos.slice(1).map((photo, index) => (
                     <div key={`${photo.url}-${index}`} className="relative aspect-square overflow-hidden rounded-xl">
                       <SpotImage spot={localSpot} src={photo.url} alt={`${displayName} photo ${index + 2}`} className="h-full w-full object-cover" />
+                      {(photo.metadata?.attribution || photo.metadata?.creator) && <span className="absolute bottom-0 inset-x-0 truncate bg-black/65 px-1 text-[10px] text-white" title={photo.metadata.attribution || photo.metadata.creator}>{photo.metadata.attribution || photo.metadata.creator}</span>}
                     </div>
                   ))}
                 </div>
@@ -295,6 +296,9 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
             </button>
             <button onClick={handleShare} className="relative min-h-[48px] rounded-2xl border border-gray-200 dark:border-border flex items-center justify-center hover:bg-gray-50 dark:hover:bg-accent" aria-label="Share this spot">{shareTooltip === 'Link copied' ? <Check className="h-5 w-5 text-green-500" /> : <Share2 className="h-5 w-5 text-blue-500" />}{shareTooltip && <span role="status" className="absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-lg bg-gray-900 px-2 py-1 text-[10px] text-white">{shareTooltip}</span>}</button>
           </div>
+          {manualShareUrl && <label className="block text-xs font-medium text-gray-600 dark:text-slate-300">Spot link
+            <input readOnly value={manualShareUrl} onFocus={event => event.target.select()} onClick={event => event.target.select()} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-border dark:bg-slate-900 dark:text-white" />
+          </label>}
 
           {/* Overall experience is rated directly and is never inferred from descriptive scales. */}
           <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-accent rounded-2xl">

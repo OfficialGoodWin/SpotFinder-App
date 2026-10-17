@@ -28,7 +28,14 @@ service cloud.firestore {
 
     // ── Public spots ─────────────────────────────────────────────────────────
     match /spots/{spotId} {
-      allow read: if true;
+      // Public discovery and shared links can read only public visible records.
+      // Owners retain access to their own records; moderation tools need all.
+      allow read: if (resource.data.is_public == true
+        && resource.data.status in ['published', 'pending_trust'])
+        || (isAuth() && (
+          ('created_by_uid' in resource.data && resource.data.created_by_uid == request.auth.uid)
+          || ('created_by' in resource.data && resource.data.created_by == authEmail())))
+        || isSuperAdmin();
 
       // Direct creates are disabled; submitSpot performs authoritative checks.
       allow create: if false && isAuth()

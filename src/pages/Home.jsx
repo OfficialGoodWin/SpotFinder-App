@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 import { Plus, Settings, Crosshair, HelpCircle, Trash2, MoreHorizontal } from 'lucide-react';
-import { getPublicSpotsInBounds, getPublicSpotsNear, getPublicSpotById, createSpot, deleteSpot, updateSpot, getAdminPOIs, getAdminClosures, getAdminERouteOverrides, getAdminRoadOverrides, getDeletedAmbientPOIs, addDeletedAmbientPOI, addSocialPost, getFirebaseServices, reauthenticateForAccountDeletion, requestAccountDeletion } from '@/api/firebaseClient';
+import { getPublicSpotsInBounds, getPublicSpotsNear, getPublicSpotById, getFeaturedSpotCandidates, createSpot, deleteSpot, updateSpot, getAdminPOIs, getAdminClosures, getAdminERouteOverrides, getAdminRoadOverrides, getDeletedAmbientPOIs, addDeletedAmbientPOI, addSocialPost, getFirebaseServices, reauthenticateForAccountDeletion, requestAccountDeletion } from '@/api/firebaseClient';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/lib/LanguageContext';
  
 import MapLayerSwitcher from '../components/map/MapLayerSwitcher';
@@ -15,7 +15,7 @@ import NearbySpotsFilterModal from '../components/spots/NearbySpotsFilterModal';
 import NavigationProviderSheet from '../components/navigation/NavigationProviderSheet';
 import ProfileMenu from '../components/ProfileMenu';
 import WelcomeDiscoveryCard from '../components/WelcomeDiscoveryCard';
-import MapExploreStrip from '../components/MapExploreStrip';
+import FeaturedDiscoveryPanel from '../components/FeaturedDiscoveryPanel';
 import { getSpotDisplayName } from '@/lib/spotPresentation';
 import { navigationCoordinates } from '@/lib/externalNavigation';
 import { normalizeLatLng } from '@/lib/spotDiscovery';
@@ -25,6 +25,8 @@ import { NEARBY_DEFAULT_KM } from '@/lib/nearbyFilters';
 import { useSpotOpenFocus } from '@/hooks/useSpotOpenFocus';
 import { getConsent } from '@/lib/consent';
 import { shouldShowWelcome } from '@/lib/discoveryExperience';
+import { selectFeaturedSpots } from '@/lib/featuredDiscovery';
+import { spotIdFromLocation, validSpotId } from '@/lib/spotLinks';
 import { getGuestDraftOwnerKey, listGuestDrafts } from '@/lib/spotDrafts';
 import { getMapExploreEnabled, setMapExploreEnabled as persistMapExploreEnabled } from '@/lib/mapExplorePreference';
 
@@ -46,7 +48,14 @@ export default function Home() {
   const { t, language } = useLanguage();
   const { isDark } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
+  const linkedSpot = spotIdFromLocation(location.pathname, location.search);
   const [spots, setSpots] = useState([]);
+  const [spotsLoading, setSpotsLoading] = useState(true);
+  const [featuredSpots, setFeaturedSpots] = useState([]);
+  const [featuredLoading, setFeaturedLoading] = useState(false);
+  const [featuredError, setFeaturedError] = useState(false);
+  const [sharedSpotError, setSharedSpotError] = useState(false);
   const [mapLayer, setMapLayer] = useState('basic');
   const [userPos, setUserPos] = useState(null);
   const [viewportCenter, setViewportCenter] = useState(null);
@@ -56,7 +65,9 @@ export default function Home() {
   const [resumingDraft, setResumingDraft] = useState(null);
   const [selectedSpot, setSelectedSpot] = useState(null);
   const { closeSpot, openSpot, spotFocus } = useSpotOpenFocus({ selectedSpot, setSelectedSpot });
-  const openMarkerSpot = useCallback((spot) => openSpot(spot, { source: 'marker' }), [openSpot]);
+  const openMarkerSpot = useCallback((spot) => {
+    if (openSpot(spot, { source: 'marker' })) navigate(`/spot/${encodeURIComponent(spot.id)}`);
+  }, [navigate, openSpot]);
   const [editingSpot, setEditingSpot] = useState(null);
   const [navigationDestination, setNavigationDestination] = useState(null);
   const [flyTo, setFlyTo] = useState(null);
@@ -85,10 +96,12 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   const [mapExploreEnabled, setMapExploreEnabled] = useState(() => getMapExploreEnabled());
   const [mapExploreDismissed, setMapExploreDismissed] = useState(false);
+  const [featuredOpen, setFeaturedOpen] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
   const [showMobileMore, setShowMobileMore] = useState(false);
   const [locationStatus, setLocationStatus] = useState('idle');
   const [showWelcome, setShowWelcome] = useState(() => {
+    if (spotIdFromLocation(window.location.pathname, window.location.search).isSpotLink) return false;
     try { return localStorage.getItem('spotfinder_welcome_dismissed_v1') !== '1'; }
     catch { return true; }
   });
@@ -162,6 +175,7 @@ export default function Home() {
   }, []);
   const mapRef = useRef(null);
   const spotRefreshTimer = useRef(null);
+  const spotRequestSequence = useRef(0);
   const moveEndMapRef = useRef(null);
 
   const refreshSpotsInViewport = useCallback(async () => {
@@ -171,14 +185,18 @@ export default function Home() {
     setViewportCenter({ lat: center.lat, lng: center.lng });
     if (spotRefreshTimer.current) clearTimeout(spotRefreshTimer.current);
     spotRefreshTimer.current = setTimeout(async () => {
+      const sequence = ++spotRequestSequence.current;
+      setSpotsLoading(true);
       try {
         const b = map.getBounds();
         const rows = await getPublicSpotsInBounds({
           south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast(),
         }, 500);
-        setSpots(rows);
+        if (sequence === spotRequestSequence.current) setSpots(rows);
       } catch (err) {
         console.error('Failed to load visible spots:', err);
+      } finally {
+        if (sequence === spotRequestSequence.current) setSpotsLoading(false);
       }
     }, 120);
   }, []);
@@ -195,6 +213,7 @@ export default function Home() {
   }, [refreshSpotsInViewport]);
 
   useEffect(() => () => {
+    spotRequestSequence.current += 1;
     if (spotRefreshTimer.current) clearTimeout(spotRefreshTimer.current);
     moveEndMapRef.current?.off('moveend', refreshSpotsInViewport);
     moveEndMapRef.current = null;
@@ -281,20 +300,66 @@ export default function Home() {
     }
   };
 
-  // Deep-link: ?spot=<id> opens that spot detail
-  const deepLinkProcessed = React.useRef(false);
-  React.useEffect(() => {
-    if (deepLinkProcessed.current) return;
-    const params = new URLSearchParams(window.location.search);
-    const spotId = params.get('spot');
-    if (!spotId) return;
-    deepLinkProcessed.current = true;
-    getPublicSpotById(spotId).then(found => {
-      if (!found) return;
-      setSpots(current => current.some(item => item.id === found.id) ? current : [...current, found]);
+  useEffect(() => {
+    let active = true;
+    if (!linkedSpot.isSpotLink) {
+      setSharedSpotError(false);
+      if (selectedSpot) closeSpot();
+      return () => { active = false; };
+    }
+    setShowWelcome(false);
+    try { localStorage.setItem('spotfinder_welcome_dismissed_v1', '1'); } catch { /* storage unavailable */ }
+    setFeaturedOpen(false);
+    if (!validSpotId(linkedSpot.id)) {
+      setSharedSpotError(true);
+      closeSpot();
+      return () => { active = false; };
+    }
+    if (String(selectedSpot?.id) === linkedSpot.id) {
+      setSharedSpotError(false);
+      return () => { active = false; };
+    }
+    const cached = spots.find(item => String(item.id) === linkedSpot.id);
+    const request = cached ? Promise.resolve(cached) : getPublicSpotById(linkedSpot.id);
+    request.then(found => {
+      if (!active) return;
+      if (!found) { setSharedSpotError(true); closeSpot(); return; }
+      setSharedSpotError(false);
       openSpot(found, { source: 'shared-link' });
-    }).catch(error => console.error('Could not open shared spot:', error));
-  }, [openSpot]);  
+    }).catch(() => { if (active) { setSharedSpotError(true); closeSpot(); } });
+    return () => { active = false; };
+  // Only URL changes initiate a link lookup. Viewport refreshes cannot repeat it.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, location.search]);
+
+  const openLinkedSpot = useCallback((spot, source) => {
+    if (!openSpot(spot, { source })) return;
+    if (spot.is_public && ['published', 'pending_trust'].includes(spot.status)) {
+      navigate(`/spot/${encodeURIComponent(spot.id)}`);
+    }
+  }, [navigate, openSpot]);
+
+  const closeLinkedSpot = useCallback(() => {
+    closeSpot();
+    if (linkedSpot.isSpotLink) navigate('/');
+  }, [closeSpot, linkedSpot.isSpotLink, navigate]);
+
+  useEffect(() => {
+    if (!featuredOpen) return;
+    let active = true;
+    setFeaturedLoading(true);
+    getFeaturedSpotCandidates().then(rows => {
+      if (active) { setFeaturedSpots(selectFeaturedSpots(rows)); setFeaturedError(false); }
+    }).catch(() => { if (active) setFeaturedError(true); })
+      .finally(() => { if (active) setFeaturedLoading(false); });
+    return () => { active = false; };
+  }, [featuredOpen]);
+
+  useEffect(() => {
+    if (!spotsLoading && spots.length === 0 && mapExploreEnabled && !mapExploreDismissed && !showWelcome && !linkedSpot.isSpotLink) {
+      setFeaturedOpen(true);
+    }
+  }, [spotsLoading, spots.length, mapExploreEnabled, mapExploreDismissed, showWelcome, linkedSpot.isSpotLink]);
  
   const handleDeleteSpot = async (spot) => {
     await deleteSpot(spot.id);
@@ -426,9 +491,9 @@ export default function Home() {
       <h1 className="sr-only">SpotFinder community map</h1>
       {shouldShowWelcome({ dismissed: !showWelcome, consentDecided }) && (
         <WelcomeDiscoveryCard
-          locationStatus={locationStatus}
           onDismiss={dismissWelcome}
-          onUseLocation={() => { dismissWelcome(); openNearbyFilters(); }}
+          onFeatured={() => { dismissWelcome(); setMapExploreDismissed(false); setFeaturedOpen(true); }}
+          onChooseLocation={() => { dismissWelcome(); setNearbyMode('map'); openNearbyFilters(); }}
         />
       )}
       {/* Cursor overlay in add mode */}
@@ -491,7 +556,7 @@ export default function Home() {
         mapCenter={mapCenter}
         spots={spots}
         onOpenNearbyFilters={openNearbyFilters}
-        onSelectSpot={(spot) => openSpot(spot, { source: 'search' })}
+        onSelectSpot={(spot) => openLinkedSpot(spot, 'search')}
         onNavigate={openNavigation}
         onSelectCategory={async (category) => {
           const position = userPos || await requestLocation();
@@ -511,14 +576,23 @@ export default function Home() {
         }}
       />
 
-      {mapExploreEnabled && !mapExploreDismissed && !showWelcome && !selectedSpot && !selectedPOI && !showNearbySpots && !pendingLatlng && (
-        <MapExploreStrip
-          spots={spots}
+      {mapExploreEnabled && !mapExploreDismissed && !showWelcome && !selectedSpot && !selectedPOI && !showNearbySpots && !pendingLatlng && (featuredOpen || (!spotsLoading && spots.length === 0)) && (
+        <FeaturedDiscoveryPanel
+          spots={featuredSpots}
           language={language}
-          onSelectSpot={(spot) => openSpot(spot, { source: 'explore' })}
-          onDismiss={() => setMapExploreDismissed(true)}
+          loading={featuredLoading}
+          error={featuredError}
+          emptyView={!spotsLoading && spots.length === 0}
+          onSelectSpot={(spot) => { setFeaturedOpen(false); openLinkedSpot(spot, 'featured'); }}
+          onSearch={() => document.querySelector('input[aria-label="Search places and community spots"]')?.focus()}
+          onDismiss={() => { setMapExploreDismissed(true); setFeaturedOpen(false); }}
         />
       )}
+      {sharedSpotError && <div role="alert" className="absolute left-1/2 top-[max(5rem,calc(env(safe-area-inset-top)+4rem))] z-[1100] w-[min(92vw,24rem)] -translate-x-1/2 rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-xl dark:border-white/10 dark:bg-slate-950 dark:text-white">
+        <h2 className="text-lg font-bold">This spot isn't available.</h2>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">You can still explore other places on SpotFinder.</p>
+        <button type="button" onClick={() => { setSharedSpotError(false); navigate('/'); setFeaturedOpen(true); }} className="mt-4 min-h-11 rounded-xl bg-green-600 px-4 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2">Explore featured places</button>
+      </div>}
  
       {/* Profile menu — top right */}
       <ProfileMenu
@@ -603,7 +677,7 @@ export default function Home() {
           onOpenFilters={() => openNearbyFilters()}
           onExploreMap={() => { nearbyRequestGate.current.cancel(); setShowNearbySpots(false); }}
           onIncreaseRadius={() => openNearbyFilters({ maxDistance: nearbyFilters.maxDistance === Infinity ? Infinity : nearbyFilters.maxDistance >= 50 ? Infinity : Math.min(50, nearbyFilters.maxDistance + 10) })}
-          onSelectSpot={(spot) => openSpot(spot, { source: 'nearby' })}
+          onSelectSpot={(spot) => openLinkedSpot(spot, 'nearby')}
           onNavigate={openNavigation}
           onClose={() => { nearbyRequestGate.current.cancel(); setShowNearbySpots(false); }}
         />
@@ -733,7 +807,7 @@ export default function Home() {
           spot={selectedSpot}
           user={user}
           isAdmin={isAdmin}
-          onClose={closeSpot}
+          onClose={closeLinkedSpot}
           onNavigate={openNavigation}
           onEdit={() => { setEditingSpot(selectedSpot); closeSpot(); }}
           onDelete={() => handleDeleteSpot(selectedSpot)}
@@ -765,7 +839,7 @@ export default function Home() {
           draftOnly={!isAuthenticated}
           initialTab={!isAuthenticated ? 'drafts' : undefined}
           onClose={() => setShowMySpots(false)}
-          onSelectSpot={(spot) => openSpot(spot, { source: 'my-spots' })}
+          onSelectSpot={(spot) => openLinkedSpot(spot, 'my-spots')}
           onResumeDraft={(spotDraft) => {
             setResumingDraft(spotDraft);
             setPendingLatlng({ lat: spotDraft.lat, lng: spotDraft.lng });

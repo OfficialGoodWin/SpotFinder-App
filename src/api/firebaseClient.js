@@ -479,6 +479,26 @@ export const getPublicSpots = async (maxCount = 200) => {
   return (await getDocs(q)).docs.map(spotFromSnapshot);
 };
 
+// One bounded discovery page. The existing public/status/date index serves it.
+// Cache in memory so opening a spot or panning never repeats the read.
+let featuredPage = null;
+let featuredPageAt = 0;
+let featuredPending = null;
+export const getFeaturedSpotCandidates = async () => {
+  if (featuredPage && Date.now() - featuredPageAt < 300000) return featuredPage;
+  if (featuredPending) return featuredPending;
+  const { db } = getFirebaseServices();
+  featuredPending = getDocs(query(collection(db, SPOTS_COLLECTION),
+    where('is_public', '==', true), where('status', '==', 'published'),
+    orderBy('created_date', 'desc'), limit(24)))
+    .then(snapshot => {
+      featuredPage = snapshot.docs.map(spotFromSnapshot);
+      featuredPageAt = Date.now();
+      return featuredPage;
+    }).finally(() => { featuredPending = null; });
+  return featuredPending;
+};
+
 // Scalable viewport query: only fetch spots currently inside the map bounds.
 // We sort after reading so Firestore does not need to order by a third field
 // while applying multiple latitude/longitude range filters.

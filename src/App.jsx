@@ -54,7 +54,10 @@ const AuthenticatedApp = () => {
         <LayoutWrapper currentPageName={mainPageKey}>
           <MainPage />
         </LayoutWrapper>
-      } />
+      }>
+        <Route index element={null} />
+        <Route path="spot/:spotId" element={null} />
+      </Route>
       {Object.entries(Pages).map(([path, Page]) => (
         <Route
           key={path}

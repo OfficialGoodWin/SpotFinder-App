@@ -2,6 +2,7 @@
 // views; optional analytics is suspended.
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { canonicalSpotUrl, spotIdFromLocation, validSpotId } from './spotLinks';
 
 const PAGE_METADATA = {
   '/': ['SpotFinder | Discover community-rated outdoor spots', 'Discover, rate, save, and navigate to scenic outdoor spots shared by the SpotFinder community.'],
@@ -25,19 +26,23 @@ function setMeta(name, content) {
 }
 
 export default function NavigationTracker() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
 
   useEffect(() => {
     const key = pathname.toLowerCase().replace(/\/$/, '') || '/';
-    const metadata = PAGE_METADATA[key];
+    const linkedSpot = spotIdFromLocation(pathname, search);
+    const validLink = linkedSpot.isSpotLink && validSpotId(linkedSpot.id);
+    const metadata = validLink
+      ? ['SpotFinder | Community place', 'Explore a real community place on the SpotFinder map.']
+      : PAGE_METADATA[key];
     const [title, description] = metadata || ['Page not found | SpotFinder', 'The requested SpotFinder page could not be found.'];
     document.title = title;
     setMeta('description', description);
     setMeta('robots', metadata ? 'index,follow' : 'noindex,follow');
 
     const canonical = document.head.querySelector('link[rel="canonical"]');
-    if (canonical) canonical.setAttribute('href', `https://spotfinder.cz${metadata ? pathname : '/'}`);
-  }, [pathname]);
+    if (canonical) canonical.setAttribute('href', validLink ? canonicalSpotUrl(linkedSpot.id) : `https://spotfinder.cz${metadata ? pathname : '/'}`);
+  }, [pathname, search]);
 
   return null;
 }

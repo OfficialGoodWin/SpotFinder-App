@@ -24,6 +24,9 @@ test('Firestore rules enforce private profiles, ownership, and verified interact
         title: 'Safe title', description: 'Safe description', created_by_uid: 'owner', created_by: 'registered-account',
         rating: 4, rating_count: 1, status: 'published',
       });
+      await setDoc(doc(db, 'spots', 'public-place'), { created_by_uid: 'owner', is_public: true, status: 'published', lat: 50, lng: 14 });
+      await setDoc(doc(db, 'spots', 'hidden-place'), { created_by_uid: 'owner', is_public: true, status: 'hidden', lat: 50, lng: 14 });
+      await setDoc(doc(db, 'spots', 'private-place'), { created_by_uid: 'owner', is_public: false, status: 'published', lat: 50, lng: 14 });
       await setDoc(doc(db, 'spot_ratings', 'spot-one_owner'), {
         spot_id: 'spot-one', user_id: 'owner', overall: 4, access: 4, condition: 4, safety: 4, crowdedness: 4, schema: 2,
       });
@@ -34,6 +37,9 @@ test('Firestore rules enforce private profiles, ownership, and verified interact
     });
 
     await assertSucceeds(getDoc(doc(owner, 'users', 'owner')));
+    await assertSucceeds(getDoc(doc(anonymous, 'spots', 'public-place')));
+    await assertFails(getDoc(doc(anonymous, 'spots', 'hidden-place')));
+    await assertFails(getDoc(doc(anonymous, 'spots', 'private-place')));
     await assertFails(getDoc(doc(other, 'users', 'owner')));
     await assertFails(getDoc(doc(anonymous, 'users', 'owner')));
     await assertSucceeds(updateDoc(doc(owner, 'spots', 'spot-one'), { title: 'Owner edit' }));
