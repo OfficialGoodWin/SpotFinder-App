@@ -16,6 +16,7 @@ import NavigationProviderSheet from '../components/navigation/NavigationProvider
 import ProfileMenu from '../components/ProfileMenu';
 import WelcomeDiscoveryCard from '../components/WelcomeDiscoveryCard';
 import FeaturedDiscoveryPanel from '../components/FeaturedDiscoveryPanel';
+import { recoverableLazy } from '@/components/ChunkLoadRecovery';
 import { getSpotDisplayName } from '@/lib/spotPresentation';
 import { navigationCoordinates } from '@/lib/externalNavigation';
 import { filterAndSortNearbySpots, normalizeLatLng } from '@/lib/spotDiscovery';
@@ -32,17 +33,17 @@ import { spotIdFromLocation, validSpotId } from '@/lib/spotLinks';
 import { getGuestDraftOwnerKey, listGuestDrafts } from '@/lib/spotDrafts';
 import { getMapExploreEnabled, setMapExploreEnabled as persistMapExploreEnabled } from '@/lib/mapExplorePreference';
 
-const SubscriptionModal = React.lazy(() => import('../components/SubscriptionModal'));
-const SuperAdminEditor = React.lazy(() => import('../components/map/SuperAdminEditor'));
-const AddSpotModal = React.lazy(() => import('../components/spots/AddSpotModal'));
-const EditSpotModal = React.lazy(() => import('../components/spots/EditSpotModal'));
-const SpotDetailModal = React.lazy(() => import('../components/spots/SpotDetailModal'));
-const AuthModal = React.lazy(() => import('../components/auth/AuthModal'));
-const MySpotsPanel = React.lazy(() => import('../components/spots/MySpotsPanel'));
-const NearbySpotsPanel = React.lazy(() => import('../components/spots/NearbySpotsPanel'));
-const POIPanel = React.lazy(() => import('../components/spots/POIPanel'));
-const POIDetailPanel = React.lazy(() => import('../components/spots/POIDetailPanel'));
-const SettingsModal = React.lazy(() => import('../components/SettingsModal'));
+const SubscriptionModal = recoverableLazy(() => import('../components/SubscriptionModal'));
+const SuperAdminEditor = recoverableLazy(() => import('../components/map/SuperAdminEditor'));
+const AddSpotModal = recoverableLazy(() => import('../components/spots/AddSpotModal'));
+const EditSpotModal = recoverableLazy(() => import('../components/spots/EditSpotModal'));
+const SpotDetailModal = recoverableLazy(() => import('../components/spots/SpotDetailModal'));
+const AuthModal = recoverableLazy(() => import('../components/auth/AuthModal'));
+const MySpotsPanel = recoverableLazy(() => import('../components/spots/MySpotsPanel'));
+const NearbySpotsPanel = recoverableLazy(() => import('../components/spots/NearbySpotsPanel'));
+const POIPanel = recoverableLazy(() => import('../components/spots/POIPanel'));
+const POIDetailPanel = recoverableLazy(() => import('../components/spots/POIDetailPanel'));
+const SettingsModal = recoverableLazy(() => import('../components/SettingsModal'));
  
  
 export default function Home() {

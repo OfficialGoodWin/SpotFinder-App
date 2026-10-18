@@ -37,7 +37,7 @@ export async function reversePlaceContext(lat, lon, language = 'en') {
 }
 
 export function localizedShareMessage(language, place, fallback = 'this area') {
-  return (SHARE_TEMPLATES[language] || SHARE_TEMPLATES.en)(place || fallback);
+  return (SHARE_TEMPLATES[language] || SHARE_TEMPLATES[String(language || '').split('-')[0]] || SHARE_TEMPLATES.en)(place || fallback);
 }
 
 export async function nearestParking(lat, lon, language = 'en') {

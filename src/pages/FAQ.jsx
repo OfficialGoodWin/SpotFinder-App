@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   ArrowLeft, Camera, ChevronDown, ExternalLink, Layers, MapPin,
   MessageSquare, Mic, Navigation, Plus, Send, Share2, ShieldCheck,
-  Sparkles, Tag,
+  Tag,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -21,136 +21,102 @@ function TutorialFrame({ label, children }) {
   );
 }
 
-const MapPlacementGraphic = () => (
-  <TutorialFrame label="Map with the green Add Spot button selected and a marker being placed">
+const MapPlacementGraphic = () => {
+  const { t } = useLanguage();
+  return <TutorialFrame label={t('faqGraphic.mapLabel')}>
     <div className="relative h-40 overflow-hidden rounded-xl bg-gradient-to-br from-sky-100 via-emerald-50 to-amber-50 dark:from-sky-950 dark:via-emerald-950 dark:to-slate-900">
       <div className="absolute inset-x-0 top-1/2 h-3 -rotate-6 bg-white/85 dark:bg-slate-700" />
-      <div className="absolute left-1/2 top-11 -translate-x-1/2 text-center"><MapPin className="mx-auto h-9 w-9 fill-red-500 text-red-600" /><span className="rounded-full bg-blue-600 px-3 py-1 text-[10px] font-bold text-white">Tap to place spot</span></div>
+      <div className="absolute left-1/2 top-11 -translate-x-1/2 text-center"><MapPin className="mx-auto h-9 w-9 fill-red-500 text-red-600" /><span className="rounded-full bg-blue-600 px-3 py-1 text-[10px] font-bold text-white">{t('faqGraphic.tapToPlace')}</span></div>
       <div className="absolute bottom-3 left-1/2 grid h-12 w-12 -translate-x-1/2 place-items-center rounded-full bg-green-600 text-white shadow-lg"><Plus className="h-7 w-7" /></div>
     </div>
-  </TutorialFrame>
-);
+  </TutorialFrame>;
+};
 
-const RequiredFieldsGraphic = () => (
-  <TutorialFrame label="Current Add Spot form showing required Spot name and Description fields and optional enrichment">
+const RequiredFieldsGraphic = () => {
+  const { t } = useLanguage();
+  return <TutorialFrame label={t('faqGraphic.requiredLabel')}>
     <div className="mx-auto max-w-sm space-y-3 rounded-2xl border border-border bg-card p-4">
-      <p className="font-bold">Add Spot</p>
-      <label className="block text-xs font-semibold">Spot name <span className="text-red-500">*</span><span className="mt-1 block rounded-lg border border-border bg-background px-3 py-2 font-normal text-foreground">Riverside Viewpoint</span></label>
-      <label className="block text-xs font-semibold">Description <span className="text-red-500">*</span><span className="mt-1 block rounded-lg border border-border bg-background px-3 py-2 font-normal text-muted-foreground">Quiet viewpoint beside the walking trail.</span></label>
-      <div className="flex items-center justify-between rounded-xl bg-muted px-3 py-2 text-xs font-semibold"><span>Optional enrichment</span><ChevronDown className="h-4 w-4" /></div>
+      <p className="font-bold">{t('faqGraphic.addSpot')}</p>
+      <label className="block text-xs font-semibold">{t('faqGraphic.spotName')} <span className="text-red-500">*</span><span className="mt-1 block rounded-lg border border-border bg-background px-3 py-2 font-normal text-foreground">{t('faqGraphic.sampleName')}</span></label>
+      <label className="block text-xs font-semibold">{t('faqGraphic.description')} <span className="text-red-500">*</span><span className="mt-1 block rounded-lg border border-border bg-background px-3 py-2 font-normal text-muted-foreground">{t('faqGraphic.sampleDescription')}</span></label>
+      <div className="flex items-center justify-between rounded-xl bg-muted px-3 py-2 text-xs font-semibold"><span>{t('faqGraphic.optional')}</span><ChevronDown className="h-4 w-4" /></div>
     </div>
-  </TutorialFrame>
-);
+  </TutorialFrame>;
+};
 
-const EnrichmentGraphic = () => (
-  <TutorialFrame label="Optional enrichment with ratings, practical details, photos, and an Instagram or TikTok link">
+const EnrichmentGraphic = () => {
+  const { t } = useLanguage();
+  return <TutorialFrame label={t('faqGraphic.enrichmentLabel')}>
     <div className="grid gap-3 sm:grid-cols-2">
-      <div className="rounded-xl border border-border bg-card p-3"><Sparkles className="mb-2 h-5 w-5 text-primary" /><p className="text-xs font-bold">Optional ratings</p><p className="mt-1 text-[11px] text-muted-foreground">Overall · Access · Condition · Safety · Crowdedness</p></div>
-      <div className="rounded-xl border border-border bg-card p-3"><Tag className="mb-2 h-5 w-5 text-primary" /><p className="text-xs font-bold">Practical details</p><p className="mt-1 text-[11px] text-muted-foreground">Tags, cost, parking, best time, directions</p></div>
-      <div className="rounded-xl border border-dashed border-border bg-card p-3"><Camera className="mb-2 h-5 w-5 text-primary" /><p className="text-xs font-bold">Up to 3 photos</p><p className="mt-1 text-[11px] text-muted-foreground">JPEG, PNG, or WebP · maximum 12 MB each</p></div>
-      <div className="rounded-xl border border-border bg-card p-3"><ExternalLink className="mb-2 h-5 w-5 text-primary" /><p className="text-xs font-bold">Social post</p><p className="mt-1 text-[11px] text-muted-foreground">Supported Instagram post/reel or TikTok video</p></div>
+      <div className="rounded-xl border border-border bg-card p-3"><Tag className="mb-2 h-5 w-5 text-primary" /><p className="text-xs font-bold">{t('faqGraphic.practical')}</p><p className="mt-1 text-[11px] text-muted-foreground">{t('faqGraphic.practicalDetails')}</p></div>
+      <div className="rounded-xl border border-dashed border-border bg-card p-3"><Camera className="mb-2 h-5 w-5 text-primary" /><p className="text-xs font-bold">{t('faqGraphic.photos')}</p><p className="mt-1 text-[11px] text-muted-foreground">{t('faqGraphic.photoLimits')}</p></div>
+      <div className="rounded-xl border border-border bg-card p-3"><ExternalLink className="mb-2 h-5 w-5 text-primary" /><p className="text-xs font-bold">{t('faqGraphic.social')}</p><p className="mt-1 text-[11px] text-muted-foreground">{t('faqGraphic.socialDetails')}</p></div>
     </div>
-  </TutorialFrame>
-);
+  </TutorialFrame>;
+};
 
-const PublishGraphic = () => (
-  <TutorialFrame label="Contribution confirmation followed by the Add spot button and successful map confirmation">
+const PublishGraphic = () => {
+  const { t } = useLanguage();
+  return <TutorialFrame label={t('faqGraphic.publishLabel')}>
     <div className="mx-auto max-w-sm space-y-3">
-      <div className="flex gap-2 rounded-xl border border-border bg-card p-3 text-xs"><span className="mt-0.5 grid h-4 w-4 place-items-center rounded border bg-primary text-primary-foreground">✓</span><span>I own or may share the information and photos.</span></div>
-      <button type="button" tabIndex={-1} className="w-full rounded-xl bg-green-600 px-4 py-3 text-sm font-bold text-white">Add spot</button>
-      <div className="rounded-xl bg-green-50 px-4 py-3 text-center text-xs font-semibold text-green-800 dark:bg-green-950/50 dark:text-green-200">Spot added to the map.</div>
+      <div className="flex gap-2 rounded-xl border border-border bg-card p-3 text-xs"><span className="mt-0.5 grid h-4 w-4 place-items-center rounded border bg-primary text-primary-foreground">✓</span><span>{t('faqGraphic.rights')}</span></div>
+      <button type="button" tabIndex={-1} className="w-full rounded-xl bg-green-600 px-4 py-3 text-sm font-bold text-white">{t('faqGraphic.addSpot')}</button>
+      <div className="rounded-xl bg-green-50 px-4 py-3 text-center text-xs font-semibold text-green-800 dark:bg-green-950/50 dark:text-green-200">{t('faqGraphic.added')}</div>
     </div>
-  </TutorialFrame>
-);
+  </TutorialFrame>;
+};
 
-const RatingsGraphic = () => (
-  <TutorialFrame label="Current Spot Details rating form with overall, access, condition, safety, and crowdedness scales">
+const RatingsGraphic = () => {
+  const { t } = useLanguage();
+  return <TutorialFrame label={t('faqGraphic.ratingsLabel')}>
     <div className="mx-auto max-w-sm rounded-2xl border border-border bg-card p-4">
-      <p className="font-bold">Rate this spot</p>
-      {['Overall experience', 'Ease of access', 'Condition & cleanliness', 'Safety & comfort', 'Crowdedness'].map((label, index) => (
-        <div key={label} className="mt-2 flex items-center justify-between gap-3 text-[11px]"><span>{label}</span><span className={index < 2 ? 'text-amber-500' : 'text-muted-foreground'}>★ ★ ★ ★ ★</span></div>
+      <p className="font-bold">{t('faqGraphic.rateSpot')}</p>
+      {['overall', 'access', 'condition', 'safety', 'crowding'].map((key, index) => (
+        <div key={key} className="mt-2 flex items-center justify-between gap-3 text-[11px]"><span>{t(`faqGraphic.${key}`)}</span><span className={index < 2 ? 'text-amber-500' : 'text-muted-foreground'}>★ ★ ★ ★ ★</span></div>
       ))}
     </div>
-  </TutorialFrame>
-);
+  </TutorialFrame>;
+};
 
-const VoiceGraphic = () => (
-  <TutorialFrame label="Description field with the voice dictation microphone button active">
+const VoiceGraphic = () => {
+  const { t } = useLanguage();
+  return <TutorialFrame label={t('faqGraphic.voiceLabel')}>
     <div className="mx-auto max-w-sm rounded-2xl border border-border bg-card p-4">
-      <div className="flex items-center justify-between"><p className="text-xs font-bold">Description *</p><span className="grid h-9 w-9 place-items-center rounded-full bg-red-500 text-white"><Mic className="h-4 w-4" /></span></div>
-      <div className="mt-2 rounded-xl border border-primary bg-background p-3 text-sm">A quiet viewpoint with an easy path…</div>
-      <p className="mt-2 text-[11px] font-semibold text-red-600">Listening — tap the microphone to stop</p>
+      <div className="flex items-center justify-between"><p className="text-xs font-bold">{t('faqGraphic.description')} *</p><span className="grid h-9 w-9 place-items-center rounded-full bg-red-500 text-white"><Mic className="h-4 w-4" /></span></div>
+      <div className="mt-2 rounded-xl border border-primary bg-background p-3 text-sm">{t('faqGraphic.voiceExample')}</div>
+      <p className="mt-2 text-[11px] font-semibold text-red-600">{t('faqGraphic.listening')}</p>
     </div>
-  </TutorialFrame>
-);
+  </TutorialFrame>;
+};
 
-const LayersGraphic = () => (
-  <TutorialFrame label="Map layer menu with Basic, Outdoor, Aerial, Winter, and Traffic choices">
+const LayersGraphic = () => {
+  const { t } = useLanguage();
+  return <TutorialFrame label={t('faqGraphic.layersLabel')}>
     <div className="flex h-40 items-center justify-center rounded-xl bg-sky-50 dark:bg-slate-900">
       <div className="w-44 overflow-hidden rounded-xl border border-border bg-card shadow-lg">
-        {['Basic', 'Outdoor', 'Aerial', 'Winter', 'Traffic'].map(label => <div key={label} className={`px-4 py-2 text-xs font-semibold ${label === 'Traffic' ? 'bg-primary text-primary-foreground' : 'border-b border-border last:border-0'}`}>{label}</div>)}
+        {['basic', 'outdoor', 'aerial', 'winter', 'traffic'].map(key => <div key={key} className={`px-4 py-2 text-xs font-semibold ${key === 'traffic' ? 'bg-primary text-primary-foreground' : 'border-b border-border last:border-0'}`}>{t(`mapLayers.${key}`)}</div>)}
       </div>
       <span className="ml-3 grid h-10 w-10 place-items-center rounded-xl bg-primary text-primary-foreground"><Layers className="h-5 w-5" /></span>
     </div>
-  </TutorialFrame>
-);
+  </TutorialFrame>;
+};
 
-const NavigateShareGraphic = () => (
-  <TutorialFrame label="Spot Details actions for navigation and sharing, followed by external map choices">
+const NavigateShareGraphic = () => {
+  const { t } = useLanguage();
+  return <TutorialFrame label={t('faqGraphic.navigateLabel')}>
     <div className="mx-auto max-w-sm space-y-3">
-      <div className="rounded-2xl border border-border bg-card p-4"><p className="font-bold">Riverside Viewpoint</p><div className="mt-3 grid grid-cols-2 gap-2"><span className="flex items-center justify-center gap-2 rounded-xl bg-primary p-2 text-xs font-bold text-primary-foreground"><Navigation className="h-4 w-4" />Navigate</span><span className="flex items-center justify-center gap-2 rounded-xl border border-border p-2 text-xs font-bold"><Share2 className="h-4 w-4" />Share</span></div></div>
+      <div className="rounded-2xl border border-border bg-card p-4"><p className="font-bold">{t('faqGraphic.sampleName')}</p><div className="mt-3 grid grid-cols-2 gap-2"><span className="flex items-center justify-center gap-2 rounded-xl bg-primary p-2 text-xs font-bold text-primary-foreground"><Navigation className="h-4 w-4" />{t('faqGraphic.navigate')}</span><span className="flex items-center justify-center gap-2 rounded-xl border border-border p-2 text-xs font-bold"><Share2 className="h-4 w-4" />{t('faqGraphic.share')}</span></div></div>
       <div className="flex flex-wrap justify-center gap-2 text-xs font-semibold"><span className="rounded-full bg-primary px-3 py-1.5 text-primary-foreground">Google Maps</span><span className="rounded-full bg-muted px-3 py-1.5">Mapy.com</span><span className="rounded-full bg-muted px-3 py-1.5">Apple Maps</span></div>
     </div>
-  </TutorialFrame>
-);
+  </TutorialFrame>;
+};
 
 const FAQ_SECTIONS = [
-  {
-    category: 'Getting started',
-    items: [
-      { q: 'What is SpotFinder?', a: 'SpotFinder is a community map for discovering and sharing useful outdoor places. Browsing, search, map layers, sharing, and opening directions in an external map app work without a registered account. Some contribution and account features have additional identity requirements.' },
-      { q: 'Do I need an account?', a: 'You can browse and add a basic spot as a guest through an anonymous app session. A registered, email-verified account is required to rate, like, save, manage synced drafts, or attach supported social content. Owners cannot rate their own spots.' },
-      { q: 'Are Elite and Ultra subscriptions available?', a: 'No purchase flow is currently enabled by default. Elite and Ultra cards are previews of possible plans, not an active offer for sale.' },
-    ],
-  },
-  {
-    category: 'Adding spots',
-    items: [
-      { q: 'How do I add a spot?', a: 'Use the green plus button, tap the map to place the marker, then provide the required spot name and description. Open Optional enrichment only if you want to add ratings, practical details, photos, or a supported social link. Confirm your contribution rights and select Add spot.', steps: [
-        { label: 'Select the green Add Spot button, then tap the map position.', Graphic: MapPlacementGraphic },
-        { label: 'Enter a meaningful spot name and description. Both are required.', Graphic: RequiredFieldsGraphic },
-        { label: 'Optionally add ratings, useful details, up to three photos, or a supported social post.', Graphic: EnrichmentGraphic },
-        { label: 'Confirm the contribution statement and publish. A success message appears after the server accepts it.', Graphic: PublishGraphic },
-      ] },
-      { q: 'Which photos and social links can I add?', a: 'You may select up to three supported image files. The app validates and re-encodes accepted images before upload. Only share images you have the right to publish. Social links are optional and limited to recognized Instagram posts/reels or TikTok videos; attaching one requires a verified account.' },
-      { q: 'Can I save a spot for later?', a: 'Yes. Save Draft keeps an unfinished spot so you can resume it later. Signed-in drafts are private to that account; guest drafts stay in this browser and are not synced across devices. Keep this browser’s site data if you need to return to a guest draft.' },
-      { q: 'How does voice dictation work?', a: 'Use the microphone beside Description. When the browser supports speech recognition and microphone permission is granted, SpotFinder uses the selected app language and inserts recognized speech into the field. You can stop listening or type instead if recognition is unavailable.', steps: [{ label: 'Tap the microphone beside Description; tap it again to stop.', Graphic: VoiceGraphic }] },
-    ],
-  },
-  {
-    category: 'Ratings',
-    items: [
-      { q: 'How do I rate a spot?', a: 'Sign in with a verified account and open a spot you did not create. The current form includes Overall experience plus optional Ease of access, Condition & cleanliness, Safety & comfort, and Crowdedness scales. Crowdedness describes how busy a place feels; a low value does not mean poor quality.', steps: [{ label: 'Open Spot Details and complete the current rating scales.', Graphic: RatingsGraphic }] },
-      { q: 'How do I save or like a spot?', a: 'Open Spot Details and use Save or Like. Both actions need a verified account. Your saved and liked places appear in My Collection.' },
-    ],
-  },
-  {
-    category: 'Map, traffic, and navigation',
-    items: [
-      { q: 'Which map styles are available?', a: 'Open Map layers to choose Basic, Outdoor, Aerial, Winter, or Traffic. Provider availability and network access can affect individual layers.', steps: [{ label: 'Open Map layers and choose the view that suits the trip.', Graphic: LayersGraphic }] },
-      { q: 'How do Nearby and Featured places work?', a: 'Open Nearby from the search bar, choose a distance, Current device location or Current map center, and a minimum rating, then select Show Nearby. Device location asks for permission; map center does not. Featured places highlight public community spots and open their details.' },
-      { q: 'What does the Traffic layer show?', a: 'When the TomTom integration is configured and reachable, Traffic displays provider flow tiles and current incident markers such as closures, works, accidents, lane restrictions, and jams. SpotFinder can also display operator-entered closures. This data may be delayed or incomplete and should not replace official road information.' },
-      { q: 'How does navigation work?', a: 'Select Navigate on a spot, search result, or place, then choose Google Maps, Mapy.com, or Apple Maps. SpotFinder sends the selected place’s coordinates directly to that provider. The map app handles directions, live location, and guidance.', steps: [{ label: 'Choose Navigate, then select an external map app.', Graphic: NavigateShareGraphic }] },
-    ],
-  },
-  {
-    category: 'Sharing and privacy',
-    items: [
-      { q: 'How do I share a spot?', a: 'Use Share in Spot Details. SpotFinder opens the device share sheet when supported and otherwise copies a direct spot link.', steps: [{ label: 'Use the Navigate and Share actions in Spot Details.', Graphic: NavigateShareGraphic }] },
-      { q: 'What happens when I delete my account?', a: 'Settings requires recent sign-in before deletion. Private account data and drafts are removed, while public spots and their photos may remain with a former-contributor label. An unresolved subscription blocks deletion until support resolves billing. See the Privacy Policy for details.' },
-      { q: 'Does SpotFinder use analytics or advertising?', a: 'Google Analytics and Google AdSense are temporarily disabled in this release. Essential Firebase authentication and reCAPTCHA, maps, search, and user-requested embeds can still contact their providers. Opening directions contacts the selected external map provider. See the Privacy and Cookie policies for details.' },
-    ],
-  },
+  [[], [], []],
+  [[MapPlacementGraphic, RequiredFieldsGraphic, EnrichmentGraphic, PublishGraphic], [], [], [VoiceGraphic]],
+  [[RatingsGraphic], []],
+  [[LayersGraphic], [], [], [NavigateShareGraphic]],
+  [[NavigateShareGraphic], [], []],
 ];
 
 function StepGuide({ steps }) {
@@ -170,18 +136,18 @@ function AccordionItem({ q, a, steps }) {
   );
 }
 
-function AboutSection() {
-  const features = ['Guest browsing and contributions', 'Verified-account ratings and collections', 'Voice input where the browser supports it', 'MapLibre maps with multiple provider-backed layers', 'Directions through Google Maps, Mapy.com, or Apple Maps', 'Optional plan previews; checkout disabled by default'];
+function AboutSection({ t }) {
+  const features = Array.from({ length: 6 }, (_, index) => t(`faqPage.about.feature${index + 1}`));
   return (
     <section className="sf-surface overflow-hidden">
-      <div className="border-b border-border bg-primary/[0.055] px-5 py-5 sm:px-6"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><MapPin className="h-5 w-5" /></span><div><h2 className="text-xl font-bold">About SpotFinder</h2><p className="text-sm text-muted-foreground">Community-powered place discovery and external directions.</p></div></div></div>
+      <div className="border-b border-border bg-primary/[0.055] px-5 py-5 sm:px-6"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><MapPin className="h-5 w-5" /></span><div><h2 className="text-xl font-bold">{t('faqPage.about.title')}</h2><p className="text-sm text-muted-foreground">{t('faqPage.about.subtitle')}</p></div></div></div>
       <ul className="grid gap-2 px-5 py-5 sm:grid-cols-2 sm:px-6">{features.map(feature => <li key={feature} className="flex items-start gap-2.5 text-sm text-muted-foreground"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />{feature}</li>)}</ul>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/40 px-5 py-4 text-xs text-muted-foreground sm:px-6"><span>React, MapLibre, Firebase, and external map directions</span><a href="/updates" className="inline-flex items-center gap-1.5 font-bold text-primary hover:underline">Version {APP_VERSION} · What’s new <ExternalLink className="h-3.5 w-3.5" /></a></div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/40 px-5 py-4 text-xs text-muted-foreground sm:px-6"><span>{t('faqPage.about.technology')}</span><a href="/updates" className="inline-flex items-center gap-1.5 font-bold text-primary hover:underline">{t('faqPage.about.whatsNew', { version: APP_VERSION })} <ExternalLink className="h-3.5 w-3.5" /></a></div>
     </section>
   );
 }
 
-function FeedbackSection({ language }) {
+function FeedbackSection({ language, t }) {
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [status, setStatus] = useState('idle');
@@ -194,14 +160,14 @@ function FeedbackSection({ language }) {
   };
   return (
     <section className="sf-surface overflow-hidden" aria-labelledby="feedback-title">
-      <div className="flex items-center gap-3 border-b border-border bg-primary/[0.055] px-5 py-4"><MessageSquare className="h-5 w-5 text-primary" /><h2 id="feedback-title" className="text-lg font-bold">Send feedback</h2></div>
-      <form onSubmit={handleSubmit} className="space-y-3 p-5">
-        {status === 'sent' && <p role="status" className="rounded-xl bg-green-50 p-3 text-sm font-semibold text-green-800 dark:bg-green-950/50 dark:text-green-200">Thank you. Your message was received.</p>}
-        {status === 'error' && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/50 dark:text-red-200">Feedback could not be sent. Contact spotfinder@icloud.com.</p>}
-        {status === 'required' && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">Please write a message first.</p>}
-        <label className="block text-xs font-semibold">Your email (optional)<input type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com" className="sf-control mt-1 w-full text-sm" /></label>
-        <label className="block text-xs font-semibold">Your message<textarea value={message} onChange={event => { setMessage(event.target.value); if (status === 'required') setStatus('idle'); }} rows={4} className="sf-control mt-1 w-full resize-none py-3 text-sm" /></label>
-        <button type="submit" disabled={status === 'sending'} className="sf-button-primary flex w-full items-center justify-center gap-2"><Send className="h-4 w-4" />{status === 'sending' ? 'Sending…' : 'Send feedback'}</button>
+      <div className="flex items-center gap-3 border-b border-border bg-primary/[0.055] px-5 py-4"><MessageSquare className="h-5 w-5 text-primary" /><h2 id="feedback-title" className="text-lg font-bold">{t('faqPage.feedback.title')}</h2></div>
+      <form onSubmit={handleSubmit} className="space-y-3 p-5" data-unsaved-work={email.trim() || message.trim() ? 'true' : undefined}>
+        {status === 'sent' && <p role="status" className="rounded-xl bg-green-50 p-3 text-sm font-semibold text-green-800 dark:bg-green-950/50 dark:text-green-200">{t('faqPage.feedback.sent')}</p>}
+        {status === 'error' && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/50 dark:text-red-200">{t('faqPage.feedback.error')}</p>}
+        {status === 'required' && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">{t('faqPage.feedback.required')}</p>}
+        <label className="block text-xs font-semibold">{t('faqPage.feedback.email')}<input type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com" className="sf-control mt-1 w-full text-sm" /></label>
+        <label className="block text-xs font-semibold">{t('faqPage.feedback.message')}<textarea value={message} onChange={event => { setMessage(event.target.value); if (status === 'required') setStatus('idle'); }} rows={4} className="sf-control mt-1 w-full resize-none py-3 text-sm" /></label>
+        <button type="submit" disabled={status === 'sending'} className="sf-button-primary flex w-full items-center justify-center gap-2"><Send className="h-4 w-4" />{t(status === 'sending' ? 'faqPage.feedback.sending' : 'faqPage.feedback.send')}</button>
       </form>
     </section>
   );
@@ -210,15 +176,23 @@ function FeedbackSection({ language }) {
 export default function FAQ() {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
+  const sections = FAQ_SECTIONS.map((items, sectionIndex) => ({
+    category: t(`faqPage.category${sectionIndex + 1}`),
+    items: items.map((graphics, itemIndex) => ({
+      q: t(`faqPage.question${sectionIndex + 1}_${itemIndex + 1}`),
+      a: t(`faqPage.answer${sectionIndex + 1}_${itemIndex + 1}`),
+      steps: graphics.length ? graphics.map((Graphic, stepIndex) => ({ Graphic, label: t(`faqPage.step${sectionIndex + 1}_${itemIndex + 1}_${stepIndex + 1}`) })) : undefined,
+    })),
+  }));
   return (
     <div className="sf-page-viewport bg-background text-foreground">
-      <header className="sticky top-0 z-10 border-b border-border bg-background/92 backdrop-blur-xl"><div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3 sm:px-6"><button type="button" onClick={() => navigate('/')} aria-label={t('faq.backToMap')} className="sf-icon-button"><ArrowLeft className="h-4 w-4" /></button><div><h1 className="text-lg font-bold">{t('faq.title')}</h1><p className="text-xs text-muted-foreground">Verified for SpotFinder {APP_VERSION}</p></div></div></header>
+      <header className="sticky top-0 z-10 border-b border-border bg-background/92 backdrop-blur-xl"><div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3 sm:px-6"><button type="button" onClick={() => navigate('/')} aria-label={t('faq.backToMap')} className="sf-icon-button"><ArrowLeft className="h-4 w-4" /></button><div><h1 className="text-lg font-bold">{t('faq.title')}</h1><p className="text-xs text-muted-foreground">{t('faqPage.version', { version: APP_VERSION })}</p></div></div></header>
       <main className="mx-auto max-w-3xl space-y-7 px-4 py-6 pb-20 sm:px-6 sm:py-8">
-        {language !== 'en' && <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">The updated help content is currently verified in English. Reviewed translations are being prepared; the app interface can remain in your selected language.</p>}
-        <p className="rounded-2xl border border-primary/15 bg-primary/[0.045] p-4 text-sm leading-6 text-muted-foreground">These instructions describe the current app. Provider-backed features can vary with browser support, configuration, permissions, and network availability.</p>
-        {FAQ_SECTIONS.map(section => <section key={section.category} aria-labelledby={`faq-${section.category.replaceAll(' ', '-').toLowerCase()}`}><h2 id={`faq-${section.category.replaceAll(' ', '-').toLowerCase()}`} className="mb-2 px-1 text-xs font-bold uppercase tracking-widest text-primary">{section.category}</h2><div className="sf-surface overflow-hidden">{section.items.map(item => <AccordionItem key={item.q} {...item} />)}</div></section>)}
-        <AboutSection />
-        <FeedbackSection language={language} />
+        {!['en', 'cs', 'pl'].includes(language.split('-')[0]) && <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">{t('faqPage.translationNotice')}</p>}
+        <p className="rounded-2xl border border-primary/15 bg-primary/[0.045] p-4 text-sm leading-6 text-muted-foreground">{t('faqPage.intro')}</p>
+        {sections.map((section, index) => <section key={index} aria-labelledby={`faq-section-${index}`}><h2 id={`faq-section-${index}`} className="mb-2 px-1 text-xs font-bold uppercase tracking-widest text-primary">{section.category}</h2><div className="sf-surface overflow-hidden">{section.items.map((item, itemIndex) => <AccordionItem key={itemIndex} {...item} />)}</div></section>)}
+        <AboutSection t={t} />
+        <FeedbackSection language={language} t={t} />
       </main>
     </div>
   );

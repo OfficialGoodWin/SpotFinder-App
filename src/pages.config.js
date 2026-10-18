@@ -48,17 +48,17 @@ import FAQ from './pages/FAQ';
  *
  * The mainPage value must match a key in the PAGES object exactly.
  */
-import { lazy } from 'react';
+import { recoverableLazy } from './components/ChunkLoadRecovery';
 import Home from './pages/Home';
-const FAQ = lazy(() => import('./pages/FAQ'));
-const Status = lazy(() => import('./pages/Status'));
-const StatusAdmin = lazy(() => import('./pages/StatusAdmin'));
-const Admin = lazy(() => import('./pages/Admin'));
-const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
-const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions'));
-const CookiePolicy = lazy(() => import('./pages/CookiePolicy'));
-const RefundPolicy = lazy(() => import('./pages/RefundPolicy'));
-const Updates = lazy(() => import('./pages/Updates'));
+const FAQ = recoverableLazy(() => import('./pages/FAQ'));
+const Status = recoverableLazy(() => import('./pages/Status'));
+const StatusAdmin = recoverableLazy(() => import('./pages/StatusAdmin'));
+const Admin = recoverableLazy(() => import('./pages/Admin'));
+const PrivacyPolicy = recoverableLazy(() => import('./pages/PrivacyPolicy'));
+const TermsAndConditions = recoverableLazy(() => import('./pages/TermsAndConditions'));
+const CookiePolicy = recoverableLazy(() => import('./pages/CookiePolicy'));
+const RefundPolicy = recoverableLazy(() => import('./pages/RefundPolicy'));
+const Updates = recoverableLazy(() => import('./pages/Updates'));
 import __Layout from './Layout.jsx';
  
  

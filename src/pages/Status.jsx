@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { getFirebaseServices } from '../api/firebaseClient';
 import { reportedUptimePercent } from '@/lib/statusMetrics';
+import { useLanguage } from '@/lib/LanguageContext';
 
 // ── Status page ────────────────────────────────────────────────────────────
 // Reads two optional Firestore collections, both public-read / admin-write:
@@ -85,6 +86,7 @@ function incidentAdjustedDays(rawDays, incidents) {
 }
 
 function ServiceRow({ service, incidents }) {
+  const { t } = useLanguage();
   const rawDays = service.days?.length ? service.days : [];
   const days = incidentAdjustedDays(rawDays, incidents);
   const current = STATUS_META[days.at(-1)] ? days.at(-1) : 'unknown';
@@ -97,7 +99,7 @@ function ServiceRow({ service, incidents }) {
           <span className={`w-1.5 h-1.5 rounded-full ${STATUS_META[current]?.dot || STATUS_META.up.dot}`} />
           <span className="font-medium text-[#1B2A1E]">{service.name}</span>
         </div>
-        <span className="text-sm font-mono text-[#5C5546]">{uptime === null ? 'No history' : `${uptime}% reported uptime`}</span>
+        <span className="text-sm font-mono text-[#5C5546]">{uptime === null ? t('statusPage.noHistory') : t('statusPage.reportedUptime').replace('{value}', uptime)}</span>
       </div>
       {days.length > 0 ? <><div className="flex gap-[2px] h-8">
         {days.map((d, i) => {
@@ -108,23 +110,24 @@ function ServiceRow({ service, incidents }) {
             <div
               key={i}
               className={`flex-1 rounded-[1px] ${STATUS_META[d]?.bar || STATUS_META.unknown.bar}`}
-              title={`${localDateKey(day)} — ${STATUS_META[d]?.label || STATUS_META.unknown.label}`}
+              title={`${localDateKey(day)} — ${t(`statusPage.${STATUS_META[d] ? d : 'unknown'}`)}`}
             />
           );
         })}
       </div>
       <div className="flex justify-between mt-1.5 text-xs font-mono text-[#8A8270]">
-        <span>{Math.max(days.length - 1, 0)} days ago</span>
-        <span>{days.filter(day => ['up', 'degraded', 'down'].includes(day)).length} reported intervals · Today</span>
+        <span>{t('statusPage.daysAgo').replace('{value}', Math.max(days.length - 1, 0))}</span>
+        <span>{t('statusPage.reportedIntervals').replace('{value}', days.filter(day => ['up', 'degraded', 'down'].includes(day)).length)}</span>
       </div>
-      </> : <p className="rounded-md bg-[#E7E2D3] px-3 py-2 text-sm text-[#5C5546]">No monitoring history has been published for this service.</p>}
+      </> : <p className="rounded-md bg-[#E7E2D3] px-3 py-2 text-sm text-[#5C5546]">{t('statusPage.noServiceHistory')}</p>}
     </div>
   );
 }
 
 function IncidentGroup({ date, incidents }) {
+  const { t, language } = useLanguage();
   const d = new Date(date + 'T00:00:00');
-  const label = d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+  const label = d.toLocaleDateString(language, { month: 'long', day: 'numeric', year: 'numeric' });
 
   return (
     <div className="py-6 border-b border-[#DDD6C8] last:border-0">
@@ -136,10 +139,10 @@ function IncidentGroup({ date, incidents }) {
             {inc.updates?.map((u, j) => (
               <div key={j} className={`border-l-2 pl-3 ${UPDATE_META[u.type]?.border || UPDATE_META.investigating.border}`}>
                 <p className="text-sm text-[#3C382F]">
-                  <span className="font-medium">{UPDATE_META[u.type]?.label || u.type}</span> — {u.message}
+                  <span className="font-medium">{UPDATE_META[u.type] ? t(`statusPage.${u.type}`) : u.type}</span> — {u.message}
                 </p>
                 <p className="text-xs font-mono text-[#8A8270] mt-0.5">
-                  {new Date(u.at).toLocaleString(undefined, { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })}
+                  {new Date(u.at).toLocaleString(language, { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })}
                 </p>
               </div>
             ))}
@@ -151,6 +154,7 @@ function IncidentGroup({ date, incidents }) {
 }
 
 export default function StatusPage() {
+  const { t } = useLanguage();
   const [services, setServices] = useState([]);
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -159,7 +163,7 @@ export default function StatusPage() {
   useEffect(() => {
     (async () => {
       const firebase = getFirebaseServices();
-      if (!firebase?.db) { setDataNotice('Status data is unavailable.'); setLoading(false); return; }
+      if (!firebase?.db) { setDataNotice('dataUnavailable'); setLoading(false); return; }
       try {
         const [serviceResult, incidentResult] = await Promise.allSettled([
           getDocs(query(collection(firebase.db, 'status_services'), orderBy('order', 'asc'))),
@@ -168,12 +172,12 @@ export default function StatusPage() {
         if (serviceResult.status === 'fulfilled') {
           const records = serviceResult.value.docs.map(d => ({ id: d.id, ...d.data() }));
           setServices(records);
-          if (!records.length) setDataNotice('No service-monitoring history has been published.');
+          if (!records.length) setDataNotice('noMonitoring');
         } else {
-          setDataNotice('Service-monitoring history could not be verified.');
+          setDataNotice('monitoringUnverified');
         }
         if (incidentResult.status === 'fulfilled') setIncidents(incidentResult.value.docs.map(d => ({ id: d.id, ...d.data() })));
-        else setDataNotice(current => current || 'Incident history could not be verified.');
+        else setDataNotice(current => current || 'incidentsUnverified');
       } finally {
         setLoading(false);
       }
@@ -199,14 +203,14 @@ export default function StatusPage() {
   const overallDown = services.some(s => s.days?.at(-1) === 'down') || incidentDown;
   const overallDegraded = services.some(s => s.days?.at(-1) === 'degraded') || incidentDegraded;
   const bannerColor = overallDown ? 'bg-[#B4453A]' : overallDegraded ? 'bg-[#C98A2C]' : hasCurrentServiceData ? 'bg-[#4C7A52]' : 'bg-[#6F6A5E]';
-  const bannerText = overallDown ? 'Reported service outage' : overallDegraded ? 'Reported service degradation' : hasCurrentServiceData ? 'Published services report operational' : 'Current status is not verified';
+  const bannerText = t(`statusPage.${overallDown ? 'outage' : overallDegraded ? 'degradation' : hasCurrentServiceData ? 'operational' : 'currentUnverified'}`);
 
   return (
     <div className="min-h-screen bg-[#F3F1EA]">
       <div className="max-w-2xl mx-auto px-6 py-14">
         <header className="mb-10">
           <p className="font-mono text-xs tracking-wide text-[#8A8270] mb-1">SPOTFINDER</p>
-          <h1 className="text-2xl font-semibold text-[#1B2A1E]">Status</h1>
+          <h1 className="text-2xl font-semibold text-[#1B2A1E]">{t('statusPage.title')}</h1>
         </header>
 
         {loading ? (
@@ -221,15 +225,15 @@ export default function StatusPage() {
           <>
             <section>
               {services.map(s => <ServiceRow key={s.id} service={s} incidents={incidents} />)}
-              {dataNotice && <p className="rounded-md bg-[#E7E2D3] px-4 py-3 text-sm text-[#5C5546]">{dataNotice}</p>}
+              {dataNotice && <p className="rounded-md bg-[#E7E2D3] px-4 py-3 text-sm text-[#5C5546]">{t(`statusPage.${dataNotice}`)}</p>}
             </section>
 
-            <p className="mt-4 text-xs leading-5 text-[#8A8270]">Status and uptime are calculated only from published Firestore monitoring intervals. Missing intervals are not counted as operational. This page is not an independent external uptime monitor.</p>
+            <p className="mt-4 text-xs leading-5 text-[#8A8270]">{t('statusPage.method')}</p>
 
             {activeIncidentGroups.length > 0 && (
               <section className="mt-4">
                 <h2 className="font-mono text-xs tracking-wide text-[#B4453A] mb-1 pt-6 border-t border-[#DDD6C8]">
-                  ACTIVE INCIDENTS
+                  {t('statusPage.activeIncidents')}
                 </h2>
                 {activeIncidentGroups.map(([date, groupedIncidents]) => (
                   <IncidentGroup key={`active-${date}`} date={date} incidents={groupedIncidents} />
@@ -239,10 +243,10 @@ export default function StatusPage() {
 
             <section className="mt-4">
               <h2 className="font-mono text-xs tracking-wide text-[#8A8270] mb-1 pt-6 border-t border-[#DDD6C8]">
-                PAST INCIDENTS
+                {t('statusPage.pastIncidents')}
               </h2>
               {pastIncidentGroups.length === 0 ? (
-                <p className="text-sm text-[#8A8270] py-6">No resolved incidents yet.</p>
+                <p className="text-sm text-[#8A8270] py-6">{t('statusPage.noResolved')}</p>
               ) : (
                 pastIncidentGroups.map(([date, groupedIncidents]) => (
                   <IncidentGroup key={`past-${date}`} date={date} incidents={groupedIncidents} />

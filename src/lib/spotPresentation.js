@@ -30,7 +30,8 @@ function localizedPoiName(poi, language = 'en') {
   if (poi.match_confidence === 'review') return '';
   const tags = poi.tags && typeof poi.tags === 'object' ? poi.tags : {};
   const names = poi.names && typeof poi.names === 'object' ? poi.names : {};
-  return [names[language], tags[`name:${language}`], poi.name, poi.title, names.en, tags['name:en'], tags.name]
+  const base = language.split('-')[0];
+  return [names[language], tags[`name:${language}`], names[base], tags[`name:${base}`], poi.name, poi.title, names.en, tags['name:en'], tags.name]
     .map(cleanText).find(isMeaningfulSpotTitle) || '';
 }
 
@@ -43,7 +44,7 @@ function verifiedWikidataLabel(poi, language = 'en') {
     || (Boolean(poi.wikidata || poi.tags?.wikidata) && Number.isFinite(distance) && distance <= 150);
   if (!geographicallyVerified) return '';
   const labels = poi.wikidata_labels && typeof poi.wikidata_labels === 'object' ? poi.wikidata_labels : {};
-  return [labels[language], poi.wikidata_label, labels.en].map(cleanText).find(isMeaningfulSpotTitle) || '';
+  return [labels[language], labels[language.split('-')[0]], poi.wikidata_label, labels.en].map(cleanText).find(isMeaningfulSpotTitle) || '';
 }
 
 export function getVerifiedSpotCategory(spot = {}) {
@@ -202,4 +203,5 @@ export function getSpotImagePresentation(spot = {}, { src, loadFailed = false } 
   if (imageInfo) return { kind: 'image', imageInfo };
   return { kind: 'fallback', reason: hasCandidate ? 'invalid' : 'missing' };
 }
+
 

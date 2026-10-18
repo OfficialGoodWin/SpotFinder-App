@@ -1,18 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { translations } from '@/locales/translations';
+import { detectPreferredLanguage, localeBase, normalizeLanguage } from './localePreference';
 
 const LanguageContext = createContext();
 
 const COOKIE_NAME = 'spotfinder_language';
 const DEFAULT_LANGUAGE = 'en';
 
-const normalizeLanguage = (candidate) => {
-  const shortCode = String(candidate || '').trim().toLowerCase().split(/[-_]/)[0];
-  return Object.prototype.hasOwnProperty.call(translations, shortCode) ? shortCode : DEFAULT_LANGUAGE;
-};
-
 const readTranslation = (language, key) => {
-  let value = translations[language];
+  let value = translations[localeBase(language)];
   for (const part of key.split('.')) {
     if (!value || typeof value !== 'object' || !(part in value)) return undefined;
     value = value[part];
@@ -37,26 +33,34 @@ const setCookie = (name, value, days = 365) => {
 
 export function LanguageProvider({ children }) {
   const [language, setLanguageState] = useState(() => {
-    // Try to get language from cookie, fallback to default
     const savedLang = getCookie(COOKIE_NAME);
-    return normalizeLanguage(savedLang);
+    return normalizeLanguage(savedLang) || detectPreferredLanguage(navigator.languages || [navigator.language]);
   });
 
+  useEffect(() => { document.documentElement.lang = language; }, [language]);
+
   const setLanguage = (lang) => {
-    const normalized = normalizeLanguage(lang);
+    const normalized = normalizeLanguage(lang) || DEFAULT_LANGUAGE;
     setLanguageState(normalized);
     setCookie(COOKIE_NAME, normalized);
   };
 
-  const t = (key, fallback) => {
+  const t = (key, fallbackOrVariables) => {
     const localized = readTranslation(language, key);
-    if (localized !== undefined && localized !== null && localized !== '') return localized;
+    // Romanian ordinal numbers do not use the English suffixes (st/nd/rd/th).
+    const intentionallyEmpty = localeBase(language) === 'ro' && /^navPanel\.ord(?:St|Nd|Rd|Th)$/.test(key);
+    const variables = fallbackOrVariables && typeof fallbackOrVariables === 'object' ? fallbackOrVariables : null;
+    const format = value => variables && typeof value === 'string'
+      ? value.replace(/\{([a-zA-Z][a-zA-Z0-9]*)\}/g, (match, name) =>
+        Object.prototype.hasOwnProperty.call(variables, name) ? String(variables[name]) : match)
+      : value;
+    if (localized !== undefined && localized !== null && (localized !== '' || intentionallyEmpty)) return format(localized);
 
     // Individual locale dictionaries can lag behind a new UI string. Falling
     // back to English keeps internal translation keys out of the interface.
     const english = readTranslation(DEFAULT_LANGUAGE, key);
-    if (english !== undefined && english !== null && english !== '') return english;
-    return fallback || key;
+    if (english !== undefined && english !== null && english !== '') return format(english);
+    return typeof fallbackOrVariables === 'string' ? fallbackOrVariables : key;
   };
 
   return (

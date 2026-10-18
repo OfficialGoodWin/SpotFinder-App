@@ -30,7 +30,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
   const recognitionRef = useRef(null);
   const searchAbortRef = useRef(null);
   const containerRef = useRef(null);
-  const bcp47 = LANG_TO_BCP47[language] || 'en-US';
+  const bcp47 = language.includes('-') ? language : (LANG_TO_BCP47[language] || language || 'en-US');
 
   // Close dropdown when clicking/touching outside
   useEffect(() => {

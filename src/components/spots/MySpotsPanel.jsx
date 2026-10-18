@@ -25,25 +25,25 @@ import { draftToast } from '../ui/draftToast';
 import { toast } from 'sonner';
 
 const TABS = [
-  { id: 'saved', label: 'Favorites', icon: Bookmark },
-  { id: 'created', label: 'Contributions', icon: PlusCircle },
-  { id: 'liked', label: 'Liked', icon: Heart },
-  { id: 'drafts', label: 'Drafts', icon: FilePenLine },
+  { id: 'saved', labelKey: 'favorites', icon: Bookmark },
+  { id: 'created', labelKey: 'contributions', icon: PlusCircle },
+  { id: 'liked', labelKey: 'liked', icon: Heart },
+  { id: 'drafts', labelKey: 'drafts', icon: FilePenLine },
 ];
 
 const SORTS = [
-  ['newest', 'Newest'],
-  ['oldest', 'Oldest'],
-  ['rating', 'Highest rated'],
-  ['liked', 'Most liked'],
-  ['alphabetical', 'Alphabetical'],
+  ['newest', 'newest'],
+  ['oldest', 'oldest'],
+  ['rating', 'highestRated'],
+  ['liked', 'mostLiked'],
+  ['alphabetical', 'alphabetical'],
 ];
 
 const EMPTY_COPY = {
-  saved: ['No saved spots yet', 'Save places you want to come back to.'],
-  created: ['No created spots yet', 'Add a spot to start your collection.'],
-  liked: ['No liked spots yet', 'Like a spot and it will appear here.'],
-  drafts: ['No drafts yet', 'Saved drafts stay private until you publish them.'],
+  saved: ['noSaved', 'noSavedHint'],
+  created: ['noCreated', 'noCreatedHint'],
+  liked: ['noLiked', 'noLikedHint'],
+  drafts: ['noDrafts', 'noDraftsHint'],
 };
 
 function DraftThumbnail({ draft, user, draftOwnerKey }) {
@@ -64,7 +64,9 @@ function DraftThumbnail({ draft, user, draftOwnerKey }) {
 }
 
 export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, initialTab, onClose, onSelectSpot, onResumeDraft }) {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
+  const collectionText = key => t(`collection.${key}`);
+  const tabName = id => collectionText(TABS.find(item => item.id === id)?.labelKey || 'drafts');
   const tabs = draftOnly ? TABS.filter(item => item.id === 'drafts') : TABS;
   const [tab, setTab] = useState(initialTab || (draftOnly ? 'drafts' : 'saved'));
   const [data, setData] = useState({ saved: null, created: null, liked: null, drafts: null });
@@ -195,45 +197,45 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
         <header className="sf-collection-header px-4 sm:px-6 pt-4 sm:pt-5 pb-4 border-b border-gray-200/70 dark:border-border">
           <div className="sf-collection-heading relative flex items-center justify-between mb-4">
             <div className="min-w-0">
-              <h2 id="my-spots-title" className="text-xl font-bold text-gray-900 dark:text-foreground">{draftOnly ? 'Drafts' : 'My collection'}</h2>
-              <p className="text-xs sm:text-sm text-gray-500 dark:text-muted-foreground mt-0.5">{user ? 'Favorites, contributions, likes, and private drafts.' : 'Drafts saved only on this device and guest session.'}</p>
+              <h2 id="my-spots-title" className="text-xl font-bold text-gray-900 dark:text-foreground">{collectionText(draftOnly ? 'drafts' : 'title')}</h2>
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-muted-foreground mt-0.5">{collectionText(user ? 'memberIntro' : 'guestIntro')}</p>
             </div>
-            <button onClick={onClose} className="sf-collection-close w-11 h-11 shrink-0 grid place-items-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500" aria-label="Close My Spots">
+            <button onClick={onClose} className="sf-collection-close w-11 h-11 shrink-0 grid place-items-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500" aria-label={t('common.close')}>
               <X className="w-5 h-5" />
             </button>
           </div>
 
           <LiquidSegmentedControl
-            ariaLabel="My Spots collections"
+            ariaLabel={collectionText('title')}
             equal
             className="sf-collection-tabs"
             value={tab}
             onChange={selectTab}
             options={tabs.map(item => ({ ...item, value: item.id }))}
-            renderOption={({ id, label, icon: Icon }) => <><Icon className="h-4 w-4 shrink-0" aria-hidden="true" /><span className="truncate">{label}</span>{data[id] !== null && <span className="sf-collection-tabs__count">{data[id].length}</span>}</>}
+            renderOption={({ id, labelKey, icon: Icon }) => <><Icon className="h-4 w-4 shrink-0" aria-hidden="true" /><span className="truncate">{collectionText(labelKey)}</span>{data[id] !== null && <span className="sf-collection-tabs__count">{data[id].length}</span>}</>}
           />
 
           <div className="sf-collection-tools grid grid-cols-[minmax(0,1fr)_auto] gap-2 mt-3">
             <label className="relative min-w-0">
-              <span className="sr-only">Search {tab} spots</span>
+              <span className="sr-only">{collectionText('search')}</span>
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" aria-hidden="true" />
-              <input value={query} onChange={event => setQuery(event.target.value)} placeholder={`Search ${tab} spots`} className="w-full h-11 pl-9 pr-3 rounded-xl border border-gray-200 dark:border-border bg-white/70 dark:bg-black/10 text-sm outline-none focus-visible:ring-2 focus-visible:ring-green-500" />
+              <input value={query} onChange={event => setQuery(event.target.value)} placeholder={collectionText('search')} className="w-full h-11 pl-9 pr-3 rounded-xl border border-gray-200 dark:border-border bg-white/70 dark:bg-black/10 text-sm outline-none focus-visible:ring-2 focus-visible:ring-green-500" />
             </label>
             <div className="relative">
               <ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-600" aria-hidden="true" />
-              <SmoothSelect value={sort} onChange={setSort} ariaLabel="Sort spots" options={SORTS.map(([value, label]) => ({ value, label }))} className="max-w-[11rem] pl-9" />
+              <SmoothSelect value={sort} onChange={setSort} ariaLabel={collectionText('sort')} options={SORTS.map(([value, labelKey]) => ({ value, label: collectionText(labelKey) }))} className="max-w-[11rem] pl-9" />
             </div>
           </div>
         </header>
 
-        <div id="my-spots-tabpanel" role="tabpanel" aria-label={`${tab} spots`} tabIndex={0} className="overflow-y-auto flex-1 p-4 sm:p-5 focus:outline-none" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+        <div id="my-spots-tabpanel" role="tabpanel" aria-label={tabName(tab)} tabIndex={0} className="overflow-y-auto flex-1 p-4 sm:p-5 focus:outline-none" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
           {isLoading ? (
-            <div className="grid sm:grid-cols-2 gap-3" aria-label="Loading spots">
+            <div className="grid sm:grid-cols-2 gap-3" aria-label={collectionText('loading')}>
               {[1, 2, 3, 4].map(item => <div key={item} className="h-36 rounded-2xl bg-gray-100 dark:bg-accent animate-pulse" />)}
             </div>
           ) : error ? (
             <div className="min-h-64 grid place-items-center text-center px-8">
-              <div><AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-3" /><p className="font-semibold">{error}</p><button onClick={() => loadTab(tab)} className="mt-4 min-h-11 px-4 rounded-xl border font-semibold inline-flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-green-500"><RefreshCw className="w-4 h-4" />Retry</button></div>
+              <div><AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-3" /><p className="font-semibold">{error}</p><button onClick={() => loadTab(tab)} className="mt-4 min-h-11 px-4 rounded-xl border font-semibold inline-flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-green-500"><RefreshCw className="w-4 h-4" />{collectionText('retry')}</button></div>
             </div>
           ) : visibleSpots.length === 0 ? (
             <div className="min-h-64 grid place-items-center text-center px-8">
@@ -241,8 +243,8 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
                 <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-accent grid place-items-center mx-auto mb-3">
                   {query ? <Search className="w-6 h-6 text-gray-400" /> : tab === 'saved' ? <Bookmark className="w-6 h-6 text-gray-400" /> : tab === 'liked' ? <Heart className="w-6 h-6 text-gray-400" /> : tab === 'drafts' ? <FilePenLine className="w-6 h-6 text-gray-400" /> : <MapPin className="w-6 h-6 text-gray-400" />}
                 </div>
-                <p className="font-semibold">{query ? 'No matching spots' : EMPTY_COPY[tab][0]}</p>
-                <p className="text-sm text-gray-500 mt-1">{query ? 'Try another title, description, or location.' : EMPTY_COPY[tab][1]}</p>
+                <p className="font-semibold">{collectionText(query ? 'noMatching' : EMPTY_COPY[tab][0])}</p>
+                <p className="text-sm text-gray-500 mt-1">{collectionText(query ? 'tryAnother' : EMPTY_COPY[tab][1])}</p>
               </div>
             </div>
           ) : (
@@ -255,13 +257,13 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
                     <div className="min-w-0 flex-1 p-3">
                       <h3 className="truncate font-semibold">{draftDisplayName(spot)}</h3>
                       <p className="mt-1 flex items-center gap-1 truncate text-xs text-muted-foreground"><MapPin className="h-3.5 w-3.5" />{getSpotLocationLabel(spot)}</p>
-                      <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{spot.description || 'No description yet'}</p>
-                      <p className="mt-2 text-[11px] text-muted-foreground">Edited {new Date(spot.updated_at).toLocaleString()}</p>
+                      <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{spot.description || collectionText('noDescriptionYet')}</p>
+                      <p className="mt-2 text-[11px] text-muted-foreground">{collectionText('edited').replace('{date}', new Date(spot.updated_at).toLocaleString(language))}</p>
                     </div>
                   </div>
                   <div className="flex border-t border-gray-100 dark:border-border">
-                    <button onClick={() => { onResumeDraft?.(spot); onClose(); }} className="flex min-h-11 flex-1 items-center justify-center gap-1.5 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-accent"><FilePenLine className="h-4 w-4" />Resume editing</button>
-                    <button onClick={() => handleDelete(spot.id)} disabled={Boolean(deletingId)} className="grid min-h-11 w-12 place-items-center border-l border-gray-100 text-red-500 hover:bg-red-50 disabled:opacity-50 dark:border-border dark:hover:bg-red-950/20" aria-label={`Delete ${draftDisplayName(spot)}`}><Trash2 className="h-4 w-4" /></button>
+                    <button onClick={() => { onResumeDraft?.(spot); onClose(); }} className="flex min-h-11 flex-1 items-center justify-center gap-1.5 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-accent"><FilePenLine className="h-4 w-4" />{collectionText('resumeEditing')}</button>
+                    <button onClick={() => handleDelete(spot.id)} disabled={Boolean(deletingId)} className="grid min-h-11 w-12 place-items-center border-l border-gray-100 text-red-500 hover:bg-red-50 disabled:opacity-50 dark:border-border dark:hover:bg-red-950/20" aria-label={`${collectionText('deleteDraft')}: ${draftDisplayName(spot)}`}><Trash2 className="h-4 w-4" /></button>
                   </div>
                 </article>
                 ) : (
@@ -273,7 +275,7 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
                     <div className="p-3 min-w-0 flex-1 flex flex-col">
                       <h3 className="line-clamp-2 break-words font-semibold text-gray-900 dark:text-foreground">{getSpotDisplayName(spot, language)}</h3>
                       <p className="text-xs text-gray-500 dark:text-muted-foreground truncate mt-1 flex items-center gap-1"><MapPin className="w-3.5 h-3.5 shrink-0" />{getSpotLocationLabel(spot)}</p>
-                      <p className="text-xs text-gray-500 dark:text-muted-foreground line-clamp-2 mt-1.5 flex-1">{spot.description || 'No description'}</p>
+                      <p className="text-xs text-gray-500 dark:text-muted-foreground line-clamp-2 mt-1.5 flex-1">{spot.description || collectionText('noDescription')}</p>
                       {(getSpotRating(spot) !== null || spot.likes_count > 0 || spot.saves_count > 0) && <div className="flex items-center gap-3 text-xs text-gray-500 mt-2" aria-label="Spot statistics">
                         {getSpotRating(spot) !== null && <span className="flex items-center gap-1"><Star className="w-3.5 h-3.5 text-amber-500" />{getSpotRating(spot).toFixed(1)}</span>}
                         {spot.likes_count > 0 && <span className="flex items-center gap-1"><Heart className="w-3.5 h-3.5" />{spot.likes_count}</span>}
@@ -282,8 +284,8 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
                     </div>
                   </div>
                   <div className="border-t border-gray-100 dark:border-border flex">
-                    <button onClick={() => { onSelectSpot?.(spot); onClose(); }} className="flex-1 min-h-11 text-sm font-semibold flex items-center justify-center gap-1.5 hover:bg-gray-50 dark:hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-green-500"><Eye className="w-4 h-4" />Open spot</button>
-                    {tab === 'created' && <button onClick={() => handleDelete(spot.id)} disabled={Boolean(deletingId)} className="w-12 min-h-11 grid place-items-center text-red-500 border-l border-gray-100 dark:border-border hover:bg-red-50 dark:hover:bg-red-950/20 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-red-500" aria-label={`Delete ${getSpotDisplayName(spot, language)}`}><Trash2 className="w-4 h-4" /></button>}
+                    <button onClick={() => { onSelectSpot?.(spot); onClose(); }} className="flex-1 min-h-11 text-sm font-semibold flex items-center justify-center gap-1.5 hover:bg-gray-50 dark:hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-green-500"><Eye className="w-4 h-4" />{collectionText('openSpot')}</button>
+                    {tab === 'created' && <button onClick={() => handleDelete(spot.id)} disabled={Boolean(deletingId)} className="w-12 min-h-11 grid place-items-center text-red-500 border-l border-gray-100 dark:border-border hover:bg-red-50 dark:hover:bg-red-950/20 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-red-500" aria-label={`${collectionText('deleteSpot')}: ${getSpotDisplayName(spot, language)}`}><Trash2 className="w-4 h-4" /></button>}
                   </div>
                 </article>
                 )
@@ -295,18 +297,18 @@ export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, i
       <DraftConfirmationDialog
         open={Boolean(confirmDraftId)}
         onOpenChange={open => { if (!open) setConfirmDraftId(''); }}
-        title="Delete this draft?"
-        description="This unpublished spot will be permanently removed. This action cannot be undone."
-        cancelLabel="Cancel"
-        confirmLabel={deletingId ? 'Deleting…' : 'Delete Draft'}
+        title={collectionText('deleteDraftTitle')}
+        description={collectionText('deleteDraftBody')}
+        cancelLabel={t('common.cancel')}
+        confirmLabel={collectionText(deletingId ? 'deleting' : 'deleteDraft')}
         onConfirm={() => handleDelete(confirmDraftId)}
         destructive
         busy={Boolean(deletingId)}
       />
       <DraftConfirmationDialog open={Boolean(confirmSpotId)}
         onOpenChange={open => { if (!open) setConfirmSpotId(''); }}
-        title="Delete this spot?" description="This public spot will be permanently removed. This action cannot be undone."
-        cancelLabel="Keep spot" confirmLabel={deletingId ? 'Deleting…' : 'Delete spot'}
+        title={collectionText('deleteSpotTitle')} description={collectionText('deleteSpotBody')}
+        cancelLabel={collectionText('keepSpot')} confirmLabel={collectionText(deletingId ? 'deleting' : 'deleteSpot')}
         onConfirm={() => handleDelete(confirmSpotId)} destructive busy={Boolean(deletingId)} />
     </div>
   );

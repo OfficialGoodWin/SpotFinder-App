@@ -37,22 +37,9 @@ service cloud.firestore {
           || ('created_by' in resource.data && resource.data.created_by == authEmail())))
         || isSuperAdmin();
 
-      // Direct creates are disabled; submitSpot performs authoritative checks.
-      allow create: if false && isAuth()
-        && strLen(request.resource.data.title, 100)
-        && strLen(request.resource.data.description, 2000)
-        // Never trust a client-supplied moderation state on create.
-        && request.resource.data.status in ['pending_trust', 'published']
-        && (!('flag_count' in request.resource.data) || request.resource.data.flag_count == 0)
-        && (!('likes_count' in request.resource.data) || request.resource.data.likes_count == 0)
-        && (!('saves_count' in request.resource.data) || request.resource.data.saves_count == 0)
-        // Ownership is by uid so anonymous guests can post too.
-        && request.resource.data.created_by_uid == request.auth.uid
-        // Community-abuse mitigation: throwaway/unverified/anonymous
-        // accounts can post, but only into the pending_trust review
-        // queue — never straight to published.
-        && (request.auth.token.email_verified == true
-            || request.resource.data.status == 'pending_trust');
+      // All creates go through submitSpot. The callable validates the signed
+      // Firebase identity, ownership, moderation state, and rate limits.
+      allow create: if false;
 
       // Owners may edit their own listing content, but can never touch the
       // rating aggregates, flag/moderation state, or re-assign ownership —
@@ -203,7 +190,8 @@ service cloud.firestore {
     // ── Bookmarks — private to each user ───────────────────────────────────────
     match /bookmarks/{bookmarkId} {
       allow read, delete: if isAuth() && resource.data.user_email == authEmail();
-      allow create: if isAuth() && request.resource.data.user_email == authEmail()
+      allow create: if isAuth() && request.auth.token.email_verified == true
+        && request.resource.data.user_email == authEmail()
         && request.resource.data.keys().hasOnly(['user_email', 'spot_id', 'created_date']);
     }
 

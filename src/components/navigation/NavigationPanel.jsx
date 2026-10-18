@@ -341,7 +341,7 @@ export default function NavigationPanel({ from, to, toLabel, onClose, onRouteRea
   }, [userPosition]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Speech helpers ────────────────────────────────────────────────────────
-  const bcp47 = LANG_BCP47[language] || 'en-US';
+  const bcp47 = language.includes('-') ? language : (LANG_BCP47[language] || language || 'en-US');
 
   function speakRaw(text) {
     if (muted || !('speechSynthesis' in window)) return;

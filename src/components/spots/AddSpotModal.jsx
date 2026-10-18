@@ -1,7 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { X, Camera, MapPin, Mic, Loader2, AlertCircle, ChevronDown } from 'lucide-react';
-import StarRating from './StarRating';
-import LabeledRatingScale from './LabeledRatingScale';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
 import { deleteCloudSpotDraft, getFirebaseServices, loadDraftImageFile, saveCloudSpotDraft, uploadDraftImage, uploadSpotImage } from '@/api/firebaseClient';
@@ -297,7 +295,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
     }
 
     const rec = new SpeechRecognition();
-    rec.lang = LANG_TO_BCP47[language] || 'en-US';
+    rec.lang = language.includes('-') ? language : (LANG_TO_BCP47[language] || language || 'en-US');
     rec.continuous = true;
     rec.interimResults = true;
 
@@ -458,8 +456,6 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
       spot_type: spotType,
       title: title.trim(),
       description,
-      rating: overallRating,
-      rating_count: overallRating > 0 ? 1 : 0,
       image_url: image_urls[0] || null,
       image_urls,
       is_public: true,
@@ -479,14 +475,6 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
       },
       _draft_id: draftIdRef.current,
     };
-
-    Object.assign(baseData, {
-      access_rating: accessRating, access_rating_count: accessRating > 0 ? 1 : 0,
-      condition_rating: conditionRating, condition_rating_count: conditionRating > 0 ? 1 : 0,
-      safety_rating: safetyRating, safety_rating_count: safetyRating > 0 ? 1 : 0,
-      crowdedness_rating: crowdednessRating, crowdedness_rating_count: crowdednessRating > 0 ? 1 : 0,
-      rating_schema: 2,
-    });
 
     try {
       assertOwnerSession();
@@ -529,7 +517,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
   };
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/50 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="add-spot-title" onKeyDown={event => { if (event.key === 'Escape') requestClose(); }}>
+    <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/50 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="add-spot-title" data-unsaved-work={hasMeaningfulAddSpotDraft(currentDraft) || imageFiles.length ? 'true' : undefined} onKeyDown={event => { if (event.key === 'Escape') requestClose(); }}>
       <div className="sf-sheet isolate w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-3xl max-h-[100dvh] sm:max-h-[90dvh] sm:rounded-3xl">
         <div className="sticky top-0 z-30 bg-white/90 dark:bg-card/90 px-6 pt-5 pb-3 border-b border-gray-100/80 dark:border-border flex items-center justify-between backdrop-blur-xl">
           <div className="flex items-center gap-2">
@@ -664,23 +652,13 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
 
           <details className="group rounded-2xl border border-gray-200 dark:border-border">
             <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-bold marker:content-none">
-              <span><span className="block">Optional enrichment</span><span className="mt-0.5 block text-xs font-normal text-gray-500 dark:text-muted-foreground">Ratings, practical details, photos and social links</span></span>
+              <span><span className="block">Optional enrichment</span><span className="mt-0.5 block text-xs font-normal text-gray-500 dark:text-muted-foreground">Practical details, photos and social links</span></span>
               <ChevronDown className="h-5 w-5 text-gray-400 transition-transform group-open:rotate-180" aria-hidden="true" />
             </summary>
             <div className="space-y-5 border-t border-gray-200 p-4 dark:border-border">
-
-          {/* Experience rating + descriptive scales (rating schema v2) */}
-          <div className="rounded-2xl border border-gray-200 dark:border-border p-4 space-y-5">
-            <div>
-              <label className="text-sm font-semibold text-gray-700 dark:text-foreground mb-1 block">Overall experience</label>
-              <p className="text-xs text-gray-500 dark:text-muted-foreground mb-2">How would you rate this spot overall?</p>
-              <StarRating value={overallRating} onChange={setOverallRating} size="lg" />
-            </div>
-            <div><label className="text-sm font-semibold block mb-2">Ease of access</label><LabeledRatingScale value={accessRating} onChange={setAccessRating} labels={['Very difficult','Difficult','Moderate','Easy','Very easy']} /></div>
-            <div><label className="text-sm font-semibold block mb-2">Condition & cleanliness</label><LabeledRatingScale value={conditionRating} onChange={setConditionRating} labels={['Very poor','Poor','Okay','Good','Excellent']} /></div>
-            <div><label className="text-sm font-semibold block mb-2">Safety & comfort</label><LabeledRatingScale value={safetyRating} onChange={setSafetyRating} labels={['Very uncomfortable','Uncomfortable','Okay','Comfortable','Very safe']} /></div>
-            <div><label className="text-sm font-semibold block mb-2">Crowdedness</label><LabeledRatingScale value={crowdednessRating} onChange={setCrowdednessRating} labels={['Very quiet','Quiet','Moderate','Busy','Very busy']} /></div>
-          </div>
+          {draft && [overallRating, accessRating, conditionRating, safetyRating, crowdednessRating].some(value => value > 0) && (
+            <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">Ratings saved in an older draft are kept in that private draft but will not be published as community ratings. Visitors can rate the spot after publication.</p>
+          )}
 
           {/* Category tags */}
           <div>

@@ -29,7 +29,7 @@ export default function MfaSection() {
   const handleSendCode = async () => {
     const normalizedPhone = phone.replace(/[\s()-]/g, '');
     if (!/^\+[1-9]\d{7,14}$/.test(normalizedPhone)) {
-      setError('Enter a phone number in international format, for example +420123456789.');
+      setError('Enter a phone number in international format, for example +48 123 456 789.');
       return;
     }
     setBusy(true); setError('');
@@ -104,7 +104,7 @@ export default function MfaSection() {
           <input aria-label="Phone number for two-factor authentication" type="tel" autoComplete="tel"
             value={phone}
             onChange={e => setPhone(e.target.value)}
-            placeholder="+1 555 555 5555"
+            placeholder="+48 123 456 789"
             className="sf-control min-w-0 flex-1 text-sm"
           />
           <button disabled={busy || !phone.trim()} onClick={handleSendCode} className="sf-button-primary shrink-0 text-sm">

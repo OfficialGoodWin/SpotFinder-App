@@ -67,7 +67,7 @@ try {
       await page.evaluate(() => document.querySelector('button[aria-label="More map options"]')?.click());
       await page.waitForTimeout(50);
       await page.evaluate(() => [...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Settings')?.click());
-      await page.waitForTimeout(50);
+      await page.waitForFunction(() => Boolean(document.querySelector('[role="dialog"] section')));
       const scaledSettings = await page.evaluate(() => {
         const panel = document.querySelector('[role="dialog"] section');
         const rect = panel?.getBoundingClientRect();
@@ -81,7 +81,7 @@ try {
 
     if (width === 1024) {
       await page.evaluate(() => document.querySelector('button[aria-label="Open settings"]')?.click());
-      await page.waitForTimeout(50);
+      await page.waitForFunction(() => Boolean(document.querySelector('[role="dialog"] section')));
       const box = await page.evaluate(() => {
         const element = document.querySelector('[role="dialog"] section');
         const rect = element?.getBoundingClientRect();

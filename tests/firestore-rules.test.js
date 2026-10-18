@@ -51,6 +51,12 @@ test('Firestore rules enforce private profiles, ownership, and verified interact
     const ownRating = { spot_id: 'spot-one', user_id: 'owner', overall: 4, access: 0, condition: 0, safety: 0, crowdedness: 1, schema: 2 };
     await assertFails(setDoc(doc(owner, 'spot_ratings', 'spot-one_owner'), ownRating));
     await assertSucceeds(setDoc(doc(other, 'spot_ratings', 'spot-one_other'), { ...ownRating, user_id: 'other' }));
+    await assertFails(setDoc(doc(unverified, 'spot_ratings', 'spot-one_unverified'), { ...ownRating, user_id: 'unverified' }));
+    await assertFails(setDoc(doc(unverified, 'spot_saves', 'spot-one_unverified'), { spot_id: 'spot-one', user_id: 'unverified', created_date: '2026-01-01' }));
+    await assertFails(setDoc(doc(unverified, 'bookmarks', 'unverified@example.test_spot-one'), { user_email: 'unverified@example.test', spot_id: 'spot-one', created_date: '2026-01-01' }));
+    await assertSucceeds(setDoc(doc(owner, 'bookmarks', 'owner@example.test_spot-one'), { user_email: 'owner@example.test', spot_id: 'spot-one', created_date: '2026-01-01' }));
+    await assertFails(setDoc(doc(unverified, 'spots', 'forged-public-spot'), { title: 'Forged', description: 'Forged', created_by_uid: 'unverified', status: 'published', is_public: true }));
+    await assertFails(setDoc(doc(unverified, 'social_posts', 'forged-social'), { status: 'active', added_by: 'unverified' }));
     await assertSucceeds(getDoc(doc(owner, 'spot_drafts', 'draft-one')));
     await assertFails(getDoc(doc(other, 'spot_drafts', 'draft-one')));
     await assertSucceeds(getDocs(query(collection(owner, 'spot_drafts'), where('owner_uid', '==', 'owner'))));

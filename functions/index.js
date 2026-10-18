@@ -546,8 +546,6 @@ exports.submitSpot = functions.runWith({ secrets: ['ANTI_SPAM_IP_SALT'] }).https
   const submittedImageUrls = (Array.isArray(input.image_urls) ? input.image_urls : [])
     .filter(value => typeof value === 'string' && isManagedImageUrl(value, uid));
   const imageUrls = [...promotedDraftUrls, ...submittedImageUrls].slice(0, 3);
-  const ratingValue = Number(input.rating);
-  const initialRating = Number.isFinite(ratingValue) && ratingValue >= 1 && ratingValue <= 5 ? ratingValue : 0;
   const allowedOption = (value, allowed) => allowed.includes(value) ? value : null;
   const list = (value, maxItems, maxLength) => Array.isArray(value)
     ? value.map(item => cleanString(item, maxLength)).filter(Boolean).slice(0, maxItems) : [];
@@ -581,13 +579,14 @@ exports.submitSpot = functions.runWith({ secrets: ['ANTI_SPAM_IP_SALT'] }).https
     best_time: list(input.best_time, 5, 30), directions: cleanString(input.directions, 1000), poi_match: poiMatch,
     status, needs_review: spam.score > 0, quality_score: 0,
     upvote_count: 0, downvote_count: 0, likes_count: 0, saves_count: 0, flag_count: 0,
-    rating: initialRating, rating_count: initialRating ? 1 : 0, rating_schema: 2,
+    // A contributor cannot create a community rating for their own spot.
+    // Never accept aggregate counts or scores from the callable input.
+    rating: 0, rating_count: 0, rating_schema: 2,
     geohash: encodeGeohash(lat, lng), created_date: new Date().toISOString(),
   };
   for (const field of ['access', 'condition', 'safety', 'crowdedness']) {
-    const score = Number(input[`${field}_rating`]);
-    spot[`${field}_rating`] = Number.isFinite(score) && score >= 1 && score <= 5 ? score : 0;
-    spot[`${field}_rating_count`] = spot[`${field}_rating`] ? 1 : 0;
+    spot[`${field}_rating`] = 0;
+    spot[`${field}_rating_count`] = 0;
   }
   const spotRef = db.collection('spots').doc();
   if (publicationRef) {

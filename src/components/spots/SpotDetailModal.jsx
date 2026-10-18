@@ -13,8 +13,9 @@ import { toast } from 'sonner';
 import { getSpotRating } from '@/lib/spotDiscovery';
 import DraftConfirmationDialog from '@/components/ui/DraftConfirmationDialog';
 import { safeWebsite } from '@/lib/poiPresentation';
+import { recoverableLazy } from '@/components/ChunkLoadRecovery';
 
-const SocialPostsSection = React.lazy(() => import('@/components/social/SocialPostsSection'));
+const SocialPostsSection = recoverableLazy(() => import('@/components/social/SocialPostsSection'));
 
 const RATED_KEY = (spotId, userId) => `sf_rated_${spotId}_${userId || 'guest'}`;
 

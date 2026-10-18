@@ -2,7 +2,7 @@ import React from 'react';
 import { X, Moon, Globe, Cookie, FileText, Shield, ReceiptText, Settings2, Compass, Type, Trash2, History } from 'lucide-react';
 import { useTheme } from '@/lib/ThemeContext';
 import { useLanguage } from '@/lib/LanguageContext';
-import { LANGUAGES } from '@/locales/translations';
+import { LANGUAGES, LANGUAGE_VARIANTS } from '@/locales/translations';
 import MfaSection from '@/components/MfaSection';
 import AccountSecuritySection from '@/components/AccountSecuritySection';
 import { reopenCookieSettings } from '@/components/CookieConsentBanner';
@@ -13,6 +13,7 @@ import { APP_VERSION } from '@/config/appVersion';
 export default function SettingsModal({ onClose, mapExploreEnabled = true, onMapExploreEnabledChange, onRequestDeleteAccount }) {
   const { isDark, toggleTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
+  const selectedLanguage = [...LANGUAGES, ...LANGUAGE_VARIANTS].find(item => item.code === language);
   const panelRef = React.useRef(null);
   const closeRef = React.useRef(onClose);
   const [textScale, setTextScale] = React.useState(() => getTextScale());
@@ -45,7 +46,7 @@ export default function SettingsModal({ onClose, mapExploreEnabled = true, onMap
         <header className="sf-settings-header flex items-center justify-between border-b border-border px-5 py-4 sm:px-7">
           <div className="flex items-center gap-3">
             <span className="sf-settings-heading-icon grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><Settings2 className="h-5 w-5" aria-hidden="true" /></span>
-            <div className="min-w-0"><h2 id="settings-title" className="text-xl font-bold tracking-tight">{t('settings.title')}</h2><p className="text-sm text-muted-foreground">Preferences, privacy, and account security</p></div>
+            <div className="min-w-0"><h2 id="settings-title" className="text-xl font-bold tracking-tight">{t('settings.title')}</h2><p className="text-sm text-muted-foreground">{t('settings.subtitle')}</p></div>
           </div>
           <button
             onClick={onClose}
@@ -59,7 +60,7 @@ export default function SettingsModal({ onClose, mapExploreEnabled = true, onMap
         <div className="overflow-y-auto overscroll-contain px-4 py-5 sm:px-7" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
           <div className="grid gap-4 md:grid-cols-2">
           <section className="sf-section" aria-labelledby="appearance-title">
-            <h3 id="appearance-title" className="mb-4 text-sm font-bold uppercase tracking-wide text-muted-foreground">Appearance</h3>
+            <h3 id="appearance-title" className="mb-4 text-sm font-bold uppercase tracking-wide text-muted-foreground">{t('settings.appearance')}</h3>
             <div className="sf-settings-row flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><Moon className="w-5 h-5" /></span>
@@ -90,20 +91,20 @@ export default function SettingsModal({ onClose, mapExploreEnabled = true, onMap
           </section>
 
           <section className="sf-section" aria-labelledby="map-display-title">
-            <h3 id="map-display-title" className="mb-4 text-sm font-bold uppercase tracking-wide text-muted-foreground">Map display</h3>
+            <h3 id="map-display-title" className="mb-4 text-sm font-bold uppercase tracking-wide text-muted-foreground">{t('settings.mapDisplay')}</h3>
             <div className="sf-settings-row flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Compass className="h-5 w-5" aria-hidden="true" /></span>
                 <div>
-                  <p className="font-semibold">Map discovery card</p>
-                  <p className="text-sm text-muted-foreground">Show contextual spots and exploration guidance on the map.</p>
+                  <p className="font-semibold">{t('settings.discoveryCard')}</p>
+                  <p className="text-sm text-muted-foreground">{t('settings.discoveryCardDescription')}</p>
                 </div>
               </div>
               <button
                 type="button"
                 role="switch"
                 aria-checked={mapExploreEnabled}
-                aria-label="Show map discovery card"
+                aria-label={t('settings.discoveryCard')}
                 onClick={() => onMapExploreEnabledChange?.(!mapExploreEnabled)}
                 className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${mapExploreEnabled ? 'bg-primary' : 'bg-muted-foreground/35'}`}
               >
@@ -115,18 +116,18 @@ export default function SettingsModal({ onClose, mapExploreEnabled = true, onMap
                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Type className="h-5 w-5" aria-hidden="true" /></span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div><p className="font-semibold">Text size</p><p className="text-sm text-muted-foreground">Applies throughout SpotFinder.</p></div>
+                    <div><p className="font-semibold">{t('settings.textSize')}</p><p className="text-sm text-muted-foreground">{t('settings.textSizeDescription')}</p></div>
                     <output htmlFor="text-size" className="rounded-lg bg-muted px-2 py-1 text-sm font-bold tabular-nums">{textScale}%</output>
                   </div>
-                  <input id="text-size" type="range" min={TEXT_SCALE_MIN} max={TEXT_SCALE_MAX} step="5" value={textScale} onChange={event => changeTextScale(event.target.value)} className="mt-3 w-full accent-green-600" aria-label="Text size percentage" />
-                  <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground"><span>{TEXT_SCALE_MIN}%</span><button type="button" onClick={() => changeTextScale(TEXT_SCALE_DEFAULT)} className="min-h-9 rounded-lg px-2 font-semibold text-primary hover:bg-primary/10">Reset to 100%</button><span>{TEXT_SCALE_MAX}%</span></div>
+                  <input id="text-size" type="range" min={TEXT_SCALE_MIN} max={TEXT_SCALE_MAX} step="5" value={textScale} onChange={event => changeTextScale(event.target.value)} className="mt-3 w-full accent-green-600" aria-label={t('settings.textSizePercentage')} />
+                  <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground"><span>{TEXT_SCALE_MIN}%</span><button type="button" onClick={() => changeTextScale(TEXT_SCALE_DEFAULT)} className="min-h-9 rounded-lg px-2 font-semibold text-primary hover:bg-primary/10">{t('settings.resetTextSize')}</button><span>{TEXT_SCALE_MAX}%</span></div>
                 </div>
               </div>
             </div>
           </section>
 
           <section className="sf-section" aria-labelledby="language-title">
-            <h3 id="language-title" className="mb-4 text-sm font-bold uppercase tracking-wide text-muted-foreground">Language</h3>
+            <h3 id="language-title" className="mb-4 text-sm font-bold uppercase tracking-wide text-muted-foreground">{t('settings.language')}</h3>
             <div className="flex items-center gap-3 mb-4">
               <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><Globe className="w-5 h-5" /></span>
               <div>
@@ -134,50 +135,51 @@ export default function SettingsModal({ onClose, mapExploreEnabled = true, onMap
                 <p className="text-sm text-muted-foreground">{t('settings.selectLanguage')}</p>
               </div>
             </div>
-            <SmoothSelect value={language} onChange={setLanguage} ariaLabel={t('settings.selectLanguage')} options={LANGUAGES.map(lang => ({ value: lang.code, label: lang.nativeName }))} />
+            <SmoothSelect value={language} onChange={setLanguage} ariaLabel={t('settings.selectLanguage')} options={[...LANGUAGES, ...LANGUAGE_VARIANTS].map(lang => ({ value: lang.code, label: `${lang.flag} ${lang.nativeName}${lang.partial ? ' · Partial' : ''}` }))} />
+            {selectedLanguage?.partial && <p className="mt-2 text-xs text-muted-foreground" role="status">{t('settings.partialTranslation')}</p>}
           </section>
 
           <div className="md:col-span-2"><AccountSecuritySection /></div>
           <div className="md:col-span-2"><MfaSection /></div>
 
           <section className="sf-section md:col-span-2" aria-labelledby="privacy-title">
-            <h3 id="privacy-title" className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted-foreground"><Shield className="w-4 h-4 text-primary" aria-hidden="true" />Privacy &amp; legal</h3>
+            <h3 id="privacy-title" className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted-foreground"><Shield className="w-4 h-4 text-primary" aria-hidden="true" />{t('settings.privacyLegal')}</h3>
             <div className="grid gap-1 sm:grid-cols-2">
             <button
               onClick={reopenCookieSettings}
               className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <Cookie className="w-4 h-4 flex-shrink-0" aria-hidden="true" /> Cookie preferences
+              <Cookie className="w-4 h-4 flex-shrink-0" aria-hidden="true" /> {t('settings.cookiePreferences')}
             </button>
             <a href="/PrivacyPolicy" className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
-              <FileText className="w-4 h-4 flex-shrink-0" aria-hidden="true" /> Privacy Policy
+              <FileText className="w-4 h-4 flex-shrink-0" aria-hidden="true" /> {t('legal.privacyTitle')}
             </a>
             <a href="/TermsAndConditions" className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
-              <FileText className="w-4 h-4 flex-shrink-0" aria-hidden="true" /> Terms &amp; Conditions
+              <FileText className="w-4 h-4 flex-shrink-0" aria-hidden="true" /> {t('legal.termsTitle')}
             </a>
             <a href="/CookiePolicy" className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
-              <FileText className="w-4 h-4 flex-shrink-0" aria-hidden="true" /> Cookie Policy
+              <FileText className="w-4 h-4 flex-shrink-0" aria-hidden="true" /> {t('legal.cookiesTitle')}
             </a>
             <a href="/RefundPolicy" className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
-              <ReceiptText className="w-4 h-4 flex-shrink-0" aria-hidden="true" /> Refund Policy
+              <ReceiptText className="w-4 h-4 flex-shrink-0" aria-hidden="true" /> {t('legal.refundTitle')}
             </a>
             </div>
           </section>
 
           <section className="sf-section md:col-span-2" aria-labelledby="app-information-title">
-            <h3 id="app-information-title" className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">App information</h3>
+            <h3 id="app-information-title" className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">{t('settings.appInformation')}</h3>
             <a href="/updates" className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
               <History className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-              <span className="flex-1"><span className="block font-semibold text-foreground">What’s new</span><span className="block text-xs text-muted-foreground">Release notes and verified changes</span></span>
+              <span className="flex-1"><span className="block font-semibold text-foreground">{t('settings.whatsNew')}</span><span className="block text-xs text-muted-foreground">{t('settings.releaseNotes')}</span></span>
               <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary">v{APP_VERSION}</span>
             </a>
           </section>
 
           {onRequestDeleteAccount && <section className="sf-section md:col-span-2" aria-labelledby="account-management-title">
-            <h3 id="account-management-title" className="mb-2 text-sm font-bold uppercase tracking-wide text-red-700 dark:text-red-300">Account management</h3>
+            <h3 id="account-management-title" className="mb-2 text-sm font-bold uppercase tracking-wide text-red-700 dark:text-red-300">{t('settings.accountManagement')}</h3>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div><p className="font-semibold">Delete account</p><p className="text-sm text-muted-foreground">Review what is deleted or de-identified, then reauthenticate to submit the deletion.</p></div>
-              <button type="button" onClick={onRequestDeleteAccount} className="sf-button-secondary shrink-0 border-red-200 text-red-700 hover:bg-red-50 focus-visible:ring-red-500 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"><Trash2 className="mr-2 inline h-4 w-4" aria-hidden="true" />Delete account</button>
+              <div><p className="font-semibold">{t('settings.deleteAccount')}</p><p className="text-sm text-muted-foreground">{t('settings.deleteAccountDescription')}</p></div>
+              <button type="button" onClick={onRequestDeleteAccount} className="sf-button-secondary shrink-0 border-red-200 text-red-700 hover:bg-red-50 focus-visible:ring-red-500 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"><Trash2 className="mr-2 inline h-4 w-4" aria-hidden="true" />{t('settings.deleteAccount')}</button>
             </div>
           </section>}
 

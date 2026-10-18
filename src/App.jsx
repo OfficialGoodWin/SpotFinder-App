@@ -11,6 +11,7 @@ import { ThemeProvider } from '@/lib/ThemeContext';
 import { LanguageProvider } from '@/lib/LanguageContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ErrorBoundary from '@/lib/ErrorBoundary';
+import ChunkLoadRecovery from '@/components/ChunkLoadRecovery';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -90,6 +91,7 @@ function App() {
           <LanguageProvider>
             <NavigationTracker />
             <AuthenticatedApp />
+            <ChunkLoadRecovery />
           </LanguageProvider>
           <Toaster />
         </ThemeProvider>

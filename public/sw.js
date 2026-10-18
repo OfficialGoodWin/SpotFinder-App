@@ -1,5 +1,6 @@
-const SHELL_CACHE = 'spotfinder-shell-v3';
-const STATIC_CACHE = 'spotfinder-static-v3';
+const SHELL_CACHE = 'spotfinder-shell-v4';
+const STATIC_CACHE = 'spotfinder-static-v4';
+const PREVIOUS_STATIC_CACHE = 'spotfinder-static-v3';
 const SHELL = ['/', '/manifest.json', '/app-icon-v2-192.png', '/app-icon-v2-512.png', '/app-icon-v2-180.png', '/favicon.svg'];
 
 self.addEventListener('install', event => {
@@ -10,7 +11,9 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => Promise.all(
-      keys.filter(key => key.startsWith('spotfinder-') && ![SHELL_CACHE, STATIC_CACHE].includes(key))
+      // A tab from the preceding deployment may still need a previously
+      // requested hashed chunk. Keep one earlier static cache through updates.
+      keys.filter(key => key.startsWith('spotfinder-') && ![SHELL_CACHE, STATIC_CACHE, PREVIOUS_STATIC_CACHE].includes(key))
         .map(key => caches.delete(key))
     ))
   );
@@ -25,7 +28,7 @@ self.addEventListener('fetch', event => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
+      fetch(request, { cache: 'no-cache' })
         .then(async response => {
           if (response.ok) {
             const cachedResponse = response.clone();
@@ -40,19 +43,28 @@ self.addEventListener('fetch', event => {
   }
 
   if (url.pathname.startsWith('/assets/') || /\.(?:png|svg|ico|woff2?)$/i.test(url.pathname)) {
+    const hasExpectedType = response => {
+      const contentType = response.headers.get('content-type') || '';
+      if (request.destination === 'script' || /\.m?js$/i.test(url.pathname)) return /(?:java|ecma)script/i.test(contentType);
+      if (request.destination === 'style' || /\.css$/i.test(url.pathname)) return /text\/css/i.test(contentType);
+      return !/text\/html/i.test(contentType);
+    };
     event.respondWith(
-      caches.match(request).then(cached => cached || fetch(request).then(async response => {
-        const contentType = response.headers.get('content-type') || '';
-        const expectsJavaScript = request.destination === 'script' || /\.m?js$/i.test(url.pathname);
-        const hasExpectedType = !expectsJavaScript || /(?:java|ecma)script/i.test(contentType);
-
-        if (response.ok && hasExpectedType) {
+      caches.match(request).then(async cached => {
+        if (cached && hasExpectedType(cached)) return cached;
+        if (cached) {
+          const keys = await caches.keys();
+          await Promise.all(keys.filter(key => key.startsWith('spotfinder-static-'))
+            .map(key => caches.open(key).then(cache => cache.delete(request))));
+        }
+        const response = await fetch(request);
+        if (response.ok && hasExpectedType(response)) {
           const cachedResponse = response.clone();
           const cache = await caches.open(STATIC_CACHE);
           await cache.put(request, cachedResponse);
         }
         return response;
-      }))
+      })
     );
   }
 });

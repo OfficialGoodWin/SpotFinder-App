@@ -8,8 +8,9 @@ import { iconGlyphSVG } from '@/lib/mapIcons';
 import ReportDialog from '@/components/moderation/ReportDialog';
 import { IMAGE_ACCEPT, validateImageFileMetadata } from '@/lib/imageUploadValidation';
 import { normalizePoiPhotos, openingHoursLabel, safeWebsite } from '@/lib/poiPresentation';
+import { recoverableLazy } from '@/components/ChunkLoadRecovery';
 
-const SocialPostsSection = React.lazy(() => import('@/components/social/SocialPostsSection'));
+const SocialPostsSection = recoverableLazy(() => import('@/components/social/SocialPostsSection'));
 
 // ─── OSM tag helpers ──────────────────────────────────────────────────────────
 function getPhone(tags = {}) { return tags.phone || tags['contact:phone'] || tags['contact:mobile'] || null; }

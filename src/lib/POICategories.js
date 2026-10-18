@@ -36,8 +36,9 @@ const CATEGORY_NAMES = {
 
 export function getCategoryName(category, language) {
   if (!category) return '';
-  if (!language || language === 'en') return category.name;
-  return CATEGORY_NAMES[category.name]?.[language] || category.name;
+  const base = language?.split('-')[0];
+  if (!base || base === 'en') return category.name;
+  return CATEGORY_NAMES[category.name]?.[base] || category.name;
 }
 
 // Category descriptions per language
@@ -49,8 +50,9 @@ const CATEGORY_DESCS = {
 
 export function getCategoryDesc(category, language) {
   if (!category) return '';
-  if (!language || language === 'en') return category.desc || '';
-  return CATEGORY_DESCS[category.name]?.[language] || category.desc || '';
+  const base = language?.split('-')[0];
+  if (!base || base === 'en') return category.desc || '';
+  return CATEGORY_DESCS[category.name]?.[base] || category.desc || '';
 }
 
 export const POI_CATEGORIES = [
