@@ -18,6 +18,7 @@
     "test:i18n-browser": "node scripts/i18n-browser-audit.mjs",
     "preview": "vite preview",
     "enrich:pois": "node scripts/enrichment/enrich-pois.js",
+    "enrich:official-wikidata": "node scripts/enrichment/wikidata-batch.mjs",
     "migrate:spot-presentation": "node scripts/migrations/backfill-spot-presentation.js"
   },
   "dependencies": {

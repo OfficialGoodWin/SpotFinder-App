@@ -668,6 +668,10 @@ export default {
     "share": "Share"
   },
   officialEditor: {
+    enrichmentCache: 'Wikidata batch cache (local admin file)', cacheTooLarge: 'Cache file exceeds 5 MB', invalidCache: 'Invalid cache format',
+    enrichmentHelp: 'Imported suggestions are read only. Review actions save a draft revision. Edit manual names and descriptions in Basic.',
+    osmSnapshot: 'OSM source snapshot', unreviewed: 'Unreviewed', approvePrefer: 'Approve / prefer', rejectSuggestion: 'Reject',
+    restoreOriginalKind: 'Restore original {kind}', clearSummary: 'Clear summary',
     adminSession: 'Admin session · server authorization required',
     adminAuthorizationFailed: 'Official POI access was denied. Refresh your sign-in and confirm the Firebase admin claim.',
     readFunctionMissing: 'Official POI read service is unavailable. Deploy adminReadOfficialPoi to this Firebase project.',

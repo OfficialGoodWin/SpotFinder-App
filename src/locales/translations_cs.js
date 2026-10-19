@@ -668,6 +668,10 @@ export default {
     "share": "Sdílet"
   },
   officialEditor: {
+    enrichmentCache: 'Dávková mezipaměť Wikidata (místní soubor správce)', cacheTooLarge: 'Soubor mezipaměti přesahuje 5 MB', invalidCache: 'Neplatný formát mezipaměti',
+    enrichmentHelp: 'Importované návrhy jsou pouze ke čtení. Schválení a zamítnutí uloží novou revizi konceptu. Ruční názvy a popisy upravte v základních údajích.',
+    osmSnapshot: 'Snímek zdroje OSM', unreviewed: 'Neposouzeno', approvePrefer: 'Schválit / upřednostnit', rejectSuggestion: 'Zamítnout',
+    restoreOriginalKind: 'Obnovit původní {kind}', clearSummary: 'Odstranit shrnutí',
     adminSession: 'Administrátorské přihlášení · vyžadováno ověření serverem',
     adminAuthorizationFailed: 'Přístup k oficiálním bodům byl odepřen. Obnovte přihlášení a ověřte administrátorský nárok Firebase.',
     readFunctionMissing: 'Služba pro čtení oficiálních bodů není dostupná. Nasaďte adminReadOfficialPoi do tohoto projektu Firebase.',

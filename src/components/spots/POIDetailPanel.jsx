@@ -21,25 +21,9 @@ function getHours(tags = {}) { return tags.opening_hours || null; }
 function getDescription(tags = {}) { return tags.description || tags.note || null; }
 
 // ─── Photo fetching ───────────────────────────────────────────────────────────
-// Priority order, each tier only tried if the previous one found nothing:
-//   1. OSM tags (`image=` / `wikimedia_commons=File:...`) — a human curated
-//      this specific photo for this specific place. Most accurate, least common.
-//   2. Wikidata's P18 "image" claim (needs an OSM `wikidata=` tag) —
-//      subject-accurate (a specific claim about a specific entity).
-// A prior version fell back further to `commons.wikimedia.org` geosearch
-// (nearby-by-coordinate, no subject check) — removed because it returned
-// photos of whatever else happened to be within the search radius (e.g. a
-// neighboring building or streetscape), not the actual POI. Showing no photo
-// is better than showing a wrong one. If none of the above match, the UI
-// falls back to its existing "no photo yet" state.
-//
-// ATTRIBUTION: every photo below is returned as { url, credit } rather than
-// a bare URL. `credit` is a plain-text line rendered near the photo —
-// Google Places Photos Terms require showing `html_attributions`, and
-// Wikimedia Commons images are almost always CC-BY-SA or similar, which
-// legally requires an author + license credit wherever the image is used.
-// `credit` is null only for sources that genuinely carry none (a raw
-// `image=` tag URL with no attribution metadata attached).
+// Only an explicit OSM Wikimedia Commons file tag is considered here. The
+// legacy per-view Wikidata, Wikipedia and name-search photo lookups were removed.
+// Commons credit is checked before showing a tagged photo.
 
 // Fetch author + license for a Wikimedia Commons file via the official
 // imageinfo/extmetadata API. Best-effort: any failure just means the photo
@@ -82,98 +66,8 @@ async function getTagPhotos(tags = {}) {
   return results;
 }
 
-async function fetchWikidataPhoto(wikidataId) {
-  if (!wikidataId) return [];
-  try {
-    const r = await fetch(
-      `https://www.wikidata.org/w/api.php?action=wbgetclaims&entity=${encodeURIComponent(wikidataId)}` +
-      `&property=P18&format=json&origin=*`
-    );
-    if (!r.ok) return [];
-    const claims = (await r.json()).claims?.P18 || [];
-    const files = claims.map(c => c.mainsnak?.datavalue?.value).filter(Boolean);
-    return (await Promise.all(files.map(async file => {
-      const rights = await fetchCommonsCredit(file);
-      return rights ? { url: `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}?width=1200`, ...rights } : null;
-    }))).filter(Boolean);
-  } catch { return []; }
-}
+async function tryFetchPhotos(tags = {}) { return getTagPhotos(tags); }
 
-// Wikipedia article lead image (subject-accurate: it's the article's own picture).
-// `wikipedia` tag format is "lang:Title" (e.g. "cs:Hrad Křivoklát").
-async function fetchWikipediaPhoto(wikipediaTag) {
-  if (typeof wikipediaTag !== 'string' || !wikipediaTag.includes(':')) return [];
-  const [lang, ...rest] = wikipediaTag.split(':');
-  const title = rest.join(':');
-  try {
-    const r = await fetch(`https://${encodeURIComponent(lang)}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title.replace(/ /g, '_'))}`);
-    if (!r.ok) return [];
-    const data = await r.json();
-    const src = data.originalimage?.source || data.thumbnail?.source;
-    if (!src) return [];
-    // Resize via Commons' FilePath redirect when the image is a Commons file so
-    // we can also fetch its credit; otherwise use the thumbnail as-is.
-    const m = src.match(/\/commons\/(?:thumb\/)?[0-9a-f]\/[0-9a-f]{2}\/([^/]+)/);
-    if (m) {
-      const file = decodeURIComponent(m[1]);
-      const rights = await fetchCommonsCredit(file);
-      return rights ? [{ url: `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}?width=1200`, ...rights }] : [];
-    }
-    // The summary endpoint does not provide the file's author or license.
-    return [];
-  } catch { return []; }
-}
-
-function distMeters(lat1, lon1, lat2, lon2) {
-  const R = 6371000, toRad = d => d * Math.PI / 180;
-  const a = Math.sin(toRad(lat2 - lat1) / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(toRad(lon2 - lon1) / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(a));
-}
-
-// For POIs with no wikidata tag: search Wikidata by name, then ACCEPT a hit only
-// if it has a photo (P18) AND its own coordinates (P625) are within 150 m of the
-// POI. The coordinate check is what keeps this subject-accurate — it's the same
-// guarantee the old (removed) blind geosearch lacked.
-async function fetchWikidataPhotoByName(name, lat, lon) {
-  if (!name || name.length < 3) return [];
-  try {
-    const sr = await fetch(
-      `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(name)}&language=cs&uselang=cs&limit=5&format=json&origin=*`
-    );
-    if (!sr.ok) return [];
-    const hits = (await sr.json()).search || [];
-    for (const h of hits) {
-      const er = await fetch(`https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${h.id}&props=claims&format=json&origin=*`);
-      if (!er.ok) continue;
-      const claims = (await er.json()).entities?.[h.id]?.claims || {};
-      const c = claims.P625?.[0]?.mainsnak?.datavalue?.value;
-      if (!c || distMeters(lat, lon, c.latitude, c.longitude) > 150) continue;
-      const photos = await fetchWikidataPhoto(h.id);
-      if (photos.length) return photos;
-    }
-  } catch {}
-  return [];
-}
-
-// Returns [{ url, credit }], credit possibly null.
-// Every tier is subject-verified (a human-curated tag, the place's own Wikipedia
-// article, its own Wikidata item, or a name+coordinate-matched Wikidata item).
-// We still never do a blind proximity photo search — a missing photo beats a
-// photo of the neighbouring building.
-async function tryFetchPhotos(name, lat, lon, tags = {}) {
-  const tagPhotos = await getTagPhotos(tags);
-  if (tagPhotos.length) return tagPhotos;
-  const wp = await fetchWikipediaPhoto(tags.wikipedia);
-  if (wp.length) return wp;
-  const wd = await fetchWikidataPhoto(tags.wikidata);
-  if (wd.length) return wd;
-  return fetchWikidataPhotoByName(name, lat, lon);
-}
-
-// ─── Address fallback ─────────────────────────────────────────────────────────
-// Ambient tiles only carry an address when OSM had addr:* tags. Reverse-geocode
-// via Geoapify (already allowed by the CSP and already used by the app) so the
-// sheet always shows a location line: "Hlavní 27, 337 01 Ejpovice, Czechia".
 const GEOAPIFY_KEY = import.meta.env.VITE_GEOAPIFY_KEY || '';
 const addressCache = new Map();
 async function reverseGeocodeAddress(lat, lon, lang = 'en') {
@@ -693,7 +587,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, onE
     // Baked-in enrichment photos win; otherwise (including when enrichment exists
     // but found no photo) fall back to the live subject-verified lookup.
     if (poi.enrichment?.photos?.length) setPhotos(poi.enrichment.photos);
-    else tryFetchPhotos(poi.name, poi.lat, poi.lon, poi.tags || {}).then(res => { if (res.length) setPhotos(res); });
+    else tryFetchPhotos(poi.tags || {}).then(res => { if (res.length) setPhotos(res); });
   }, [poi?.id]);
 
   const handleShare = async () => {

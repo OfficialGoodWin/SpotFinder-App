@@ -32,7 +32,8 @@ test('base and sparse patches reject invalid coordinates, categories, forged fie
   assert.throws(() => validatePatch({ photoRefs: [{ storagePath: 'official-poi-photos/a.jpg', license: 'CC BY', credit: 'Author', approval: 'approved' }] }), /rights review/);
   assert.throws(() => validatePatch({ phone: 'x'.repeat(70000) }), /64 KiB/);
   assert.throws(() => validateImportedBase({ ...base, id: 'osm:node:1', wikidata: { id: 'Q42', linkMethod: 'name_match' } }), /explicit OSM/);
-  assert.equal(validateImportedBase({ ...base, id: 'osm:way:1', wikidata: { id: 'Q42', linkMethod: 'osm_tag' } }).osm.type, 'way');
+  assert.equal(validateImportedBase({ ...base, id: 'osm:way:1', wikidata: { id: 'Q42', linkMethod: 'osm_tag' }, sourceFields: { tile: { wikidata: 'Q42' } } }).osm.type, 'way');
+  assert.throws(() => validateImportedBase({ ...base, id: 'osm:way:1', wikidata: { id: 'Q42', linkMethod: 'osm_tag' } }), /explicit OSM tag/);
   assert.deepEqual(validateImportedBase({ ...base, id: 'osm:way:1', originalName: '', sourceFields: { tile: { id: 'way/1', cat: 'museum' } } }).sourceFields.tile, { id: 'way/1', cat: 'museum' });
   assert.throws(() => validateImportedBase({ ...base, id: 'osm:way:1', sourceFields: { tile: { html: 'x'.repeat(40000) } } }), /32 KiB/);
 });

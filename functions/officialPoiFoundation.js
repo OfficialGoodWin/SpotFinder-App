@@ -3,7 +3,7 @@
 const { randomUUID, createHash } = require('node:crypto');
 
 const CATEGORIES = new Set(['train', 'fuel', 'charging', 'hotel', 'museum', 'heritage', 'hospital', 'restaurant', 'cafe', 'bar', 'pharmacy', 'bank', 'supermarket', 'atm', 'bakery', 'parking', 'viewpoint', 'camp_site', 'caravan_site', 'toilets', 'drinking_water', 'picnic_site']);
-const PATCH_FIELDS = new Set(['position', 'category', 'nameOverrides', 'descriptions', 'shortSummaries', 'attributes', 'website', 'phone', 'openingHours', 'accessibility', 'photoRefs', 'visibility']);
+const PATCH_FIELDS = new Set(['position', 'category', 'nameOverrides', 'descriptions', 'shortSummaries', 'enrichmentReviews', 'attributes', 'website', 'phone', 'openingHours', 'accessibility', 'photoRefs', 'visibility']);
 const ATTRIBUTE_FIELDS = new Set(['address', 'email', 'wheelchair', 'internet_access', 'toilets:wheelchair', 'operator', 'brand', 'access']);
 const PROVENANCE = new Set(['original_osm', 'osm_language_tag', 'wikidata', 'human', 'machine']);
 const LANGUAGE = /^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/;
@@ -60,18 +60,38 @@ function validLocalized(value, kind) {
   assert(Array.isArray(value) && value.length <= 100, `${kind} must be an array`);
   const seen = new Set();
   return value.map((entry, index) => {
-    keysOnly(entry, new Set(['language', 'text', 'source', 'approval', 'sourceRevision']), `${kind}[${index}]`);
+    keysOnly(entry, new Set(['language', 'text', 'source', 'approval', 'sourceRevision', 'sourceReference', 'retrievedAt']), `${kind}[${index}]`);
     assert(LANGUAGE.test(entry.language), 'Invalid language tag');
-    string(entry.text, kind === 'descriptions' ? 4000 : 250, `${kind} text`);
+    string(entry.text, kind === 'descriptions' ? 4000 : kind === 'shortSummaries' ? 500 : 250, `${kind} text`);
     assert(PROVENANCE.has(entry.source), 'Invalid provenance');
     assert(['draft', 'approved'].includes(entry.approval), 'Invalid approval state');
     if (kind === 'nameOverrides') assert(entry.source === 'human', 'Proper-name overrides require human approval');
     else assert(['human', 'machine'].includes(entry.source), 'Source data and Wikidata must come from verified import records');
     if (entry.source === 'machine') assert(/^sha256:[a-f0-9]{64}$/.test(entry.sourceRevision), 'Machine translation requires a source-content SHA-256');
+    if (entry.sourceRevision != null) assert(/^sha256:[a-f0-9]{64}$/.test(entry.sourceRevision), 'Invalid source-content SHA-256');
     const unique = `${entry.language}:${entry.source}`;
     assert(!seen.has(unique), 'Duplicate language/provenance entry'); seen.add(unique);
+    if (entry.sourceReference != null) assert(/^(?:wikidata:Q[1-9]\d*|osm:(?:name|description):[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*)$/.test(entry.sourceReference), 'Invalid source reference');
+    if (entry.retrievedAt != null) assert(!Number.isNaN(Date.parse(entry.retrievedAt)) && entry.retrievedAt.length <= 40, 'Invalid retrieval time');
     return { language: entry.language, text: entry.text.trim(), source: entry.source, approval: entry.approval,
-      ...(entry.sourceRevision ? { sourceRevision: entry.sourceRevision } : {}) };
+      ...(entry.sourceRevision ? { sourceRevision: entry.sourceRevision } : {}),
+      ...(entry.sourceReference ? { sourceReference: entry.sourceReference } : {}),
+      ...(entry.retrievedAt ? { retrievedAt: entry.retrievedAt } : {}) };
+  });
+}
+function validEnrichmentReviews(value) {
+  assert(Array.isArray(value) && value.length <= 100, 'enrichmentReviews must be an array');
+  const seen = new Set();
+  return value.map(item => {
+    keysOnly(item, new Set(['language', 'kind', 'sourceReference', 'sourceRevision', 'status']), 'enrichmentReview');
+    assert(LANGUAGE.test(item.language), 'Invalid review language');
+    assert(['name', 'description', 'summary'].includes(item.kind), 'Invalid review kind');
+    assert(/^(?:wikidata:Q[1-9]\d*|osm:(?:name|description):[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*)$/.test(item.sourceReference), 'Invalid review source');
+    assert(/^sha256:[a-f0-9]{64}$/.test(item.sourceRevision), 'Invalid review source revision');
+    assert(['approved', 'rejected'].includes(item.status), 'Invalid review status');
+    const key = `${item.kind}:${item.language}:${item.sourceReference}`;
+    assert(!seen.has(key), 'Duplicate enrichment review'); seen.add(key);
+    return { language: item.language, kind: item.kind, sourceReference: item.sourceReference, sourceRevision: item.sourceRevision, status: item.status };
   });
 }
 function validPhotoRefs(value) {
@@ -103,6 +123,7 @@ function validatePatch(patch) {
     if (key === 'position') result.position = validPosition(value);
     else if (key === 'category') result.category = validCategory(value);
     else if (['nameOverrides', 'descriptions', 'shortSummaries'].includes(key)) result[key] = validLocalized(value, key);
+    else if (key === 'enrichmentReviews') result[key] = validEnrichmentReviews(value);
     else if (key === 'attributes' || key === 'accessibility') {
       keysOnly(value, key === 'attributes' ? ATTRIBUTE_FIELDS : new Set(['wheelchair', 'stepFree', 'accessibleToilet']), key);
       result[key] = Object.fromEntries(Object.entries(value).map(([name, text]) => [name, string(text, 300, name)]));
@@ -155,18 +176,26 @@ function validateImportedBase(base) {
     return Object.fromEntries(Object.entries(value || {}).map(([key, entry]) => [key, string(entry, 4000, `${label}.${key}`)]));
   };
   const originalDescription = base.originalDescription == null ? null : string(base.originalDescription, 4000, 'originalDescription');
+  const wikidata = validWikidata(base.wikidata);
+  if (wikidata) assert(base.sourceFields?.tile?.wikidata === wikidata.id || base.sourceFields?.detail?.tags?.wikidata === wikidata.id,
+    'Wikidata Q-ID needs an explicit OSM tag in the source snapshot');
+  if (wikidata) assert(!Object.keys(wikidata.labels).length && !Object.keys(wikidata.summaries).length,
+    'Wikidata text must come from the bounded enrichment cache');
   return { id: identity.id, sourceKind: 'osm', osm: identity.osm, position: validPosition(base.position),
     category: validCategory(base.category), originalName: string(base.originalName, 250, 'originalName', true),
     originalDescription, descriptionRevision: sourceRevision(originalDescription),
     osmNames: localized(base.osmNames, 'osmNames'), osmDescriptions: localized(base.osmDescriptions, 'osmDescriptions'),
-    wikidata: validWikidata(base.wikidata), region: validRegion(base.region),
+    wikidata, region: validRegion(base.region),
     website: base.website == null ? null : validWebsite(base.website), phone: base.phone == null ? null : string(base.phone, 80, 'phone'),
     openingHours: base.openingHours == null ? null : string(base.openingHours, 500, 'openingHours'),
     sourceFields: base.sourceFields == null ? null : validSourceFields(base.sourceFields),
     attributes: base.attributes == null ? {} : validatePatch({ attributes: base.attributes }).attributes,
     accessibility: base.accessibility == null ? {} : validatePatch({ accessibility: base.accessibility }).accessibility };
 }
-function localeCandidates(language) { return [...new Set([language, String(language || '').split('-')[0]].filter(Boolean))]; }
+function localeCandidates(language) {
+  const parts = String(language || '').replaceAll('_', '-').split('-');
+  return [...new Set(parts.map((_, index) => parts.slice(0, parts.length - index).join('-')).filter(Boolean))];
+}
 function approved(items, language, sources) {
   for (const lang of localeCandidates(language)) for (const source of sources) {
     const hit = items?.find(item => item.language === lang && item.source === source && item.approval === 'approved');
@@ -174,16 +203,32 @@ function approved(items, language, sources) {
   }
   return null;
 }
+function suggested(patch, language, kind, source) {
+  for (const lang of localeCandidates(language)) {
+    const text = source?.[lang];
+    if (!text) continue;
+    const reference = kind === 'name' ? `osm:name:${lang}` : `osm:description:${lang}`;
+    const rejected = patch?.enrichmentReviews?.some(item => item.language === lang && item.kind === kind && item.sourceReference === reference
+      && item.status === 'rejected' && item.sourceRevision === sourceRevision(text));
+    if (!rejected) return text;
+  }
+  return null;
+}
 function resolvePoiName(base, patch, language) {
   return approved(patch?.nameOverrides, language, ['human'])
-    || localeCandidates(language).map(lang => base?.osmNames?.[lang]).find(Boolean)
-    || (base?.wikidata?.linkMethod === 'osm_tag' ? localeCandidates(language).map(lang => base.wikidata.labels?.[lang]).find(Boolean) : null)
+    || suggested(patch, language, 'name', base?.osmNames)
+    || (QID.test(base?.wikidata?.id || '') && ['osm_tag', 'manual_approved'].includes(base.wikidata.linkMethod) ? localeCandidates(language).map(lang => {
+      const value = base.wikidata.labels?.[lang];
+      return value && !patch?.enrichmentReviews?.some(item => item.kind === 'name' && item.language === lang && item.sourceReference === `wikidata:${base.wikidata.id}`
+        && item.status === 'rejected' && item.sourceRevision === sourceRevision(value)) ? value : null;
+    }).find(Boolean) : null)
     || base?.originalName || null;
 }
 function resolvePoiDescription(base, patch, language) {
   const eligible = patch?.descriptions?.filter(item => item.source !== 'machine' || (base?.descriptionRevision && item.sourceRevision === base.descriptionRevision));
-  return approved(eligible, language, ['human', 'machine'])
-    || localeCandidates(language).map(lang => base?.osmDescriptions?.[lang]).find(Boolean)
+  return approved(eligible, language, ['human'])
+    || suggested(patch, language, 'description', base?.osmDescriptions)
+    || approved(eligible, language, ['machine'])
     || base?.originalDescription || null;
 }
 function toPublicPoiRecord(base, change) {

@@ -3,6 +3,7 @@ import { Marker } from 'maplibre-gl';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/LanguageContext';
 import { readImportedPoi, readImportedDetailShard, validEditorPosition } from '@/lib/officialPoiImport';
+import { LANGUAGES, LANGUAGE_VARIANTS } from '@/locales/translations';
 import { adminSaveOfficialPoi, findOfficialPoiChanges, getOfficialPoiChange, getOfficialPoiRevisions, getFirebaseServices, resolveOfficialImportedIdentity } from '@/api/firebaseClient';
 
 const CATEGORIES = ['train', 'fuel', 'charging', 'hotel', 'museum', 'heritage', 'hospital', 'restaurant', 'cafe', 'bar', 'pharmacy', 'bank', 'supermarket', 'atm', 'bakery', 'parking', 'viewpoint', 'camp_site', 'caravan_site', 'toilets', 'drinking_water', 'picnic_site'];
@@ -11,6 +12,8 @@ const buttonClass = 'min-h-10 rounded-lg border border-border px-3 py-2 text-sm 
 const SUPPORTED_TAGS = ['operator', 'brand', 'access', 'internet_access', 'toilets:wheelchair'];
 const emptyForm = { name: '', category: 'museum', description: '', lat: '', lon: '', website: '', phone: '', openingHours: '', address: '', email: '', wheelchair: '', attributes: {}, region: 'CZ', privateNote: '', language: 'cs', workflow: 'draft', visibility: 'visible', photoRefs: [] };
 const localized = (items, language) => (items || []).find(item => item.language === language && item.source === 'human')?.text || '';
+const languageCodes = [...new Set([...LANGUAGES, ...LANGUAGE_VARIANTS].map(item => item.code))];
+const sourceHash = async value => `sha256:${[...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)))].map(byte => byte.toString(16).padStart(2, '0')).join('')}`;
 const safeImageUrl = value => { try { const url = new URL(value); return url.protocol === 'https:' ? url.href : null; } catch { return null; } };
 const baseFromSaved = item => item?.sourceKind === 'osm' && item.base ? {
   canonicalId: item.id, sourceId: String(item.base?.sourceFields?.tile?.id || `${item.osm?.type}/${item.osm?.id}`),
@@ -61,6 +64,7 @@ export default function OfficialPoiEditor({ map, selectedHit, pickedPosition, on
   const [areaOnly, setAreaOnly] = useState(false);
   const [areaVersion, setAreaVersion] = useState(0);
   const [section, setSection] = useState('basic');
+  const [enrichmentCache, setEnrichmentCache] = useState(null);
   const [busy, setBusy] = useState(false);
   const [conflict, setConflict] = useState(false);
   const [latestConflict, setLatestConflict] = useState(null);
@@ -245,10 +249,12 @@ export default function OfficialPoiEditor({ map, selectedHit, pickedPosition, on
     const existingNames = record?.patch?.nameOverrides || [];
     const existingDescriptions = record?.patch?.descriptions || [];
     if (!isNew && (existingNames.some(item => item.language === form.language) || form.name.trim() !== originalName)) {
-      patch.nameOverrides = [...existingNames.filter(item => item.language !== form.language), ...(form.name.trim() === originalName ? [] : [{ language: form.language, text: form.name.trim(), source: 'human', approval: 'approved' }])];
+      const retained = existingNames.find(item => item.language === form.language && item.source === 'human' && item.text === form.name.trim());
+      patch.nameOverrides = [...existingNames.filter(item => item.language !== form.language), ...(form.name.trim() === originalName ? [] : [retained || { language: form.language, text: form.name.trim(), source: 'human', approval: 'approved' }])];
     }
     if (!isNew && (existingDescriptions.some(item => item.language === form.language) || form.description.trim() !== originalDescription)) {
-      patch.descriptions = [...existingDescriptions.filter(item => item.language !== form.language), ...(form.description.trim() === originalDescription ? [] : [{ language: form.language, text: form.description.trim(), source: 'human', approval: 'approved' }])];
+      const retained = existingDescriptions.find(item => item.language === form.language && item.source === 'human' && item.text === form.description.trim());
+      patch.descriptions = [...existingDescriptions.filter(item => item.language !== form.language), ...(form.description.trim() === originalDescription ? [] : [retained || { language: form.language, text: form.description.trim(), source: 'human', approval: 'approved' }])];
     }
     for (const [field, sourceField] of [['website', 'website'], ['phone', 'phone'], ['openingHours', 'openingHours']]) if (record?.patch?.[field] !== undefined || form[field] !== (source?.[sourceField] || '')) patch[field] = form[field].trim() || null;
     const attributes = {};
@@ -313,6 +319,57 @@ export default function OfficialPoiEditor({ map, selectedHit, pickedPosition, on
   const startNewUnsafe = () => { setBase(null); setRecord(null); setHistory([]); setMoveMode(false); const next = { ...emptyForm, language: language.split('-')[0] }; setForm(next); setInitial(next); onPickPosition?.(); };
   const close = () => { if (dirty) setConfirmAction({ label: L('discardQuestion'), run: onClose }); else onClose(); };
   const nearbyLegacy = base && legacyPois.some(p => Number.isFinite(Number(p.lat)) && Math.abs(Number(p.lat) - Number(base.position?.lat)) < 0.0001 && Math.abs(Number(p.lon) - Number(base.position?.lon)) < 0.0001);
+  const sourceBase = record?.base || base;
+  const verifiedQid = sourceBase?.wikidata?.linkMethod === 'osm_tag' ? sourceBase.wikidata.id : base?.wikidata;
+  const entity = /^Q[1-9]\d*$/.test(verifiedQid || '') && enrichmentCache?.entities?.[verifiedQid]?.qid === verifiedQid ? enrichmentCache.entities[verifiedQid] : null;
+  const suggestions = [
+    ...Object.entries(sourceBase?.osmNames || sourceBase?.localizedNames || {}).map(([code, value]) => ({ kind: 'name', language: code, text: value, sourceReference: `osm:name:${code}`, retrievedAt: record?.baseCapturedAt ? new Date(record.baseCapturedAt).toISOString() : undefined })),
+    ...Object.entries(sourceBase?.osmDescriptions || sourceBase?.localizedDescriptions || {}).map(([code, value]) => ({ kind: 'description', language: code, text: value, sourceReference: `osm:description:${code}`, retrievedAt: record?.baseCapturedAt ? new Date(record.baseCapturedAt).toISOString() : undefined })),
+    ...Object.entries(entity?.labels || {}).filter(([, value]) => value).map(([code, value]) => ({ kind: 'name', language: code, text: value, sourceReference: `wikidata:${verifiedQid}`, retrievedAt: entity.retrievedAt })),
+    ...Object.entries(entity?.summaries || {}).filter(([, value]) => value).map(([code, value]) => ({ kind: 'summary', language: code, text: value, sourceReference: `wikidata:${verifiedQid}`, retrievedAt: entity.retrievedAt })),
+  ].filter(item => languageCodes.includes(item.language) && typeof item.text === 'string');
+  const loadEnrichmentCache = async file => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) return toast.error(L('cacheTooLarge'));
+    try {
+      const parsed = JSON.parse(await file.text());
+      if (parsed.schemaVersion !== 1 || !parsed.entities || typeof parsed.entities !== 'object') throw new Error(L('invalidCache'));
+      setEnrichmentCache(parsed);
+    } catch (error) { toast.error(error.message); }
+  };
+  const reviewSuggestion = async (suggestion, status) => {
+    if (!record || dirty || busy || authError || overrideError) return;
+    const sourceRevision = await sourceHash(suggestion.text);
+    const prior = record.patch || {};
+    const review = { language: suggestion.language, kind: suggestion.kind, sourceReference: suggestion.sourceReference, sourceRevision, status };
+    const patch = { enrichmentReviews: [...(prior.enrichmentReviews || []).filter(item => !(item.language === review.language && item.kind === review.kind && item.sourceReference === review.sourceReference)), review] };
+    const field = suggestion.kind === 'name' ? 'nameOverrides' : suggestion.kind === 'summary' ? 'shortSummaries' : 'descriptions';
+    if (status === 'approved') {
+      patch[field] = [...(prior[field] || []).filter(item => item.language !== suggestion.language || item.source !== 'human'),
+        { language: suggestion.language, text: suggestion.text, source: 'human', approval: 'approved', sourceReference: suggestion.sourceReference,
+          sourceRevision, ...(suggestion.retrievedAt ? { retrievedAt: suggestion.retrievedAt } : {}) }];
+    } else {
+      patch[field] = (prior[field] || []).filter(item => !(item.language === suggestion.language && item.sourceReference === suggestion.sourceReference && item.sourceRevision === sourceRevision));
+    }
+    setBusy(true);
+    try {
+      await adminSaveOfficialPoi({ id: record.id, expectedRevision: record.revision, patch, workflow: 'draft' });
+      await loadRecord(record.id, base); refreshList(); toast.success(L('savedUnpublished'));
+    } catch (error) { if (error.code === 'functions/aborted') setConflict(true); toast.error(error.message); }
+    finally { setBusy(false); }
+  };
+  const restoreLocalized = async kind => {
+    if (!record || dirty || busy) return;
+    const field = kind === 'name' ? 'nameOverrides' : kind === 'summary' ? 'shortSummaries' : 'descriptions';
+    const original = kind === 'name' ? sourceBase?.originalName : kind === 'description' ? sourceBase?.originalDescription : null;
+    setBusy(true);
+    try {
+      await adminSaveOfficialPoi({ id: record.id, expectedRevision: record.revision,
+        patch: { [field]: [...(record.patch?.[field] || []).filter(item => item.language !== form.language),
+          ...(original ? [{ language: form.language, text: original, source: 'human', approval: 'approved' }] : [])] }, workflow: 'draft' });
+      await loadRecord(record.id, base); refreshList(); toast.success(L('savedUnpublished'));
+    } catch (error) { toast.error(error.message); } finally { setBusy(false); }
+  };
 
   return <section className="flex min-h-0 flex-1 flex-col bg-background" aria-label={L('title')}>
     <header className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-3"><div><h2 className="font-bold">{L('title')}</h2><p className="text-xs text-muted-foreground">{L('authoringOnly')}</p></div><div className="flex gap-1"><button className={buttonClass} onClick={() => dirty ? setConfirmAction({ label: L('discardQuestion'), run: onOpenLegacy }) : onOpenLegacy?.()}>{L('legacyEditor')}</button><button className={buttonClass} onClick={close} aria-label={L('close')}>×</button></div></header>
@@ -343,7 +400,7 @@ export default function OfficialPoiEditor({ map, selectedHit, pickedPosition, on
       {section === 'contact' && <Section title={L('contact')}>{[['website', 'website'], ['phone', 'telephone'], ['email', 'email'], ['address', 'address'], ['openingHours', 'openingHours']].map(([key, label]) => <Field key={key} label={L(label)}><input className={inputClass} value={form[key]} maxLength={key === 'website' ? 1000 : 300} onChange={e => setField(key, e.target.value)} /></Field>)}</Section>}
       {section === 'accessibility' && <Section title={L('accessibility')}><Field label={L('wheelchair')}><select className={inputClass} value={form.wheelchair} onChange={e => setField('wheelchair', e.target.value)}><option value="">—</option>{['yes', 'no', 'limited', 'designated'].map(value => <option key={value}>{value}</option>)}</select></Field></Section>}
       {section === 'attributes' && <Section title={L('attributes')}><p className="text-xs text-muted-foreground">{L('supportedTagsOnly')}</p>{SUPPORTED_TAGS.map(key => <Field key={key} label={key}><input className={inputClass} value={form.attributes[key] || ''} maxLength={300} onChange={event => setField('attributes', { ...form.attributes, [key]: event.target.value })} /></Field>)}</Section>}
-      {section === 'languages' && <Section title={L('languages')}><p className="text-xs text-muted-foreground">{L('languageNote')}</p><Field label={L('editLanguage')}><select className={inputClass} value={form.language} onChange={e => switchLanguage(e.target.value)}>{[...new Set(['cs', 'en', ...Object.keys(base?.localizedNames || record?.base?.osmNames || {}), ...(record?.patch?.nameOverrides || []).map(item => item.language)])].map(code => <option key={code} value={code}>{code}</option>)}</select></Field><p className="text-xs">{L('originalName')}: {base?.name || record?.base?.originalName || '—'}</p><p className="text-xs">{L('wikidata')}: {base?.wikidata || '—'} ({L('sourceTagOnly')})</p><pre className="overflow-auto text-xs">{JSON.stringify({ osmNames: base?.localizedNames || {}, osmDescriptions: base?.localizedDescriptions || {}, approvedNames: record?.patch?.nameOverrides || [], approvedDescriptions: record?.patch?.descriptions || [] }, null, 2)}</pre><p className="text-xs">{L('nameAndDescriptionAbove')}</p></Section>}
+      {section === 'languages' && <Section title={L('languages')}><p className="text-xs text-muted-foreground">{L('languageNote')}</p><Field label={L('editLanguage')}><select className={inputClass} value={form.language} onChange={e => switchLanguage(e.target.value)}>{languageCodes.map(code => <option key={code} value={code}>{code}</option>)}</select></Field><p className="text-xs">{L('originalName')}: {sourceBase?.originalName || sourceBase?.name || '—'}</p><p className="text-xs">{L('wikidata')}: {verifiedQid || '—'} ({L('sourceTagOnly')})</p><Field label={L('enrichmentCache')}><input type="file" accept="application/json,.json" onChange={event => loadEnrichmentCache(event.target.files?.[0])} /></Field><p className="text-xs text-muted-foreground">{L('enrichmentHelp')}</p><div className="space-y-2">{suggestions.filter(item => item.language === form.language || item.language === form.language.split('-')[0]).map((item, index) => { const review = (record?.patch?.enrichmentReviews || []).find(entry => entry.language === item.language && entry.kind === item.kind && entry.sourceReference === item.sourceReference); return <div key={`${item.kind}-${item.sourceReference}-${item.language}-${index}`} className="rounded-lg border border-border p-2 text-xs"><p className="font-semibold">{item.kind} · {item.language} · {item.sourceReference}</p><p className="break-words">{item.text}</p><p className="text-muted-foreground">{item.retrievedAt || L('osmSnapshot')} · {review?.status || L('unreviewed')} · {review?.sourceRevision || ''}</p><div className="mt-1 flex gap-2"><button className={buttonClass} disabled={!record || dirty || busy} onClick={() => reviewSuggestion(item, 'approved')}>{L('approvePrefer')}</button><button className={buttonClass} disabled={!record || dirty || busy} onClick={() => reviewSuggestion(item, 'rejected')}>{L('rejectSuggestion')}</button></div></div>; })}</div><div className="flex flex-wrap gap-2">{['name', 'description', 'summary'].map(kind => <button key={kind} className={buttonClass} disabled={!record || dirty || busy} onClick={() => restoreLocalized(kind)}>{kind === 'summary' ? L('clearSummary') : L('restoreOriginalKind', { kind })}</button>)}</div><pre className="max-h-44 overflow-auto text-xs">{JSON.stringify({ nameOverrides: record?.patch?.nameOverrides || [], descriptions: record?.patch?.descriptions || [], shortSummaries: record?.patch?.shortSummaries || [] }, null, 2)}</pre></Section>}
       {section === 'media' && Array.isArray(base?.raw?.detail?.photos) && base.raw.detail.photos.length > 0 && <Section title={L('sourcePhotos')}>{base.raw.detail.photos.map((photo, index) => <div key={index} className="flex gap-2 text-xs">{safeImageUrl(photo.url) && <img src={safeImageUrl(photo.url)} alt="" loading="lazy" className="h-14 w-14 rounded object-cover" />}<div><p>{photo.credit || photo.author || L('unknownCredit')}</p><p>{photo.license || L('rightsUnknown')}</p><p className="text-muted-foreground">{L('sourcePhotoReadOnly')}</p></div></div>)}</Section>}
       {section === 'media' && <Section title={L('media')}><p className="text-xs text-muted-foreground">{L('mediaUnavailable')}</p>{form.photoRefs.map((photo, index) => <div key={index} className="space-y-2 rounded-lg border border-border p-2"><Field label={L('storagePath')}><input className={inputClass} value={photo.storagePath} onChange={e => setField('photoRefs', form.photoRefs.map((item, i) => i === index ? { ...item, storagePath: e.target.value } : item))} /></Field>{[['credit', 'credit'], ['creator', 'creator'], ['license', 'license'], ['rightsReference', 'rightsReference'], ['sourceUrl', 'sourceUrl']].map(([field, label]) => <Field key={field} label={L(label)}><input className={inputClass} value={photo[field] || ''} onChange={e => setField('photoRefs', form.photoRefs.map((item, i) => i === index ? { ...item, [field]: e.target.value } : item))} /></Field>)}<p className="text-xs">{L('draftRights')}</p><div className="flex gap-2"><button className={buttonClass} disabled={index === 0} onClick={() => { const next = [...form.photoRefs]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; setField('photoRefs', next); }}>{L('moveFirst')}</button><button className={buttonClass} onClick={() => setField('photoRefs', form.photoRefs.filter((_, i) => i !== index))}>{L('remove')}</button></div></div>)}<button className={buttonClass} onClick={() => setField('photoRefs', [...form.photoRefs, { storagePath: 'official-poi-photos/', license: '', credit: '', sourceUrl: '', approval: 'draft' }])}>{L('addMetadata')}</button></Section>}
       {section === 'history' && <Section title={L('history')}><button className={buttonClass} disabled={!record || busy || Boolean(authError || overrideError)} onClick={() => setConfirmAction({ label: L('resetQuestion'), run: resetToBase })}>{L('resetAll')}</button>{history.map(item => <div key={item.revision} className="rounded-lg border border-border p-2 text-xs"><p className="font-semibold">#{item.revision} · {item.action} · {item.actorUid}</p><p>{item.createdAt ? new Date(item.createdAt).toLocaleString() : ''} · {item.workflow === 'ready' ? L('ready') : L('draft')} · {L('unpublished')}</p><p>{(item.changedFields || Object.keys(item.patch || {})).join(', ')}</p><pre className="max-h-32 overflow-auto whitespace-pre-wrap break-all">{JSON.stringify({ before: item.previousValues || null, after: item.newValues || item.patch }, null, 2)}</pre><button className={buttonClass} disabled={busy || item.revision === record?.revision || Boolean(authError || overrideError)} onClick={() => setConfirmAction({ label: L('rollbackQuestion'), run: () => rollback(item.revision) })}>{L('rollback')}</button></div>)}</Section>}

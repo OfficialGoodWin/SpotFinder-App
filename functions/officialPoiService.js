@@ -1,7 +1,7 @@
 'use strict';
 
 const {
-  parseCanonicalId, newSpotFinderId, validatePatch, validateCustomBase, validateImportedBase, PATCH_FIELDS,
+  parseCanonicalId, newSpotFinderId, validatePatch, validateCustomBase, validateImportedBase, sourceRevision, PATCH_FIELDS,
 } = require('./officialPoiFoundation');
 
 const COLLECTIONS = Object.freeze({
@@ -64,6 +64,21 @@ async function saveOfficialPoi({ db, serverTimestamp, actor, input, createId = n
     if (!creating && !previous && identity.sourceKind === 'spotfinder') throw new PoiEditError('not-found', 'Custom POI does not exist');
     if (!creating && !previous && identity.sourceKind === 'osm' && !importedBase) throw new PoiEditError('invalid-argument', 'Verified imported base snapshot is required');
     if (previous && importedBase) throw new PoiEditError('invalid-argument', 'Imported base is immutable');
+    const linkedBase = previous?.base || importedBase || base;
+    for (const entry of [...(patch?.nameOverrides || []), ...(patch?.descriptions || []), ...(patch?.shortSummaries || []), ...(patch?.enrichmentReviews || [])]) {
+      const reference = entry.sourceReference;
+      if (!reference) continue;
+      if (reference.startsWith('wikidata:') && (linkedBase?.wikidata?.id !== reference.slice(9) || linkedBase.wikidata.linkMethod !== 'osm_tag'))
+        throw new PoiEditError('invalid-argument', 'Enrichment Q-ID must match the explicit OSM link');
+      if (reference.startsWith('osm:') && identity.sourceKind !== 'osm')
+        throw new PoiEditError('invalid-argument', 'OSM source is required for this review');
+      if (reference.startsWith('osm:')) {
+        const [, kind, language] = /^osm:(name|description):(.+)$/.exec(reference) || [];
+        const sourceText = kind === 'name' ? linkedBase?.osmNames?.[language] : linkedBase?.osmDescriptions?.[language];
+        if (!sourceText || entry.sourceRevision !== sourceRevision(sourceText) || (entry.text && entry.text !== sourceText))
+          throw new PoiEditError('invalid-argument', 'OSM suggestion must match the stored source revision');
+      }
+    }
     const revision = previous?.revision || 0;
     if (revision !== input.expectedRevision) throw new PoiEditError('aborted', 'POI changed since it was opened; reload before editing');
     let nextPatch = { ...(previous?.patch || {}) };
@@ -89,6 +104,7 @@ async function saveOfficialPoi({ db, serverTimestamp, actor, input, createId = n
       id, sourceKind: identity.sourceKind,
       ...(identity.osm ? { osm: identity.osm } : {}),
       ...(base || importedBase ? { base: base || importedBase } : previous?.base ? { base: previous.base } : {}),
+      baseCapturedAt: previous?.baseCapturedAt || (base || importedBase ? now : null),
       region: input.region || base?.region || previous?.region || null,
       patch: nextPatch, revision: nextRevision,
       workflow: input.workflow || 'draft',
