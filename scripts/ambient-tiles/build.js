@@ -6,16 +6,7 @@
 
 import { readFile, writeFile } from 'node:fs/promises';
 import { OSM_TAG_MAP, KEPT_TAGS } from './osm-tags.js';
-import { AMBIENT_CATEGORIES } from '../../src/lib/ambientCategories.js';
 import { identityFromOsmiumAttributes } from './identity.js';
-
-// category -> minZoom, so tippecanoe only puts a feature in tiles from that zoom
-// up. Keeps low-zoom tiles small and stops --drop-densest-as-needed from
-// discarding important POIs in favour of parking lots.
-const MIN_ZOOM = Object.fromEntries(AMBIENT_CATEGORIES.map(c => [c.key, c.minZoom]));
-
-const PRIVATE_ACCESS = new Set(['private', 'customers', 'permit', 'no', 'delivery']);
-const STREET_PARKING = new Set(['street_side', 'lane', 'on_kerb', 'half_on_kerb', 'shoulder']);
 
 function parseArgs() {
   const args = Object.fromEntries(process.argv.slice(2).map(a => {
@@ -59,8 +50,6 @@ async function main() {
     const tags = feat.properties || {};
     const cat = categoryForTags(tags);
     if (!cat) continue;
-    // Private / customer-only / kerbside parking is noise on a public map.
-    if (cat === 'parking' && (PRIVATE_ACCESS.has(tags.access) || STREET_PARKING.has(tags.parking))) continue;
     if (!['Point', 'Polygon', 'MultiPolygon'].includes(feat.geometry?.type)) continue;
 
     const identity = identityFromOsmiumAttributes(tags);
@@ -80,9 +69,7 @@ async function main() {
     for (const [key, value] of Object.entries(tags)) {
       if (/^(name|description):[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/.test(key) && typeof value === 'string' && value.length <= 4000) props[key] = value;
     }
-    const feature = { type: 'Feature', geometry: feat.geometry, properties: props };
-    if (MIN_ZOOM[cat] != null) feature.tippecanoe = { minzoom: Math.max(10, MIN_ZOOM[cat]) };
-    features.push(feature);
+    features.push({ type: 'Feature', geometry: feat.geometry, properties: props });
   }
 
   await writeFile(out, JSON.stringify({ type: 'FeatureCollection', features }));

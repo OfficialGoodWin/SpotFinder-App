@@ -26,7 +26,7 @@ nwr/railway=station
 nwr/amenity=fuel,charging_station,hospital,restaurant,cafe,bar,pharmacy,bank,atm,parking,toilets,drinking_water
 nwr/tourism=hotel,museum,viewpoint,camp_site,caravan_site,picnic_site
 nwr/shop=supermarket,bakery
-nwr/historic=castle,fort,manor,palace,monastery,ruins,archaeological_site,monument,city_gate
+nwr/historic
 EOF
 
 echo "[1/4] Filtering OSM objects..."
@@ -48,6 +48,7 @@ tippecanoe \
   -Z10 -z16 \
   --convert-polygons-to-label-points \
   --drop-densest-as-needed \
+  --no-progress-indicator \
   --force \
   "$GEOJSON"
 

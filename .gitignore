@@ -33,5 +33,12 @@ serviceAccountKey.json
 spot-presentation-review-*.json
 spot-presentation-rollback-*.json
 
+# Local ambient POI source extracts and unpublished tile candidates.
+scripts/ambient-tiles/*.osm.pbf
+scripts/ambient-tiles/*.geojson
+scripts/ambient-tiles/*.geojsonseq
+scripts/ambient-tiles/*.pmtiles
+scripts/ambient-tiles/.ambient-filter.txt
+
 # Local AI handoff notes; never commit this file.
 AI-README.md

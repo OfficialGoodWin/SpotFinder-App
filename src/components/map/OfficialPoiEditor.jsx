@@ -3,7 +3,7 @@ import { Marker } from 'maplibre-gl';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/LanguageContext';
 import { readImportedPoi, readImportedDetailShard, validEditorPosition } from '@/lib/officialPoiImport';
-import { adminSaveOfficialPoi, findOfficialPoiChanges, getOfficialPoiChange, getOfficialPoiRevisions } from '@/api/firebaseClient';
+import { adminSaveOfficialPoi, findOfficialPoiChanges, getOfficialPoiChange, getOfficialPoiRevisions, getFirebaseServices, resolveOfficialImportedIdentity } from '@/api/firebaseClient';
 
 const CATEGORIES = ['train', 'fuel', 'charging', 'hotel', 'museum', 'heritage', 'hospital', 'restaurant', 'cafe', 'bar', 'pharmacy', 'bank', 'supermarket', 'atm', 'bakery', 'parking', 'viewpoint', 'camp_site', 'caravan_site', 'toilets', 'drinking_water', 'picnic_site'];
 const inputClass = 'w-full min-h-10 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground';
@@ -13,7 +13,8 @@ const emptyForm = { name: '', category: 'museum', description: '', lat: '', lon:
 const localized = (items, language) => (items || []).find(item => item.language === language && item.source === 'human')?.text || '';
 const safeImageUrl = value => { try { const url = new URL(value); return url.protocol === 'https:' ? url.href : null; } catch { return null; } };
 const baseFromSaved = item => item?.sourceKind === 'osm' && item.base ? {
-  canonicalId: item.id, sourceId: `${item.osm?.type}/${item.osm?.id}`,
+  canonicalId: item.id, sourceId: String(item.base?.sourceFields?.tile?.id || `${item.osm?.type}/${item.osm?.id}`),
+  identityProvenance: /^[1-9]\d*$/.test(String(item.base?.sourceFields?.tile?.id || '')) ? 'verified-original-pbf-index' : 'typed-source-attributes',
   position: item.base.position, name: item.base.originalName, category: item.base.category,
   description: item.base.originalDescription || '', website: item.base.website || '',
   phone: item.base.phone || '', openingHours: item.base.openingHours || '',
@@ -48,6 +49,11 @@ export default function OfficialPoiEditor({ map, selectedHit, pickedPosition, on
   const [initial, setInitial] = useState(emptyForm);
   const [history, setHistory] = useState([]);
   const [list, setList] = useState([]);
+  const [authError, setAuthError] = useState(null);
+  const [listError, setListError] = useState(null);
+  const [overrideError, setOverrideError] = useState(null);
+  const [historyError, setHistoryError] = useState(null);
+  const [identityError, setIdentityError] = useState(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -66,6 +72,20 @@ export default function OfficialPoiEditor({ map, selectedHit, pickedPosition, on
   useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
   const id = base?.canonicalId || record?.id || null;
   const unresolved = base && !base.canonicalId;
+  const readFailure = error => {
+    if (error?.code === 'functions/not-found') return L('readFunctionMissing');
+    if (error?.code === 'functions/permission-denied') return L('adminAuthorizationFailed');
+    return `${L('officialReadFailed')} (${error?.code || 'unknown'})`;
+  };
+  useEffect(() => {
+    let active = true;
+    getFirebaseServices()?.auth?.currentUser?.getIdTokenResult(true).then(result => {
+      if (active) setAuthError(result.claims?.admin === true ? null : L('adminAuthorizationFailed'));
+    }).catch(() => { if (active) setAuthError(L('adminAuthorizationFailed')); });
+    return () => { active = false; };
+  // The signed claim is only a UI diagnostic; callables enforce it on the server.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const setField = (key, value) => setForm(current => ({ ...current, [key]: value }));
   const switchLanguage = nextLanguage => {
     const switchNow = () => { const next = mapRecord(base, record, nextLanguage); setForm(next); setInitial(next); };
@@ -75,17 +95,35 @@ export default function OfficialPoiEditor({ map, selectedHit, pickedPosition, on
 
   const loadRecord = useCallback(async (canonicalId, imported = null) => {
     setBusy(true);
+    let overrideLoaded = true;
     try {
-      const [saved, detail] = await Promise.all([canonicalId ? getOfficialPoiChange(canonicalId) : null,
-        imported?.raw?.detail ? imported.raw.detail : imported ? readImportedDetailShard(imported) : null]);
-      const source = detail && imported?.raw?.tile ? readImportedPoi({ properties: imported.raw.tile, details: detail, position: imported.position, sourceLayer: imported.sourceLayer }) : imported;
+      setOverrideError(null); setHistoryError(null); setIdentityError(null);
+      const detail = imported?.raw?.detail || (imported ? await readImportedDetailShard(imported) : null);
+      let source = detail && imported?.raw?.tile ? readImportedPoi({ properties: imported.raw.tile, details: detail, position: imported.position, sourceLayer: imported.sourceLayer }) : imported;
+      if (source && !source.canonicalId && /^[1-9]\d*$/.test(source.sourceId)) {
+        try {
+          const identity = await resolveOfficialImportedIdentity(source.sourceId, source.category);
+          source = { ...source, canonicalId: identity.canonicalId, identityProvenance: identity.provenance };
+        } catch (error) { setIdentityError(`${L('identityLookupFailed')} (${error?.code || 'unknown'})`); }
+      }
+      const resolvedId = source?.canonicalId || canonicalId;
       const lang = imported ? language.split('-')[0] : form.language;
-      const next = mapRecord(source, saved, lang);
       if (source) setBase(source);
+      let saved = null;
+      if (resolvedId) {
+        try { saved = await getOfficialPoiChange(resolvedId); }
+        catch (error) { overrideLoaded = false; setOverrideError(readFailure(error)); }
+      }
+      const next = mapRecord(source, saved, lang);
       setRecord(saved); setForm(next); setInitial(next); setConflict(false); setLatestConflict(null);
-      setHistory(canonicalId && saved ? await getOfficialPoiRevisions(canonicalId) : []);
-    } catch (error) { toast.error(error.message || L('loadFailed')); }
+      setHistory([]);
+      if (resolvedId && saved) {
+        try { setHistory(await getOfficialPoiRevisions(resolvedId)); }
+        catch (error) { setHistoryError(readFailure(error)); }
+      }
+    } catch (error) { overrideLoaded = false; setOverrideError(`${L('loadFailed')} (${error?.code || 'source'})`); }
     finally { setBusy(false); }
+    return overrideLoaded;
   }, [language, form.language]);
 
   useEffect(() => {
@@ -143,7 +181,7 @@ export default function OfficialPoiEditor({ map, selectedHit, pickedPosition, on
         const old = map.getFilter(layer.id);
         if (JSON.stringify(old) === JSON.stringify(applied.get(layer.id))) continue;
         if (!originals.has(layer.id)) originals.set(layer.id, old);
-        const next = ['all', old || true, ['!=', ['get', 'id'], base.sourceId]];
+        const next = ['all', old || true, ['!=', ['get', 'id'], base.raw?.tile?.id ?? base.sourceId]];
         applied.set(layer.id, next);
         map.setFilter(layer.id, next);
       }
@@ -173,7 +211,7 @@ export default function OfficialPoiEditor({ map, selectedHit, pickedPosition, on
     getOfficialPoiRevisions(item.id).then(setHistory).catch(error => toast.error(error.message));
     if (map && validEditorPosition(next.lat, next.lon)) map.flyTo({ center: [Number(next.lon), Number(next.lat)], zoom: Math.max(map.getZoom(), 14) });
   };
-  const refreshList = async () => { try { setList(await findOfficialPoiChanges()); } catch (error) { toast.error(error.message); } };
+  const refreshList = async () => { try { setList(await findOfficialPoiChanges()); setListError(null); } catch (error) { setListError(readFailure(error)); } };
   useEffect(() => { refreshList(); }, []);
   const searchItems = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -191,6 +229,7 @@ export default function OfficialPoiEditor({ map, selectedHit, pickedPosition, on
 
   const save = async (override = {}) => {
     if (unresolved) return toast.error(L('unresolved'));
+    if (authError || overrideError) return toast.error(authError || overrideError);
     if (!validEditorPosition(form.lat, form.lon)) return toast.error(L('invalidPosition'));
     if (!form.name.trim()) return toast.error(L('nameRequired'));
     if (!CATEGORIES.includes(form.category)) return toast.error(L('categoryRequired'));
@@ -228,11 +267,10 @@ export default function OfficialPoiEditor({ map, selectedHit, pickedPosition, on
     setBusy(true);
     try {
       const result = await adminSaveOfficialPoi(input);
-      const saved = await getOfficialPoiChange(result.id);
-      setRecord(saved); setBase(isNew ? null : base);
-      const next = mapRecord(base, saved, form.language); setForm(next); setInitial(next);
-      setHistory(await getOfficialPoiRevisions(result.id)); setMoveMode(false); setConflict(false); refreshList();
-      toast.success(L('savedUnpublished'));
+      const overrideLoaded = await loadRecord(result.id, isNew ? null : base);
+      if (overrideLoaded) toast.success(L('savedUnpublished'));
+      else toast.warning(L('savedButReloadFailed'));
+      setMoveMode(false); setConflict(false); refreshList();
     } catch (error) {
       if (error.code === 'functions/aborted' || error.code === 'aborted') {
         setConflict(true);
@@ -287,12 +325,17 @@ export default function OfficialPoiEditor({ map, selectedHit, pickedPosition, on
       if (dirty) setConfirmAction({ label: L('discardQuestion'), run: choose }); else choose();
     }}>{item.basePreview?.name || item.base?.originalName || item.id} · {item.id}</button>)}</div>}
     <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+      {authError && <p role="alert" className="rounded-lg bg-red-100 p-3 text-sm text-red-900 dark:bg-red-900/30 dark:text-red-100">{authError}</p>}
+      {identityError && <p role="status" className="rounded-lg bg-amber-100 p-3 text-sm text-amber-900 dark:bg-amber-900/30 dark:text-amber-100">{identityError}</p>}
+      {listError && <p role="status" className="rounded-lg bg-amber-100 p-3 text-sm text-amber-900 dark:bg-amber-900/30 dark:text-amber-100">{L('recentListFailed')}: {listError}</p>}
+      {overrideError && <p role="alert" className="rounded-lg bg-red-100 p-3 text-sm text-red-900 dark:bg-red-900/30 dark:text-red-100">{L('overrideLoadFailed')}: {overrideError}</p>}
+      {historyError && <p role="status" className="rounded-lg bg-amber-100 p-3 text-sm text-amber-900 dark:bg-amber-900/30 dark:text-amber-100">{L('historyLoadFailed')}: {historyError}</p>}
       {unresolved && <p className="rounded-lg bg-amber-100 p-3 text-sm text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">{L('unresolved')} <span className="block break-all">{base.sourceId}</span></p>}
       {base && !validEditorPosition(base.position?.lat, base.position?.lon) && <p className="rounded-lg bg-amber-100 p-3 text-sm text-amber-900">{L('missingGeometry')}</p>}
       {nearbyLegacy && <p className="rounded-lg bg-amber-100 p-3 text-xs text-amber-900">{L('legacyOverlap')}</p>}
       {conflict && <div className="rounded-lg border border-red-400 p-3 text-sm"><p>{L('conflict')}</p><p className="text-xs">{L('revision')} {latestConflict?.revision ?? '…'} · {L('reviewBeforeRetry')}</p><pre className="max-h-24 overflow-auto text-xs">{JSON.stringify(latestConflict?.patch || {}, null, 2)}</pre><div className="flex flex-wrap gap-2"><button className={buttonClass} onClick={() => setConfirmAction({ label: L('discardQuestion'), run: () => loadRecord(id, base) })}>{L('reviewLatest')}</button><button className={buttonClass} disabled={!latestConflict} onClick={() => setConfirmAction({ label: L('retryQuestion'), run: () => { setRecord(latestConflict); setConflict(false); toast.info(L('retryNotice')); } })}>{L('retryOnLatest')}</button></div></div>}
-      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground"><span>{id || L('newCustom')}</span><span>{base ? 'OSM' : 'SpotFinder'}</span><span>{L('revision')} {record?.revision || 0}</span><span>{L('unpublished')}</span></div>
-      {base && <details className="rounded-xl border border-border p-3 text-xs"><summary className="cursor-pointer font-semibold">{L('originalSource')}</summary><p>{L('sourceId')}: {base.sourceId}</p><p>{L('wikidata')}: {base.wikidata || '—'}</p><p>{L('originalPosition')}: {base.position?.lat}, {base.position?.lon}</p><pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all">{JSON.stringify(base.raw, null, 2)}</pre></details>}
+      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground"><span>{id || base?.sourceId || L('newCustom')}</span><span>{base ? (unresolved ? L('importedUnresolved') : L('importedVerified')) : record ? L('spotfinderCreated') : L('newCustom')}</span><span>{L('revision')} {record?.revision || 0}</span><span>{record ? `${record.workflow === 'ready' ? L('ready') : L('draft')} · ${L('unpublished')}` : L('noOfficialOverride')}</span></div>
+      {base && <details className="rounded-xl border border-border p-3 text-xs"><summary className="cursor-pointer font-semibold">{L('originalSource')}</summary><p>{L('sourceId')}: {base.sourceId}</p><p>{L('identityEvidence')}: {base.identityProvenance || L('unresolved')}</p><p>{L('wikidata')}: {base.wikidata || '—'}</p><p>{L('originalPosition')}: {base.position?.lat}, {base.position?.lon}</p><pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all">{JSON.stringify(base.raw, null, 2)}</pre></details>}
       {record?.patch?.position && <p className="rounded-lg bg-blue-50 p-2 text-xs text-blue-900 dark:bg-blue-900/30 dark:text-blue-100">{L('previewOnly')}</p>}
       {record && <div className="rounded-xl border border-border p-3 text-xs"><p className="font-semibold">{L('overriddenFields')}</p><div className="mt-2 flex flex-wrap gap-2">{Object.keys(record.patch || {}).length ? Object.keys(record.patch).map(field => <button key={field} type="button" className={buttonClass} disabled={busy} onClick={() => resetField(field)}>{L('resetField')} {field}</button>) : <span className="text-muted-foreground">{L('noOverrides')}</span>}</div></div>}
       <nav className="flex gap-1 overflow-x-auto" aria-label={L('sections')}>{['basic', 'contact', 'accessibility', 'attributes', 'languages', 'media', 'history'].map(name => <button key={name} className={`${buttonClass} shrink-0 ${section === name ? 'bg-blue-600 text-white' : ''}`} onClick={() => setSection(name)}>{L(name)}</button>)}</nav>
@@ -303,10 +346,10 @@ export default function OfficialPoiEditor({ map, selectedHit, pickedPosition, on
       {section === 'languages' && <Section title={L('languages')}><p className="text-xs text-muted-foreground">{L('languageNote')}</p><Field label={L('editLanguage')}><select className={inputClass} value={form.language} onChange={e => switchLanguage(e.target.value)}>{[...new Set(['cs', 'en', ...Object.keys(base?.localizedNames || record?.base?.osmNames || {}), ...(record?.patch?.nameOverrides || []).map(item => item.language)])].map(code => <option key={code} value={code}>{code}</option>)}</select></Field><p className="text-xs">{L('originalName')}: {base?.name || record?.base?.originalName || '—'}</p><p className="text-xs">{L('wikidata')}: {base?.wikidata || '—'} ({L('sourceTagOnly')})</p><pre className="overflow-auto text-xs">{JSON.stringify({ osmNames: base?.localizedNames || {}, osmDescriptions: base?.localizedDescriptions || {}, approvedNames: record?.patch?.nameOverrides || [], approvedDescriptions: record?.patch?.descriptions || [] }, null, 2)}</pre><p className="text-xs">{L('nameAndDescriptionAbove')}</p></Section>}
       {section === 'media' && Array.isArray(base?.raw?.detail?.photos) && base.raw.detail.photos.length > 0 && <Section title={L('sourcePhotos')}>{base.raw.detail.photos.map((photo, index) => <div key={index} className="flex gap-2 text-xs">{safeImageUrl(photo.url) && <img src={safeImageUrl(photo.url)} alt="" loading="lazy" className="h-14 w-14 rounded object-cover" />}<div><p>{photo.credit || photo.author || L('unknownCredit')}</p><p>{photo.license || L('rightsUnknown')}</p><p className="text-muted-foreground">{L('sourcePhotoReadOnly')}</p></div></div>)}</Section>}
       {section === 'media' && <Section title={L('media')}><p className="text-xs text-muted-foreground">{L('mediaUnavailable')}</p>{form.photoRefs.map((photo, index) => <div key={index} className="space-y-2 rounded-lg border border-border p-2"><Field label={L('storagePath')}><input className={inputClass} value={photo.storagePath} onChange={e => setField('photoRefs', form.photoRefs.map((item, i) => i === index ? { ...item, storagePath: e.target.value } : item))} /></Field>{[['credit', 'credit'], ['creator', 'creator'], ['license', 'license'], ['rightsReference', 'rightsReference'], ['sourceUrl', 'sourceUrl']].map(([field, label]) => <Field key={field} label={L(label)}><input className={inputClass} value={photo[field] || ''} onChange={e => setField('photoRefs', form.photoRefs.map((item, i) => i === index ? { ...item, [field]: e.target.value } : item))} /></Field>)}<p className="text-xs">{L('draftRights')}</p><div className="flex gap-2"><button className={buttonClass} disabled={index === 0} onClick={() => { const next = [...form.photoRefs]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; setField('photoRefs', next); }}>{L('moveFirst')}</button><button className={buttonClass} onClick={() => setField('photoRefs', form.photoRefs.filter((_, i) => i !== index))}>{L('remove')}</button></div></div>)}<button className={buttonClass} onClick={() => setField('photoRefs', [...form.photoRefs, { storagePath: 'official-poi-photos/', license: '', credit: '', sourceUrl: '', approval: 'draft' }])}>{L('addMetadata')}</button></Section>}
-      {section === 'history' && <Section title={L('history')}><button className={buttonClass} disabled={!record || busy} onClick={() => setConfirmAction({ label: L('resetQuestion'), run: resetToBase })}>{L('resetAll')}</button>{history.map(item => <div key={item.revision} className="rounded-lg border border-border p-2 text-xs"><p className="font-semibold">#{item.revision} · {item.action} · {item.actorUid}</p><p>{item.createdAt?.toDate?.().toLocaleString() || ''} · {item.workflow === 'ready' ? L('ready') : L('draft')} · {L('unpublished')}</p><p>{(item.changedFields || Object.keys(item.patch || {})).join(', ')}</p><pre className="max-h-32 overflow-auto whitespace-pre-wrap break-all">{JSON.stringify({ before: item.previousValues || null, after: item.newValues || item.patch }, null, 2)}</pre><button className={buttonClass} disabled={busy || item.revision === record?.revision} onClick={() => setConfirmAction({ label: L('rollbackQuestion'), run: () => rollback(item.revision) })}>{L('rollback')}</button></div>)}</Section>}
+      {section === 'history' && <Section title={L('history')}><button className={buttonClass} disabled={!record || busy || Boolean(authError || overrideError)} onClick={() => setConfirmAction({ label: L('resetQuestion'), run: resetToBase })}>{L('resetAll')}</button>{history.map(item => <div key={item.revision} className="rounded-lg border border-border p-2 text-xs"><p className="font-semibold">#{item.revision} · {item.action} · {item.actorUid}</p><p>{item.createdAt ? new Date(item.createdAt).toLocaleString() : ''} · {item.workflow === 'ready' ? L('ready') : L('draft')} · {L('unpublished')}</p><p>{(item.changedFields || Object.keys(item.patch || {})).join(', ')}</p><pre className="max-h-32 overflow-auto whitespace-pre-wrap break-all">{JSON.stringify({ before: item.previousValues || null, after: item.newValues || item.patch }, null, 2)}</pre><button className={buttonClass} disabled={busy || item.revision === record?.revision || Boolean(authError || overrideError)} onClick={() => setConfirmAction({ label: L('rollbackQuestion'), run: () => rollback(item.revision) })}>{L('rollback')}</button></div>)}</Section>}
       <Field label={L('privateNote')}><textarea className={inputClass} rows={2} maxLength={2000} value={form.privateNote} onChange={e => setField('privateNote', e.target.value)} /></Field>
     </div>
-    <footer className="flex shrink-0 flex-wrap gap-2 border-t border-border bg-background p-3"><button className={buttonClass} disabled={!dirty || busy} onClick={() => { setForm(initial); setMoveMode(false); }}>{L('cancel')}</button><button className={buttonClass} disabled={busy || unresolved} onClick={() => save({ workflow: 'draft' })}>{busy ? L('saving') : L('saveDraft')}</button><button className="min-h-10 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40" disabled={busy || unresolved} onClick={() => save({ workflow: 'ready' })}>{L('markReady')}</button>{record && <button className={buttonClass} disabled={busy} onClick={() => setConfirmAction({ label: form.visibility === 'hidden' ? L('restoreQuestion') : L('hideQuestion'), run: () => save({ visibility: form.visibility === 'hidden' ? 'visible' : 'hidden', workflow: 'draft' }) })}>{form.visibility === 'hidden' ? L('restore') : L('hide')}</button>}</footer>
+    <footer className="flex shrink-0 flex-wrap gap-2 border-t border-border bg-background p-3"><button className={buttonClass} disabled={!dirty || busy} onClick={() => { setForm(initial); setMoveMode(false); }}>{L('cancel')}</button><button className={buttonClass} disabled={busy || unresolved || Boolean(authError || overrideError)} onClick={() => save({ workflow: 'draft' })}>{busy ? L('saving') : L('saveDraft')}</button><button className="min-h-10 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40" disabled={busy || unresolved || Boolean(authError || overrideError)} onClick={() => save({ workflow: 'ready' })}>{L('markReady')}</button>{record && <button className={buttonClass} disabled={busy || Boolean(authError || overrideError)} onClick={() => setConfirmAction({ label: form.visibility === 'hidden' ? L('restoreQuestion') : L('hideQuestion'), run: () => save({ visibility: form.visibility === 'hidden' ? 'visible' : 'hidden', workflow: 'draft' }) })}>{form.visibility === 'hidden' ? L('restore') : L('hide')}</button>}</footer>
     {confirmAction && <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 p-4"><div role="alertdialog" aria-modal="true" aria-label={confirmAction.label} className="w-full rounded-xl bg-background p-4 shadow-xl"><p className="mb-4 text-sm">{confirmAction.label}</p><div className="flex justify-end gap-2"><button className={buttonClass} onClick={() => setConfirmAction(null)}>{L('cancel')}</button><button className={buttonClass} onClick={() => { const action = confirmAction.run; setConfirmAction(null); action(); }}>{L('confirm')}</button></div></div></div>}
   </section>;
 }

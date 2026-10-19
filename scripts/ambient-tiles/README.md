@@ -1,8 +1,9 @@
 # Ambient POI identity recovery and candidate build
 
-The published archive may contain only a numeric OSM `@id`. A number does not
-identify an OSM node, way, or relation. The official editor leaves those
-features read-only. The build now copies osmium's original `@type` and `@id`
+The owner's October 2026 archive contains only a numeric OSM `@id`. A number
+does not identify an OSM node, way, or relation. The original-PBF admin lookup
+resolves verified numeric IDs after its Function is deployed; unknown IDs
+remain read-only. The build also copies osmium's original `@type` and `@id`
 into `source_id=node/123`, `canonical_id=osm:node:123`, `osm_type`, and
 `osm_id`. It rejects an included feature without both original attributes.
 The GeoJSON feature ID from `--add-unique-id=type_id` is never treated as an
@@ -41,6 +42,58 @@ From `scripts/ambient-tiles`:
 ./build.sh /absolute/path/to/original-czech.osm.pbf
 node validate-candidate.mjs --raw=ambient-export.geojson --geojson=ambient-poi.geojson --pmtiles=ambient-poi.candidate.pmtiles
 ```
+
+For the owner's current WSL source, the PBF is
+`/home/user/SpotFinder-App/scripts/ambient-tiles/czech-republic-latest.osm.pbf`.
+The older normalized export is
+`/home/user/SpotFinder-App/scripts/ambient-tiles/ambient-poi.geojson`; keep
+it and `ambient-poi.pmtiles` untouched. If building from a separate checkout,
+compare the two exports:
+
+```bash
+node compare-legacy.mjs \
+  --old=/home/user/SpotFinder-App/scripts/ambient-tiles/ambient-poi.geojson \
+  --candidate=ambient-poi.geojson
+node inspect-pmtiles.mjs --pmtiles=ambient-poi.candidate.pmtiles \
+  --geojson=ambient-poi.geojson --id=node/13794953629
+```
+
+The original export has **262,865 features**. The typed candidate built from
+that PBF must retain the same feature count and category/geometry distribution;
+`compare-legacy.mjs` checks every feature's original numeric ID, category,
+and exact geometry against the typed candidate. The inspected old archive's
+`13794953629` drinking-water feature had only a numeric `id`; the PBF
+verified it is `osm:node:13794953629`. Do not infer other types from number
+size. Review node, way, and relation samples in the candidate tile before
+release.
+
+## Admin lookup for the existing numeric archive
+
+The tested old-to-new comparison found 262,865 exact source matches and zero
+numeric collisions among included POIs. It generated
+`functions/officialPoiIdentity/index.json.gz` (about 1.75 MB), with original
+PBF and old archive SHA-256 checksums. `adminReadOfficialPoi` checks the signed
+admin claim, then resolves an exact numeric ID and category. On first save,
+`adminSaveOfficialPoi` independently verifies the mapping. The **existing**
+PMTiles and numeric detail shards can therefore remain in place for Phase 2C.
+A PMTiles rebuild is not mandatory for authoring once the live archive is
+confirmed to match the indexed legacy archive.
+
+Regenerate the index from the original WSL files and a typed candidate:
+
+```bash
+node compare-legacy.mjs \
+  --old=/home/user/SpotFinder-App/scripts/ambient-tiles/ambient-poi.geojson \
+  --candidate=ambient-poi.geojson \
+  --old-pmtiles=/home/user/SpotFinder-App/scripts/ambient-tiles/ambient-poi.pmtiles \
+  --pbf=/home/user/SpotFinder-App/scripts/ambient-tiles/czech-republic-latest.osm.pbf \
+  --index=../../functions/officialPoiIdentity/index.json.gz
+```
+
+Compare the live Vercel archive SHA-256 with the index metadata before
+deploying the lookup. If it differs, review the actual live archive against
+the PBF first. Community photos and ratings retain legacy coordinate/name
+keys; do not reassociate those records automatically.
 
 Inputs are the PBF and `export-config.json`. Outputs are
 `ambient-filtered.osm.pbf`, `ambient-export.geojson`, `ambient-poi.geojson`,

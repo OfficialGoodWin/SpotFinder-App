@@ -953,7 +953,9 @@ export default function MapLibreMap({
         const baseTags = { phone: p.phone, website: p.website, opening_hours: p.opening_hours, description: p.description, wikidata: p.wikidata, wikimedia_commons: p.wikimedia_commons, image: p.image };
         const enrichedTags = details?.wikipedia ? { ...baseTags, wikipedia: details.wikipedia } : baseTags;
         onSelectPOI?.(
-          { id: p.id || `${lat}-${lon}`, lat, lon, name: p.name || '', address: p.address || '',
+          // Keep the existing public/social POI key when typed candidate tiles
+          // replace numeric tiles. Official editing uses _ambientHit instead.
+          { id: p.osm_id || p.id || `${lat}-${lon}`, lat, lon, name: p.name || '', address: p.address || '',
             tags: enrichedTags,
             enrichment: details || null,
             _ambientHit: { properties: { ...p }, details, position, sourceLayer: AMBIENT_SOURCE_LAYER },

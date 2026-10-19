@@ -36,6 +36,14 @@ async function saveOfficialPoi({ db, serverTimestamp, actor, input, createId = n
   const base = creating ? validateCustomBase(input.base) : null;
   const importedBase = input.importedBase == null ? null : validateImportedBase(input.importedBase);
   if (importedBase && importedBase.id !== id) throw new PoiEditError('invalid-argument', 'Imported identity mismatch');
+  const legacyTileId = importedBase?.sourceFields?.tile?.id;
+  if (legacyTileId != null && /^[1-9]\d*$/.test(String(legacyTileId))) {
+    // A bare tile ID can enter the authoring system only through the
+    // independently verified original-PBF index bundled with this function.
+    const { resolveLegacyIdentity } = require('./officialPoiIdentity');
+    const resolved = resolveLegacyIdentity(String(legacyTileId), importedBase.category);
+    if (resolved.canonicalId !== id) throw new PoiEditError('invalid-argument', 'Legacy tile identity does not match the original PBF');
+  }
   const patch = input.patch == null ? null : validatePatch(input.patch);
   if ([Boolean(patch), input.rollbackRevision != null, input.resetToBase === true, input.removeFields != null].filter(Boolean).length !== 1)
     throw new PoiEditError('invalid-argument', 'Choose exactly one patch, rollback, reset or field removal');

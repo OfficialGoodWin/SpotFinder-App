@@ -25,6 +25,7 @@ const { GoogleAuth } = require('google-auth-library');
 const { defineString } = require('firebase-functions/params');
 const { validateSocialPostUrl, INVALID_SOCIAL_URL_MESSAGE } = require('./socialUrlPolicy');
 const { saveOfficialPoi, PoiEditError } = require('./officialPoiService');
+const { readOfficialPoi } = require('./officialPoiReader');
 initializeApp();
 const db = getFirestore();
 const adminAuth = getAuth();
@@ -43,6 +44,19 @@ exports.adminSaveOfficialPoi = functions.https.onCall(async (data, context) => {
   } catch (error) {
     if (error instanceof PoiEditError) throw new functions.https.HttpsError(error.code, error.message);
     if (error instanceof TypeError) throw new functions.https.HttpsError('invalid-argument', error.message);
+    throw error;
+  }
+});
+
+// Bounded admin reads are served by a trusted backend. This keeps the editor
+// usable even when an older deployed Firestore ruleset lacks Phase 1 paths.
+// The signed claim is checked independently of the React admin state.
+exports.adminReadOfficialPoi = functions.https.onCall(async (data, context) => {
+  if (context.auth?.token?.admin !== true) throw new functions.https.HttpsError('permission-denied', 'Admin only.');
+  try {
+    return await readOfficialPoi({ db, actor: { uid: context.auth.uid, admin: true }, input: data });
+  } catch (error) {
+    if (error instanceof PoiEditError) throw new functions.https.HttpsError(error.code, error.message);
     throw error;
   }
 });

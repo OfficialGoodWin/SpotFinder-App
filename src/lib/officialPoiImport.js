@@ -18,7 +18,7 @@ export function readImportedPoi(hit) {
   const localizedNames = Object.fromEntries(Object.entries(tags).filter(([key, value]) => /^name:[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/.test(key) && typeof value === 'string').map(([key, value]) => [key.slice(5), value]));
   const localizedDescriptions = Object.fromEntries(Object.entries(tags).filter(([key, value]) => /^description:[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/.test(key) && typeof value === 'string').map(([key, value]) => [key.slice(12), value]));
   return {
-    canonicalId, sourceId, sourceLayer: hit?.sourceLayer || 'ambient_poi',
+    canonicalId, sourceId, identityProvenance: canonicalId ? 'typed-source-attributes' : null, sourceLayer: hit?.sourceLayer || 'ambient_poi',
     position: hit?.position, name: String(tags.name || ''), category: String(tags.cat || ''),
     description: String(tags.description || details?.description || ''), website: String(tags.website || ''),
     phone: String(tags.phone || ''), openingHours: String(tags.opening_hours || ''),

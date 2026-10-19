@@ -668,6 +668,15 @@ export default {
     "share": "Share"
   },
   officialEditor: {
+    adminSession: 'Admin session · server authorization required',
+    adminAuthorizationFailed: 'Official POI access was denied. Refresh your sign-in and confirm the Firebase admin claim.',
+    readFunctionMissing: 'Official POI read service is unavailable. Deploy adminReadOfficialPoi to this Firebase project.',
+    officialReadFailed: 'Unable to load official POI data. Check the Firebase Function and project configuration.',
+    recentListFailed: 'Recent official edits could not be loaded', overrideLoadFailed: 'Official override could not be loaded; saving is disabled', historyLoadFailed: 'Revision history could not be loaded',
+    importedVerified: 'Imported OSM POI — identity verified', importedUnresolved: 'Imported OSM POI — identity unresolved', spotfinderCreated: 'SpotFinder-created POI', noOfficialOverride: 'No official override saved',
+    identityLookupFailed: 'The original-PBF identity lookup could not verify this legacy marker. Check the deployed identity index and archive version.',
+    identityEvidence: 'Identity evidence',
+    savedButReloadFailed: 'The server saved this revision, but the editor could not reload it. Reopen the POI before making another edit.',
     importedTab: 'Imported POIs', editorTabs: 'Map editor tabs', otherTools: 'Other tools', editThisPoi: 'Edit this POI', selectInstruction: 'Select an imported place on the map to edit it.', selectPoi: 'Select POI mode', stopSelecting: 'Stop selecting', noSelection: 'Choose a place marker; the map remains available outside this panel.', overlappingPlaces: 'Places under this tap', missingGeometry: 'The tile did not provide a reliable point position. Saving is disabled until the source geometry is reviewed.', overriddenFields: 'Unpublished field overrides', resetField: 'Reset', noOverrides: 'No field overrides', subcategoryReadOnly: 'Source subcategory (read only; unsupported by official schema)', attributes: 'Attributes', supportedTagsOnly: 'Only these validated OSM-style attributes can be saved. Other raw tags are read only.', sourceTagOnly: 'linked only when present in an explicit OSM tag', sourcePhotos: 'Source-linked photos', unknownCredit: 'Credit missing', rightsUnknown: 'Rights unverified', sourcePhotoReadOnly: 'Source image; association is read only here.',
     unpublished: 'Unpublished',
     reviewBeforeRetry: 'Compare the current server patch with your unsaved form.', retryQuestion: 'Use the latest revision number while keeping your form values? Review every field before saving, because your values may replace another admin’s edit.', retryOnLatest: 'Keep form and retry', retryNotice: 'Latest revision selected. Review all fields, then save again.',

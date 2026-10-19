@@ -668,6 +668,15 @@ export default {
     "share": "Sdílet"
   },
   officialEditor: {
+    adminSession: 'Administrátorské přihlášení · vyžadováno ověření serverem',
+    adminAuthorizationFailed: 'Přístup k oficiálním bodům byl odepřen. Obnovte přihlášení a ověřte administrátorský nárok Firebase.',
+    readFunctionMissing: 'Služba pro čtení oficiálních bodů není dostupná. Nasaďte adminReadOfficialPoi do tohoto projektu Firebase.',
+    officialReadFailed: 'Oficiální data bodů nelze načíst. Zkontrolujte funkci Firebase a nastavení projektu.',
+    recentListFailed: 'Poslední oficiální úpravy nelze načíst', overrideLoadFailed: 'Oficiální úpravu nelze načíst; ukládání je vypnuto', historyLoadFailed: 'Historii revizí nelze načíst',
+    importedVerified: 'Importovaný bod OSM — identita ověřena', importedUnresolved: 'Importovaný bod OSM — identita nevyřešena', spotfinderCreated: 'Bod vytvořený SpotFinderem', noOfficialOverride: 'Žádná oficiální úprava není uložená',
+    identityLookupFailed: 'Identitu staršího bodu nelze ověřit podle původního PBF. Zkontrolujte nasazený index identit a verzi archivu.',
+    identityEvidence: 'Podklad ověření identity',
+    savedButReloadFailed: 'Server revizi uložil, ale editor ji nedokázal znovu načíst. Před další úpravou bod znovu otevřete.',
     importedTab: 'Importované POI', editorTabs: 'Záložky editoru mapy', otherTools: 'Další nástroje', editThisPoi: 'Upravit toto POI', selectInstruction: 'Vyberte importované místo na mapě a upravte ho.', selectPoi: 'Režim výběru POI', stopSelecting: 'Ukončit výběr', noSelection: 'Vyberte značku místa; mimo panel lze mapu dál ovládat.', overlappingPlaces: 'Místa pod klepnutím', missingGeometry: 'Dlaždice neposkytla spolehlivou bodovou polohu. Uložení je zakázáno do prověření zdrojové geometrie.', overriddenFields: 'Nezveřejněné změny polí', resetField: 'Obnovit', noOverrides: 'Žádné změny polí', subcategoryReadOnly: 'Zdrojová podkategorie (jen ke čtení; oficiální schéma ji nepodporuje)', attributes: 'Atributy', supportedTagsOnly: 'Uložit lze pouze tyto ověřované atributy ve stylu OSM. Ostatní zdrojové tagy jsou jen ke čtení.', sourceTagOnly: 'propojeno pouze přes výslovný tag OSM', sourcePhotos: 'Fotografie propojené se zdrojem', unknownCredit: 'Chybí autor', rightsUnknown: 'Práva neověřena', sourcePhotoReadOnly: 'Zdrojová fotografie; toto propojení je zde pouze ke čtení.',
     unpublished: 'Nezveřejněno',
     reviewBeforeRetry: 'Porovnejte aktuální změny na serveru se svým neuloženým formulářem.', retryQuestion: 'Použít číslo nejnovější revize a ponechat hodnoty formuláře? Před uložením zkontrolujte všechna pole, protože mohou nahradit změny jiného správce.', retryOnLatest: 'Ponechat formulář a opakovat', retryNotice: 'Vybrána nejnovější revize. Zkontrolujte pole a uložte znovu.',

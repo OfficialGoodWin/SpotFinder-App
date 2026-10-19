@@ -6,9 +6,8 @@ export const OSM_TAG_MAP = {
   charging:      { key: 'amenity', value: 'charging_station' },
   hotel:         { key: 'tourism', value: 'hotel' },
   museum:        { key: 'tourism', value: 'museum' },
-  // Only real landmarks. `historic=*` alone pulls in every memorial, wayside cross
-  // and boundary stone, which is what produced the black clusters on the map.
-  heritage:      { key: 'historic', value: null, values: ['castle','fort','manor','palace','monastery','ruins','archaeological_site','monument','city_gate'] },
+  // Keep the published historic=* feature set during the identity repair.
+  heritage:      { key: 'historic', value: null },
   hospital:      { key: 'amenity', value: 'hospital' },
   restaurant:    { key: 'amenity', value: 'restaurant' },
   cafe:          { key: 'amenity', value: 'cafe' },

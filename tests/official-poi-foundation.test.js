@@ -139,3 +139,18 @@ test('admin service enforces signed claim, revision conflicts, immutable history
   await assert.rejects(service.saveOfficialPoi({ ...context, input: { id, expectedRevision: 6, removeFields: ['actorUid'] } }), /Invalid fields/);
   assert.equal([...db.docs.keys()].filter(key => key.startsWith('official_poi_audit/')).length, 6);
 });
+
+test('numeric legacy tile features require the verified PBF identity index before first save', async () => {
+  const db = memoryDb();
+  const context = { db, serverTimestamp: () => 'SERVER_TIME', actor: { uid: 'admin-uid', admin: true } };
+  const base = { id: 'osm:node:13794953629', position: { lat: 50.0859408, lon: 14.4629643 },
+    category: 'drinking_water', originalName: '', region: 'CZ',
+    sourceFields: { tile: { id: 13794953629, cat: 'drinking_water', description: 'Pítko Parukářka sever' } } };
+  await assert.rejects(service.saveOfficialPoi({ ...context, input: { id: 'osm:way:13794953629',
+    importedBase: { ...base, id: 'osm:way:13794953629' }, expectedRevision: 0, patch: { visibility: 'visible' } } }),
+  { code: 'invalid-argument' });
+  const created = await service.saveOfficialPoi({ ...context, input: { id: base.id, importedBase: base, expectedRevision: 0,
+    patch: { nameOverrides: [{ language: 'cs', text: 'Pítko Parukářka', source: 'human', approval: 'approved' }] } } });
+  assert.equal(created.revision, 1);
+  assert.equal(db.docs.get(`official_poi_changes/${base.id}`).patch.nameOverrides[0].text, 'Pítko Parukářka');
+});

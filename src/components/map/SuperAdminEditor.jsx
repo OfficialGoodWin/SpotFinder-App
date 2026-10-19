@@ -1013,7 +1013,7 @@ export default function SuperAdminEditor({ user, onClose, onAdminDataChange, map
           </div>
           <div className="flex-1">
             <p className="text-sm font-bold text-foreground leading-tight">Map Editor</p>
-            <p className="text-[11px] text-muted-foreground">Admin claim verified</p>
+            <p className="text-[11px] text-muted-foreground">{t('officialEditor.adminSession')}</p>
           </div>
           {adminNavMode && (
             <span className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full font-semibold animate-pulse">

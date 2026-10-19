@@ -16,10 +16,9 @@ const wantedCategory = tags => {
   }
   return null;
 };
-const noise = tags => ['private', 'customers', 'permit', 'no', 'delivery'].includes(tags.access) || ['street_side', 'lane', 'on_kerb', 'half_on_kerb', 'shoulder'].includes(tags.parking);
 const expected = (raw.features || []).filter(feature => {
   const category = wantedCategory(feature.properties);
-  return category && !(category === 'parking' && noise(feature.properties)) && ['Point', 'Polygon', 'MultiPolygon'].includes(feature.geometry?.type);
+  return category && ['Point', 'Polygon', 'MultiPolygon'].includes(feature.geometry?.type);
 });
 if (expected.length !== normalized.features?.length) throw new Error(`Feature count mismatch: source ${expected.length}, normalized ${normalized.features?.length || 0}`);
 const categories = {};

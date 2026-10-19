@@ -88,26 +88,37 @@ const callFn = (name) => async (payload) => {
   return data;
 };
 
-// Official authoring is read by claimed admins and written only by the callable.
-export const adminSaveOfficialPoi = callFn('adminSaveOfficialPoi');
+// Official authoring reads and writes pass through signed-claim callables.
+// Direct Firestore authoring writes remain forbidden by the security rules.
+// A claim granted after sign-in is absent from an older cached ID token.
+// Refresh before official authoring calls; the Functions still verify the
+// signed claim themselves and never trust this client-side check.
+const callOfficialFn = (name) => async (payload) => {
+  const services = getFirebaseServices();
+  await services.auth.authStateReady();
+  if (services.auth.currentUser) await services.auth.currentUser.getIdToken(true);
+  return callFn(name)(payload);
+};
+export const adminSaveOfficialPoi = callOfficialFn('adminSaveOfficialPoi');
+export async function resolveOfficialImportedIdentity(legacyId, category) {
+  const result = await callOfficialFn('adminReadOfficialPoi')({ action: 'resolve-legacy', legacyId, category });
+  return result.identity;
+}
 export async function getOfficialPoiChange(id) {
-  const { db: firestore } = getFirebaseServices();
-  const snapshot = await getDoc(doc(firestore, 'official_poi_changes', id));
-  return snapshot.exists() ? snapshot.data() : null;
+  const result = await callOfficialFn('adminReadOfficialPoi')({ action: 'get', id });
+  return result.item;
 }
 export async function getOfficialPoiRevisions(id) {
-  const { db: firestore } = getFirebaseServices();
-  const snapshot = await getDocs(query(collection(firestore, 'official_poi_revisions'), where('id', '==', id), limit(100)));
-  return snapshot.docs.map(item => item.data()).sort((a, b) => b.revision - a.revision);
+  const result = await callOfficialFn('adminReadOfficialPoi')({ action: 'history', id });
+  return result.items;
 }
 export async function findOfficialPoiChanges(id) {
-  const { db: firestore } = getFirebaseServices();
   if (id) {
     const record = await getOfficialPoiChange(id);
     return record ? [record] : [];
   }
-  const snapshot = await getDocs(query(collection(firestore, 'official_poi_changes'), orderBy('updatedAt', 'desc'), limit(50)));
-  return snapshot.docs.map(item => item.data());
+  const result = await callOfficialFn('adminReadOfficialPoi')({ action: 'list' });
+  return result.items;
 }
  
 // Detect WebView / in-app browsers that block Google OAuth popup

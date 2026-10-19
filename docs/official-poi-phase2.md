@@ -13,12 +13,16 @@ and legacy `admin_pois` are unchanged.
 
 The editor accepts imported `node/<id>`, `way/<id>`, and `relation/<id>` values
 from `ambient_poi`, or the matching canonical and typed source attributes.
-A bare number, vector-tile feature ID, name, or coordinate cannot establish
-identity. Such markers show their raw tile/detail attributes but saving is
-disabled. The previous build exported numeric `@id` and discarded `@type`.
+A bare number, vector-tile feature ID, name, or coordinate cannot by itself
+establish identity. The previous build exported numeric `@id` and discarded
+`@type`. Phase 2C uses a bounded admin-only callable to resolve numeric IDs
+against the verified original-PBF index. IDs absent from that index, or with
+a mismatched category, remain read-only. On first save the write callable
+independently verifies the same source mapping.
 See [`../scripts/ambient-tiles/README.md`](../scripts/ambient-tiles/README.md)
-for the exact PBF-to-candidate rebuild and review procedure. It requires the
-original PBF or a reviewed replacement extract and does not replace PMTiles.
+for the exact index generation, candidate rebuild and review procedure. The
+numeric archive can stay in place for authoring if its live SHA-256 matches
+the indexed archive; it must not be assumed from filenames alone.
 
 The first edit captures an immutable, bounded copy of available source fields
 with provenance in `base.sourceFields`. Subsequent edits patch only supported
@@ -30,9 +34,10 @@ Phase 3 should verify it against an indexed source export before publication.
 
 The legacy editor remains accessible in the admin panel. A nearby legacy POI
 warning is only a distance-based review cue; it is not an identity alias.
-No alias index or migration has been created. Review candidate matches
-against typed OSM source IDs and create an explicit audited alias map in a
-later phase. Keep `admin_pois` rendering until that review is complete.
+A verified numeric tile-ID lookup exists for the included OSM features. It is
+not an alias map for legacy coordinate/name-based photos, ratings, reports,
+social posts, or shared links. Review those associations separately before
+any public rendering migration. Keep `admin_pois` rendering until reviewed.
 
 ## Media boundary
 
@@ -48,9 +53,10 @@ secure upload and rights review service is implemented.
 
 1. Use an account with a signed Firebase `admin` custom claim; open the map's
    admin editor and choose **Imported POIs**.
-2. Select a typed OSM marker. Inspect source ID and raw fields; rename,
+2. Select a typed OSM marker or a numeric marker resolved by the verified
+   original-PBF index. Inspect source ID and raw fields; rename,
    recategorize, move, save as draft, refresh, and inspect revision history.
-3. Select an untyped marker and verify saving is disabled.
+3. Select a numeric marker absent from the index and verify saving is disabled.
 4. Add a custom POI, pick a map position, save, and verify an `sf:<UUIDv4>` ID.
 5. Open two admin sessions on the same record. Save from the first, then try
    the second; review the conflict and load the latest revision.
@@ -64,7 +70,20 @@ secure upload and rights review service is implemented.
 
 The Firebase rules emulator requires Java 21 or newer with the installed
 Firebase Tools version. The current workstation has Java 8, so emulator
-security tests could not be executed here. `adminSaveOfficialPoi` was deployed
-to `spotfinderapp-cdc7b` in `us-central1` on 2026-10-19 and verified ACTIVE.
-Firestore and Storage rules were not changed or deployed. The frontend has not
-been released from this workspace.
+security tests could not be executed here. `adminSaveOfficialPoi` is deployed
+to `spotfinderapp-cdc7b` in `us-central1`. On 2026-10-19,
+`firebase functions:list` confirmed that `adminReadOfficialPoi` was not
+deployed. The old frontend's direct list query on `official_poi_changes`
+caused the permission toast on editor startup. The new frontend uses the
+admin-only read callable and refreshes the signed ID token before official
+operations. Deploy both callable implementations before releasing it:
+
+```powershell
+firebase deploy --project spotfinderapp-cdc7b --only functions:adminReadOfficialPoi,functions:adminSaveOfficialPoi
+```
+
+Deploy the frontend afterward. No Firestore or Storage rule relaxation is
+needed for these callable reads and writes. The live archive checksum and a
+real admin browser save/refresh test still need verification. Firestore and
+Storage rules were not changed or deployed from this workspace; neither was
+the frontend.
