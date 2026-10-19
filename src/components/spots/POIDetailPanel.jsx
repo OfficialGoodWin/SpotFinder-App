@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Navigation, Share2, Camera, Star, Phone, Mail, Globe, MapPin, ChevronUp, ChevronLeft, ChevronRight, Flag, Pencil } from 'lucide-react';
+import { X, Navigation, Share2, Camera, Star, Phone, Mail, Globe, MapPin, ChevronUp, ChevronLeft, ChevronRight, Flag, Pencil, Clock } from 'lucide-react';
 import { getPOIPhotos, getPOIRatings, addPOIPhoto, addPOIRating, uploadSpotImage, makePOIId } from '@/api/firebaseClient';
 import { moderateSubmission } from '@/lib/moderation';
 import { toast } from 'sonner';

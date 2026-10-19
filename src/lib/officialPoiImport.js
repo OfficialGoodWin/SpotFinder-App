@@ -1,5 +1,6 @@
 // Read-only view of the currently rendered ambient tile and its optional z10
 // detail shard. A typed osmium @id is the only safe imported identity here.
+import { readPoiDetailShard } from './poiDetailShard.js';
 const TYPED_OSM = /^(node|way|relation)\/([1-9]\d*)$/;
 const CANONICAL_OSM = /^osm:(node|way|relation):([1-9]\d*)$/;
 
@@ -31,17 +32,11 @@ export function readImportedPoi(hit) {
 export async function readImportedDetailShard(imported) {
   const { lat, lon } = imported?.position || {};
   if (!validEditorPosition(lat, lon) || !imported?.sourceId) return null;
-  const n = 2 ** 10;
-  const x = Math.floor((Number(lon) + 180) / 360 * n);
-  const radians = Math.max(-85.05112878, Math.min(85.05112878, Number(lat))) * Math.PI / 180;
-  const y = Math.floor((1 - Math.log(Math.tan(radians) + 1 / Math.cos(radians)) / Math.PI) / 2 * n);
   const root = import.meta.env?.VITE_POI_DETAILS_BASE_URL || '/poi-details/10';
   try {
-    const response = await fetch(`${String(root).replace(/\/$/, '')}/${x}/${y}.json`, { signal: AbortSignal.timeout?.(5000) });
-    if (!response.ok) return null;
-    const body = await response.json();
-    return (body.items || []).find(item => String(item.id) === imported.sourceId && (!item.canonical_id || item.canonical_id === imported.canonicalId)) || null;
-  } catch { return null; }
+    const items = await readPoiDetailShard(Number(lon), Number(lat), root);
+    return items?.find(item => String(item.id) === imported.sourceId && (!item.canonical_id || item.canonical_id === imported.canonicalId)) || null;
+  } catch (error) { console.warn('Official POI detail shard unavailable:', error); return null; }
 }
 
 export function validEditorPosition(lat, lon) {

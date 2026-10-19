@@ -9,9 +9,10 @@ export default [
     files: [
       "src/components/**/*.{js,mjs,cjs,jsx}",
       "src/pages/**/*.{js,mjs,cjs,jsx}",
+      "src/lib/**/*.{js,mjs,cjs,jsx}",
       "src/Layout.jsx",
     ],
-    ignores: ["src/lib/**/*", "src/components/ui/**/*"],
+    ignores: ["src/components/ui/**/*"],
     ...pluginJs.configs.recommended,
     ...pluginReact.configs.flat.recommended,
     languageOptions: {
@@ -35,6 +36,8 @@ export default [
       "unused-imports": pluginUnusedImports,
     },
     rules: {
+      "no-undef": "error",
+      "react/jsx-no-undef": "error",
       "no-unused-vars": "off",
       "react/jsx-uses-vars": "error",
       "react/jsx-uses-react": "error",

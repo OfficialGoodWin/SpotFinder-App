@@ -14,6 +14,7 @@ import { getSpotDisplayName, getSpotImageInfo } from '@/lib/spotPresentation';
 import { clampMapZoom, getSpotCameraOptions, MAP_MAX_ZOOM } from '@/lib/mapSpotFocus';
 import { registerSingleMapListener } from '@/lib/mapLifecycle';
 import { attachMarkerAt, validMarkerLngLat } from '@/lib/mapMarkerCoordinates';
+import { readPoiDetailShard } from '@/lib/poiDetailShard';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { Protocol } from 'pmtiles';
 import { Minus, Plus } from 'lucide-react';
@@ -937,18 +938,11 @@ export default function MapLibreMap({
         }
 
         const detailsBase = import.meta.env.VITE_POI_DETAILS_BASE_URL || '/poi-details/10';
-        const n = 2 ** 10;
-        const x = Math.floor((lon + 180) / 360 * n);
-        const latRad = Math.max(-85.05112878, Math.min(85.05112878, lat)) * Math.PI / 180;
-        const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n);
         let details = null;
         try {
-          const r = await fetch(`${String(detailsBase).replace(/\/$/, '')}/${x}/${y}.json`, { cache: 'force-cache' });
-          if (r.ok) {
-            const body = await r.json();
-            details = (body.items || []).find(item => String(item.id) === String(p.id)) || null;
-          }
-        } catch {}
+          const items = await readPoiDetailShard(lon, lat, detailsBase);
+          details = items?.find(item => String(item.id) === String(p.id)) || null;
+        } catch (error) { console.warn('POI detail shard unavailable:', error); }
 
         const baseTags = { phone: p.phone, website: p.website, opening_hours: p.opening_hours, description: p.description, wikidata: p.wikidata, wikimedia_commons: p.wikimedia_commons, image: p.image };
         const enrichedTags = details?.wikipedia ? { ...baseTags, wikipedia: details.wikipedia } : baseTags;
