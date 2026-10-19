@@ -132,5 +132,10 @@ test('admin service enforces signed claim, revision conflicts, immutable history
   assert.equal(fourth.visibility, 'visible');
   assert.deepEqual(db.docs.get(`official_poi_changes/${id}`).patch, {});
   assert.equal(db.docs.get(`official_poi_revisions/${id}__4`).action, 'reset');
-  assert.equal([...db.docs.keys()].filter(key => key.startsWith('official_poi_audit/')).length, 4);
+  const fifth = await service.saveOfficialPoi({ ...context, input: { id, expectedRevision: 4, patch: { category: 'cafe' } } });
+  assert.equal(fifth.revision, 5);
+  await service.saveOfficialPoi({ ...context, input: { id, expectedRevision: 5, removeFields: ['category'] } });
+  assert.equal(db.docs.get(`official_poi_changes/${id}`).patch.category, undefined);
+  await assert.rejects(service.saveOfficialPoi({ ...context, input: { id, expectedRevision: 6, removeFields: ['actorUid'] } }), /Invalid fields/);
+  assert.equal([...db.docs.keys()].filter(key => key.startsWith('official_poi_audit/')).length, 6);
 });

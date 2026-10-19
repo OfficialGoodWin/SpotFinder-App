@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { X, MapPin, AlertTriangle, Navigation, Trash2, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
 import OfficialPoiEditor from './OfficialPoiEditor';
+import { useLanguage } from '@/lib/LanguageContext';
 import {
   getAdminPOIs, addAdminPOI, updateAdminPOI, deleteAdminPOI,
   getAdminClosures, addAdminClosure, deleteAdminClosure,
@@ -54,7 +55,7 @@ const CATEGORY_OPTIONS = [
 ];
 
 const TABS = [
-  { id: 'official', label: 'Official POIs', Icon: MapPin },
+  { id: 'imported', label: 'Imported POIs', Icon: MapPin },
   { id: 'pois',     label: 'Custom POIs',   Icon: MapPin },
   { id: 'closures', label: 'Road Closures', Icon: AlertTriangle },
   { id: 'nav',      label: 'Nav Overrides', Icon: Navigation },
@@ -966,14 +967,19 @@ function ModerationTab({ user }) {
 
 // ─── Main editor ──────────────────────────────────────────────────────────────
 export default function SuperAdminEditor({ user, onClose, onAdminDataChange, map, selectedOfficialHit, legacyPois }) {
-  const [tab, setTab] = useState('official');
+  const { t } = useLanguage();
+  const [tab, setTab] = useState('imported');
   const [collapsed, setCollapsed] = useState(false);
   const [pendingLatLon, setPendingLatLon] = useState(null);
   const [adminNavMode, setAdminNavMode] = useState(false);
+  const [selectMode, setSelectMode] = useState(true);
+  const [officialDirty, setOfficialDirty] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState(null);
 
   const handleMapClick = useCallback((coords) => {
     setPendingLatLon(coords);
     setAdminNavMode(false);
+    setCollapsed(false);
   }, []);
 
   const requestMapClick = () => {
@@ -984,17 +990,22 @@ export default function SuperAdminEditor({ user, onClose, onAdminDataChange, map
   const clearPending = () => setPendingLatLon(null);
 
   useEffect(() => {
-    onAdminDataChange?.({ handleMapClick, adminNavMode, officialActive: tab === 'official' });
-  }, [adminNavMode, handleMapClick, tab]);
+    onAdminDataChange?.({ handleMapClick, adminNavMode, officialActive: tab === 'imported' && selectMode });
+  }, [adminNavMode, handleMapClick, tab, selectMode]);
 
-  if (tab === 'official') return <OfficialPoiEditor map={map} selectedHit={selectedOfficialHit} pickedPosition={pendingLatLon} legacyPois={legacyPois} onPickPosition={requestMapClick} onClose={() => { setAdminNavMode(false); onClose(); }} onOpenLegacy={() => { setAdminNavMode(false); setTab('pois'); }} />;
+  useEffect(() => { if (selectedOfficialHit) { setTab('imported'); setSelectMode(true); setCollapsed(false); } }, [selectedOfficialHit]);
+  const navigate = next => {
+    if (tab === 'imported' && officialDirty) { setPendingNavigation(next); return; }
+    setAdminNavMode(false);
+    if (next === 'close') onClose(); else setTab(next);
+  };
 
   return (
-    <div className="fixed left-0 right-0 z-[2000] flex flex-col"
-      style={{ bottom: 56, maxHeight: collapsed ? 60 : '80vh' }}>
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(56px+env(safe-area-inset-bottom))] z-[2000] flex flex-col md:inset-y-4 md:left-auto md:right-4 md:w-[480px]"
+      style={{ maxHeight: collapsed ? 60 : undefined }}>
 
-      <div className="mx-auto w-full max-w-md bg-white dark:bg-card rounded-t-3xl shadow-2xl border-t border-gray-100 dark:border-border overflow-hidden flex flex-col"
-        style={{ maxHeight: collapsed ? 60 : '80vh' }}>
+      <div className="pointer-events-auto mx-auto flex w-full max-w-md flex-col overflow-hidden rounded-t-3xl border-t border-gray-100 bg-white shadow-2xl dark:border-border dark:bg-card md:max-w-none md:rounded-2xl md:border"
+        style={{ maxHeight: collapsed ? 60 : 'min(80dvh, 900px)' }}>
 
         <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-border flex-shrink-0">
           <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
@@ -1014,7 +1025,7 @@ export default function SuperAdminEditor({ user, onClose, onAdminDataChange, map
             className="w-8 h-8 rounded-full bg-gray-100 dark:bg-accent flex items-center justify-center">
             {collapsed ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
-          <button onClick={onClose}
+          <button onClick={() => navigate('close')}
             aria-label="Close"
             className="w-8 h-8 rounded-full bg-gray-100 dark:bg-accent flex items-center justify-center">
             <X className="w-4 h-4" />
@@ -1023,16 +1034,21 @@ export default function SuperAdminEditor({ user, onClose, onAdminDataChange, map
 
         {!collapsed && (
           <>
-            <div className="flex gap-2 px-4 py-2 border-b border-gray-100 dark:border-border flex-shrink-0 overflow-x-auto">
-              {TABS.map(({ id, label, Icon }) => (
-                <button key={id} onClick={() => setTab(id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${tab === id ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-accent text-muted-foreground hover:bg-gray-200 dark:hover:bg-accent/80'}`}>
-                  <Icon className="w-3.5 h-3.5" /> {label}
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2 border-b border-gray-100 px-3 py-2 dark:border-border" role="tablist" aria-label={t('officialEditor.editorTabs', 'Map editor tabs')}>
+              {TABS.slice(0, 2).map(({ id, label, Icon }) => (
+                <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => navigate(id)}
+                  className={`flex min-h-11 items-center justify-center gap-1 rounded-lg px-1 text-center text-xs font-semibold ${tab === id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-foreground dark:bg-accent'}`}>
+                  <Icon className="h-4 w-4 shrink-0" />{id === 'imported' ? t('officialEditor.importedTab', 'Imported POIs') : label}
                 </button>
               ))}
+              <select aria-label={t('officialEditor.otherTools', 'Other map tools')} value={TABS.slice(2).some(item => item.id === tab) ? tab : ''} onChange={event => navigate(event.target.value)} className="min-w-0 rounded-lg border border-border bg-background px-1 text-xs text-foreground">
+                <option value="">{t('officialEditor.otherTools', 'Other tools')}</option>
+                {TABS.slice(2).map(({ id, label }) => <option key={id} value={id}>{label}</option>)}
+              </select>
             </div>
 
-            <div className="overflow-y-auto overscroll-contain flex-1 px-4 py-3">
+            <div className={`min-h-0 flex-1 overscroll-contain ${tab === 'imported' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto px-4 py-3'}`}>
+              {tab === 'imported' && <OfficialPoiEditor map={map} selectedHit={selectedOfficialHit} pickedPosition={pendingLatLon} legacyPois={legacyPois} selectMode={selectMode} onToggleSelect={() => setSelectMode(value => !value)} onPickPosition={requestMapClick} onDirtyChange={setOfficialDirty} onClose={() => { setAdminNavMode(false); onClose(); }} onOpenLegacy={() => { setAdminNavMode(false); setTab('pois'); }} />}
               {tab === 'pois' && (
                 <POIsTab user={user} pendingLatLon={pendingLatLon}
                   onRequestMapClick={requestMapClick} onClear={clearPending} />
@@ -1058,6 +1074,7 @@ export default function SuperAdminEditor({ user, onClose, onAdminDataChange, map
           </>
         )}
       </div>
+      {pendingNavigation && <div className="pointer-events-auto fixed inset-0 z-[2200] flex items-center justify-center bg-black/50 p-4"><div role="alertdialog" aria-modal="true" aria-label={t('officialEditor.discardQuestion')} className="w-full max-w-sm rounded-xl bg-background p-4 shadow-xl"><p className="mb-4 text-sm">{t('officialEditor.discardQuestion')}</p><div className="flex justify-end gap-2"><button className="rounded-lg border px-3 py-2" onClick={() => setPendingNavigation(null)}>{t('officialEditor.cancel')}</button><button className="rounded-lg bg-blue-600 px-3 py-2 text-white" onClick={() => { const next = pendingNavigation; setPendingNavigation(null); setOfficialDirty(false); setAdminNavMode(false); if (next === 'close') onClose(); else setTab(next); }}>{t('officialEditor.confirm')}</button></div></div></div>}
     </div>
   );
 }

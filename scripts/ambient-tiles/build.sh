@@ -14,7 +14,7 @@ PBF="${1:-czech-republic-latest.osm.pbf}"
 FILTERED="ambient-filtered.osm.pbf"
 GEOJSON_RAW="ambient-export.geojson"
 GEOJSON="ambient-poi.geojson"
-OUT="ambient-poi.pmtiles"
+OUT="ambient-poi.candidate.pmtiles"
 
 command -v osmium >/dev/null || { echo "osmium not found" >&2; exit 1; }
 command -v tippecanoe >/dev/null || { echo "tippecanoe not found" >&2; exit 1; }
@@ -51,15 +51,9 @@ tippecanoe \
   --force \
   "$GEOJSON"
 
-echo "Built $OUT."
+node validate-candidate.mjs --raw="$GEOJSON_RAW" --geojson="$GEOJSON" --pmtiles="$OUT"
+echo "Built and validated local candidate $OUT. No production upload was performed."
 
-if [ -n "${BLOB_READ_WRITE_TOKEN:-}" ]; then
-  node upload.js "$OUT"
-else
-  echo "BLOB_READ_WRITE_TOKEN not set — PMTiles upload skipped."
-  echo "Set it from your Vercel Blob store, then run: node upload.js $OUT"
-fi
-
-if [ "${KEEP_BUILD_FILES:-0}" != "1" ]; then
+if [ "${KEEP_BUILD_FILES:-1}" != "1" ]; then
   rm -f "$FILTERED" "$GEOJSON_RAW" .ambient-filter.txt
 fi

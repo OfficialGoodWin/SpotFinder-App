@@ -211,6 +211,10 @@ async function main() {
 
     const details = {
       id: String(id),
+      canonical_id: tags.canonical_id || null,
+      source_id: tags.source_id || String(id),
+      osm_type: tags.osm_type || null,
+      osm_id: tags.osm_id || null,
       description: desc,
       photos,
       wikipedia,

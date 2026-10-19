@@ -30,7 +30,8 @@ export const OSM_TAG_MAP = {
 // Tags worth keeping in the GeoJSON/PMTiles and details-enrichment input.
 export const KEPT_TAGS = [
   'name', 'description', 'note', 'phone', 'contact:phone', 'website', 'contact:website',
-  'opening_hours', 'wikidata', 'wikimedia_commons', 'image', 'addr:full',
+  'opening_hours', 'email', 'contact:email', 'wheelchair', 'toilets:wheelchair',
+  'wikidata', 'wikimedia_commons', 'image', 'addr:full',
   'addr:street', 'addr:housenumber',
   'access', 'parking',
 ];

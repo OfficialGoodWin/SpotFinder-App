@@ -917,11 +917,24 @@ export default function MapLibreMap({
       };
       map.on('click', async (e) => {
         if (adminPickRef.current) return;
-        const feat = ambientHits(e.point)[0];
+        const hits = ambientHits(e.point);
+        const feat = hits[0];
         if (!feat) return;
         const p = feat.properties || {};
         const cat = AMBIENT_CATEGORIES.find(c => c.key === p.cat);
-        const [lon, lat] = feat.geometry?.coordinates || [e.lngLat.lng, e.lngLat.lat];
+        const point = feat.geometry?.type === 'Point' ? feat.geometry.coordinates : null;
+        const position = point && Number.isFinite(point[0]) && Number.isFinite(point[1]) ? { lat: point[1], lon: point[0] } : null;
+        const lon = position?.lon ?? e.lngLat.lng;
+        const lat = position?.lat ?? e.lngLat.lat;
+
+        if (officialEditorRef.current.active && officialEditorRef.current.select) {
+          const alternatives = hits.slice(0, 12).map(hit => {
+            const coordinates = hit.geometry?.type === 'Point' ? hit.geometry.coordinates : null;
+            return { properties: { ...hit.properties }, position: coordinates && Number.isFinite(coordinates[0]) && Number.isFinite(coordinates[1]) ? { lat: coordinates[1], lon: coordinates[0] } : null, sourceLayer: AMBIENT_SOURCE_LAYER };
+          });
+          officialEditorRef.current.select({ ...alternatives[0], alternatives });
+          return;
+        }
 
         const detailsBase = import.meta.env.VITE_POI_DETAILS_BASE_URL || '/poi-details/10';
         const n = 2 ** 10;
@@ -939,14 +952,11 @@ export default function MapLibreMap({
 
         const baseTags = { phone: p.phone, website: p.website, opening_hours: p.opening_hours, description: p.description, wikidata: p.wikidata, wikimedia_commons: p.wikimedia_commons, image: p.image };
         const enrichedTags = details?.wikipedia ? { ...baseTags, wikipedia: details.wikipedia } : baseTags;
-        if (officialEditorRef.current.active && officialEditorRef.current.select) {
-          officialEditorRef.current.select({ properties: { ...p }, details, position: { lat, lon }, sourceLayer: AMBIENT_SOURCE_LAYER });
-          return;
-        }
         onSelectPOI?.(
           { id: p.id || `${lat}-${lon}`, lat, lon, name: p.name || '', address: p.address || '',
             tags: enrichedTags,
             enrichment: details || null,
+            _ambientHit: { properties: { ...p }, details, position, sourceLayer: AMBIENT_SOURCE_LAYER },
           },
           cat
         );

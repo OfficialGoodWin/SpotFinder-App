@@ -907,6 +907,7 @@ export default function Home() {
           onClose={() => { setSelectedPOI(null); setSelectedPOIDirectCat(null); if (!showPOIPanel) setSelectedPOICategory(null); }}
           onNavigate={openNavigation}
           onBlockPOI={handleBlockAmbientPOI}
+          onEditOfficial={(hit) => { setSelectedOfficialHit({ ...hit }); setShowAdminEditor(true); setOfficialEditorActive(true); }}
         />
       )}
  

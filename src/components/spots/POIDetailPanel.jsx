@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Navigation, Share2, Camera, Star, Phone, Mail, Globe, MapPin, ChevronUp, Clock, ChevronLeft, ChevronRight, Flag } from 'lucide-react';
+import { X, Navigation, Share2, Camera, Star, Phone, Mail, Globe, MapPin, ChevronUp, ChevronLeft, ChevronRight, Flag, Pencil } from 'lucide-react';
 import { getPOIPhotos, getPOIRatings, addPOIPhoto, addPOIRating, uploadSpotImage, makePOIId } from '@/api/firebaseClient';
 import { moderateSubmission } from '@/lib/moderation';
 import { toast } from 'sonner';
@@ -349,7 +349,7 @@ function ContactRow({ icon: Icon, value, href }) {
 }
 
 // ─── Mini bar ─────────────────────────────────────────────────────────────────
-function MiniBar({ poi, category, sfRating, photoUrl, photos, onExpand, onClose, onNavigate, onShare, onAddPhoto, user, onOpenLightbox }) {
+function MiniBar({ poi, category, sfRating, photoUrl, photos, onExpand, onClose, onNavigate, onShare, onAddPhoto, onEditOfficial, user, onOpenLightbox }) {
   const { t } = useLanguage();
   const avg = sfRating?.count > 0 ? sfRating.avg : 0;
   const count = sfRating?.count || 0;
@@ -398,17 +398,18 @@ function MiniBar({ poi, category, sfRating, photoUrl, photos, onExpand, onClose,
         <ChevronUp className="w-4 h-4 text-muted-foreground flex-shrink-0 mr-8" />
       </div>
 
-      <div className="flex items-center gap-2 px-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+      <div className="flex flex-wrap items-center gap-2 px-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
         <ActionBtn icon={Navigation} label={t('poiDetail.navigate')} onClick={onNavigate} color={category.color} />
         <ActionBtn icon={Share2} label={t('poiDetail.share')} onClick={onShare} />
         <ActionBtn icon={Camera} label={t('poiDetail.addPhoto')} onClick={onAddPhoto} disabled={!user} />
+        {onEditOfficial && <ActionBtn icon={Pencil} label={t('officialEditor.editThisPoi', 'Edit this POI')} onClick={onEditOfficial} />}
       </div>
     </div>
   );
 }
 
 // ─── Full sheet ───────────────────────────────────────────────────────────────
-function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavigate, onShare, onAddPhoto, onSubmitRating, user, onOpenLightbox, onReportPOI, onReportPhoto, socialTargetId }) {
+function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavigate, onShare, onAddPhoto, onEditOfficial, onSubmitRating, user, onOpenLightbox, onReportPOI, onReportPhoto, socialTargetId }) {
   const { t, language } = useLanguage();
   const closeRef = useRef(null);
   useEffect(() => { closeRef.current?.focus(); }, []);
@@ -479,8 +480,9 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
               </span>
             </div>
 
-            <div className="flex gap-2 mb-5">
+            <div className="flex flex-wrap gap-2 mb-5">
               <ActionBtn icon={Navigation} label={t('poiDetail.navigate')} onClick={onNavigate} color={category.color} />
+              {onEditOfficial && <ActionBtn icon={Pencil} label={t('officialEditor.editThisPoi', 'Edit this POI')} onClick={onEditOfficial} />}
               <ActionBtn icon={Share2} label={t('poiDetail.share')} onClick={onShare} />
               <ActionBtn icon={Camera} label={t('poiDetail.addPhoto')} onClick={onAddPhoto} disabled={!user} />
             </div>
@@ -645,7 +647,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
-export default function POIDetailPanel({ poi, category, onClose, onNavigate, user }) {
+export default function POIDetailPanel({ poi, category, onClose, onNavigate, onEditOfficial, isSuperAdmin, user }) {
   const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   const [sfPhotos, setSfPhotos] = useState([]);
@@ -762,6 +764,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, use
     socialTargetId: makePOIId(poi.lat, poi.lon, poi.name),
     onClose, onNavigate: handleNavigate, onShare: handleShare,
     onAddPhoto: handleAddPhoto, user,
+    onEditOfficial: isSuperAdmin && poi._ambientHit ? () => { onClose(); onEditOfficial?.(poi._ambientHit); } : null,
     onOpenLightbox: (i) => setLightboxIndex(i),
     onReportPOI: () => setReportTarget({ type: 'poi', id: makePOIId(poi.lat, poi.lon, poi.name), label: poi.name, snapshot: { name: poi.name, lat: poi.lat, lon: poi.lon } }),
     onReportPhoto: (p) => setReportTarget({ type: 'poi_photo', id: String(p.photoId), label: `photo at ${poi.name}`, snapshot: { name: poi.name, lat: poi.lat, lon: poi.lon, image: p.url } }),

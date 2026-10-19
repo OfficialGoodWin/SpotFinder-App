@@ -14,6 +14,8 @@ test('typed osmium identities are preserved, including way and relation', () => 
 
 test('bare, coordinate and tile IDs stay unresolved', () => {
   for (const id of ['123', '50-14', 'feature/123', 'node/0']) assert.equal(readImportedPoi({ properties: { id } }).canonicalId, null);
+  assert.equal(readImportedPoi({ properties: { id: 'node/123', canonical_id: 'osm:way:123' } }).canonicalId, null);
+  assert.equal(readImportedPoi({ properties: { id: '123', canonical_id: 'osm:node:123', osm_type: 'node', osm_id: '123' } }).canonicalId, 'osm:node:123');
 });
 
 test('position validation rejects empty, non-finite and out-of-range coordinates', () => {

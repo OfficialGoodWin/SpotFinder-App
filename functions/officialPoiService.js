@@ -1,7 +1,7 @@
 'use strict';
 
 const {
-  parseCanonicalId, newSpotFinderId, validatePatch, validateCustomBase, validateImportedBase,
+  parseCanonicalId, newSpotFinderId, validatePatch, validateCustomBase, validateImportedBase, PATCH_FIELDS,
 } = require('./officialPoiFoundation');
 
 const COLLECTIONS = Object.freeze({
@@ -24,7 +24,7 @@ function assertAdmin(actor) {
 async function saveOfficialPoi({ db, serverTimestamp, actor, input, createId = newSpotFinderId }) {
   assertAdmin(actor);
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new PoiEditError('invalid-argument', 'Missing edit input');
-  const allowed = new Set(['id', 'base', 'importedBase', 'patch', 'expectedRevision', 'workflow', 'privateNote', 'rollbackRevision', 'resetToBase', 'region']);
+  const allowed = new Set(['id', 'base', 'importedBase', 'patch', 'expectedRevision', 'workflow', 'privateNote', 'rollbackRevision', 'resetToBase', 'removeFields', 'region']);
   for (const key of Object.keys(input)) if (!allowed.has(key)) throw new PoiEditError('invalid-argument', `Unsupported edit field: ${key}`);
   const creating = input.id == null;
   if (!Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0) throw new PoiEditError('invalid-argument', 'expectedRevision is required');
@@ -37,10 +37,12 @@ async function saveOfficialPoi({ db, serverTimestamp, actor, input, createId = n
   const importedBase = input.importedBase == null ? null : validateImportedBase(input.importedBase);
   if (importedBase && importedBase.id !== id) throw new PoiEditError('invalid-argument', 'Imported identity mismatch');
   const patch = input.patch == null ? null : validatePatch(input.patch);
-  if ([Boolean(patch), input.rollbackRevision != null, input.resetToBase === true].filter(Boolean).length !== 1)
-    throw new PoiEditError('invalid-argument', 'Choose exactly one patch, rollback or reset');
+  if ([Boolean(patch), input.rollbackRevision != null, input.resetToBase === true, input.removeFields != null].filter(Boolean).length !== 1)
+    throw new PoiEditError('invalid-argument', 'Choose exactly one patch, rollback, reset or field removal');
   if (input.resetToBase != null && input.resetToBase !== true) throw new PoiEditError('invalid-argument', 'Invalid resetToBase');
-  if (creating && (input.resetToBase === true || input.rollbackRevision != null)) throw new PoiEditError('invalid-argument', 'New POI requires a patch');
+  if (input.removeFields != null && (!Array.isArray(input.removeFields) || input.removeFields.length < 1 || input.removeFields.length > PATCH_FIELDS.size || new Set(input.removeFields).size !== input.removeFields.length || input.removeFields.some(field => !PATCH_FIELDS.has(field))))
+    throw new PoiEditError('invalid-argument', 'Invalid fields to remove');
+  if (creating && (input.resetToBase === true || input.rollbackRevision != null || input.removeFields != null)) throw new PoiEditError('invalid-argument', 'New POI requires a patch');
   if (input.workflow != null && !['draft', 'ready'].includes(input.workflow)) throw new PoiEditError('invalid-argument', 'Invalid workflow');
   if (input.privateNote != null && (typeof input.privateNote !== 'string' || input.privateNote.length > 2000)) throw new PoiEditError('invalid-argument', 'Invalid private note');
   if (input.region != null && (typeof input.region !== 'string' || !/^[A-Z]{2}(?:-[A-Z0-9]{1,8})?$/.test(input.region))) throw new PoiEditError('invalid-argument', 'Invalid region');
@@ -57,7 +59,8 @@ async function saveOfficialPoi({ db, serverTimestamp, actor, input, createId = n
     const revision = previous?.revision || 0;
     if (revision !== input.expectedRevision) throw new PoiEditError('aborted', 'POI changed since it was opened; reload before editing');
     let nextPatch = { ...(previous?.patch || {}) };
-    if (input.resetToBase === true) nextPatch = identity.sourceKind === 'spotfinder' ? { visibility: 'visible' } : {};
+    if (input.removeFields) { for (const field of input.removeFields) delete nextPatch[field]; }
+    else if (input.resetToBase === true) nextPatch = identity.sourceKind === 'spotfinder' ? { visibility: 'visible' } : {};
     else if (input.rollbackRevision != null) {
       const oldRef = db.collection(COLLECTIONS.revisions).doc(`${id}__${input.rollbackRevision}`);
       const old = await tx.get(oldRef);
@@ -65,7 +68,7 @@ async function saveOfficialPoi({ db, serverTimestamp, actor, input, createId = n
       nextPatch = old.data().patch;
     } else nextPatch = { ...nextPatch, ...patch };
     if (creating && !('visibility' in nextPatch)) nextPatch.visibility = 'visible';
-    const changedFields = input.rollbackRevision != null || input.resetToBase === true
+    const changedFields = input.rollbackRevision != null || input.resetToBase === true || input.removeFields != null
       ? [...new Set([...Object.keys(previous?.patch || {}), ...Object.keys(nextPatch)])].filter(key => JSON.stringify(previous?.patch?.[key]) !== JSON.stringify(nextPatch[key]))
       : Object.keys(patch);
     const previousValues = Object.fromEntries(changedFields.map(key => [key, previous?.patch?.[key] ?? null]));
@@ -91,9 +94,9 @@ async function saveOfficialPoi({ db, serverTimestamp, actor, input, createId = n
     tx.create(revisionRef, { id, revision: nextRevision, patch: nextPatch, workflow: next.workflow,
       previousRevision: revision, createdAt: now, actorUid: actor.uid,
       changedFields, previousValues, newValues, publicationStatus: 'unpublished',
-      action: input.resetToBase === true ? 'reset' : input.rollbackRevision != null ? 'rollback' : creating ? 'create' : 'edit' });
+      action: input.removeFields ? 'remove-fields' : input.resetToBase === true ? 'reset' : input.rollbackRevision != null ? 'rollback' : creating ? 'create' : 'edit' });
     tx.create(auditRef, { id, revision: nextRevision, previousRevision: revision, actorUid: actor.uid,
-      action: input.resetToBase === true ? 'reset' : input.rollbackRevision != null ? 'rollback' : creating ? 'create' : 'edit',
+      action: input.removeFields ? 'remove-fields' : input.resetToBase === true ? 'reset' : input.rollbackRevision != null ? 'rollback' : creating ? 'create' : 'edit',
       changedFields, createdAt: now });
     return { id, revision: nextRevision, workflow: next.workflow, visibility: nextPatch.visibility || 'visible' };
   });

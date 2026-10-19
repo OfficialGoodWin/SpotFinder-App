@@ -7,6 +7,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { OSM_TAG_MAP, KEPT_TAGS } from './osm-tags.js';
 import { AMBIENT_CATEGORIES } from '../../src/lib/ambientCategories.js';
+import { identityFromOsmiumAttributes } from './identity.js';
 
 // category -> minZoom, so tippecanoe only puts a feature in tiles from that zoom
 // up. Keeps low-zoom tiles small and stops --drop-densest-as-needed from
@@ -54,7 +55,7 @@ async function main() {
   const raw = JSON.parse(await readFile(input, 'utf8'));
   const features = [];
 
-  for (const feat of raw.features || []) {
+  for (const [index, feat] of (raw.features || []).entries()) {
     const tags = feat.properties || {};
     const cat = categoryForTags(tags);
     if (!cat) continue;
@@ -62,7 +63,10 @@ async function main() {
     if (cat === 'parking' && (PRIVATE_ACCESS.has(tags.access) || STREET_PARKING.has(tags.parking))) continue;
     if (!['Point', 'Polygon', 'MultiPolygon'].includes(feat.geometry?.type)) continue;
 
-    const props = { cat, id: tags['@id'] || tags.id || `${feat.id ?? ''}` };
+    const identity = identityFromOsmiumAttributes(tags);
+    if (!identity) throw new Error(`Missing verified @type/@id on included feature ${index}; rebuild the osmium export with export-config.json`);
+    const props = { cat, id: identity.sourceId, canonical_id: identity.canonicalId,
+      osm_type: identity.type, osm_id: identity.id, source_id: identity.sourceId };
     for (const tag of KEPT_TAGS) {
       const v = propValue(tags, tag);
       if (v != null && v !== '') {
@@ -73,6 +77,9 @@ async function main() {
     const address = normalizeAddress(tags);
     if (address) props.address = address;
     if (!props.name && tags['name:en']) props.name = tags['name:en'];
+    for (const [key, value] of Object.entries(tags)) {
+      if (/^(name|description):[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/.test(key) && typeof value === 'string' && value.length <= 4000) props[key] = value;
+    }
     const feature = { type: 'Feature', geometry: feat.geometry, properties: props };
     if (MIN_ZOOM[cat] != null) feature.tippecanoe = { minzoom: Math.max(10, MIN_ZOOM[cat]) };
     features.push(feature);

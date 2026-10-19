@@ -4,6 +4,7 @@
 import { createReadStream, createWriteStream } from 'node:fs';
 import { createInterface } from 'node:readline';
 import foundation from '../../functions/officialPoiFoundation.js';
+import { identityFromOsmiumAttributes } from './identity.js';
 
 const input = process.argv.find(arg => arg.startsWith('--input='))?.slice(8);
 const output = process.argv.find(arg => arg.startsWith('--output='))?.slice(9);
@@ -16,8 +17,9 @@ try {
     if (!line.trim()) continue;
     const feature = JSON.parse(line.replace(/^\x1e/, ''));
     counts.total++;
-    const source = feature.properties?.['@id'] || feature.properties?.id || feature.id;
-    const canonical = foundation.canonicalFromOsmium(source);
+    const verified = identityFromOsmiumAttributes(feature.properties);
+    const source = verified?.sourceId || feature.properties?.source_id || feature.properties?.id;
+    const canonical = verified?.canonicalId || foundation.canonicalFromOsmium(source);
     if (!canonical) { counts.missing++; continue; }
     if (seen.has(canonical)) { counts.duplicate++; continue; }
     seen.add(canonical); counts.typed++;

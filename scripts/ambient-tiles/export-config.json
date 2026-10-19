@@ -1,7 +1,7 @@
 {
   "attributes": {
     "id": "@id",
-    "type": false
+    "type": "@type"
   },
   "linear_tags": [],
   "area_tags": [
@@ -13,13 +13,19 @@
   ],
   "include_tags": [
     "name",
+    "name:*",
     "description",
+    "description:*",
     "note",
     "phone",
     "contact:phone",
+    "email",
+    "contact:email",
     "website",
     "contact:website",
     "opening_hours",
+    "wheelchair",
+    "toilets:wheelchair",
     "wikidata",
     "wikimedia_commons",
     "image",

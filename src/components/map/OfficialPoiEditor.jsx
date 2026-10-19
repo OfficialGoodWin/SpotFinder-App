@@ -2,14 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Marker } from 'maplibre-gl';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/LanguageContext';
-import { readImportedPoi, validEditorPosition } from '@/lib/officialPoiImport';
+import { readImportedPoi, readImportedDetailShard, validEditorPosition } from '@/lib/officialPoiImport';
 import { adminSaveOfficialPoi, findOfficialPoiChanges, getOfficialPoiChange, getOfficialPoiRevisions } from '@/api/firebaseClient';
 
 const CATEGORIES = ['train', 'fuel', 'charging', 'hotel', 'museum', 'heritage', 'hospital', 'restaurant', 'cafe', 'bar', 'pharmacy', 'bank', 'supermarket', 'atm', 'bakery', 'parking', 'viewpoint', 'camp_site', 'caravan_site', 'toilets', 'drinking_water', 'picnic_site'];
 const inputClass = 'w-full min-h-10 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground';
 const buttonClass = 'min-h-10 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent disabled:opacity-40';
-const emptyForm = { name: '', category: 'museum', description: '', lat: '', lon: '', website: '', phone: '', openingHours: '', address: '', email: '', wheelchair: '', region: 'CZ', privateNote: '', language: 'cs', workflow: 'draft', visibility: 'visible', photoRefs: [] };
+const SUPPORTED_TAGS = ['operator', 'brand', 'access', 'internet_access', 'toilets:wheelchair'];
+const emptyForm = { name: '', category: 'museum', description: '', lat: '', lon: '', website: '', phone: '', openingHours: '', address: '', email: '', wheelchair: '', attributes: {}, region: 'CZ', privateNote: '', language: 'cs', workflow: 'draft', visibility: 'visible', photoRefs: [] };
 const localized = (items, language) => (items || []).find(item => item.language === language && item.source === 'human')?.text || '';
+const safeImageUrl = value => { try { const url = new URL(value); return url.protocol === 'https:' ? url.href : null; } catch { return null; } };
 const baseFromSaved = item => item?.sourceKind === 'osm' && item.base ? {
   canonicalId: item.id, sourceId: `${item.osm?.type}/${item.osm?.id}`,
   position: item.base.position, name: item.base.originalName, category: item.base.category,
@@ -19,9 +21,9 @@ const baseFromSaved = item => item?.sourceKind === 'osm' && item.base ? {
   localizedDescriptions: item.base.osmDescriptions || {}, raw: item.base.sourceFields || {},
 } : null;
 const mapRecord = (base, record, language) => ({
-  name: localized(record?.patch?.nameOverrides, language) || base?.name || record?.base?.originalName || '',
+  name: localized(record?.patch?.nameOverrides, language) || base?.localizedNames?.[language] || record?.base?.osmNames?.[language] || base?.name || record?.base?.originalName || '',
   category: record?.patch?.category || base?.category || record?.base?.category || 'museum',
-  description: localized(record?.patch?.descriptions, language) || base?.description || record?.base?.originalDescription || '',
+  description: localized(record?.patch?.descriptions, language) || base?.localizedDescriptions?.[language] || record?.base?.osmDescriptions?.[language] || base?.description || record?.base?.originalDescription || '',
   lat: String(record?.patch?.position?.lat ?? base?.position?.lat ?? record?.base?.position?.lat ?? ''),
   lon: String(record?.patch?.position?.lon ?? base?.position?.lon ?? record?.base?.position?.lon ?? ''),
   website: record?.patch?.website ?? base?.website ?? '', phone: record?.patch?.phone ?? base?.phone ?? '',
@@ -29,6 +31,7 @@ const mapRecord = (base, record, language) => ({
   address: record?.patch?.attributes?.address || base?.raw?.tile?.address || '',
   email: record?.patch?.attributes?.email || base?.raw?.tile?.email || '',
   wheelchair: record?.patch?.accessibility?.wheelchair || base?.raw?.tile?.wheelchair || '',
+  attributes: Object.fromEntries(SUPPORTED_TAGS.map(key => [key, record?.patch?.attributes?.[key] || base?.raw?.tile?.[key] || record?.base?.attributes?.[key] || ''])),
   region: record?.region || record?.base?.region || 'CZ', privateNote: record?.privateNote || '',
   language, workflow: record?.workflow || 'draft', visibility: record?.patch?.visibility || 'visible', photoRefs: record?.patch?.photoRefs || [],
 });
@@ -36,7 +39,7 @@ const mapRecord = (base, record, language) => ({
 function Field({ label, children }) { return <label className="block space-y-1 text-xs font-medium text-muted-foreground"><span>{label}</span>{children}</label>; }
 function Section({ title, children }) { return <section className="space-y-3 rounded-xl border border-border p-3"><h3 className="text-sm font-semibold text-foreground">{title}</h3>{children}</section>; }
 
-export default function OfficialPoiEditor({ map, selectedHit, pickedPosition, onClose, onOpenLegacy, onPickPosition, legacyPois = [] }) {
+export default function OfficialPoiEditor({ map, selectedHit, pickedPosition, onClose, onOpenLegacy, onPickPosition, onDirtyChange, onToggleSelect, selectMode, legacyPois = [] }) {
   const { t, language } = useLanguage();
   const L = key => t(`officialEditor.${key}`);
   const [base, setBase] = useState(null);
@@ -60,16 +63,25 @@ export default function OfficialPoiEditor({ map, selectedHit, pickedPosition, on
   const marker = useRef(null);
   const previewMarker = useRef(null);
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(initial), [form, initial]);
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
   const id = base?.canonicalId || record?.id || null;
   const unresolved = base && !base.canonicalId;
   const setField = (key, value) => setForm(current => ({ ...current, [key]: value }));
+  const switchLanguage = nextLanguage => {
+    const switchNow = () => { const next = mapRecord(base, record, nextLanguage); setForm(next); setInitial(next); };
+    if (dirty) setConfirmAction({ label: L('discardQuestion'), run: switchNow });
+    else switchNow();
+  };
 
   const loadRecord = useCallback(async (canonicalId, imported = null) => {
     setBusy(true);
     try {
-      const saved = canonicalId ? await getOfficialPoiChange(canonicalId) : null;
+      const [saved, detail] = await Promise.all([canonicalId ? getOfficialPoiChange(canonicalId) : null,
+        imported?.raw?.detail ? imported.raw.detail : imported ? readImportedDetailShard(imported) : null]);
+      const source = detail && imported?.raw?.tile ? readImportedPoi({ properties: imported.raw.tile, details: detail, position: imported.position, sourceLayer: imported.sourceLayer }) : imported;
       const lang = imported ? language.split('-')[0] : form.language;
-      const next = mapRecord(imported, saved, lang);
+      const next = mapRecord(source, saved, lang);
+      if (source) setBase(source);
       setRecord(saved); setForm(next); setInitial(next); setConflict(false); setLatestConflict(null);
       setHistory(canonicalId && saved ? await getOfficialPoiRevisions(canonicalId) : []);
     } catch (error) { toast.error(error.message || L('loadFailed')); }
@@ -106,32 +118,39 @@ export default function OfficialPoiEditor({ map, selectedHit, pickedPosition, on
   }, [map, moveMode, id]);
   useEffect(() => { if (marker.current && validEditorPosition(form.lat, form.lon)) marker.current.setLngLat([Number(form.lon), Number(form.lat)]); }, [form.lat, form.lon]);
   useEffect(() => {
-    if (!map || !record) return;
-    const position = record.patch?.position || record.base?.position;
-    if (!position || record.patch?.visibility === 'hidden') return;
+    if (!map || moveMode || record?.patch?.visibility === 'hidden') return;
+    const position = record?.patch?.position || base?.position || record?.base?.position;
+    if (!validEditorPosition(position?.lat, position?.lon)) return;
     // Admin-only preview. The public tile and its search entry are untouched.
     const el = document.createElement('div');
-    el.className = 'h-7 w-7 rounded-full border-4 border-white bg-blue-600 shadow-lg';
-    el.title = L('previewOnly');
+    const overridden = Object.keys(record?.patch || {}).length > 0;
+    el.className = overridden ? 'rounded-full border-4 border-white bg-blue-600 px-2 py-1 text-xs font-bold text-white shadow-lg' : 'h-11 w-11 rounded-full border-4 border-blue-600 bg-transparent shadow-lg';
+    el.style.pointerEvents = 'none';
+    if (overridden) el.textContent = (record?.patch?.nameOverrides || []).find(item => item.language === form.language)?.text || record?.base?.originalName || base?.name || 'POI';
+    el.title = `${record?.patch?.category || base?.category || record?.base?.category || ''} · ${L('previewOnly')}`;
     const preview = new Marker({ element: el }).setLngLat([position.lon, position.lat]).addTo(map);
     previewMarker.current = preview;
     return () => { preview.remove(); if (previewMarker.current === preview) previewMarker.current = null; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, record]);
+  }, [map, record, base, moveMode, form.language]);
   useEffect(() => {
-    if (!map || !base?.sourceId || !record || (!record.patch?.position && record.patch?.visibility !== 'hidden')) return;
+    if (!map || !base?.sourceId || !record || !Object.keys(record.patch || {}).length) return;
     const originals = new Map();
+    const applied = new Map();
     const hideOriginal = () => {
       for (const layer of map.getStyle()?.layers || []) {
         if (!layer.id.startsWith('ambient-poi-z') || !map.getLayer(layer.id)) continue;
         const old = map.getFilter(layer.id);
+        if (JSON.stringify(old) === JSON.stringify(applied.get(layer.id))) continue;
         if (!originals.has(layer.id)) originals.set(layer.id, old);
-        map.setFilter(layer.id, ['all', old || true, ['!=', ['get', 'id'], base.sourceId]]);
+        const next = ['all', old || true, ['!=', ['get', 'id'], base.sourceId]];
+        applied.set(layer.id, next);
+        map.setFilter(layer.id, next);
       }
     };
-    hideOriginal(); map.on('style.load', hideOriginal);
+    hideOriginal(); map.on('styledata', hideOriginal);
     return () => {
-      map.off('style.load', hideOriginal);
+      map.off('styledata', hideOriginal);
       for (const [layer, filter] of originals) if (map.getLayer(layer)) map.setFilter(layer, filter);
     };
   }, [map, base, record]);
@@ -182,19 +201,28 @@ export default function OfficialPoiEditor({ map, selectedHit, pickedPosition, on
     const position = { lat: Number(form.lat), lon: Number(form.lon) };
     if (!isNew && (record?.patch?.position || position.lat !== Number(source?.position?.lat) || position.lon !== Number(source?.position?.lon))) patch.position = position;
     if (!isNew && (record?.patch?.category || form.category !== source?.category)) patch.category = form.category;
-    if (!isNew && (record?.patch?.nameOverrides || form.name.trim() !== (source?.originalName || source?.name || ''))) patch.nameOverrides = form.name.trim() === (source?.originalName || source?.name || '') ? [] : [{ language: form.language, text: form.name.trim(), source: 'human', approval: 'approved' }];
-    if (!isNew && (record?.patch?.descriptions || form.description.trim() !== (source?.originalDescription || source?.description || ''))) patch.descriptions = form.description.trim() ? [{ language: form.language, text: form.description.trim(), source: 'human', approval: 'approved' }] : [];
+    const originalName = source?.osmNames?.[form.language] || source?.localizedNames?.[form.language] || source?.originalName || source?.name || '';
+    const originalDescription = source?.osmDescriptions?.[form.language] || source?.localizedDescriptions?.[form.language] || source?.originalDescription || source?.description || '';
+    const existingNames = record?.patch?.nameOverrides || [];
+    const existingDescriptions = record?.patch?.descriptions || [];
+    if (!isNew && (existingNames.some(item => item.language === form.language) || form.name.trim() !== originalName)) {
+      patch.nameOverrides = [...existingNames.filter(item => item.language !== form.language), ...(form.name.trim() === originalName ? [] : [{ language: form.language, text: form.name.trim(), source: 'human', approval: 'approved' }])];
+    }
+    if (!isNew && (existingDescriptions.some(item => item.language === form.language) || form.description.trim() !== originalDescription)) {
+      patch.descriptions = [...existingDescriptions.filter(item => item.language !== form.language), ...(form.description.trim() === originalDescription ? [] : [{ language: form.language, text: form.description.trim(), source: 'human', approval: 'approved' }])];
+    }
     for (const [field, sourceField] of [['website', 'website'], ['phone', 'phone'], ['openingHours', 'openingHours']]) if (record?.patch?.[field] !== undefined || form[field] !== (source?.[sourceField] || '')) patch[field] = form[field].trim() || null;
     const attributes = {};
-    if (form.address.trim()) attributes.address = form.address.trim();
-    if (form.email.trim()) attributes.email = form.email.trim();
+    if (form.address.trim() && form.address.trim() !== (base?.raw?.tile?.address || '')) attributes.address = form.address.trim();
+    if (form.email.trim() && form.email.trim() !== (base?.raw?.tile?.email || '')) attributes.email = form.email.trim();
+    for (const key of SUPPORTED_TAGS) if (form.attributes[key]?.trim() && form.attributes[key].trim() !== (base?.raw?.tile?.[key] || '')) attributes[key] = form.attributes[key].trim();
     if (Object.keys(attributes).length || record?.patch?.attributes) patch.attributes = attributes;
-    if (form.wheelchair.trim() || record?.patch?.accessibility) patch.accessibility = form.wheelchair.trim() ? { wheelchair: form.wheelchair.trim() } : {};
+    if ((form.wheelchair.trim() && form.wheelchair.trim() !== (base?.raw?.tile?.wheelchair || '')) || record?.patch?.accessibility) patch.accessibility = form.wheelchair.trim() === (base?.raw?.tile?.wheelchair || '') ? {} : { wheelchair: form.wheelchair.trim() };
     if (JSON.stringify(form.photoRefs) !== JSON.stringify(record?.patch?.photoRefs || [])) patch.photoRefs = form.photoRefs.map(photo => ({ ...photo, sourceUrl: photo.sourceUrl || null, approval: 'draft' }));
     if (visibility !== 'visible' || record?.patch?.visibility) patch.visibility = visibility;
     const workflow = override.workflow || form.workflow;
     if (!Object.keys(patch).length) patch.visibility = 'visible';
-    const input = isNew ? { expectedRevision: 0, base: { position, category: form.category, originalName: form.name.trim(), originalDescription: form.description.trim() || null, region: form.region.toUpperCase() }, patch: { visibility }, workflow, privateNote: form.privateNote } :
+    const input = isNew ? { expectedRevision: 0, base: { position, category: form.category, originalName: form.name.trim(), originalDescription: form.description.trim() || null, region: form.region.toUpperCase() }, patch: { ...patch, visibility }, workflow, privateNote: form.privateNote } :
       { id, expectedRevision: record?.revision || 0, patch, workflow, privateNote: form.privateNote, region: form.region.toUpperCase(),
         ...(!record && base ? { importedBase: { id, position: base.position, category: base.category, originalName: base.name, originalDescription: base.description || null, osmNames: base.localizedNames, osmDescriptions: base.localizedDescriptions, wikidata: base.wikidata ? { id: base.wikidata, linkMethod: 'osm_tag' } : null, region: form.region.toUpperCase(), website: base.website || null, phone: base.phone || null, openingHours: base.openingHours || null, sourceFields: base.raw } } : {}) };
     setBusy(true);
@@ -231,6 +259,15 @@ export default function OfficialPoiEditor({ map, selectedHit, pickedPosition, on
     } catch (error) { if (error.code === 'functions/aborted') { setConflict(true); getOfficialPoiChange(record.id).then(setLatestConflict).catch(() => {}); } toast.error(error.message); }
     finally { setBusy(false); }
   };
+  const resetField = async field => {
+    if (!record?.patch || !Object.prototype.hasOwnProperty.call(record.patch, field)) return;
+    setBusy(true);
+    try {
+      await adminSaveOfficialPoi({ id: record.id, expectedRevision: record.revision, removeFields: [field], workflow: 'draft' });
+      await loadRecord(record.id, base); refreshList(); toast.success(L('rollbackSaved'));
+    } catch (error) { if (error.code === 'functions/aborted') { setConflict(true); getOfficialPoiChange(record.id).then(setLatestConflict).catch(() => {}); } toast.error(error.message); }
+    finally { setBusy(false); }
+  };
   const startNew = () => {
     if (dirty) { setConfirmAction({ label: L('discardQuestion'), run: startNewUnsafe }); return; }
     startNewUnsafe();
@@ -239,8 +276,10 @@ export default function OfficialPoiEditor({ map, selectedHit, pickedPosition, on
   const close = () => { if (dirty) setConfirmAction({ label: L('discardQuestion'), run: onClose }); else onClose(); };
   const nearbyLegacy = base && legacyPois.some(p => Number.isFinite(Number(p.lat)) && Math.abs(Number(p.lat) - Number(base.position?.lat)) < 0.0001 && Math.abs(Number(p.lon) - Number(base.position?.lon)) < 0.0001);
 
-  return <div className="fixed inset-x-0 bottom-[env(safe-area-inset-bottom)] z-[2000] flex max-h-[78dvh] flex-col rounded-t-2xl border border-border bg-background shadow-2xl md:inset-y-16 md:left-auto md:right-4 md:w-[440px] md:max-h-none md:rounded-2xl" role="dialog" aria-label={L('title')}>
+  return <section className="flex min-h-0 flex-1 flex-col bg-background" aria-label={L('title')}>
     <header className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-3"><div><h2 className="font-bold">{L('title')}</h2><p className="text-xs text-muted-foreground">{L('authoringOnly')}</p></div><div className="flex gap-1"><button className={buttonClass} onClick={() => dirty ? setConfirmAction({ label: L('discardQuestion'), run: onOpenLegacy }) : onOpenLegacy?.()}>{L('legacyEditor')}</button><button className={buttonClass} onClick={close} aria-label={L('close')}>×</button></div></header>
+    <div className="shrink-0 border-b border-border px-3 py-2"><p className="text-sm font-medium">{L('selectInstruction')}</p><button type="button" aria-pressed={selectMode} className={`${buttonClass} mt-2 ${selectMode ? 'border-blue-600 bg-blue-600 text-white' : ''}`} onClick={onToggleSelect}>{selectMode ? L('stopSelecting') : L('selectPoi')}</button>{!base && !record && <p className="mt-2 text-xs text-muted-foreground">{L('noSelection')}</p>}</div>
+    {selectedHit?.alternatives?.length > 1 && <div className="max-h-24 shrink-0 overflow-y-auto border-b border-border px-3 py-1 text-xs"><p className="text-muted-foreground">{L('overlappingPlaces')}</p>{selectedHit.alternatives.map((hit, index) => <button key={`${hit.properties?.id}-${index}`} type="button" className="mr-1 rounded border px-2 py-1 hover:bg-accent" onClick={() => { const select = () => { const imported = readImportedPoi(hit); setBase(imported); loadRecord(imported.canonicalId, imported); }; if (dirty) setConfirmAction({ label: L('discardQuestion'), run: select }); else select(); }}>{hit.properties?.name || hit.properties?.cat || hit.properties?.id || index + 1}</button>)}</div>}
     <div className="shrink-0 border-b border-border p-3"><div className="flex gap-2"><input className={inputClass} value={search} onChange={event => setSearch(event.target.value)} onKeyDown={async event => { if (event.key !== 'Enter' || !/^(osm:(node|way|relation):[1-9]\d*|sf:[0-9a-f-]{36})$/.test(search.trim())) return; try { const found = await getOfficialPoiChange(search.trim()); if (found) chooseRecord(found); else toast.info(L('notIndexed')); } catch (error) { toast.error(error.message); } }} placeholder={L('searchPlaceholder')} aria-label={L('search')} /><button className={buttonClass} onClick={startNew}>{L('add')}</button></div><div className="mt-2 flex gap-2"><select className={inputClass} value={filter} onChange={event => setFilter(event.target.value)} aria-label={L('status')}><option value="all">{L('all')}</option><option value="draft">{L('draft')}</option><option value="ready">{L('ready')}</option><option value="hidden">{L('hidden')}</option></select><select className={inputClass} value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)} aria-label={L('category')}><option value="all">{L('all')}</option>{CATEGORIES.map(cat => <option key={cat}>{cat}</option>)}</select><select className={inputClass} value={sourceFilter} onChange={event => setSourceFilter(event.target.value)} aria-label={L('source')}><option value="all">{L('all')}</option><option value="osm">OSM</option><option value="spotfinder">SpotFinder</option></select><label className="flex shrink-0 items-center gap-1 text-xs"><input type="checkbox" checked={areaOnly} onChange={event => setAreaOnly(event.target.checked)} />{L('area')}</label></div></div>
     {search && <div className="max-h-32 shrink-0 overflow-auto border-b border-border px-3 text-xs"><p className="py-1 text-muted-foreground">{L('boundedSearch')}</p>{searchItems.map((item, index) => <button key={`${item.id}-${index}`} className="block w-full truncate rounded p-2 text-left hover:bg-accent" onClick={() => {
       if (!item.basePreview) return chooseRecord(item);
@@ -249,21 +288,25 @@ export default function OfficialPoiEditor({ map, selectedHit, pickedPosition, on
     }}>{item.basePreview?.name || item.base?.originalName || item.id} · {item.id}</button>)}</div>}
     <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
       {unresolved && <p className="rounded-lg bg-amber-100 p-3 text-sm text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">{L('unresolved')} <span className="block break-all">{base.sourceId}</span></p>}
+      {base && !validEditorPosition(base.position?.lat, base.position?.lon) && <p className="rounded-lg bg-amber-100 p-3 text-sm text-amber-900">{L('missingGeometry')}</p>}
       {nearbyLegacy && <p className="rounded-lg bg-amber-100 p-3 text-xs text-amber-900">{L('legacyOverlap')}</p>}
       {conflict && <div className="rounded-lg border border-red-400 p-3 text-sm"><p>{L('conflict')}</p><p className="text-xs">{L('revision')} {latestConflict?.revision ?? '…'} · {L('reviewBeforeRetry')}</p><pre className="max-h-24 overflow-auto text-xs">{JSON.stringify(latestConflict?.patch || {}, null, 2)}</pre><div className="flex flex-wrap gap-2"><button className={buttonClass} onClick={() => setConfirmAction({ label: L('discardQuestion'), run: () => loadRecord(id, base) })}>{L('reviewLatest')}</button><button className={buttonClass} disabled={!latestConflict} onClick={() => setConfirmAction({ label: L('retryQuestion'), run: () => { setRecord(latestConflict); setConflict(false); toast.info(L('retryNotice')); } })}>{L('retryOnLatest')}</button></div></div>}
       <div className="flex flex-wrap gap-2 text-xs text-muted-foreground"><span>{id || L('newCustom')}</span><span>{base ? 'OSM' : 'SpotFinder'}</span><span>{L('revision')} {record?.revision || 0}</span><span>{L('unpublished')}</span></div>
       {base && <details className="rounded-xl border border-border p-3 text-xs"><summary className="cursor-pointer font-semibold">{L('originalSource')}</summary><p>{L('sourceId')}: {base.sourceId}</p><p>{L('wikidata')}: {base.wikidata || '—'}</p><p>{L('originalPosition')}: {base.position?.lat}, {base.position?.lon}</p><pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all">{JSON.stringify(base.raw, null, 2)}</pre></details>}
       {record?.patch?.position && <p className="rounded-lg bg-blue-50 p-2 text-xs text-blue-900 dark:bg-blue-900/30 dark:text-blue-100">{L('previewOnly')}</p>}
-      <nav className="flex gap-1 overflow-x-auto" aria-label={L('sections')}>{['basic', 'contact', 'accessibility', 'languages', 'media', 'history'].map(name => <button key={name} className={`${buttonClass} shrink-0 ${section === name ? 'bg-blue-600 text-white' : ''}`} onClick={() => setSection(name)}>{L(name)}</button>)}</nav>
-      {section === 'basic' && <Section title={L('basic')}><Field label={L('name')}><input className={inputClass} value={form.name} maxLength={250} onChange={e => setField('name', e.target.value)} /></Field><Field label={L('category')}><select className={inputClass} value={form.category} onChange={e => setField('category', e.target.value)}>{CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}</select></Field><Field label={L('description')}><textarea className={inputClass} rows={3} maxLength={4000} value={form.description} onChange={e => setField('description', e.target.value)} /></Field><div className="grid grid-cols-2 gap-2"><Field label={L('latitude')}><input className={inputClass} type="number" step="any" value={form.lat} onChange={e => setField('lat', e.target.value)} /></Field><Field label={L('longitude')}><input className={inputClass} type="number" step="any" value={form.lon} onChange={e => setField('lon', e.target.value)} /></Field></div><div className="flex flex-wrap gap-2"><button className={buttonClass} onClick={() => setMoveMode(value => !value)} disabled={!validEditorPosition(form.lat, form.lon)}>{moveMode ? L('stopMove') : L('move')}</button><button className={buttonClass} onClick={() => { setField('lat', String(base?.position?.lat ?? record?.base?.position?.lat ?? '')); setField('lon', String(base?.position?.lon ?? record?.base?.position?.lon ?? '')); }}>{L('resetPosition')}</button><button className={buttonClass} onClick={onPickPosition}>{L('pickOnMap')}</button></div><Field label={L('region')}><input className={inputClass} value={form.region} maxLength={12} onChange={e => setField('region', e.target.value)} /></Field><Field label={L('visibility')}><select className={inputClass} value={form.visibility} onChange={e => setField('visibility', e.target.value)}><option value="visible">{L('visible')}</option><option value="hidden">{L('hidden')}</option></select></Field></Section>}
+      {record && <div className="rounded-xl border border-border p-3 text-xs"><p className="font-semibold">{L('overriddenFields')}</p><div className="mt-2 flex flex-wrap gap-2">{Object.keys(record.patch || {}).length ? Object.keys(record.patch).map(field => <button key={field} type="button" className={buttonClass} disabled={busy} onClick={() => resetField(field)}>{L('resetField')} {field}</button>) : <span className="text-muted-foreground">{L('noOverrides')}</span>}</div></div>}
+      <nav className="flex gap-1 overflow-x-auto" aria-label={L('sections')}>{['basic', 'contact', 'accessibility', 'attributes', 'languages', 'media', 'history'].map(name => <button key={name} className={`${buttonClass} shrink-0 ${section === name ? 'bg-blue-600 text-white' : ''}`} onClick={() => setSection(name)}>{L(name)}</button>)}</nav>
+      {section === 'basic' && <Section title={L('basic')}><Field label={L('name')}><input className={inputClass} value={form.name} maxLength={250} onChange={e => setField('name', e.target.value)} /></Field><Field label={L('category')}><select className={inputClass} value={form.category} onChange={e => setField('category', e.target.value)}>{CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}</select></Field><p className="text-xs text-muted-foreground">{L('subcategoryReadOnly')}: {base?.raw?.tile?.amenity || base?.raw?.tile?.tourism || base?.raw?.tile?.historic || base?.raw?.tile?.shop || '—'}</p><Field label={L('description')}><textarea className={inputClass} rows={3} maxLength={4000} value={form.description} onChange={e => setField('description', e.target.value)} /></Field><div className="grid grid-cols-2 gap-2"><Field label={L('latitude')}><input className={inputClass} type="number" step="any" value={form.lat} onChange={e => setField('lat', e.target.value)} /></Field><Field label={L('longitude')}><input className={inputClass} type="number" step="any" value={form.lon} onChange={e => setField('lon', e.target.value)} /></Field></div><div className="flex flex-wrap gap-2"><button className={buttonClass} onClick={() => setMoveMode(value => !value)} disabled={!validEditorPosition(form.lat, form.lon)}>{moveMode ? L('stopMove') : L('move')}</button><button className={buttonClass} onClick={() => { setForm(current => ({ ...current, lat: String(base?.position?.lat ?? record?.base?.position?.lat ?? ''), lon: String(base?.position?.lon ?? record?.base?.position?.lon ?? '') })); }}>{L('resetPosition')}</button><button className={buttonClass} onClick={onPickPosition}>{L('pickOnMap')}</button></div><Field label={L('region')}><input className={inputClass} value={form.region} maxLength={12} onChange={e => setField('region', e.target.value)} /></Field><Field label={L('visibility')}><select className={inputClass} value={form.visibility} onChange={e => setField('visibility', e.target.value)}><option value="visible">{L('visible')}</option><option value="hidden">{L('hidden')}</option></select></Field></Section>}
       {section === 'contact' && <Section title={L('contact')}>{[['website', 'website'], ['phone', 'telephone'], ['email', 'email'], ['address', 'address'], ['openingHours', 'openingHours']].map(([key, label]) => <Field key={key} label={L(label)}><input className={inputClass} value={form[key]} maxLength={key === 'website' ? 1000 : 300} onChange={e => setField(key, e.target.value)} /></Field>)}</Section>}
       {section === 'accessibility' && <Section title={L('accessibility')}><Field label={L('wheelchair')}><select className={inputClass} value={form.wheelchair} onChange={e => setField('wheelchair', e.target.value)}><option value="">—</option>{['yes', 'no', 'limited', 'designated'].map(value => <option key={value}>{value}</option>)}</select></Field></Section>}
-      {section === 'languages' && <Section title={L('languages')}><p className="text-xs text-muted-foreground">{L('languageNote')}</p><Field label={L('editLanguage')}><input className={inputClass} value={form.language} onChange={e => setField('language', e.target.value)} maxLength={12} /></Field><p className="text-xs">{L('originalName')}: {base?.name || record?.base?.originalName || '—'}</p><pre className="overflow-auto text-xs">{JSON.stringify({ osmNames: base?.localizedNames || {}, osmDescriptions: base?.localizedDescriptions || {} }, null, 2)}</pre><p className="text-xs">{L('nameAndDescriptionAbove')}</p></Section>}
+      {section === 'attributes' && <Section title={L('attributes')}><p className="text-xs text-muted-foreground">{L('supportedTagsOnly')}</p>{SUPPORTED_TAGS.map(key => <Field key={key} label={key}><input className={inputClass} value={form.attributes[key] || ''} maxLength={300} onChange={event => setField('attributes', { ...form.attributes, [key]: event.target.value })} /></Field>)}</Section>}
+      {section === 'languages' && <Section title={L('languages')}><p className="text-xs text-muted-foreground">{L('languageNote')}</p><Field label={L('editLanguage')}><select className={inputClass} value={form.language} onChange={e => switchLanguage(e.target.value)}>{[...new Set(['cs', 'en', ...Object.keys(base?.localizedNames || record?.base?.osmNames || {}), ...(record?.patch?.nameOverrides || []).map(item => item.language)])].map(code => <option key={code} value={code}>{code}</option>)}</select></Field><p className="text-xs">{L('originalName')}: {base?.name || record?.base?.originalName || '—'}</p><p className="text-xs">{L('wikidata')}: {base?.wikidata || '—'} ({L('sourceTagOnly')})</p><pre className="overflow-auto text-xs">{JSON.stringify({ osmNames: base?.localizedNames || {}, osmDescriptions: base?.localizedDescriptions || {}, approvedNames: record?.patch?.nameOverrides || [], approvedDescriptions: record?.patch?.descriptions || [] }, null, 2)}</pre><p className="text-xs">{L('nameAndDescriptionAbove')}</p></Section>}
+      {section === 'media' && Array.isArray(base?.raw?.detail?.photos) && base.raw.detail.photos.length > 0 && <Section title={L('sourcePhotos')}>{base.raw.detail.photos.map((photo, index) => <div key={index} className="flex gap-2 text-xs">{safeImageUrl(photo.url) && <img src={safeImageUrl(photo.url)} alt="" loading="lazy" className="h-14 w-14 rounded object-cover" />}<div><p>{photo.credit || photo.author || L('unknownCredit')}</p><p>{photo.license || L('rightsUnknown')}</p><p className="text-muted-foreground">{L('sourcePhotoReadOnly')}</p></div></div>)}</Section>}
       {section === 'media' && <Section title={L('media')}><p className="text-xs text-muted-foreground">{L('mediaUnavailable')}</p>{form.photoRefs.map((photo, index) => <div key={index} className="space-y-2 rounded-lg border border-border p-2"><Field label={L('storagePath')}><input className={inputClass} value={photo.storagePath} onChange={e => setField('photoRefs', form.photoRefs.map((item, i) => i === index ? { ...item, storagePath: e.target.value } : item))} /></Field>{[['credit', 'credit'], ['creator', 'creator'], ['license', 'license'], ['rightsReference', 'rightsReference'], ['sourceUrl', 'sourceUrl']].map(([field, label]) => <Field key={field} label={L(label)}><input className={inputClass} value={photo[field] || ''} onChange={e => setField('photoRefs', form.photoRefs.map((item, i) => i === index ? { ...item, [field]: e.target.value } : item))} /></Field>)}<p className="text-xs">{L('draftRights')}</p><div className="flex gap-2"><button className={buttonClass} disabled={index === 0} onClick={() => { const next = [...form.photoRefs]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; setField('photoRefs', next); }}>{L('moveFirst')}</button><button className={buttonClass} onClick={() => setField('photoRefs', form.photoRefs.filter((_, i) => i !== index))}>{L('remove')}</button></div></div>)}<button className={buttonClass} onClick={() => setField('photoRefs', [...form.photoRefs, { storagePath: 'official-poi-photos/', license: '', credit: '', sourceUrl: '', approval: 'draft' }])}>{L('addMetadata')}</button></Section>}
       {section === 'history' && <Section title={L('history')}><button className={buttonClass} disabled={!record || busy} onClick={() => setConfirmAction({ label: L('resetQuestion'), run: resetToBase })}>{L('resetAll')}</button>{history.map(item => <div key={item.revision} className="rounded-lg border border-border p-2 text-xs"><p className="font-semibold">#{item.revision} · {item.action} · {item.actorUid}</p><p>{item.createdAt?.toDate?.().toLocaleString() || ''} · {item.workflow === 'ready' ? L('ready') : L('draft')} · {L('unpublished')}</p><p>{(item.changedFields || Object.keys(item.patch || {})).join(', ')}</p><pre className="max-h-32 overflow-auto whitespace-pre-wrap break-all">{JSON.stringify({ before: item.previousValues || null, after: item.newValues || item.patch }, null, 2)}</pre><button className={buttonClass} disabled={busy || item.revision === record?.revision} onClick={() => setConfirmAction({ label: L('rollbackQuestion'), run: () => rollback(item.revision) })}>{L('rollback')}</button></div>)}</Section>}
       <Field label={L('privateNote')}><textarea className={inputClass} rows={2} maxLength={2000} value={form.privateNote} onChange={e => setField('privateNote', e.target.value)} /></Field>
     </div>
     <footer className="flex shrink-0 flex-wrap gap-2 border-t border-border bg-background p-3"><button className={buttonClass} disabled={!dirty || busy} onClick={() => { setForm(initial); setMoveMode(false); }}>{L('cancel')}</button><button className={buttonClass} disabled={busy || unresolved} onClick={() => save({ workflow: 'draft' })}>{busy ? L('saving') : L('saveDraft')}</button><button className="min-h-10 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40" disabled={busy || unresolved} onClick={() => save({ workflow: 'ready' })}>{L('markReady')}</button>{record && <button className={buttonClass} disabled={busy} onClick={() => setConfirmAction({ label: form.visibility === 'hidden' ? L('restoreQuestion') : L('hideQuestion'), run: () => save({ visibility: form.visibility === 'hidden' ? 'visible' : 'hidden', workflow: 'draft' }) })}>{form.visibility === 'hidden' ? L('restore') : L('hide')}</button>}</footer>
     {confirmAction && <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 p-4"><div role="alertdialog" aria-modal="true" aria-label={confirmAction.label} className="w-full rounded-xl bg-background p-4 shadow-xl"><p className="mb-4 text-sm">{confirmAction.label}</p><div className="flex justify-end gap-2"><button className={buttonClass} onClick={() => setConfirmAction(null)}>{L('cancel')}</button><button className={buttonClass} onClick={() => { const action = confirmAction.run; setConfirmAction(null); action(); }}>{L('confirm')}</button></div></div></div>}
-  </div>;
+  </section>;
 }
