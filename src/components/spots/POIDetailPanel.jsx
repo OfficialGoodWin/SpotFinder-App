@@ -9,6 +9,7 @@ import { iconGlyphSVG } from '@/lib/mapIcons';
 import ReportDialog from '@/components/moderation/ReportDialog';
 import { IMAGE_ACCEPT, validateImageFileMetadata } from '@/lib/imageUploadValidation';
 import { normalizePoiPhotos, openingHoursLabel, safeWebsite } from '@/lib/poiPresentation';
+import { resolveVisiblePoiText } from '@/lib/poiLocalization';
 import { recoverableLazy } from '@/components/ChunkLoadRecovery';
 
 const SocialPostsSection = recoverableLazy(() => import('@/components/social/SocialPostsSection'));
@@ -18,7 +19,6 @@ function getPhone(tags = {}) { return tags.phone || tags['contact:phone'] || tag
 function getWebsite(tags = {}) { return safeWebsite(tags.website || tags['contact:website'] || tags.url); }
 function getEmail(tags = {}) { return tags.email || tags['contact:email'] || null; }
 function getHours(tags = {}) { return tags.opening_hours || null; }
-function getDescription(tags = {}) { return tags.description || tags.note || null; }
 
 // ─── Photo fetching ───────────────────────────────────────────────────────────
 // Only an explicit OSM Wikimedia Commons file tag is considered here. The
@@ -243,7 +243,7 @@ function ContactRow({ icon: Icon, value, href }) {
 }
 
 // ─── Mini bar ─────────────────────────────────────────────────────────────────
-function MiniBar({ poi, category, sfRating, photoUrl, photos, onExpand, onClose, onNavigate, onShare, onAddPhoto, onEditOfficial, user, onOpenLightbox }) {
+function MiniBar({ poi, displayName, category, sfRating, photoUrl, photos, onExpand, onClose, onNavigate, onShare, onAddPhoto, onEditOfficial, user, onOpenLightbox }) {
   const { t } = useLanguage();
   const avg = sfRating?.count > 0 ? sfRating.avg : 0;
   const count = sfRating?.count || 0;
@@ -273,12 +273,12 @@ function MiniBar({ poi, category, sfRating, photoUrl, photos, onExpand, onClose,
           onClick={photoUrl ? (e => { e.stopPropagation(); onOpenLightbox(0); }) : undefined}
         >
           {photoUrl
-            ? <img src={photoUrl} alt={poi.name} className="w-full h-full object-cover cursor-zoom-in"
+            ? <img src={photoUrl} alt={displayName} className="w-full h-full object-cover cursor-zoom-in"
                 onError={e => { e.target.style.display = 'none'; }} />
             : <span dangerouslySetInnerHTML={{ __html: iconGlyphSVG(category.key, 24, category.color) }} />}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="line-clamp-2 break-words font-semibold text-foreground text-sm leading-tight">{poi.name}</p>
+          <p className="line-clamp-2 break-words font-semibold text-foreground text-sm leading-tight">{displayName}</p>
           {poi.address && <p className="text-xs text-muted-foreground truncate mt-0.5">{poi.address}</p>}
           {photos[0]?.credit && <p className="line-clamp-1 text-[10px] text-muted-foreground" title={photos[0].credit}>{photos[0].credit}</p>}
           {avg > 0 && (
@@ -303,7 +303,7 @@ function MiniBar({ poi, category, sfRating, photoUrl, photos, onExpand, onClose,
 }
 
 // ─── Full sheet ───────────────────────────────────────────────────────────────
-function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavigate, onShare, onAddPhoto, onEditOfficial, onSubmitRating, user, onOpenLightbox, onReportPOI, onReportPhoto, socialTargetId }) {
+function FullSheet({ poi, displayName, displayDescription, shortSummary, category, sfPhotos, sfRating, photos, onClose, onNavigate, onShare, onAddPhoto, onEditOfficial, onSubmitRating, user, onOpenLightbox, onReportPOI, onReportPhoto, socialTargetId }) {
   const { t, language } = useLanguage();
   const closeRef = useRef(null);
   useEffect(() => { closeRef.current?.focus(); }, []);
@@ -314,7 +314,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
 
   const tags = poi.tags || {};
   const phone = getPhone(tags), website = getWebsite(tags), email = getEmail(tags);
-  const ohRaw = getHours(tags), desc = getDescription(tags), hoursLabel = openingHoursLabel(ohRaw);
+  const ohRaw = getHours(tags), hoursLabel = openingHoursLabel(ohRaw);
   const avg = sfRating?.count > 0 ? sfRating.avg : 0;
   const count = sfRating?.count || 0;
 
@@ -330,7 +330,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
 
   return (
     <div className="fixed inset-0 z-[1200] flex flex-col bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="sf-sheet mt-auto flex max-h-[92dvh] min-h-0 flex-col overflow-hidden rounded-t-3xl sm:mx-auto sm:w-full sm:max-w-2xl sm:rounded-3xl" role="dialog" aria-modal="true" aria-label={`${poi.name} details`} onClick={e => e.stopPropagation()} onKeyDown={e => { if (e.key === 'Escape') onClose(); }}>
+      <div className="sf-sheet mt-auto flex max-h-[92dvh] min-h-0 flex-col overflow-hidden rounded-t-3xl sm:mx-auto sm:w-full sm:max-w-2xl sm:rounded-3xl" role="dialog" aria-modal="true" aria-label={`${displayName} details`} onClick={e => e.stopPropagation()} onKeyDown={e => { if (e.key === 'Escape') onClose(); }}>
 
         {/* Hero — clickable to open lightbox */}
         <div
@@ -339,7 +339,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
           onClick={allPhotos.length ? () => onOpenLightbox(0) : undefined}
         >
           {allPhotos[0]?.url
-            ? <img src={allPhotos[0].url} alt={poi.name} className="w-full h-full object-cover"
+            ? <img src={allPhotos[0].url} alt={displayName} className="w-full h-full object-cover"
                 onError={e => { e.target.style.display = 'none'; }} />
             : <div className="w-full h-full flex items-center justify-center" style={{ background: `${category.color}18` }}>
                 <span dangerouslySetInnerHTML={{ __html: iconGlyphSVG(category.key, 64, category.color) }} />
@@ -364,7 +364,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <div className="px-5 pt-4" style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
-            <h1 className="break-words pr-10 text-xl font-bold text-foreground leading-tight">{poi.name}</h1>
+            <h1 className="break-words pr-10 text-xl font-bold text-foreground leading-tight">{displayName}</h1>
             {poi.address && <p className="text-sm text-muted-foreground mt-0.5">{poi.address}</p>}
             {allPhotos[0]?.credit && <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{allPhotos[0].credit}{safeWebsite(allPhotos[0].source) && <> · <a href={safeWebsite(allPhotos[0].source)} target="_blank" rel="noopener noreferrer" className="underline">{t('poiDetailUi.source')}</a></>}{safeWebsite(allPhotos[0].license_url) && <> · <a href={safeWebsite(allPhotos[0].license_url)} target="_blank" rel="noopener noreferrer" className="underline">{t('poiDetailUi.license')}</a></>}</p>}
             <div className="mt-1.5 mb-4">
@@ -434,12 +434,13 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
 
             <div className="h-px bg-gray-100 dark:bg-border mb-4" />
 
-            {desc && (
+            {displayDescription && (
               <>
-                <p className="text-sm text-foreground leading-relaxed mb-4">{desc}</p>
+                <p className="text-sm text-foreground leading-relaxed mb-4">{displayDescription}</p>
                 <div className="h-px bg-gray-100 dark:bg-border mb-4" />
               </>
             )}
+            {shortSummary && shortSummary !== displayDescription && <p className="mb-4 text-xs text-muted-foreground">{t('poiDetailUi.wikidataSummary', 'Wikidata summary')}: {shortSummary}</p>}
             {poi.enrichment?.wikipedia?.text && (
               <>
                 <p className="text-sm text-foreground leading-relaxed mb-2">{poi.enrichment.wikipedia.text}</p>
@@ -542,7 +543,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 export default function POIDetailPanel({ poi, category, onClose, onNavigate, onEditOfficial, isSuperAdmin, user }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   const [sfPhotos, setSfPhotos] = useState([]);
   const [sfRating, setSfRating] = useState({ ratings: [], avg: 0, count: 0 });
@@ -551,7 +552,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, onE
   const [resolvedAddress, setResolvedAddress] = useState('');
   const [reportTarget, setReportTarget] = useState(null);
   const fileInputRef = useRef(null);
-  const { language } = useLanguage();
+  const visibleText = resolveVisiblePoiText(poi, language);
   useEffect(() => {
     if (!expanded) return undefined;
     const previous = document.body.style.overflow;
@@ -655,6 +656,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, onE
 
   const sharedProps = {
     poi: poiForView, category, sfPhotos, sfRating, photos,
+    displayName: visibleText.name, displayDescription: visibleText.description, shortSummary: visibleText.shortSummary,
     socialTargetId: makePOIId(poi.lat, poi.lon, poi.name),
     onClose, onNavigate: handleNavigate, onShare: handleShare,
     onAddPhoto: handleAddPhoto, user,

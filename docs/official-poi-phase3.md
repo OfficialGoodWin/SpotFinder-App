@@ -40,6 +40,12 @@ OSM attribution and ODbL review remain required for derived source data. Wikidat
 
 ## Limits
 
+### Public UI integration
+
+The map detail panel now resolves already available language values from the clicked ambient tile and its optional static detail shard. The ambient POI symbol layers choose `name:<language>` with parent-locale and original-name fallback and update their text expression when LanguageContext changes. OpenFreeMap basemap labels are separate. The resolver makes no Wikidata or translation request from a visitor session. It accepts approved localized values and verified Q-ID labels only when those values are already present in public static data.
+
+The current checkout has no Wikidata batch cache or generated detail shards, and the existing deployed PMTiles may lack `name:*` and `description:*`. Thus this wiring alone does not make untranslated production POIs multilingual. Approved official editor changes remain unpublished drafts. Phase 6 must join reviewed source data and cache values into public, versioned localized assets, then the public reader must load those assets by locale and canonical POI ID. Private notes, reviews, and account data must stay out of them.
+
 The current tile and detail exports do not generally include `name:*` and `description:*`. This phase displays tags when present, but a later reviewed OSM source export is needed for broad multilingual coverage. The local cache upload is limited to 5 MB. It is an admin review aid, not a shared server cache or an automatic cache distribution mechanism. The historical `enrich-pois.js` is a separate legacy detail/photo pipeline; do not use its name-matching output as verified official POI evidence.
 
 The ordinary POI detail sheet no longer calls Wikidata or Wikipedia APIs for photos or performs name-based entity searches. Its explicitly OSM-tagged Commons file path still checks Commons license metadata before display. Existing static detail shard photos are outside this enrichment batch and require separate rights review before official publication.

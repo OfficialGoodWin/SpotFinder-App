@@ -15,6 +15,7 @@ import { clampMapZoom, getSpotCameraOptions, MAP_MAX_ZOOM } from '@/lib/mapSpotF
 import { registerSingleMapListener } from '@/lib/mapLifecycle';
 import { attachMarkerAt, validMarkerLngLat } from '@/lib/mapMarkerCoordinates';
 import { readPoiDetailShard } from '@/lib/poiDetailShard';
+import { ambientPoiNameExpression } from '@/lib/poiLocalization';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { Protocol } from 'pmtiles';
 import { Minus, Plus } from 'lucide-react';
@@ -640,13 +641,13 @@ function loadAmbientIcons() {
   return ambientIconPromise;
 }
 
-function addAmbientVectorLayer(map) {
+function addAmbientVectorLayer(map, getLanguage = () => 'en') {
   if (!AMBIENT_TILES_URL || map.getSource(AMBIENT_SOURCE_ID)) return;
   // First call: rasterize icons (async), then come back. After a setStyle() the
   // cached ImageData is reused, so re-adding is synchronous.
   if (!ambientIconData) {
     loadAmbientIcons()
-      .then(() => addAmbientVectorLayer(map))
+      .then(() => addAmbientVectorLayer(map, getLanguage))
       .catch(e => console.warn('Ambient POI icons failed to render:', e?.message || e));
     return;
   }
@@ -683,7 +684,7 @@ function addAmbientVectorLayer(map) {
           'symbol-sort-key': sortExpr,
           // Names only once zoomed in; `text-optional` drops the label (not the icon) if it collides.
           // Name sits directly below the icon (Mapy.cz style), from z14 up.
-          'text-field': ['step', ['zoom'], '', 14, ['coalesce', ['get', 'name'], '']],
+          'text-field': ambientPoiNameExpression(getLanguage()),
           'text-font': ['Noto Sans Regular'],
           'text-size': ['interpolate', ['linear'], ['zoom'], 14, 11, 17, 13],
           'text-anchor': 'top',
@@ -779,7 +780,7 @@ function registerMissingImageResolver(map) {
   });
 }
 
-function registerStyleRestoration(map, getTerrainEnabled, onStyleLoad) {
+function registerStyleRestoration(map, getTerrainEnabled, getLanguage, onStyleLoad) {
   // The missing-image resolver survives setStyle in MapLibre — no need to re-add
   // BUT we need to clear the image cache so shields get redrawn after style reload
   // (setStyle wipes all images including our shields)
@@ -790,7 +791,7 @@ function registerStyleRestoration(map, getTerrainEnabled, onStyleLoad) {
     applyTerrain(map, getTerrainEnabled());
     apply3DBuildings(map, getTerrainEnabled());
     addOnewayArrow(map);
-    addAmbientVectorLayer(map);
+    addAmbientVectorLayer(map, getLanguage);
     onStyleLoad?.();
     map.triggerRepaint();
   };
@@ -810,8 +811,16 @@ export default function MapLibreMap({
   adminERouteOverrides, adminRoadOverrides,
 }) {
   const { language, t } = useLanguage();
+  const languageRef = useRef(language);
+  languageRef.current = language;
   const containerRef = useRef(null);
   const mapRef = useRef(null);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const expression = ambientPoiNameExpression(language);
+    for (const id of AMBIENT_LAYER_IDS) if (map.getLayer(id)) map.setLayoutProperty(id, 'text-field', expression);
+  }, [language]);
   const appliedStyleRef = useRef(null);
   // Ref so the map's click handler (registered once on mount) always reads
   // the current addMode value instead of the stale value from init time.
@@ -902,7 +911,7 @@ export default function MapLibreMap({
     // both). Previously this listener was defined but never registered, so 3D
     // silently broke — visually stuck tilted with no terrain/buildings — the
     // moment the user switched map layer or dark/light mode while 3D was on.
-    const removeStyleRestoration = registerStyleRestoration(map, () => terrainRef.current, () => {
+    const removeStyleRestoration = registerStyleRestoration(map, () => terrainRef.current, () => languageRef.current, () => {
       setStyleRevision(revision => revision + 1);
     });
     // Add the one-way arrow image on first style load, and re-add after style reloads
