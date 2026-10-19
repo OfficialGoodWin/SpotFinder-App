@@ -24,6 +24,7 @@ const crypto = require('crypto');
 const { GoogleAuth } = require('google-auth-library');
 const { defineString } = require('firebase-functions/params');
 const { validateSocialPostUrl, INVALID_SOCIAL_URL_MESSAGE } = require('./socialUrlPolicy');
+const { saveOfficialPoi, PoiEditError } = require('./officialPoiService');
 initializeApp();
 const db = getFirestore();
 const adminAuth = getAuth();
@@ -31,6 +32,20 @@ const RECAPTCHA_SITE_KEY = defineString('RECAPTCHA_SITE_KEY');
 const googleAuth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
 
 const RECENT_AUTH_SECONDS = 5 * 60;
+
+// New official POI drafts are server-owned and deliberately separate from the
+// legacy admin_pois map overlay and community spots. No publication occurs here.
+exports.adminSaveOfficialPoi = functions.https.onCall(async (data, context) => {
+  if (context.auth?.token?.admin !== true) throw new functions.https.HttpsError('permission-denied', 'Admin only.');
+  try {
+    return await saveOfficialPoi({ db, serverTimestamp: FieldValue.serverTimestamp,
+      actor: { uid: context.auth.uid, admin: true }, input: data });
+  } catch (error) {
+    if (error instanceof PoiEditError) throw new functions.https.HttpsError(error.code, error.message);
+    if (error instanceof TypeError) throw new functions.https.HttpsError('invalid-argument', error.message);
+    throw error;
+  }
+});
 
 async function forEachQueryBatch(query, mutate) {
   while (true) {

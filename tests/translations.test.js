@@ -23,8 +23,18 @@ test('locale files have valid values; existing translations retain their origina
   assert.deepEqual(LANGUAGES.map(({ code }) => code).sort(), Object.keys(translations).sort());
   const established = new Set(['en', 'en-GB', 'cs', 'pl', 'de', 'sk', 'it', 'fr', 'ru', 'uk', 'hu', 'ro', 'es', 'bg']);
   const originalSettings = new Set(['title', 'darkMode', 'enabled', 'disabled', 'language', 'selectLanguage', 'prefSaved', 'about', 'help', 'feedback']);
-  const originalKeys = [...english.keys()].filter(key => !key.startsWith('collection.') && !key.startsWith('legal.') && !key.startsWith('updates.') && !key.startsWith('statusPage.') && !key.startsWith('refundDraft.') && !key.startsWith('faqPage.') && !key.startsWith('faqGraphic.') && !key.startsWith('cookieDraft.') && !key.startsWith('termsDraft.') && !key.startsWith('privacyDraft.')
-    && (!key.startsWith('settings.') || originalSettings.has(key.slice('settings.'.length))));
+  const newerNamespaces = new Set([
+    'nearbyUi', 'accountSecurity', 'searchUi', 'mfaUi', 'authErrors', 'mapUi',
+    'poiPanelUi', 'homeUi', 'localeUi', 'addSpotUi', 'spotTags', 'spotDetailUi',
+    'offlineMaps', 'statusBanner', 'notFound', 'authMore', 'routeUi',
+    'reportUi', 'reportAnythingUi', 'discoveryUi', 'editSpotUi', 'poiDetailUi', 'collection', 'legal',
+    'updates', 'statusPage', 'refundDraft', 'faqPage', 'faqGraphic', 'cookieDraft',
+    'termsDraft', 'privacyDraft',
+  ]);
+  const originalKeys = [...english.keys()].filter(key => {
+    const [namespace, item] = key.split('.');
+    return !newerNamespaces.has(namespace) && (namespace !== 'settings' || originalSettings.has(item));
+  });
   for (const [language, values] of Object.entries(translations)) {
     const localized = new Map(flatten(values));
     if (established.has(language)) {
@@ -79,7 +89,7 @@ test('Czech and Polish refund drafts contain every source paragraph', () => {
 test('Czech and Polish FAQ content has every question, answer, step, About and feedback label', () => {
   const required = Object.keys(translations.en.faqPage).filter(key => key !== 'translationNotice').sort();
   for (const code of ['cs', 'pl']) {
-    assert.deepEqual(Object.keys(translations[code].faqPage).sort(), required);
+    assert.deepEqual(Object.keys(translations[code].faqPage).filter(key => key !== 'translationNotice').sort(), required);
   }
 });
 
@@ -106,7 +116,7 @@ test('static translation calls refer to a key in the English dictionary', () => 
   for (const file of sourceFiles(join(process.cwd(), 'src'))) {
     const contents = readFileSync(file, 'utf8');
     for (const match of contents.matchAll(/\bt\(\s*(['"`])([a-zA-Z][\w]*(?:\.[\w]+)+)\1/g)) {
-      if (!english.has(match[2])) missing.push(`${file}: ${match[2]}`);
+      if (!english.has(match[2]) && !english.has(`${match[2]}_one`) && !english.has(`${match[2]}_other`)) missing.push(`${file}: ${match[2]}`);
     }
   }
   assert.deepEqual([...new Set(missing)], []);

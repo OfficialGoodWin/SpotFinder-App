@@ -4,6 +4,7 @@ import { getPOIPhotos, getPOIRatings, addPOIPhoto, addPOIRating, uploadSpotImage
 import { moderateSubmission } from '@/lib/moderation';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/LanguageContext';
+import { getCategoryName } from '@/lib/POICategories';
 import { iconGlyphSVG } from '@/lib/mapIcons';
 import ReportDialog from '@/components/moderation/ReportDialog';
 import { IMAGE_ACCEPT, validateImageFileMetadata } from '@/lib/imageUploadValidation';
@@ -196,6 +197,7 @@ async function reverseGeocodeAddress(lat, lon, lang = 'en') {
 
 // ─── Lightbox ─────────────────────────────────────────────────────────────────
 function Lightbox({ photos, startIndex, onClose }) {
+  const { t, language } = useLanguage();
   const [idx, setIdx] = useState(startIndex);
   const [failed, setFailed] = useState(false);
   const touchStartX = useRef(null);
@@ -225,14 +227,14 @@ function Lightbox({ photos, startIndex, onClose }) {
   return (
     <div
       className="fixed inset-0 z-[2000] bg-black flex items-center justify-center"
-      role="dialog" aria-modal="true" aria-label="Photo viewer"
+      role="dialog" aria-modal="true" aria-label={t('poiDetailUi.photoViewer')}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
       {/* Close */}
       <button
         onClick={onClose}
-        aria-label="Close"
+        aria-label={t('common.close')}
         className="absolute top-4 right-4 z-10 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white backdrop-blur-sm transition-colors"
       >
         <X className="w-5 h-5" />
@@ -240,7 +242,7 @@ function Lightbox({ photos, startIndex, onClose }) {
 
       {/* Counter */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-black/50 backdrop-blur-sm text-white text-sm font-medium px-3 py-1 rounded-full">
-        {idx + 1} / {photos.length}
+        {new Intl.NumberFormat(language).format(idx + 1)} / {new Intl.NumberFormat(language).format(photos.length)}
       </div>
 
       {/* Prev */}
@@ -254,10 +256,10 @@ function Lightbox({ photos, startIndex, onClose }) {
       )}
 
       {/* Image */}
-      {failed ? <p className="text-white">Photo unavailable. Try another image.</p> : <img
+      {failed ? <p className="text-white">{t('poiDetailUi.photoUnavailable')}</p> : <img
         key={idx}
         src={photos[idx].url}
-        alt={`Photo ${idx + 1} of ${photos.length}`}
+        alt={t('poiDetailUi.photoPosition', { number: idx + 1, total: photos.length })}
         className="max-w-full max-h-full object-contain select-none"
         style={{ maxHeight: '100dvh', maxWidth: '100dvw', padding: '0 60px' }}
         onError={() => setFailed(true)}
@@ -268,8 +270,8 @@ function Lightbox({ photos, startIndex, onClose }) {
       {photos[idx].credit && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 max-w-[90vw] truncate bg-black/50 backdrop-blur-sm text-white/90 text-xs px-3 py-1 rounded-full">
           {photos[idx].credit}
-          {safeWebsite(photos[idx].source) && <> · <a href={safeWebsite(photos[idx].source)} target="_blank" rel="noopener noreferrer" className="underline">Source</a></>}
-          {safeWebsite(photos[idx].license_url) && <> · <a href={safeWebsite(photos[idx].license_url)} target="_blank" rel="noopener noreferrer" className="underline">License</a></>}
+          {safeWebsite(photos[idx].source) && <> · <a href={safeWebsite(photos[idx].source)} target="_blank" rel="noopener noreferrer" className="underline">{t('poiDetailUi.source')}</a></>}
+          {safeWebsite(photos[idx].license_url) && <> · <a href={safeWebsite(photos[idx].license_url)} target="_blank" rel="noopener noreferrer" className="underline">{t('poiDetailUi.license')}</a></>}
         </div>
       )}
 
@@ -355,11 +357,11 @@ function MiniBar({ poi, category, sfRating, photoUrl, photos, onExpand, onClose,
   return (
     <div className="sf-sheet fixed left-0 right-0 z-[1200] rounded-t-2xl"
       style={{ bottom: 0 }}>
-      <button className="w-full flex justify-center pt-2.5 pb-0" onClick={onExpand} aria-label="Expand details">
+      <button className="w-full flex justify-center pt-2.5 pb-0" onClick={onExpand} aria-label={t('poiDetailUi.expand')}>
         <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-border" />
       </button>
       <button onClick={onClose}
-        aria-label="Close"
+        aria-label={t('common.close')}
         className="absolute top-2 right-2 w-11 h-11 rounded-full bg-gray-100 dark:bg-accent flex items-center justify-center z-10">
         <X className="w-3.5 h-3.5 text-foreground" />
       </button>
@@ -407,7 +409,7 @@ function MiniBar({ poi, category, sfRating, photoUrl, photos, onExpand, onClose,
 
 // ─── Full sheet ───────────────────────────────────────────────────────────────
 function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavigate, onShare, onAddPhoto, onSubmitRating, user, onOpenLightbox, onReportPOI, onReportPhoto, socialTargetId }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const closeRef = useRef(null);
   useEffect(() => { closeRef.current?.focus(); }, []);
   const [ratingVal, setRatingVal] = useState(0);
@@ -458,7 +460,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
           <button
             ref={closeRef}
             onClick={e => { e.stopPropagation(); onClose(); }}
-            aria-label="Close place details"
+            aria-label={t('poiDetailUi.closeDetails')}
             className="absolute top-4 right-4 w-11 h-11 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white"
           >
             <X className="w-4 h-4" />
@@ -469,11 +471,11 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
           <div className="px-5 pt-4" style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
             <h1 className="break-words pr-10 text-xl font-bold text-foreground leading-tight">{poi.name}</h1>
             {poi.address && <p className="text-sm text-muted-foreground mt-0.5">{poi.address}</p>}
-            {allPhotos[0]?.credit && <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{allPhotos[0].credit}{safeWebsite(allPhotos[0].source) && <> · <a href={safeWebsite(allPhotos[0].source)} target="_blank" rel="noopener noreferrer" className="underline">Source</a></>}{safeWebsite(allPhotos[0].license_url) && <> · <a href={safeWebsite(allPhotos[0].license_url)} target="_blank" rel="noopener noreferrer" className="underline">License</a></>}</p>}
+            {allPhotos[0]?.credit && <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{allPhotos[0].credit}{safeWebsite(allPhotos[0].source) && <> · <a href={safeWebsite(allPhotos[0].source)} target="_blank" rel="noopener noreferrer" className="underline">{t('poiDetailUi.source')}</a></>}{safeWebsite(allPhotos[0].license_url) && <> · <a href={safeWebsite(allPhotos[0].license_url)} target="_blank" rel="noopener noreferrer" className="underline">{t('poiDetailUi.license')}</a></>}</p>}
             <div className="mt-1.5 mb-4">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-white"
                 style={{ background: category.color }}>
-                <span dangerouslySetInnerHTML={{ __html: iconGlyphSVG(category.key, 14, 'white') }} /> {category.name}
+                <span dangerouslySetInnerHTML={{ __html: iconGlyphSVG(category.key, 14, 'white') }} /> {getCategoryName(category, language)}
               </span>
             </div>
 
@@ -488,7 +490,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
             {hoursLabel && (
               <div className="flex items-start gap-2 mb-4">
                 <Clock className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                <span className="text-sm text-muted-foreground">Hours: {hoursLabel}</span>
+                <span className="text-sm text-muted-foreground">{t('poiDetailUi.hours', { hours: hoursLabel === 'Open 24/7' ? t('poiDetail.open247') : hoursLabel })}</span>
               </div>
             )}
 
@@ -546,7 +548,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
               <>
                 <p className="text-sm text-foreground leading-relaxed mb-2">{poi.enrichment.wikipedia.text}</p>
                 <p className="text-[10px] text-muted-foreground mb-4 leading-snug">{poi.enrichment.wikipedia.attribution}{' '}
-                  <a href={poi.enrichment.wikipedia.url} target="_blank" rel="noopener noreferrer" className="underline">Source</a>
+                  <a href={poi.enrichment.wikipedia.url} target="_blank" rel="noopener noreferrer" className="underline">{t('poiDetailUi.source')}</a>
                 </p>
                 <div className="h-px bg-gray-100 dark:bg-border mb-4" />
               </>
@@ -568,7 +570,7 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
               </>
             )}
 
-            <button onClick={onReportPOI} className="w-full mb-4 flex items-center justify-center gap-2 border rounded-xl py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"><Flag className="w-4 h-4"/>Report this place</button>
+            <button onClick={onReportPOI} className="w-full mb-4 flex items-center justify-center gap-2 border rounded-xl py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"><Flag className="w-4 h-4"/>{t('poiDetailUi.reportPlace')}</button>
 
             {/* Photo gallery — full grid, all photos visible */}
             {(allPhotos.length > 1 || (allPhotos.length > 0 && user)) && (
@@ -582,14 +584,14 @@ function FullSheet({ poi, category, sfPhotos, sfRating, photos, onClose, onNavig
                     <button
                       key={p.url}
                       onClick={() => onOpenLightbox(i + 1)}
-                      aria-label={`View photo ${i + 2} of ${allPhotos.length}`}
+                      aria-label={t('poiDetailUi.photoPosition', { number: i + 2, total: allPhotos.length })}
                       className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 dark:bg-accent cursor-zoom-in hover:opacity-90 active:scale-95 transition-all"
                     >
                       <img src={p.thumbnail_url || p.url} alt="" loading="lazy" className="w-full h-full object-cover"
                         onError={e => { e.target.parentNode.style.display = 'none'; }} />
                       {p.kind === 'sf' && (<>
                         <div className="absolute bottom-1 right-1 bg-green-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">SF</div>
-                        <span role="button" tabIndex={0} onClick={(e)=>{e.stopPropagation();onReportPhoto?.(p)}} onKeyDown={(e)=>{if(e.key==='Enter'){e.stopPropagation();onReportPhoto?.(p)}}} className="absolute top-1 right-1 bg-black/70 text-white rounded-full p-1" title="Report this photo"><Flag className="w-3.5 h-3.5"/></span>
+                        <span role="button" tabIndex={0} onClick={(e)=>{e.stopPropagation();onReportPhoto?.(p)}} onKeyDown={(e)=>{if(e.key==='Enter'){e.stopPropagation();onReportPhoto?.(p)}}} className="absolute top-1 right-1 bg-black/70 text-white rounded-full p-1" title={t('poiDetailUi.reportPhoto')} aria-label={t('poiDetailUi.reportPhoto')}><Flag className="w-3.5 h-3.5"/></span>
                       </>)}
                     </button>
                   ))}

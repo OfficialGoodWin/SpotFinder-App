@@ -13,13 +13,14 @@ function haversineKm([lat1, lng1], [lat2, lng2]) {
 }
 
 function Spinner({ color }) {
+  const { t } = useLanguage();
   return (
     <div className="flex flex-col items-center justify-center py-14 gap-3">
       <div
         className="w-10 h-10 rounded-full border-4 border-gray-200 dark:border-border animate-spin"
         style={{ borderTopColor: color || '#3b82f6' }}
       />
-      <span className="text-sm text-muted-foreground">Loading nearby places…</span>
+      <span className="text-sm text-muted-foreground">{t('poiPanelUi.loading')}</span>
     </div>
   );
 }
@@ -29,6 +30,8 @@ const SHEET_VH = 0.60;
 const PEEK_SHOW = HEADER_H + 8;
 
 function POIRow({ poi, category, onFlyTo, onNavigate, onSelect, onClose }) {
+  const { t, language } = useLanguage();
+  const number = new Intl.NumberFormat(language, { maximumFractionDigits: 1 });
   return (
     <div
       className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 dark:border-border/40 hover:bg-gray-50 dark:hover:bg-accent/60 active:bg-gray-100 dark:active:bg-accent transition-colors cursor-pointer"
@@ -56,7 +59,7 @@ function POIRow({ poi, category, onFlyTo, onNavigate, onSelect, onClose }) {
             />
           </div>
           <span className="text-xs text-muted-foreground whitespace-nowrap">
-            {poi._km < 1 ? `${Math.round(poi._km * 1000)} m` : `${poi._km.toFixed(1)} km`}
+            {poi._km < 1 ? `${number.format(Math.round(poi._km * 1000))} m` : `${number.format(poi._km)} km`}
           </span>
         </div>
       )}
@@ -64,7 +67,8 @@ function POIRow({ poi, category, onFlyTo, onNavigate, onSelect, onClose }) {
         onClick={e => { e.stopPropagation(); onNavigate?.(poi); onClose(); }}
         className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-colors"
         style={{ background: `${category.color}20`, color: category.color }}
-        title="Navigate"
+        title={t('poiDetail.navigate')}
+        aria-label={t('searchUi.navigateTo', { name: poi.name })}
       >
         <Navigation className="w-4 h-4" />
       </button>
@@ -187,7 +191,7 @@ export default function POIPanel({ pois, category, userPos, loading, onFlyTo, on
     <Spinner color={category?.color} />
   ) : sortedPOIs.length === 0 ? (
     <div className="px-4 py-12 text-center text-muted-foreground">
-      No {categoryName.toLowerCase()} found in this area
+      {t('poiPanelUi.empty', { category: categoryName.toLowerCase() })}
     </div>
   ) : (
     sortedPOIs.map(poi => (

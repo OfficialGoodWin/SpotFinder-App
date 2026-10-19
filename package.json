@@ -13,6 +13,9 @@
     "test:responsive": "node scripts/responsive-audit.mjs",
     "test:privacy-network": "node scripts/privacy-network-audit.mjs",
     "test:release": "node scripts/release-audit.mjs",
+    "i18n:check": "node scripts/i18n-check.mjs",
+    "i18n:generate": "node scripts/i18n-generate.mjs",
+    "test:i18n-browser": "node scripts/i18n-browser-audit.mjs",
     "preview": "vite preview",
     "enrich:pois": "node scripts/enrichment/enrich-pois.js",
     "migrate:spot-presentation": "node scripts/migrations/backfill-spot-presentation.js"

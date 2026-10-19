@@ -135,7 +135,7 @@ export default function SettingsModal({ onClose, mapExploreEnabled = true, onMap
                 <p className="text-sm text-muted-foreground">{t('settings.selectLanguage')}</p>
               </div>
             </div>
-            <SmoothSelect value={language} onChange={setLanguage} ariaLabel={t('settings.selectLanguage')} options={[...LANGUAGES, ...LANGUAGE_VARIANTS].map(lang => ({ value: lang.code, label: `${lang.flag} ${lang.nativeName}${lang.partial ? ' · Partial' : ''}` }))} />
+            <SmoothSelect value={language} onChange={setLanguage} ariaLabel={t('settings.selectLanguage')} options={[...LANGUAGES, ...LANGUAGE_VARIANTS].map(lang => ({ value: lang.code, label: `${lang.flag} ${lang.nativeName}${lang.partial ? ` · ${t('localeUi.partial')}` : ''}` }))} />
             {selectedLanguage?.partial && <p className="mt-2 text-xs text-muted-foreground" role="status">{t('settings.partialTranslation')}</p>}
           </section>
 

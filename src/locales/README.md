@@ -23,3 +23,20 @@ country has one language. No GPS or IP lookup is used for this selection.
 
 When adding copy, put the English key in `translations_en.js`, translate it in
 the relevant locale files, and run `node --test tests/translations.test.js`.
+
+Run `npm run i18n:check` to regenerate `reports/i18n-coverage.md` and the full
+key inventory in `reports/i18n-issues.json`. The report
+lists missing keys, placeholder mismatches, duplicate keys, identical values,
+namespace coverage, and likely hardcoded UI text. `npm run i18n:check -- --strict`
+exits unsuccessfully while issues remain. Catalog coverage is not screen
+coverage; review the hardcoded candidates before claiming a locale is complete.
+
+`npm run i18n:generate -- --locale=cs` is a network-free dry run. To request
+Azure suggestions, set `AZURE_TRANSLATOR_KEY` and `AZURE_TRANSLATOR_REGION` in
+your local environment and add `--execute`. Suggestions go to a review JSON
+file under `reports/`; adding `--write` also inserts missing suggestions into
+the catalog. Review every suggestion and the source diff before committing.
+The optional `AZURE_TRANSLATOR_ENDPOINT` must use HTTPS. Never use `VITE_`
+credentials. Generation excludes legal drafts and existing translations and
+is never part of build or deployment. Character counts are printed before
+requests; actual quota and price depend on the Azure subscription.

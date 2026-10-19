@@ -38,7 +38,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const displayName = getSpotDisplayName(localSpot, language);
-  const creatorName = localSpot.created_by_name || (String(localSpot.created_by || '').includes('@') ? 'Community contributor' : localSpot.created_by) || 'Community contributor';
+  const creatorName = localSpot.created_by_name || (String(localSpot.created_by || '').includes('@') ? t('spotDetailUi.contributor') : localSpot.created_by) || t('spotDetailUi.contributor');
 
   useEffect(() => {
     let alive = true;
@@ -52,7 +52,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
 
   const requireVerified = () => {
     if (!user) { onShowAuth?.(); return false; }
-    if (!user.emailVerified) { toast.error('Please verify your email before liking or saving spots.'); return false; }
+    if (!user.emailVerified) { toast.error(t('spotDetailUi.verifySocial')); return false; }
     return true;
   };
   const handleLike = async () => {
@@ -62,9 +62,9 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
     try {
       await toggleSpotLike(spot.id, user, old);
       window.dispatchEvent(new CustomEvent('spotfinder:collection-changed', { detail: { tabs: ['liked'] } }));
-      toast.success(old ? 'Like removed' : 'Spot liked');
+      toast.success(t(old ? 'spotDetailUi.likeRemoved' : 'spotDetailUi.spotLiked'));
     }
-    catch (e) { setSocial(value => setSpotRelationState(value, 'like', old)); toast.error(e.message || 'Could not update like'); }
+    catch { setSocial(value => setSpotRelationState(value, 'like', old)); toast.error(t('spotDetailUi.likeFailed')); }
     finally { setSocialBusy(''); }
   };
   const handleSave = async () => {
@@ -74,9 +74,9 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
     try {
       await toggleSpotSave(spot.id, user, old);
       window.dispatchEvent(new CustomEvent('spotfinder:collection-changed', { detail: { tabs: ['saved'] } }));
-      toast.success(old ? 'Removed from favorites' : 'Added to favorites');
+      toast.success(t(old ? 'spotDetailUi.saveRemoved' : 'spotDetailUi.saved'));
     }
-    catch (e) { setSocial(value => setSpotRelationState(value, 'save', old)); toast.error(e.message || 'Could not update save'); }
+    catch { setSocial(value => setSpotRelationState(value, 'save', old)); toast.error(t('spotDetailUi.saveFailed')); }
     finally { setSocialBusy(''); }
   };
 
@@ -100,15 +100,15 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
   const overallCount = overallRating === null ? 0 : Number(localSpot.rating_count);
 
   const catRows = [
-    { key: 'access', label: 'Ease of access', val: Number(localSpot.access_rating), count: Number(localSpot.access_rating_count) || 0, labels: ['Very difficult','Difficult','Moderate','Easy','Very easy'] },
-    { key: 'condition', label: 'Condition & cleanliness', val: Number(localSpot.condition_rating), count: Number(localSpot.condition_rating_count) || 0, labels: ['Very poor','Poor','Okay','Good','Excellent'] },
-    { key: 'safety', label: 'Safety & comfort', val: Number(localSpot.safety_rating), count: Number(localSpot.safety_rating_count) || 0, labels: ['Very uncomfortable','Uncomfortable','Okay','Comfortable','Very safe'] },
-    { key: 'crowdedness', label: 'Crowdedness', val: Number(localSpot.crowdedness_rating), count: Number(localSpot.crowdedness_rating_count) || 0, labels: ['Very quiet','Quiet','Moderate','Busy','Very busy'] },
+    { key: 'access', label: t('spotDetailUi.access'), val: Number(localSpot.access_rating), count: Number(localSpot.access_rating_count) || 0, labels: [1, 2, 3, 4, 5].map(n => t(`spotDetailUi.access${n}`)) },
+    { key: 'condition', label: t('spotDetailUi.condition'), val: Number(localSpot.condition_rating), count: Number(localSpot.condition_rating_count) || 0, labels: [1, 2, 3, 4, 5].map(n => t(`spotDetailUi.condition${n}`)) },
+    { key: 'safety', label: t('spotDetailUi.safety'), val: Number(localSpot.safety_rating), count: Number(localSpot.safety_rating_count) || 0, labels: [1, 2, 3, 4, 5].map(n => t(`spotDetailUi.safety${n}`)) },
+    { key: 'crowdedness', label: t('spotDetailUi.crowding'), val: Number(localSpot.crowdedness_rating), count: Number(localSpot.crowdedness_rating_count) || 0, labels: [1, 2, 3, 4, 5].map(n => t(`spotDetailUi.crowding${n}`)) },
   ];
   const legacyRows = localSpot.rating_schema === 2 ? [] : [
-    { key: 'parking', label: 'Parking quality (legacy)', val: Number(localSpot.parking_rating), count: Number(localSpot.parking_rating_count) || 0 },
-    { key: 'beauty', label: 'Scenery (legacy)', val: Number(localSpot.beauty_rating), count: Number(localSpot.beauty_rating_count) || 0 },
-    { key: 'privacy', label: 'Privacy (legacy)', val: Number(localSpot.privacy_rating), count: Number(localSpot.privacy_rating_count) || 0 },
+    { key: 'parking', label: t('spotDetailUi.legacyParking'), val: Number(localSpot.parking_rating), count: Number(localSpot.parking_rating_count) || 0 },
+    { key: 'beauty', label: t('spotDetailUi.legacyBeauty'), val: Number(localSpot.beauty_rating), count: Number(localSpot.beauty_rating_count) || 0 },
+    { key: 'privacy', label: t('spotDetailUi.legacyPrivacy'), val: Number(localSpot.privacy_rating), count: Number(localSpot.privacy_rating_count) || 0 },
   ];
 
   const hasCategoryRatings = [...catRows, ...legacyRows].some(row => row.count > 0 && Number.isFinite(row.val) && row.val >= 1 && row.val <= 5);
@@ -154,18 +154,18 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
 
   const handleShare = async () => {
     if (!localSpot.is_public || !['published', 'pending_trust'].includes(localSpot.status)) {
-      setShareTooltip('Sharing unavailable');
+      setShareTooltip('sharingUnavailable');
       setTimeout(() => setShareTooltip(''), 2000);
       return;
     }
     const result = await shareSpotLink({ id: String(spot.id), title: displayName });
     if (result === 'shared' || result === 'cancelled') return;
     setManualShareUrl(result === 'unavailable' ? canonicalSpotUrl(String(spot.id)) || '' : '');
-    setShareTooltip(result === 'copied' ? 'Link copied' : 'Select and copy the link below');
+    setShareTooltip(result === 'copied' ? 'linkCopied' : 'copyLink');
     setTimeout(() => setShareTooltip(''), 2000);
   };
 
-  const formatDate = (d) => d ? new Date(d).toLocaleDateString() : '';
+  const formatDate = (d) => d ? new Intl.DateTimeFormat(language, { dateStyle: 'medium' }).format(new Date(d)) : '';
   const poiMatch = localSpot.poi_match?.name ? localSpot.poi_match : null;
   // Only community uploads are documentary spot photos here. A nearby POI
   // image is not promoted into the gallery unless its identity and full
@@ -188,7 +188,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
               <div className="min-w-0">
                 <h2 id="spot-detail-title" className="break-words text-lg font-bold leading-snug text-gray-900 dark:text-foreground">{displayName}</h2>
                 {poiMatch && displayName !== poiMatch.name && (
-                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400">Also known as {poiMatch.name}</p>
+                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400">{t('spotDetailUi.alsoKnownAs', { name: poiMatch.name })}</p>
                 )}
                 <p className="mt-0.5 text-xs font-medium text-gray-600 dark:text-muted-foreground">{getSpotLocationLabel(localSpot, 5)}</p>
                 <p className="mt-0.5 text-[11px] text-gray-400 dark:text-muted-foreground">
@@ -211,14 +211,14 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
           {localSpot.description && (
             <p className="text-gray-600 dark:text-muted-foreground text-sm leading-relaxed">{localSpot.description}</p>
           )}
-          {!localSpot.description && <p className="text-sm italic text-gray-500 dark:text-muted-foreground">No description has been added yet.</p>}
+          {!localSpot.description && <p className="text-sm italic text-gray-500 dark:text-muted-foreground">{t('spotDetailUi.noDescription')}</p>}
 
           {/* Tags */}
           {localSpot.tags?.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {localSpot.tags.map(tag => (
                 <span key={tag} className="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">
-                  #{tag}
+                  {t(`spotTags.${tag}`, tag)}
                 </span>
               ))}
             </div>
@@ -226,8 +226,8 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
 
           {poiMatch && (
             <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4 dark:border-blue-900/60 dark:bg-blue-950/20">
-              <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">Nearby place match · {poiMatch.distance_m} m away</p>
-              <p className="mt-1 font-semibold text-gray-900 dark:text-foreground">Also known as {poiMatch.name}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">{t('spotDetailUi.nearbyMatch', { distance: new Intl.NumberFormat(language).format(poiMatch.distance_m) })}</p>
+              <p className="mt-1 font-semibold text-gray-900 dark:text-foreground">{t('spotDetailUi.alsoKnownAs', { name: poiMatch.name })}</p>
               {poiMatch.address && <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-muted-foreground">{poiMatch.address}</p>}
               {poiMatch.categories?.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-1.5">
@@ -239,7 +239,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
                 </div>
               )}
               {poiWebsite && (
-                <a href={poiWebsite} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex text-xs font-semibold text-blue-600 underline underline-offset-2 dark:text-blue-400">Visit place website</a>
+                <a href={poiWebsite} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex text-xs font-semibold text-blue-600 underline underline-offset-2 dark:text-blue-400">{t('spotDetailUi.website')}</a>
               )}
             </div>
           )}
@@ -278,18 +278,18 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
           )}
 
           {/* Community actions — counts are server-maintained and update live */}
-          <div className="grid grid-cols-3 gap-2" aria-label="Spot actions">
-            <button onClick={handleLike} disabled={!!socialBusy} aria-pressed={social.liked} aria-label={`${social.liked ? 'Unlike' : 'Like'} this spot; ${social.likesCount} likes`} className={`min-h-[48px] rounded-2xl border flex items-center justify-center gap-2 font-semibold text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${social.liked ? 'bg-rose-50 border-rose-200 text-rose-600 dark:bg-rose-950/30 dark:border-rose-900' : 'border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent'}`}>
+          <div className="grid grid-cols-3 gap-2" aria-label={t('spotDetailUi.actions')}>
+            <button onClick={handleLike} disabled={!!socialBusy} aria-pressed={social.liked} aria-label={t('spotDetailUi.likeAction', { action: t(social.liked ? 'spotDetailUi.unlike' : 'spotDetailUi.like'), count: social.likesCount })} className={`min-h-[48px] rounded-2xl border flex items-center justify-center gap-2 font-semibold text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${social.liked ? 'bg-rose-50 border-rose-200 text-rose-600 dark:bg-rose-950/30 dark:border-rose-900' : 'border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent'}`}>
               <Heart className={`w-5 h-5 ${social.liked ? 'fill-current' : ''}`} />
-              <span className="sr-only">{social.liked ? 'Liked' : 'Like'} </span><span className="tabular-nums text-xs">{social.likesCount}</span>
+              <span className="sr-only">{t(social.liked ? 'spotDetailUi.liked' : 'spotDetailUi.like')} </span><span className="tabular-nums text-xs">{new Intl.NumberFormat(language).format(social.likesCount)}</span>
             </button>
-            <button onClick={handleSave} disabled={!!socialBusy} aria-pressed={social.saved} aria-label={`${social.saved ? 'Remove from saved' : 'Save'} this spot; ${social.savesCount} saves`} className={`min-h-[48px] rounded-2xl border flex items-center justify-center gap-2 font-semibold text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${social.saved ? 'bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-950/30 dark:border-blue-900' : 'border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent'}`}>
+            <button onClick={handleSave} disabled={!!socialBusy} aria-pressed={social.saved} aria-label={t('spotDetailUi.saveAction', { action: t(social.saved ? 'spotDetailUi.unsave' : 'spotDetailUi.save'), count: social.savesCount })} className={`min-h-[48px] rounded-2xl border flex items-center justify-center gap-2 font-semibold text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${social.saved ? 'bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-950/30 dark:border-blue-900' : 'border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent'}`}>
               <Bookmark className={`w-5 h-5 ${social.saved ? 'fill-current' : ''}`} />
-              <span className="sr-only">{social.saved ? 'Saved' : 'Save'} </span><span className="tabular-nums text-xs">{social.savesCount}</span>
+              <span className="sr-only">{t(social.saved ? 'collection.favorites' : 'spotDetailUi.save')} </span><span className="tabular-nums text-xs">{new Intl.NumberFormat(language).format(social.savesCount)}</span>
             </button>
-            <button onClick={handleShare} className="relative min-h-[48px] rounded-2xl border border-gray-200 dark:border-border flex items-center justify-center hover:bg-gray-50 dark:hover:bg-accent" aria-label="Share this spot">{shareTooltip === 'Link copied' ? <Check className="h-5 w-5 text-green-500" /> : <Share2 className="h-5 w-5 text-blue-500" />}{shareTooltip && <span role="status" className="absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-lg bg-gray-900 px-2 py-1 text-[10px] text-white">{shareTooltip}</span>}</button>
+            <button onClick={handleShare} className="relative min-h-[48px] rounded-2xl border border-gray-200 dark:border-border flex items-center justify-center hover:bg-gray-50 dark:hover:bg-accent" aria-label={t('spotDetailUi.share')}>{shareTooltip === 'linkCopied' ? <Check className="h-5 w-5 text-green-500" /> : <Share2 className="h-5 w-5 text-blue-500" />}{shareTooltip && <span role="status" className="absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-lg bg-gray-900 px-2 py-1 text-[10px] text-white">{t(`spotDetailUi.${shareTooltip}`)}</span>}</button>
           </div>
-          {manualShareUrl && <label className="block text-xs font-medium text-gray-600 dark:text-slate-300">Spot link
+          {manualShareUrl && <label className="block text-xs font-medium text-gray-600 dark:text-slate-300">{t('spotDetailUi.spotLink')}
             <input readOnly value={manualShareUrl} onFocus={event => event.target.select()} onClick={event => event.target.select()} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-border dark:bg-slate-900 dark:text-white" />
           </label>}
 
@@ -300,13 +300,13 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
               {overallCount > 0 ? (
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="flex gap-0.5">{renderOverallStars(overallRating)}</div>
-                  <span className="font-semibold text-gray-700 dark:text-foreground">{overallRating.toFixed(1)}</span>
-                  <span className="text-xs text-gray-400 dark:text-muted-foreground">Based on {overallCount} community {overallCount === 1 ? 'rating' : 'ratings'}</span>
+                  <span className="font-semibold text-gray-700 dark:text-foreground">{new Intl.NumberFormat(language, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(overallRating)}</span>
+                  <span className="text-xs text-gray-400 dark:text-muted-foreground">{t('spotDetailUi.basedOn', { count: overallCount })}</span>
                 </div>
-              ) : <p className="text-sm font-semibold text-gray-600 dark:text-muted-foreground">Unrated · no community ratings yet</p>}
+              ) : <p className="text-sm font-semibold text-gray-600 dark:text-muted-foreground">{t('spotDetailUi.unrated')}</p>}
               {overallCount > 0 && (
                 <p className="text-xs text-gray-400 dark:text-muted-foreground mt-0.5 italic">
-                  Overall stars are rated directly; the scales describe what the place is like.
+                  {t('spotDetailUi.ratingExplanation')}
                 </p>
               )}
             </div>
@@ -321,11 +321,11 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
               {catRows.filter(r => r.count > 0 && Number.isFinite(r.val) && r.val >= 1 && r.val <= 5).map(row => (
                 <div key={row.key} className="flex items-center justify-between gap-3 py-1">
                   <span className="text-sm text-gray-700 dark:text-foreground">{row.label}</span>
-                  <span className="text-sm font-semibold text-gray-800 dark:text-foreground text-right">{row.labels[Math.min(4, Math.max(0, Math.round(row.val)-1))]} · {row.val.toFixed(1)} <span className="text-xs font-normal text-gray-400">({row.count})</span></span>
+                  <span className="text-sm font-semibold text-gray-800 dark:text-foreground text-right">{row.labels[Math.min(4, Math.max(0, Math.round(row.val)-1))]} · {new Intl.NumberFormat(language, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(row.val)} <span className="text-xs font-normal text-gray-400">({new Intl.NumberFormat(language).format(row.count)})</span></span>
                 </div>
               ))}
-              {legacyRows.filter(row => row.count > 0 && Number.isFinite(row.val) && row.val >= 1 && row.val <= 5).map(row => <div key={row.key} className="flex justify-between text-xs text-gray-500 dark:text-gray-400"><span>{row.label}</span><span>{row.val.toFixed(1)} ({row.count})</span></div>)}
-              {catRows.some(row => row.key === 'crowdedness' && row.count > 0) && <p className="pt-2 text-[11px] leading-4 text-blue-600 dark:text-blue-300">Crowdedness describes how busy the place feels. A lower score means quieter, not worse.</p>}
+              {legacyRows.filter(row => row.count > 0 && Number.isFinite(row.val) && row.val >= 1 && row.val <= 5).map(row => <div key={row.key} className="flex justify-between text-xs text-gray-500 dark:text-gray-400"><span>{row.label}</span><span>{new Intl.NumberFormat(language, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(row.val)} ({new Intl.NumberFormat(language).format(row.count)})</span></div>)}
+              {catRows.some(row => row.key === 'crowdedness' && row.count > 0) && <p className="pt-2 text-[11px] leading-4 text-blue-600 dark:text-blue-300">{t('spotDetailUi.crowdingExplanation')}</p>}
             </div>
           )}
 
@@ -344,7 +344,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
             </div>
           )}
           {user && !user.emailVerified && !isOwner && !ratingSubmitted && (
-            <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-2xl border border-amber-200 dark:border-amber-800 text-sm text-amber-800 dark:text-amber-300">Verify your email to rate this spot.</div>
+            <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-2xl border border-amber-200 dark:border-amber-800 text-sm text-amber-800 dark:text-amber-300">{t('spotDetailUi.verifyRating')}</div>
           )}
           {user && user.emailVerified && !isOwner && !ratingSubmitted && (
             <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-2xl border border-purple-200 dark:border-purple-800 space-y-3">
@@ -353,18 +353,18 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
                   {t('spotDetail.rateCategories')}
                 </p>
                 <p className="text-xs text-purple-500 dark:text-purple-400 mt-0.5">
-                  Overall stars are rated directly; the scales describe what the place is like.
+                  {t('spotDetailUi.ratingExplanation')}
                 </p>
               </div>
 
               <div>
-                <label className="text-sm font-semibold text-gray-700 dark:text-foreground mb-2 block">Overall experience <span className="text-red-500">*</span></label>
+                <label className="text-sm font-semibold text-gray-700 dark:text-foreground mb-2 block">{t('spotDetailUi.overall')} <span className="text-red-500">*</span></label>
                 <StarRating value={pendingOverall} onChange={setPendingOverall} size="lg" />
               </div>
-              <div><label className="text-sm font-semibold block mb-2">Ease of access</label><LabeledRatingScale value={pendingAccess} onChange={setPendingAccess} labels={['Very difficult','Difficult','Moderate','Easy','Very easy']} /></div>
-              <div><label className="text-sm font-semibold block mb-2">Condition & cleanliness</label><LabeledRatingScale value={pendingCondition} onChange={setPendingCondition} labels={['Very poor','Poor','Okay','Good','Excellent']} /></div>
-              <div><label className="text-sm font-semibold block mb-2">Safety & comfort</label><LabeledRatingScale value={pendingSafety} onChange={setPendingSafety} labels={['Very uncomfortable','Uncomfortable','Okay','Comfortable','Very safe']} /></div>
-              <div><label className="text-sm font-semibold block mb-2">Crowdedness</label><LabeledRatingScale value={pendingCrowdedness} onChange={setPendingCrowdedness} labels={['Very quiet','Quiet','Moderate','Busy','Very busy']} /></div>
+              <div><label className="text-sm font-semibold block mb-2">{t('spotDetailUi.access')}</label><LabeledRatingScale value={pendingAccess} onChange={setPendingAccess} labels={catRows[0].labels} /></div>
+              <div><label className="text-sm font-semibold block mb-2">{t('spotDetailUi.condition')}</label><LabeledRatingScale value={pendingCondition} onChange={setPendingCondition} labels={catRows[1].labels} /></div>
+              <div><label className="text-sm font-semibold block mb-2">{t('spotDetailUi.safety')}</label><LabeledRatingScale value={pendingSafety} onChange={setPendingSafety} labels={catRows[2].labels} /></div>
+              <div><label className="text-sm font-semibold block mb-2">{t('spotDetailUi.crowding')}</label><LabeledRatingScale value={pendingCrowdedness} onChange={setPendingCrowdedness} labels={catRows[3].labels} /></div>
 
               <button
                 onClick={handleSubmitRatings}
@@ -372,7 +372,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
                 className="w-full py-2.5 rounded-xl bg-purple-600 text-white font-semibold text-sm disabled:opacity-40 hover:bg-purple-700 active:scale-95 transition-all flex items-center justify-center gap-2 mt-1"
               >
                 {submitting
-                  ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving…</>
+                  ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> {t('accountSecurity.saving')}</>
                   : t('spotDetail.submitRatings')
                 }
               </button>
@@ -396,18 +396,18 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
           {(isOwner || isAdmin) && (
             <>
               {isOwner && (
-                <button onClick={onEdit} aria-label="Edit this spot" className="p-3 rounded-2xl border-2 border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent transition-colors">
+                <button onClick={onEdit} aria-label={t('spotDetailUi.edit')} className="p-3 rounded-2xl border-2 border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent transition-colors">
                   <Edit2 className="w-5 h-5 text-gray-600 dark:text-foreground" />
                 </button>
               )}
-              <button onClick={() => setShowDeleteConfirm(true)} aria-label="Delete this spot" className="p-3 rounded-2xl border-2 border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+              <button onClick={() => setShowDeleteConfirm(true)} aria-label={t('spotDetailUi.delete')} className="p-3 rounded-2xl border-2 border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                 <Trash2 className="w-5 h-5 text-red-500" />
               </button>
             </>
           )}
 
           {!isOwner && (
-            <button onClick={() => { if (!user) { onShowAuth?.(); return; } setShowReport(true); }} className="p-3 rounded-2xl border-2 border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent transition-colors" title="Report spot">
+            <button onClick={() => { if (!user) { onShowAuth?.(); return; } setShowReport(true); }} className="p-3 rounded-2xl border-2 border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent transition-colors" title={t('spotDetailUi.report')} aria-label={t('spotDetailUi.report')}>
               <Flag className="w-5 h-5 text-gray-500" />
             </button>
           )}
@@ -423,12 +423,12 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
       </div>
       <ReportDialog open={showReport} onClose={() => setShowReport(false)} user={user} targetType="spot" targetId={String(spot.id)} targetLabel={displayName} targetSnapshot={{ title: displayName, lat: localSpot.lat || '', lon: localSpot.lng || localSpot.lon || '', created_by: localSpot.created_by || '' }} />
       <DraftConfirmationDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}
-        title="Delete this spot?" description={`Permanently delete ${displayName}? This cannot be undone.`}
-        confirmLabel={deleting ? 'Deleting…' : 'Delete spot'} cancelLabel="Keep spot" destructive busy={deleting}
+        title={t('spotDetailUi.deleteTitle')} description={t('spotDetailUi.deleteDescription', { name: displayName })}
+        confirmLabel={t(deleting ? 'spotDetailUi.deleting' : 'spotDetailUi.deleteSpot')} cancelLabel={t('spotDetailUi.keepSpot')} destructive busy={deleting}
         onConfirm={async () => {
           setDeleting(true);
           try { await onDelete?.(); setShowDeleteConfirm(false); }
-          catch (error) { toast.error(error?.message || 'Could not delete this spot.'); }
+          catch { toast.error(t('spotDetailUi.deleteFailed')); }
           finally { setDeleting(false); }
         }} />
     </div>

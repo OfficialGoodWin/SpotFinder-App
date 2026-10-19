@@ -1,7 +1,9 @@
 import { Activity, ArrowLeft } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+import { useLanguage } from './LanguageContext';
 
 export default function PageNotFound() {
+  const { t } = useLanguage();
   const location = useLocation();
 
   return (
@@ -24,7 +26,7 @@ export default function PageNotFound() {
         <section className="w-full rounded-[2rem] border border-border/70 bg-card/85 px-6 py-8 text-center shadow-2xl shadow-emerald-950/10 backdrop-blur-xl sm:px-12 sm:py-12">
           <div className="mb-7 flex items-center justify-center gap-3 text-xs font-bold uppercase tracking-[0.24em] text-muted-foreground">
             <span className="h-px w-10 bg-border" />
-            Error 404
+            {t('notFound.error')}
             <span className="h-px w-10 bg-border" />
           </div>
 
@@ -33,24 +35,24 @@ export default function PageNotFound() {
             <div className="relative -rotate-1 overflow-hidden rounded-2xl border border-border/80 bg-white p-2 shadow-xl transition-transform duration-500 group-hover:rotate-0 group-hover:scale-[1.01] dark:bg-slate-100">
               <img
                 src="/spotfinder-404.png"
-                alt="Three stick figures confused by a 404 sign"
+                alt={t('notFound.artAlt')}
                 className="h-auto w-full rounded-xl object-contain"
               />
             </div>
-            <span className="absolute -right-3 -top-4 grid h-14 w-14 rotate-6 place-items-center rounded-2xl border border-white/70 bg-white/95 text-3xl shadow-lg dark:border-white/10 dark:bg-slate-900" role="img" aria-label="Broken heart">
+            <span className="absolute -right-3 -top-4 grid h-14 w-14 rotate-6 place-items-center rounded-2xl border border-white/70 bg-white/95 text-3xl shadow-lg dark:border-white/10 dark:bg-slate-900" role="img" aria-label={t('notFound.brokenHeart')}>
               💔
             </span>
           </div>
 
           <div className="mx-auto mt-9 max-w-xl">
             <h1 className="text-3xl font-black tracking-tight sm:text-5xl">
-              This spot doesn&apos;t exist.
+              {t('notFound.title')}
             </h1>
             <p className="mx-auto mt-4 max-w-lg text-base leading-7 text-muted-foreground sm:text-lg">
-              We searched the whole map, but this page is nowhere to be found.
+              {t('notFound.description')}
             </p>
             <p className="mt-2 text-sm font-semibold text-foreground/70">
-              here isnt anything special bro
+              {t('notFound.hint')}
             </p>
 
             <div className="mx-auto mt-5 w-fit max-w-full rounded-full border border-border bg-muted/40 px-4 py-2 font-mono text-xs text-muted-foreground">
@@ -63,14 +65,14 @@ export default function PageNotFound() {
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <ArrowLeft className="h-4 w-4" />
-                Back to map
+                {t('notFound.backToMap')}
               </Link>
               <Link
                 to="/Status"
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-border bg-background px-6 py-3 text-sm font-bold transition hover:-translate-y-0.5 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <Activity className="h-4 w-4 text-primary" />
-                View status
+                {t('notFound.viewStatus')}
               </Link>
             </div>
           </div>

@@ -46,10 +46,12 @@ export function LanguageProvider({ children }) {
   };
 
   const t = (key, fallbackOrVariables) => {
-    const localized = readTranslation(language, key);
+    const variables = fallbackOrVariables && typeof fallbackOrVariables === 'object' ? fallbackOrVariables : null;
+    const pluralKey = variables && Number.isFinite(Number(variables.count))
+      ? `${key}_${new Intl.PluralRules(language).select(Number(variables.count))}` : key;
+    const localized = readTranslation(language, pluralKey) ?? readTranslation(language, key);
     // Romanian ordinal numbers do not use the English suffixes (st/nd/rd/th).
     const intentionallyEmpty = localeBase(language) === 'ro' && /^navPanel\.ord(?:St|Nd|Rd|Th)$/.test(key);
-    const variables = fallbackOrVariables && typeof fallbackOrVariables === 'object' ? fallbackOrVariables : null;
     const format = value => variables && typeof value === 'string'
       ? value.replace(/\{([a-zA-Z][a-zA-Z0-9]*)\}/g, (match, name) =>
         Object.prototype.hasOwnProperty.call(variables, name) ? String(variables[name]) : match)
@@ -58,7 +60,7 @@ export function LanguageProvider({ children }) {
 
     // Individual locale dictionaries can lag behind a new UI string. Falling
     // back to English keeps internal translation keys out of the interface.
-    const english = readTranslation(DEFAULT_LANGUAGE, key);
+    const english = readTranslation(DEFAULT_LANGUAGE, pluralKey) ?? readTranslation(DEFAULT_LANGUAGE, `${key}_other`) ?? readTranslation(DEFAULT_LANGUAGE, key);
     if (english !== undefined && english !== null && english !== '') return format(english);
     return typeof fallbackOrVariables === 'string' ? fallbackOrVariables : key;
   };

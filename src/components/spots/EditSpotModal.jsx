@@ -79,7 +79,7 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
 
   const handleSave = async () => {
     if (!isMeaningfulSpotTitle(title)) {
-      toast.error('Give this place a specific, recognizable name.');
+      toast.error(t('addSpotUi.validationTitle'));
       return;
     }
     setLoading(true);
@@ -90,8 +90,8 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
         const { uploadSpotImage } = await import('@/api/firebaseClient');
         image_url = await uploadSpotImage(imageFile);
         image_urls = [image_url, ...image_urls.slice(1)];
-      } catch (e) {
-        toast.error(e?.message || 'The photo could not be uploaded.');
+      } catch {
+        toast.error(t('editSpotUi.photoUploadFailed'));
         setLoading(false);
         return;
       }
@@ -118,12 +118,12 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
       try { await submitCategoryRatings(spot.id, spot, rating, user.id || user.uid); }
       catch (ratingError) {
         console.error('Spot rating failed:', ratingError);
-        toast.error('Changes saved, but the rating could not be submitted.');
+        toast.error(t('editSpotUi.ratingFailed'));
       }
     }
     } catch (error) {
       console.error('Spot edit failed:', error);
-      toast.error(error?.message || 'Changes could not be saved. Your edits are still here.');
+      toast.error(t('editSpotUi.saveFailed'));
     } finally {
     setLoading(false);
     }
@@ -135,7 +135,7 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
         <div className="sticky top-0 z-30 bg-white/90 dark:bg-card/90 px-6 pt-5 pb-3 border-b border-gray-100/80 dark:border-border flex items-center justify-between backdrop-blur-xl">
           <div className="flex items-center gap-2">
             <MapPin className="w-5 h-5 text-blue-500" />
-            <h2 className="text-lg font-bold text-gray-900 dark:text-foreground">{t('common.edit')} Spot</h2>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-foreground">{t('editSpotUi.title')}</h2>
           </div>
           <button onClick={requestClose} aria-label={t('common.close')} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-accent">
             <X className="w-5 h-5 text-gray-500 dark:text-muted-foreground" />
@@ -144,8 +144,8 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
 
         <div className="px-6 py-4 space-y-5">
           <div>
-            <label htmlFor="edit-spot-name" className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">Spot name</label>
-            <input id="edit-spot-name" value={title} maxLength={100} onChange={event => setTitle(event.target.value)} placeholder="e.g. Old Quarry Viewpoint" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-border bg-white dark:bg-background text-gray-900 dark:text-foreground focus:outline-none focus:ring-2 focus:ring-green-500 text-base" />
+            <label htmlFor="edit-spot-name" className="text-sm font-semibold text-gray-600 dark:text-foreground mb-1 block">{t('addSpotUi.spotName')}</label>
+            <input id="edit-spot-name" value={title} maxLength={100} onChange={event => setTitle(event.target.value)} placeholder={t('addSpotUi.namePlaceholder')} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-border bg-white dark:bg-background text-gray-900 dark:text-foreground focus:outline-none focus:ring-2 focus:ring-green-500 text-base" />
           </div>
           {/* Description */}
           <div>
@@ -160,21 +160,21 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
           </div>
 
           {!isOwner && <div className="rounded-2xl border border-emerald-500/15 bg-emerald-50/60 p-4 dark:bg-emerald-950/15">
-            <p className="text-sm font-bold text-foreground">Your rating</p>
-            <p className="mt-1 text-xs text-muted-foreground">Your rating is stored separately from the spot details, so older spots can safely move to the current rating system.</p>
+            <p className="text-sm font-bold text-foreground">{t('editSpotUi.yourRating')}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t('editSpotUi.ratingHint')}</p>
             {user?.emailVerified ? (
               <div className="mt-3 space-y-3">
                 <StarRating value={rating.overall} onChange={overall => setRating(value => ({ ...value, overall }))} />
                 {[
-                  ['access', 'Ease of access', ['Very difficult', '', '', '', 'Very easy']],
-                  ['condition', 'Condition & cleanliness', ['Very poor', '', '', '', 'Excellent']],
-                  ['safety', 'Safety & comfort', ['Uncomfortable', '', '', '', 'Very safe']],
-                  ['crowdedness', 'Crowdedness', ['Very quiet', '', '', '', 'Very busy']],
+                  ['access', t('spotDetailUi.access'), [t('spotDetailUi.access1'), '', '', '', t('spotDetailUi.access5')]],
+                  ['condition', t('spotDetailUi.condition'), [t('spotDetailUi.condition1'), '', '', '', t('spotDetailUi.condition5')]],
+                  ['safety', t('spotDetailUi.safety'), [t('spotDetailUi.safety2'), '', '', '', t('spotDetailUi.safety5')]],
+                  ['crowdedness', t('spotDetailUi.crowding'), [t('spotDetailUi.crowding1'), '', '', '', t('spotDetailUi.crowding5')]],
                 ].map(([key, label, labels]) => (
                   <div key={key}><p className="mb-1 text-xs font-semibold text-muted-foreground">{label}</p><LabeledRatingScale value={rating[key]} labels={labels} onChange={value => setRating(current => ({ ...current, [key]: value }))} /></div>
                 ))}
               </div>
-            ) : <p className="mt-2 text-xs font-medium text-amber-600">Verify your email to submit a rating.</p>}
+            ) : <p className="mt-2 text-xs font-medium text-amber-600">{t('editSpotUi.ratingVerify')}</p>}
           </div>}
 
           {/* Category tags */}
@@ -192,7 +192,7 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
                       : ''
                   }`}
                 >
-                  {emoji} #{id}
+                  {emoji} {t(`spotTags.${id}`, id)}
                 </button>
               ))}
             </div>
@@ -253,7 +253,7 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
             <label className="text-sm font-semibold text-gray-600 dark:text-foreground mb-2 block">{t('addSpot.photo')}</label>
             {imagePreview ? (
               <div className="relative">
-                <img src={imagePreview} alt="preview" className="w-full h-40 object-cover rounded-2xl" />
+                <img src={imagePreview} alt={t('addSpotUi.photoPreview', { number: 1 })} className="w-full h-40 object-cover rounded-2xl" />
                 <button
                   onClick={() => { setImageFile(null); setImagePreview(null); }}
                   className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1"
@@ -284,7 +284,7 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
           </button>
         </div>
       </div>
-      <DraftConfirmationDialog open={confirmDiscard} onOpenChange={setConfirmDiscard} title="Discard unsaved changes?" description="Your edits to this spot have not been saved." cancelLabel="Keep editing" confirmLabel="Discard changes" onConfirm={onClose} destructive />
+      <DraftConfirmationDialog open={confirmDiscard} onOpenChange={setConfirmDiscard} title={t('editSpotUi.discardTitle')} description={t('editSpotUi.discardHint')} cancelLabel={t('editSpotUi.keepEditing')} confirmLabel={t('editSpotUi.discardChanges')} onConfirm={onClose} destructive />
     </div>
   );
 }

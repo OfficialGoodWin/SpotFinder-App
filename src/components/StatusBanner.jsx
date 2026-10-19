@@ -3,6 +3,7 @@ import { AlertTriangle, X, MailWarning } from 'lucide-react';
 import { getMaintenanceStatus, resendVerificationEmail } from '@/api/firebaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Link, useLocation } from 'react-router-dom';
+import { useLanguage } from '@/lib/LanguageContext';
 
 /**
  * Global status banner. Previously `getMaintenanceStatus`/`setMaintenanceStatus`
@@ -41,6 +42,7 @@ function safeBannerMessage(message, fallback) {
 }
 
 export default function StatusBanner() {
+  const { t } = useLanguage();
   const [status, setStatus] = useState(null);
   const [dismissed, setDismissed] = useState(false);
   const { user, refreshUser } = useAuth();
@@ -69,15 +71,15 @@ export default function StatusBanner() {
               external image service. */}
           <img
             src="/spotfinder-outage.png"
-            alt="SpotFinder workers repairing servers"
+            alt={t('statusBanner.artAlt')}
             className="w-full max-w-md mx-auto h-auto max-h-[42vh] object-contain mb-4 rounded-lg"
           />
-          <h2 className="text-xl font-semibold mb-2">SpotFinder is temporarily unavailable</h2>
+          <h2 className="text-xl font-semibold mb-2">{t('statusBanner.unavailable')}</h2>
           <p className="text-sm text-gray-600 dark:text-gray-300">
-            {safeBannerMessage(status.message, 'We are performing maintenance. Please check back shortly.')}
+            {safeBannerMessage(status.message, t('statusBanner.maintenance'))}
           </p>
           <Link to="/Status" className="inline-block mt-4 text-sm font-semibold underline">
-            View Status Page
+            {t('statusBanner.viewStatus')}
           </Link>
         </div>
       </div>
@@ -95,13 +97,13 @@ export default function StatusBanner() {
         <div className="bg-amber-500 text-white px-4 py-2 flex items-center gap-2 text-sm shadow">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
           <span className="flex-1">
-            {safeBannerMessage(status.message, 'Some features may be temporarily degraded.')}
+            {safeBannerMessage(status.message, t('statusBanner.degraded'))}
             {' '}
             <Link to="/Status" className="underline font-semibold whitespace-nowrap">
-              Status Page
+              {t('statusBanner.statusPage')}
             </Link>
           </span>
-          <button onClick={() => setDismissed(true)} aria-label="Dismiss">
+          <button onClick={() => setDismissed(true)} aria-label={t('statusBanner.dismiss')}>
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -111,24 +113,24 @@ export default function StatusBanner() {
           <MailWarning className="w-4 h-4 flex-shrink-0" />
           <span className="flex-1">
             {resent
-              ? 'Verification email sent — check your inbox.'
-              : 'Please verify your email to add spots, reviews, or reports.'}
+              ? t('statusBanner.verificationSent')
+              : t('statusBanner.verifyEmail')}
           </span>
           {!resent && (
             <button
               onClick={() => resendVerificationEmail().then(() => setResent(true)).catch(() => {})}
               className="underline font-semibold whitespace-nowrap"
             >
-              Resend email
+              {t('statusBanner.resendEmail')}
             </button>
           )}
           <button
             onClick={() => refreshUser()}
             className="underline font-semibold whitespace-nowrap"
           >
-            I've verified
+            {t('statusBanner.verified')}
           </button>
-          <button onClick={() => setVerifyDismissed(true)} aria-label="Dismiss">
+          <button onClick={() => setVerifyDismissed(true)} aria-label={t('statusBanner.dismiss')}>
             <X className="w-4 h-4" />
           </button>
         </div>

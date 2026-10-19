@@ -517,7 +517,7 @@ function makeDot(catKey, color, size = 28, label = '') {
   return el;
 }
 
-function makeSpotDom(spot, language = 'en', onClick) {
+function makeSpotDom(spot, language = 'en', onClick, openLabel) {
   const photoUrl = getSpotImageInfo(spot)?.url || '';
 
   const el = document.createElement('div');
@@ -530,7 +530,7 @@ function makeSpotDom(spot, language = 'en', onClick) {
   el.className = 'sf-discovery-marker';
   el.setAttribute('role', 'button');
   el.setAttribute('tabindex', '0');
-  el.setAttribute('aria-label', `Open ${getSpotDisplayName(spot, language)}`);
+  el.setAttribute('aria-label', openLabel || `Open ${getSpotDisplayName(spot, language)}`);
   el.style.cssText = `width:${photoUrl ? 116 : 96}px;height:${photoUrl ? 98 : 88}px;cursor:pointer;`;
   const root = createRoot(el);
   root.render(photoUrl
@@ -805,10 +805,10 @@ export default function MapLibreMap({
   selectedPOICategory, onSelectPOI, onPOIsLoaded, onLoadingChange,
   isDark, mapLayer,
   terrainEnabled,
-  adminPOIs, adminClosures, adminNavMode, onAdminMapClick,
+  adminPOIs, adminClosures, adminNavMode, onAdminMapClick, onSelectOfficialPoi, officialEditorActive,
   adminERouteOverrides, adminRoadOverrides,
 }) {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const appliedStyleRef = useRef(null);
@@ -828,8 +828,12 @@ export default function MapLibreMap({
   const markers = useRef({ spots: new Map(), ambient: new Map(), pois: new Map(), user: null });
   const onSelectSpotRef = useRef(onSelectSpot);
   onSelectSpotRef.current = onSelectSpot;
+  const officialEditorRef = useRef({ active: officialEditorActive, select: onSelectOfficialPoi });
+  officialEditorRef.current = { active: officialEditorActive, select: onSelectOfficialPoi };
   const onAdminMapClickRef = useRef(onAdminMapClick);
   onAdminMapClickRef.current = onAdminMapClick;
+  const adminPickRef = useRef(adminNavMode);
+  adminPickRef.current = adminNavMode;
   const poiAbort = useRef(null);
   const categoryPoiAbort = useRef(null);
   const categoryOriginRef = useRef({ key: null, position: null });
@@ -912,6 +916,7 @@ export default function MapLibreMap({
         return map.queryRenderedFeatures([[point.x - r, point.y - r], [point.x + r, point.y + r]], { layers });
       };
       map.on('click', async (e) => {
+        if (adminPickRef.current) return;
         const feat = ambientHits(e.point)[0];
         if (!feat) return;
         const p = feat.properties || {};
@@ -934,6 +939,10 @@ export default function MapLibreMap({
 
         const baseTags = { phone: p.phone, website: p.website, opening_hours: p.opening_hours, description: p.description, wikidata: p.wikidata, wikimedia_commons: p.wikimedia_commons, image: p.image };
         const enrichedTags = details?.wikipedia ? { ...baseTags, wikipedia: details.wikipedia } : baseTags;
+        if (officialEditorRef.current.active && officialEditorRef.current.select) {
+          officialEditorRef.current.select({ properties: { ...p }, details, position: { lat, lon }, sourceLayer: AMBIENT_SOURCE_LAYER });
+          return;
+        }
         onSelectPOI?.(
           { id: p.id || `${lat}-${lon}`, lat, lon, name: p.name || '', address: p.address || '',
             tags: enrichedTags,
@@ -1064,7 +1073,7 @@ export default function MapLibreMap({
       const existing = m.get(spotId);
       if (existing?.__spotSignature === signature) continue;
       if (existing) removeSpotMarker(existing);
-      const el = makeSpotDom(spot, language, selected => onSelectSpotRef.current?.(selected));
+      const el = makeSpotDom(spot, language, selected => onSelectSpotRef.current?.(selected), t('searchUi.openSpot', { name: getSpotDisplayName(spot, language) }));
       el.classList.toggle('is-selected', String(selectedSpotId || '') === String(spot.id));
       const mk = attachMarkerAt(new maplibregl.Marker({ element: el, anchor: 'bottom' }), map, lngLat);
       mk.__spotSignature = signature;
@@ -1547,8 +1556,8 @@ const addAdminMarkers = () => {
           type="button"
           onClick={() => mapRef.current?.zoomIn({ duration: 250 })}
           className="grid h-11 w-11 place-items-center transition-colors hover:bg-slate-100 active:bg-slate-200 dark:hover:bg-white/10 dark:active:bg-white/15"
-          aria-label="Zoom in"
-          title="Zoom in"
+          aria-label={t('mapUi.zoomIn')}
+          title={t('mapUi.zoomIn')}
         >
           <Plus className="h-5 w-5" strokeWidth={2.25} />
         </button>
@@ -1559,8 +1568,8 @@ const addAdminMarkers = () => {
           type="button"
           onClick={() => mapRef.current?.zoomOut({ duration: 250 })}
           className="grid h-11 w-11 place-items-center transition-colors hover:bg-slate-100 active:bg-slate-200 dark:hover:bg-white/10 dark:active:bg-white/15"
-          aria-label="Zoom out"
-          title="Zoom out"
+          aria-label={t('mapUi.zoomOut')}
+          title={t('mapUi.zoomOut')}
         >
           <Minus className="h-5 w-5" strokeWidth={2.25} />
         </button>

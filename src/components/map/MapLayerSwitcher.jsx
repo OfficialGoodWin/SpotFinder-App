@@ -38,7 +38,7 @@ export default function MapLayerSwitcher({ activeLayer, onLayerChange, menuPlace
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        aria-label="Map layers"
+        aria-label={t('mapLayers.title')}
         aria-expanded={open}
         className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95
           ${open

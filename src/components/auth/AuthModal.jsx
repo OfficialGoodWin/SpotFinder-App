@@ -78,7 +78,7 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
     if (Date.now() < loginAttempts.lockedUntil) {
       const remaining = Math.ceil((loginAttempts.lockedUntil - Date.now()) / 1000);
       setLockoutRemaining(remaining);
-      setError(`Too many failed attempts. Please wait ${remaining}s before trying again.`);
+      setError(t('authErrors.waitSeconds', { seconds: remaining }));
       return;
     }
 
@@ -104,7 +104,7 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
           loginAttempts.lockedUntil = Date.now() + LOCKOUT_MS;
           const remaining = Math.ceil(LOCKOUT_MS / 1000);
           setLockoutRemaining(remaining);
-          setError(`Too many failed attempts. Account temporarily locked for ${Math.round(LOCKOUT_MS / 60000)} minutes.`);
+          setError(t('authErrors.lockedMinutes', { minutes: Math.round(LOCKOUT_MS / 60000) }));
           setLoading(false);
           return;
         }
@@ -112,11 +112,11 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
         const codes = {
           'auth/invalid-email': t('auth.invalidEmail'),
           'auth/user-not-found': t('auth.userNotFound'),
-          'auth/wrong-password': `${t('auth.wrongPassword')} (${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} left)`,
+          'auth/wrong-password': `${t('auth.wrongPassword')} (${t('authErrors.attempts', { count: attemptsLeft })})`,
           'auth/email-already-in-use': t('auth.emailInUse'),
           'auth/weak-password': t('auth.weakPassword'),
-          'auth/invalid-credential': `${t('auth.invalidCredential')} (${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} left)`,
-          'auth/too-many-requests': 'Too many requests. Your account has been temporarily locked by the server. Try again later.',
+          'auth/invalid-credential': `${t('auth.invalidCredential')} (${t('authErrors.attempts', { count: attemptsLeft })})`,
+          'auth/too-many-requests': t('authErrors.serverLocked'),
         };
         setError(codes[err.code] || t('auth.somethingWrong'));
       } else {
@@ -194,9 +194,9 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
             <div className="sf-status-warning flex items-start gap-3 p-4">
               <Smartphone className="w-5 h-5 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold">Two-factor verification</p>
+                <p className="text-sm font-semibold">{t('authMore.twoFactorVerification')}</p>
                 <p className="mt-0.5 text-xs">
-                  {mfaResolver.hints[0]?.phoneNumber ? `Code sent to ${mfaResolver.hints[0].phoneNumber}` : 'This account requires a verification code.'}
+                  {mfaResolver.hints[0]?.phoneNumber ? t('authMore.codeSentTo', { phone: mfaResolver.hints[0].phoneNumber }) : t('authMore.codeRequired')}
                 </p>
               </div>
             </div>
@@ -204,28 +204,28 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
             {!mfaVerificationId ? (
               <button onClick={handleSendMfaCode} disabled={mfaSending}
                 className="sf-button-primary w-full">
-                {mfaSending ? 'Sending…' : 'Send verification code'}
+                {mfaSending ? t('authMore.sending') : t('authMore.sendCode')}
               </button>
             ) : (
               <form onSubmit={handleVerifyMfaCode} className="space-y-4">
                 <input
                   value={mfaCode}
                   onChange={e => setMfaCode(e.target.value)}
-                  placeholder="6-digit code"
+                  placeholder={t('mfaUi.codePlaceholder')}
                   inputMode="numeric"
                   autoFocus
                   className="w-full px-4 py-3.5 bg-gray-50 dark:bg-background border border-gray-200 dark:border-border rounded-2xl text-center text-lg tracking-widest"
                 />
                 <button type="submit" disabled={loading}
                   className="sf-button-primary w-full">
-                  {loading ? 'Verifying…' : 'Verify & sign in'}
+                  {loading ? t('authMore.verifying') : t('authMore.verifySignIn')}
                 </button>
               </form>
             )}
             {error && <div className="sf-status-error" role="alert">{error}</div>}
             <button onClick={() => { clearMfaRecaptchaVerifier(); setMfaResolver(null); setMfaVerificationId(null); setMfaCode(''); }}
               className="w-full text-sm text-gray-500 dark:text-muted-foreground underline">
-              Cancel
+              {t('common.cancel')}
             </button>
           </div>
         ) : (
@@ -283,13 +283,13 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
           )}
           {tab === 'register' && (
             <div>
-              <label htmlFor="auth-date-of-birth" className="block text-sm font-medium text-gray-700 dark:text-foreground mb-1.5">Date of birth</label>
+              <label htmlFor="auth-date-of-birth" className="block text-sm font-medium text-gray-700 dark:text-foreground mb-1.5">{t('authMore.birthDate')}</label>
               <div className="relative">
                 <CalendarDays className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
                 <input id="auth-date-of-birth" type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} required min={birthDateBounds.min} max={birthDateBounds.max}
                   className="sf-control w-full pl-12 pr-4" />
               </div>
-              <p className="mt-1.5 text-xs text-gray-500 dark:text-muted-foreground">Use your local date format (for example, {dateExample}). You must be at least 16; this stays private.</p>
+              <p className="mt-1.5 text-xs text-gray-500 dark:text-muted-foreground">{t('authMore.birthDateHint', { example: dateExample })}</p>
             </div>
           )}
           <div>
@@ -306,13 +306,13 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required minLength={6} autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
                 className="sf-control w-full pl-12 pr-12" />
-              <button type="button" onClick={() => setShowPassword(value => !value)} className="absolute right-1 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground hover:bg-muted" aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
+              <button type="button" onClick={() => setShowPassword(value => !value)} className="absolute right-1 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground hover:bg-muted" aria-label={showPassword ? t('authMore.hidePassword') : t('authMore.showPassword')}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
             </div>
           </div>
           {error && <div className="sf-status-error" role="alert">{error}</div>}
           {lockoutRemaining > 0 && (
             <div className="sf-status-warning" role="status">
-              <p className="text-sm font-semibold">🔒 Locked — try again in {lockoutRemaining}s</p>
+              <p className="text-sm font-semibold">{t('authMore.lockedSeconds', { seconds: lockoutRemaining })}</p>
             </div>
           )}
           {tab === 'register' && (

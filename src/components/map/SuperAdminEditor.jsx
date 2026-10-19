@@ -5,6 +5,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { X, MapPin, AlertTriangle, Navigation, Trash2, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
+import OfficialPoiEditor from './OfficialPoiEditor';
 import {
   getAdminPOIs, addAdminPOI, updateAdminPOI, deleteAdminPOI,
   getAdminClosures, addAdminClosure, deleteAdminClosure,
@@ -53,6 +54,7 @@ const CATEGORY_OPTIONS = [
 ];
 
 const TABS = [
+  { id: 'official', label: 'Official POIs', Icon: MapPin },
   { id: 'pois',     label: 'Custom POIs',   Icon: MapPin },
   { id: 'closures', label: 'Road Closures', Icon: AlertTriangle },
   { id: 'nav',      label: 'Nav Overrides', Icon: Navigation },
@@ -447,32 +449,6 @@ function ClosuresTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
 const DIRECTIONS = ['straight','slight_left','left','sharp_left','slight_right','right','sharp_right','u_turn'];
 const DIR_LABELS = { straight:'⬆ Straight', slight_left:'↖ Slight Left', left:'← Left', sharp_left:'⤾ Sharp Left', slight_right:'↗ Slight Right', right:'→ Right', sharp_right:'⤿ Sharp Right', u_turn:'↩ U-Turn' };
 
-const NAV_TRANSLATE_LANGS = ['cs','pl','de','sk','it','fr','ru','uk','hu','ro','es','bg'];
-
-async function translateMyMemory(text, targetLang) {
-  try {
-    const r = await fetch(
-      `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|${targetLang}`
-    );
-    if (!r.ok) return null;
-    const d = await r.json();
-    return d.responseData?.translatedText || null;
-  } catch { return null; }
-}
-
-async function buildTranslations(instructionEn) {
-  const result = { en: instructionEn };
-  await Promise.all(
-    NAV_TRANSLATE_LANGS.map(async (lang) => {
-      const translated = await translateMyMemory(instructionEn, lang);
-      if (translated && translated.toLowerCase() !== instructionEn.toLowerCase()) {
-        result[lang] = translated;
-      }
-    })
-  );
-  return result;
-}
-
 function NavTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
   const [items, setItems] = useState([]);
   const [road, setRoad] = useState('');
@@ -497,7 +473,7 @@ function NavTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
     if (!instruction.trim() || !lat || !lon) return;
     setSaving(true);
     try {
-      const translations = await buildTranslations(instruction.trim());
+      const translations = { en: instruction.trim() };
       const item = await addAdminNavOverride(user, {
         road: road.trim(), direction, instruction: instruction.trim(),
         translations,
@@ -535,9 +511,9 @@ function NavTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
       <Field label="Towards (place name shown on sign)">
         <Input value={towards} onChange={setTowards} placeholder="e.g. Stříbro, Tachov" />
       </Field>
-      <Field label="Custom instruction text (type in English — auto-translated to all languages)">
+      <Field label="Custom instruction text (English)">
         <Input value={instruction} onChange={setInstruction} placeholder="e.g. Turn right towards Stříbro" />
-        <p className="text-[11px] text-muted-foreground mt-1">✅ Will be auto-translated into cs, de, pl, sk, fr, it, ru, uk, hu, ro, es, bg on save.</p>
+        <p className="text-[11px] text-muted-foreground mt-1">Other languages use the source instruction until a reviewed translation is provided.</p>
       </Field>
       <Field label="Trigger radius (metres)">
         <Input value={radius} onChange={setRadius} placeholder="100" type="number" />
@@ -989,8 +965,8 @@ function ModerationTab({ user }) {
 }
 
 // ─── Main editor ──────────────────────────────────────────────────────────────
-export default function SuperAdminEditor({ user, onClose, onAdminDataChange }) {
-  const [tab, setTab] = useState('pois');
+export default function SuperAdminEditor({ user, onClose, onAdminDataChange, map, selectedOfficialHit, legacyPois }) {
+  const [tab, setTab] = useState('official');
   const [collapsed, setCollapsed] = useState(false);
   const [pendingLatLon, setPendingLatLon] = useState(null);
   const [adminNavMode, setAdminNavMode] = useState(false);
@@ -1008,8 +984,10 @@ export default function SuperAdminEditor({ user, onClose, onAdminDataChange }) {
   const clearPending = () => setPendingLatLon(null);
 
   useEffect(() => {
-    onAdminDataChange?.({ handleMapClick, adminNavMode });
-  }, [adminNavMode, handleMapClick]);
+    onAdminDataChange?.({ handleMapClick, adminNavMode, officialActive: tab === 'official' });
+  }, [adminNavMode, handleMapClick, tab]);
+
+  if (tab === 'official') return <OfficialPoiEditor map={map} selectedHit={selectedOfficialHit} pickedPosition={pendingLatLon} legacyPois={legacyPois} onPickPosition={requestMapClick} onClose={() => { setAdminNavMode(false); onClose(); }} onOpenLegacy={() => { setAdminNavMode(false); setTab('pois'); }} />;
 
   return (
     <div className="fixed left-0 right-0 z-[2000] flex flex-col"

@@ -166,6 +166,8 @@ export default function Home() {
   const [adminPOIs, setAdminPOIs] = useState([]);
   const [adminClosures, setAdminClosures] = useState([]);
   const [adminNavMode, setAdminNavMode] = useState(false);
+  const [selectedOfficialHit, setSelectedOfficialHit] = useState(null);
+  const [officialEditorActive, setOfficialEditorActive] = useState(false);
   const [adminERouteOverrides, setAdminERouteOverrides] = useState([]);
   const [adminRoadOverrides, setAdminRoadOverrides] = useState([]);
   const adminMapClickRef = useRef(null);
@@ -564,6 +566,8 @@ export default function Home() {
           }
           setSelectedPOI(poi);
         }}
+        officialEditorActive={isSuperAdmin && showAdminEditor && officialEditorActive}
+        onSelectOfficialPoi={(hit) => setSelectedOfficialHit({ ...hit })}
         onPOIsLoaded={(pois) => {
           setCurrentPOIs(pois);
         }}
@@ -614,14 +618,14 @@ export default function Home() {
           error={featuredError}
           emptyView={!spotsLoading && spots.length === 0}
           onSelectSpot={(spot) => { setFeaturedOpen(false); openLinkedSpot(spot, 'featured'); }}
-          onSearch={() => document.querySelector('input[aria-label="Search places and community spots"]')?.focus()}
+          onSearch={() => document.querySelector('input[data-spotfinder-search]')?.focus()}
           onDismiss={() => { setMapExploreDismissed(true); setFeaturedOpen(false); }}
         />
       )}
       {sharedSpotError && <div role="alert" className="absolute left-1/2 top-[max(5rem,calc(env(safe-area-inset-top)+4rem))] z-[1100] w-[min(92vw,24rem)] -translate-x-1/2 rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-xl dark:border-white/10 dark:bg-slate-950 dark:text-white">
-        <h2 className="text-lg font-bold">This spot isn't available.</h2>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">You can still explore other places on SpotFinder.</p>
-        <button type="button" onClick={() => { setSharedSpotError(false); navigate('/'); setFeaturedOpen(true); }} className="mt-4 min-h-11 rounded-xl bg-green-600 px-4 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2">Explore featured places</button>
+        <h2 className="text-lg font-bold">{t('homeUi.spotUnavailable')}</h2>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{t('homeUi.spotUnavailableHint')}</p>
+        <button type="button" onClick={() => { setSharedSpotError(false); navigate('/'); setFeaturedOpen(true); }} className="mt-4 min-h-11 rounded-xl bg-green-600 px-4 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2">{t('homeUi.exploreFeatured')}</button>
       </div>}
  
       {/* Profile menu — top right */}
@@ -651,8 +655,8 @@ export default function Home() {
             type="button"
             onClick={async () => { const position = await requestLocation(); if (position) setFlyTo([...position]); }}
             className="grid h-11 w-11 place-items-center rounded-xl transition-colors hover:bg-slate-100 active:scale-95 dark:hover:bg-white/10"
-            aria-label="Center on my location"
-            title="Center location"
+            aria-label={t('homeUi.centerMyLocation')}
+            title={t('homeUi.centerLocation')}
           >
             <Crosshair className="h-5 w-5" />
           </button>
@@ -660,24 +664,24 @@ export default function Home() {
             type="button"
             onClick={() => setTerrainEnabled(value => !value)}
             className={`grid h-11 w-11 place-items-center rounded-xl text-xs font-black italic transition-all active:scale-95 ${terrainEnabled ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-slate-100 dark:hover:bg-white/10'}`}
-            aria-label="Toggle 3D terrain"
+            aria-label={t('homeUi.toggleTerrain')}
             aria-pressed={terrainEnabled}
-            title="3D terrain"
+            title={t('homeUi.terrain')}
           >
             3D
           </button>
           <div className="relative">
             {showMobileMore && (
               <>
-                <button type="button" className="fixed inset-0 z-40 cursor-default" onClick={() => setShowMobileMore(false)} aria-label="Close more menu" />
+                <button type="button" className="fixed inset-0 z-40 cursor-default" onClick={() => setShowMobileMore(false)} aria-label={t('homeUi.closeMore')} />
                 <div className="absolute left-full top-0 z-50 ml-3 w-52 overflow-hidden rounded-2xl border border-border/80 bg-background/95 p-1.5 shadow-2xl backdrop-blur-xl">
                   <button type="button" onClick={() => { navigate('/faq'); setShowMobileMore(false); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium hover:bg-accent">
-                    <HelpCircle className="h-5 w-5 text-muted-foreground" /> FAQ
+                    <HelpCircle className="h-5 w-5 text-muted-foreground" /> {t('nav.faq')}
                   </button>
                   <button type="button" onClick={() => { setShowSettings(true); setShowMobileMore(false); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium hover:bg-accent">
-                    <Settings className="h-5 w-5 text-muted-foreground" /> Settings
+                    <Settings className="h-5 w-5 text-muted-foreground" /> {t('common.settings')}
                   </button>
-                  {liveTracking && <button type="button" onClick={() => { stopLiveLocation(); setShowMobileMore(false); }} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium hover:bg-accent"><Crosshair className="h-5 w-5 text-muted-foreground" /> Stop live location</button>}
+                  {liveTracking && <button type="button" onClick={() => { stopLiveLocation(); setShowMobileMore(false); }} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium hover:bg-accent"><Crosshair className="h-5 w-5 text-muted-foreground" /> {t('homeUi.stopLive')}</button>}
                 </div>
               </>
             )}
@@ -685,9 +689,9 @@ export default function Home() {
               type="button"
               onClick={() => setShowMobileMore(value => !value)}
               className={`grid h-11 w-11 place-items-center rounded-xl transition-all active:scale-95 ${showMobileMore ? 'bg-primary text-primary-foreground' : 'hover:bg-slate-100 dark:hover:bg-white/10'}`}
-              aria-label="More map options"
+              aria-label={t('homeUi.moreOptions')}
               aria-expanded={showMobileMore}
-              title="More"
+              title={t('homeUi.more')}
             >
               <MoreHorizontal className="h-5 w-5" />
             </button>
@@ -738,7 +742,7 @@ export default function Home() {
         <div className="absolute left-1/2 -translate-x-1/2 z-10 pointer-events-none" style={{ bottom: '100%', marginBottom: '-36px' }}>
           <button
             onClick={() => setAddMode(a => !a)}
-            aria-label={addMode ? 'Cancel adding spot' : 'Add a spot'}
+            aria-label={t(addMode ? 'homeUi.cancelAdd' : 'homeUi.addSpot')}
             aria-pressed={addMode}
             className={`w-[72px] h-[72px] rounded-full shadow-2xl flex items-center justify-center transition-all active:scale-95 pointer-events-auto
               ${addMode ? 'bg-red-500 rotate-45 shadow-red-300' : 'bg-green-500 shadow-green-300'}`}
@@ -755,12 +759,12 @@ export default function Home() {
             <button
               onClick={async () => { const position = await requestLocation(); if (position) setFlyTo([...position]); }}
               className="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-100 text-gray-600 transition-all hover:bg-gray-200 active:scale-95 dark:bg-accent/60 dark:text-foreground dark:hover:bg-accent"
-              title="Center location"
-              aria-label="Center map on my location"
+              title={t('homeUi.centerLocation')}
+              aria-label={t('homeUi.centerMap')}
             >
               <Crosshair className="w-5 h-5" />
             </button>
-            {liveTracking && <button type="button" onClick={stopLiveLocation} className="min-h-11 rounded-xl px-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 dark:text-foreground dark:hover:bg-accent" aria-label="Stop live location">Stop GPS</button>}
+            {liveTracking && <button type="button" onClick={stopLiveLocation} className="min-h-11 rounded-xl px-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 dark:text-foreground dark:hover:bg-accent" aria-label={t('homeUi.stopLive')}>{t('homeUi.stopGps')}</button>}
 
             {/* 3D Terrain toggle */}
             <button
@@ -770,8 +774,8 @@ export default function Home() {
                   ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30'
                   : 'bg-gray-100 dark:bg-accent/60 text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent'
               }`}
-              title="3D terrain"
-              aria-label="Toggle 3D terrain"
+              title={t('homeUi.terrain')}
+              aria-label={t('homeUi.toggleTerrain')}
               aria-pressed={terrainEnabled}
             >
               <span className="text-base font-extrabold italic tracking-tight">3D</span>
@@ -786,24 +790,25 @@ export default function Home() {
             <button
               onClick={() => navigate('/faq')}
               className="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-100 text-gray-600 transition-all hover:bg-gray-200 active:scale-95 dark:bg-accent/60 dark:text-foreground dark:hover:bg-accent"
-              title="FAQ"
-              aria-label="Open help and FAQ"
+              title={t('nav.faq')}
+              aria-label={t('homeUi.openFaq')}
             >
               <HelpCircle className="w-5 h-5" />
             </button>
             <button
               onClick={() => setShowSettings(true)}
               className="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-100 text-gray-600 transition-all hover:bg-gray-200 active:scale-95 dark:bg-accent/60 dark:text-foreground dark:hover:bg-accent"
-              title="Settings"
-              aria-label="Open settings"
+              title={t('common.settings')}
+              aria-label={t('homeUi.openSettings')}
             >
               <Settings className="w-5 h-5" />
             </button>
             {isSuperAdmin && (
               <button
-                onClick={() => setShowAdminEditor(v => !v)}
+                onClick={() => { if (!showAdminEditor) setShowAdminEditor(true); }}
+                disabled={showAdminEditor}
                 className={`w-10 h-10 rounded-xl flex items-center justify-center active:scale-95 transition-all text-base ${showAdminEditor ? 'bg-red-100 dark:bg-red-900/40 text-red-600' : 'bg-gray-100 dark:bg-accent/60 text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent'}`}
-                title="Map Editor (Superadmin)"
+                title={t('homeUi.mapEditor')}
               >
                 🛠️
               </button>
@@ -812,7 +817,7 @@ export default function Home() {
               <a
                 href="/StatusAdmin"
                 className="w-10 h-10 rounded-xl flex items-center justify-center active:scale-95 transition-all text-base bg-gray-100 dark:bg-accent/60 text-gray-600 dark:text-foreground hover:bg-gray-200 dark:hover:bg-accent"
-                title="Publish Status (Superadmin)"
+                title={t('homeUi.publishStatus')}
               >
                 📊
               </a>
@@ -921,8 +926,12 @@ export default function Home() {
       {isSuperAdmin && showAdminEditor && (
         <SuperAdminEditor
           user={user}
-          onClose={() => setShowAdminEditor(false)}
-          onAdminDataChange={({ handleMapClick, adminNavMode: mode }) => {
+          map={mapRef.current}
+          selectedOfficialHit={selectedOfficialHit}
+          legacyPois={adminPOIs}
+          onClose={() => { setShowAdminEditor(false); setOfficialEditorActive(false); }}
+          onAdminDataChange={({ handleMapClick, adminNavMode: mode, officialActive }) => {
+            setOfficialEditorActive(officialActive);
             adminMapClickRef.current = (coords) => {
               handleMapClick(coords);
               // Refresh lists after a short delay so new item shows up
@@ -957,11 +966,11 @@ export default function Home() {
             </div>
             
             <p id="delete-account-description" className="text-gray-600 dark:text-muted-foreground text-sm mb-4">
-              This removes your sign-in account, private profile (including date of birth and enrolled SMS factors), drafts, saves, likes, and individual ratings. Public spots, reviews, social links, and photos are retained under a former-contributor label to preserve the community map and moderation record; public photo URLs may keep a pseudonymous storage path. Active subscriptions must be cancelled through support first. This cannot be undone.
+              {t('homeUi.deleteDescription')}
             </p>
             
             <p className="text-gray-500 dark:text-muted-foreground text-xs mb-4">
-              Reauthentication is required. Type DELETE to confirm:
+              {t('homeUi.deletePrompt')}
             </p>
 
             {getFirebaseServices().auth.currentUser?.providerData.some(provider => provider.providerId === 'password') && (
@@ -969,8 +978,8 @@ export default function Home() {
                 type="password"
                 value={deletePassword}
                 onChange={(event) => setDeletePassword(event.target.value)}
-                placeholder="Current password"
-                aria-label="Current password"
+                placeholder={t('accountSecurity.currentPassword')}
+                aria-label={t('accountSecurity.currentPassword')}
                 autoComplete="current-password"
                 className="sf-control mb-3 w-full focus-visible:ring-red-500"
               />
@@ -980,8 +989,8 @@ export default function Home() {
               type="text"
               value={deleteInput}
               onChange={(e) => setDeleteInput(e.target.value)}
-              placeholder="Type DELETE"
-              aria-label="Type DELETE to confirm account deletion"
+              placeholder={t('homeUi.typeDelete')}
+              aria-label={t('homeUi.typeDeleteLabel')}
               autoFocus
               className="sf-control mb-4 w-full focus-visible:ring-red-500"
             />
@@ -992,18 +1001,18 @@ export default function Home() {
                 disabled={deleteBusy}
                 className="sf-button-secondary flex-1"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleDeleteAccount}
                 disabled={deleteInput !== 'DELETE' || deleteBusy}
                 className="sf-button-danger flex-1"
               >
-                {deleteBusy ? 'Deleting…' : 'Delete account'}
+                {t(deleteBusy ? 'homeUi.deleting' : 'homeUi.deleteAccount')}
               </button>
             </div>
             {deleteError && <p role="alert" className="mt-3 text-sm text-red-600 dark:text-red-400">{deleteError}</p>}
-            <p className="mt-3 text-xs text-muted-foreground">If cleanup fails, the account remains available so you can retry. Contact spotfinder@icloud.com if a retry does not complete.</p>
+            <p className="mt-3 text-xs text-muted-foreground">{t('homeUi.cleanupHint')}</p>
           </div>
         </div>
       )}

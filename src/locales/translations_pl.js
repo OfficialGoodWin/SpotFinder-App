@@ -442,6 +442,7 @@ export default {
     "noResolved": "Nie ma jeszcze rozwiązanych incydentów."
   },
   "faqPage": {
+    "translationNotice": "Część pomocy jest nadal wyświetlana po angielsku. Tłumaczenia są przygotowywane.",
     "version": "Sprawdzono dla SpotFinder {version}",
     "intro": "Te instrukcje opisują obecną aplikację. Funkcje dostawców zewnętrznych mogą zależeć od przeglądarki, konfiguracji, uprawnień i sieci.",
     "category1": "Pierwsze kroki",

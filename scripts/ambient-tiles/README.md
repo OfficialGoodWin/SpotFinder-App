@@ -1,5 +1,11 @@
 # SpotFinder ambient POI tiles — local build
 
+For canonical identity and the later publication plan, see
+[`../../docs/official-poi-phase1.md`](../../docs/official-poi-phase1.md).
+`node audit-identities.mjs --input=original-osm.geojsonseq` optionally checks
+typed OSM IDs from an original osmium GeoJSON sequence without rebuilding or
+uploading tiles.
+
 This folder builds a Czech Republic POI PMTiles archive from OpenStreetMap data. It does not use Overpass and does not scrape Mapy/Firmy.cz.
 
 ## Windows: use WSL2

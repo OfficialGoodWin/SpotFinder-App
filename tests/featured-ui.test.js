@@ -28,6 +28,7 @@ test('featured images wait, load, retry, and fit mobile cards', { skip: !existsS
       const dom = await import('/node_modules/.vite/deps/react-dom_client.js');
       const createRoot = dom.createRoot || dom.default.createRoot;
       const { default: Panel } = await import('/src/components/FeaturedDiscoveryPanel.jsx');
+      const { LanguageProvider } = await import('/src/lib/LanguageContext.jsx');
       const base = { is_public: true, status: 'published', lat: 50, lng: 14, spot_type: 'castle' };
       const mount = document.createElement('div');
       mount.id = 'featured-test-root';
@@ -35,14 +36,14 @@ test('featured images wait, load, retry, and fit mobile cards', { skip: !existsS
       mount.style.inset = '0';
       mount.style.zIndex = '9999';
       document.body.append(mount);
-      createRoot(mount).render(React.createElement(Panel, {
+      createRoot(mount).render(React.createElement(LanguageProvider, null, React.createElement(Panel, {
         spots: [
           { ...base, id: 'slow', title: 'Slow photo', image_url: 'https://example.test/slow.jpg' },
           { ...base, id: 'retry', title: 'Retry photo', image_urls: ['https://example.test/broken.jpg', 'https://example.test/slow.jpg'] },
           { ...base, id: 'missing', title: 'No photo' },
         ], language: 'en', loading: false, error: false, emptyView: false,
         onSelectSpot: () => {}, onSearch: () => {}, onDismiss: () => mount.remove(),
-      }));
+      })));
     });
     await page.waitForFunction(() => Boolean(document.querySelector('[aria-label="Discover community places"]')));
     assert.equal(await page.locator('[aria-label="Discover community places"] [aria-label*="photo unavailable"]').count(), 1);

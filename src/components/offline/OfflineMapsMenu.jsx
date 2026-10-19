@@ -10,6 +10,7 @@ import { X, Download, Trash2, MapPin, WifiOff, HardDrive, ChevronDown, ChevronUp
 import { COUNTRIES, downloadCountryPOIs, deleteCountry, scrubInvalidMeta } from '../../lib/vectorTileDownloader.js';
 import { downloadCountryPMTiles, GITHUB_AVAILABLE } from '../../lib/offlineManager.js';
 import { getAllMeta, estimateStorageUsage } from '../../lib/offlineStorage.js';
+import { useLanguage } from '../../lib/LanguageContext.jsx';
 
 const GEOAPIFY_KEY = import.meta.env.VITE_GEOAPIFY_KEY || '';
 
@@ -23,13 +24,24 @@ const REGIONS = [
   { name: 'Microstates',     codes: ['AD','MC','SM','LI'] },
 ];
 
+function useOfflineText() {
+  const { language, t } = useLanguage();
+  const number = value => new Intl.NumberFormat(language).format(value);
+  const countryName = country => {
+    try { return new Intl.DisplayNames([language], { type: 'region' }).of(country.code) || country.name; }
+    catch { return country.name; }
+  };
+  return { language, t, number, countryName };
+}
+
 function StorageBar({ usedMB, quotaMB }) {
+  const { t, number } = useOfflineText();
   const pct = quotaMB > 0 ? Math.min(100, Math.round(usedMB / quotaMB * 100)) : 0;
   return (
     <div className="space-y-1">
       <div className="flex justify-between text-xs text-muted-foreground">
-        <span className="flex items-center gap-1"><HardDrive className="w-3 h-3" />Storage</span>
-        <span>{usedMB} MB {quotaMB > 0 ? `/ ${quotaMB} MB` : ''}</span>
+        <span className="flex items-center gap-1"><HardDrive className="w-3 h-3" />{t('offlineMaps.storage')}</span>
+        <span>{number(usedMB)} MB {quotaMB > 0 ? `/ ${number(quotaMB)} MB` : ''}</span>
       </div>
       <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
         <div className={`h-full rounded-full transition-all ${pct > 80 ? 'bg-red-500' : 'bg-green-500'}`} style={{ width:`${pct}%` }} />
@@ -39,6 +51,7 @@ function StorageBar({ usedMB, quotaMB }) {
 }
 
 function ProgressBar({ receivedMB, totalMB, speedMBps, etaSec, pct, poi, poiDone, poiTotal }) {
+  const { t, number } = useOfflineText();
   const safePct = Math.min(100, Math.max(0, pct || 0));
   const eta = !etaSec ? '' : etaSec > 3600 ? `${Math.round(etaSec/3600)}h` : etaSec > 60 ? `${Math.round(etaSec/60)}m` : `${Math.round(etaSec)}s`;
   if (poi) {
@@ -46,8 +59,8 @@ function ProgressBar({ receivedMB, totalMB, speedMBps, etaSec, pct, poi, poiDone
     return (
       <div className="mt-2 space-y-1">
         <div className="flex justify-between text-xs text-muted-foreground">
-          <span className="font-medium">Downloading POIs…</span>
-          <span className="text-orange-500">{pp}%</span>
+          <span className="font-medium">{t('offlineMaps.downloadingPois')}</span>
+          <span className="text-orange-500">{number(pp)}%</span>
         </div>
         <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
           <div className="h-full bg-orange-500 rounded-full transition-all" style={{ width:`${pp}%` }} />
@@ -58,7 +71,7 @@ function ProgressBar({ receivedMB, totalMB, speedMBps, etaSec, pct, poi, poiDone
   return (
     <div className="mt-2 space-y-1">
       <div className="flex justify-between text-xs text-muted-foreground">
-        <span className="font-medium">Downloading map…</span>
+        <span className="font-medium">{t('offlineMaps.downloadingMap')}</span>
         <span className="text-blue-500 font-medium">
           {safePct}%{speedMBps > 0 ? ` · ${speedMBps.toFixed(1)} MB/s` : ''}{eta ? ` · ${eta}` : ''}
         </span>
@@ -74,8 +87,9 @@ function ProgressBar({ receivedMB, totalMB, speedMBps, etaSec, pct, poi, poiDone
 }
 
 function StatusBadge({ meta }) {
+  const { language } = useOfflineText();
   if (!meta) return null;
-  const date = new Date(meta.downloadedAt).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'2-digit' });
+  const date = new Date(meta.downloadedAt).toLocaleDateString(language, { month:'short', day:'numeric', year:'2-digit' });
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
       <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">
@@ -91,6 +105,7 @@ function StatusBadge({ meta }) {
 }
 
 function CountryRow({ country, meta, onDownload, onDelete, activeDownload }) {
+  const { t, number, countryName } = useOfflineText();
   const [expanded, setExpanded] = useState(false);
   const isActive     = activeDownload?.code === country.code;
   const downloaded   = !!meta;
@@ -104,10 +119,10 @@ function CountryRow({ country, meta, onDownload, onDelete, activeDownload }) {
         <span className="text-xl leading-none select-none">{country.flag}</span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium text-sm">{country.name}</span>
+            <span className="font-medium text-sm">{countryName(country)}</span>
             {!isActive && <StatusBadge meta={meta} />}
             {!downloaded && !isActive && !available && (
-              <span className="text-xs px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-accent text-muted-foreground">Not yet available</span>
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-accent text-muted-foreground">{t('offlineMaps.unavailable')}</span>
             )}
           </div>
           {isActive && activeDownload.progress && <ProgressBar {...activeDownload.progress} />}
@@ -116,7 +131,7 @@ function CountryRow({ country, meta, onDownload, onDelete, activeDownload }) {
           {isActive ? (
             <button onClick={() => onDownload(country, 'cancel')}
               className="px-2.5 py-1 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs font-medium hover:bg-red-200 active:scale-95 transition-all">
-              Cancel
+              {t('common.cancel')}
             </button>
           ) : (available || downloaded) ? (
             <button onClick={() => setExpanded(e => !e)}
@@ -132,21 +147,21 @@ function CountryRow({ country, meta, onDownload, onDelete, activeDownload }) {
           <button onClick={() => { onDownload(country, 'map'); setExpanded(false); }}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-500 text-white font-semibold text-sm hover:bg-blue-600 active:scale-[0.98] transition-all shadow-sm">
             <Download className="w-4 h-4" />
-            Download Map
+            {t('offlineMaps.downloadMap')}
             <span className="text-blue-100 font-normal text-xs">({sizeLabel} · zoom 0–16)</span>
           </button>
           {GEOAPIFY_KEY && (
             <button onClick={() => { onDownload(country, 'pois'); setExpanded(false); }}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-orange-300 dark:border-orange-600 text-orange-700 dark:text-orange-300 text-sm font-medium hover:bg-orange-50 dark:hover:bg-orange-900/20 active:scale-[0.98] transition-all">
               <MapPin className="w-4 h-4" />
-              {meta?.hasPOIs ? `Refresh POIs (${meta.poiCount?.toLocaleString() || '?'} places)` : 'Download POIs (restaurants, ATMs, hotels…)'}
+              {meta?.hasPOIs ? t('offlineMaps.refreshPois', { count: meta.poiCount == null ? '?' : number(meta.poiCount) }) : t('offlineMaps.downloadPois')}
             </button>
           )}
           {downloaded && (
             <button onClick={() => { onDelete(country); setExpanded(false); }}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 text-sm font-medium hover:bg-red-50 dark:hover:bg-red-900/20 active:scale-[0.98] transition-all">
               <Trash2 className="w-4 h-4" />
-              Delete offline data
+              {t('offlineMaps.deleteData')}
             </button>
           )}
         </div>
@@ -156,17 +171,18 @@ function CountryRow({ country, meta, onDownload, onDelete, activeDownload }) {
 }
 
 function RegionSection({ region, countries, metaMap, onDownload, onDelete, activeDownload }) {
+  const { t, number } = useOfflineText();
   const [open, setOpen] = useState(false);
   const downloaded = countries.filter(c => metaMap[c.code]).length;
   return (
     <div className="space-y-1.5">
       <button onClick={() => setOpen(o => !o)}
         className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-gray-100 dark:bg-accent/40 hover:bg-gray-200 dark:hover:bg-accent/60 transition-all">
-        <span className="font-semibold text-sm">{region.name}</span>
+        <span className="font-semibold text-sm">{t(`offlineMaps.region.${region.codes[0]}`)}</span>
         <div className="flex items-center gap-2">
           {downloaded > 0 && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">
-              {downloaded}/{countries.length} downloaded
+              {t('offlineMaps.downloaded', { count: `${number(downloaded)}/${number(countries.length)}` })}
             </span>
           )}
           {open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
@@ -186,6 +202,7 @@ function RegionSection({ region, countries, metaMap, onDownload, onDelete, activ
 }
 
 export default function OfflineMapsMenu({ onClose }) {
+  const { t, countryName } = useOfflineText();
   const [metaMap, setMetaMap] = useState({});
   const [storage, setStorage] = useState({ usedMB: 0, quotaMB: 0 });
   const [active,  setActive]  = useState(null);
@@ -211,7 +228,7 @@ export default function OfflineMapsMenu({ onClose }) {
         onProgress: (p) => setActive(a => a ? { ...a, progress: { poi:true, poiDone:p.done, poiTotal:p.total } } : null),
         abortRef: abortRef.current,
       });
-      if (!abortRef.current.current) showToast(`POIs downloaded for ${country.name} ✓`, 'success');
+      if (!abortRef.current.current) showToast(t('offlineMaps.poisReady', { country: countryName(country) }), 'success');
       setActive(null); await refresh(); return;
     }
 
@@ -222,19 +239,19 @@ export default function OfflineMapsMenu({ onClose }) {
         onProgress: (p) => setActive(a => a ? { ...a, progress: p } : null),
         abortRef: abortRef.current,
       });
-      if (!abortRef.current.current) showToast(`${country.name} ready for offline use ✓`, 'success');
-      else showToast('Download cancelled', 'info');
+      if (!abortRef.current.current) showToast(t('offlineMaps.mapReady', { country: countryName(country) }), 'success');
+      else showToast(t('offlineMaps.cancelled'), 'info');
     } catch(e) {
       showToast(e.message.split('\n')[0], 'error');
     }
     setActive(null); await refresh();
-  }, []);
+  }, [t, countryName]);
 
   const handleDelete = useCallback(async (country) => {
     await deleteCountry(country);
-    showToast(`${country.name} deleted`, 'info');
+    showToast(t('offlineMaps.deleted', { country: countryName(country) }), 'info');
     await refresh();
-  }, []);
+  }, [t, countryName]);
 
   return (
     <div className="fixed inset-0 z-[2000] flex flex-col bg-background">
@@ -242,11 +259,11 @@ export default function OfflineMapsMenu({ onClose }) {
         <div className="flex items-center gap-3">
           <WifiOff className="w-5 h-5 text-blue-500" />
           <div>
-            <h2 className="font-bold text-base leading-tight">Offline Maps</h2>
-            <p className="text-xs text-muted-foreground">All of Europe · Vector tiles · Zoom 0–16</p>
+            <h2 className="font-bold text-base leading-tight">{t('offlineMaps.title')}</h2>
+            <p className="text-xs text-muted-foreground">{t('offlineMaps.subtitle')}</p>
           </div>
         </div>
-        <button onClick={onClose} aria-label="Close" className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-accent/60 flex items-center justify-center hover:bg-gray-200 active:scale-95 transition-all">
+        <button onClick={onClose} aria-label={t('common.close')} className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-accent/60 flex items-center justify-center hover:bg-gray-200 active:scale-95 transition-all">
           <X className="w-5 h-5" />
         </button>
       </div>
@@ -254,9 +271,7 @@ export default function OfflineMapsMenu({ onClose }) {
       {/* Info banner */}
       <div className="mx-4 mt-3 px-3 py-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 shrink-0">
         <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
-          <strong>One file per country</strong> — downloads in minutes, not hours. Uses{' '}
-          <strong>vector tiles</strong> (OpenMapTiles format) so zoom 0–16 is included in every download.
-          Requires WiFi. Works fully offline after.
+          {t('offlineMaps.info')}
         </p>
       </div>
 

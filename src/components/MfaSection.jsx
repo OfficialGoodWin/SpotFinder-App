@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ShieldCheck, Smartphone } from 'lucide-react';
+import { useLanguage } from '@/lib/LanguageContext';
 import {
   getFirebaseServices, getMfaRecaptchaVerifier, clearMfaRecaptchaVerifier,
   startMfaEnrollment, completeMfaEnrollment, getEnrolledMfaFactors, unenrollMfaFactor,
@@ -9,6 +10,7 @@ import {
 // on in the Firebase console, and the signed-in user's email verified —
 // Firebase itself blocks enrollment otherwise.
 export default function MfaSection() {
+  const { t } = useLanguage();
   const { auth } = getFirebaseServices();
   const user = auth.currentUser;
 
@@ -29,7 +31,7 @@ export default function MfaSection() {
   const handleSendCode = async () => {
     const normalizedPhone = phone.replace(/[\s()-]/g, '');
     if (!/^\+[1-9]\d{7,14}$/.test(normalizedPhone)) {
-      setError('Enter a phone number in international format, for example +48 123 456 789.');
+      setError('phoneInvalid');
       return;
     }
     setBusy(true); setError('');
@@ -40,12 +42,12 @@ export default function MfaSection() {
       setVerificationId(id);
     } catch (err) {
       setError(err.code === 'auth/unverified-email' || err.message === 'auth/unverified-email'
-        ? 'Verify your email address before adding two-factor authentication.'
+        ? 'verifyEmail'
         : err.code === 'auth/too-many-requests'
-          ? 'Too many SMS attempts. Wait before trying again.'
+          ? 'tooMany'
           : err.code === 'auth/operation-not-allowed'
-            ? 'SMS two-factor authentication is not available for this account right now.'
-        : err.message || 'Could not send code.');
+            ? 'unavailable'
+        : 'sendFailed');
     } finally { setBusy(false); }
   };
 
@@ -59,7 +61,7 @@ export default function MfaSection() {
       setFactors(getEnrolledMfaFactors(user));
       setPhone(''); setVerificationId(null); setCode('');
     } catch (err) {
-      setError(err.message || 'Verification failed.');
+      setError('verificationFailed');
     } finally { setBusy(false); }
   };
 
@@ -69,7 +71,7 @@ export default function MfaSection() {
       await unenrollMfaFactor(user, uid);
       setFactors(getEnrolledMfaFactors(user));
     } catch (err) {
-      setError(err.message || 'Could not remove.');
+      setError('removeFailed');
     } finally { setBusy(false); }
   };
 
@@ -77,7 +79,7 @@ export default function MfaSection() {
     <section className="sf-section" aria-labelledby="mfa-settings-title">
       <div className="mb-3 flex items-center gap-2 text-muted-foreground">
         <ShieldCheck className="w-4 h-4 text-primary" />
-        <h3 id="mfa-settings-title" className="text-sm font-bold uppercase tracking-wide">Two-factor authentication</h3>
+        <h3 id="mfa-settings-title" className="text-sm font-bold uppercase tracking-wide">{t('mfaUi.title')}</h3>
       </div>
 
       {factors.length > 0 && (
@@ -86,7 +88,7 @@ export default function MfaSection() {
             <div key={f.uid} className="flex items-center justify-between rounded-xl border border-border bg-background px-3 py-2 text-sm">
               <span className="flex items-center gap-2"><Smartphone className="w-4 h-4" />{f.displayName || f.phoneNumber}</span>
               <button disabled={busy} onClick={() => handleRemove(f.uid)} className="text-xs text-red-500 underline disabled:opacity-40">
-                Remove
+                {t('mfaUi.remove')}
               </button>
             </div>
           ))}
@@ -94,41 +96,41 @@ export default function MfaSection() {
       )}
 
       <p className="mb-3 text-xs font-medium text-muted-foreground" role="status">
-        {factors.length > 0 ? 'SMS two-factor authentication is active.' : 'SMS two-factor authentication is not active.'}
+        {t(factors.length > 0 ? 'mfaUi.active' : 'mfaUi.inactive')}
       </p>
 
       <div id="mfa-enroll-recaptcha" />
 
       {!verificationId ? (
         <div className="sf-settings-action-row flex gap-2">
-          <input aria-label="Phone number for two-factor authentication" type="tel" autoComplete="tel"
+          <input aria-label={t('mfaUi.phoneLabel')} type="tel" autoComplete="tel"
             value={phone}
             onChange={e => setPhone(e.target.value)}
             placeholder="+48 123 456 789"
             className="sf-control min-w-0 flex-1 text-sm"
           />
           <button disabled={busy || !phone.trim()} onClick={handleSendCode} className="sf-button-primary shrink-0 text-sm">
-            Send code
+            {t('mfaUi.sendCode')}
           </button>
         </div>
       ) : (
         <form onSubmit={handleVerify} className="sf-settings-action-row flex gap-2">
-          <input aria-label="Six-digit verification code" autoComplete="one-time-code"
+          <input aria-label={t('mfaUi.codeLabel')} autoComplete="one-time-code"
             value={code}
             onChange={e => setCode(e.target.value)}
-            placeholder="6-digit code"
+            placeholder={t('mfaUi.codePlaceholder')}
             inputMode="numeric"
             className="sf-control min-w-0 flex-1 text-sm"
           />
           <button disabled={busy || !code.trim()} className="sf-button-primary shrink-0 text-sm">
-            Confirm
+            {t('mfaUi.confirm')}
           </button>
         </form>
       )}
 
-      {error && <p className="sf-status-error mt-3" role="alert">{error}</p>}
+      {error && <p className="sf-status-error mt-3" role="alert">{t(`mfaUi.${error}`)}</p>}
       <p className="text-xs text-muted-foreground mt-2">
-        After enrollment completes, a text-message code is required in addition to your primary sign-in method. Keep access to the enrolled number; recovery options depend on Firebase and your sign-in provider.
+        {t('mfaUi.recoveryHint')}
       </p>
     </section>
   );

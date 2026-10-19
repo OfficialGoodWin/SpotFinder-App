@@ -3,7 +3,7 @@ import { X, Camera, MapPin, Mic, Loader2, AlertCircle, ChevronDown } from 'lucid
 import { useLanguage } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
 import { deleteCloudSpotDraft, getFirebaseServices, loadDraftImageFile, saveCloudSpotDraft, uploadDraftImage, uploadSpotImage } from '@/api/firebaseClient';
-import { INVALID_SOCIAL_URL_MESSAGE, validateSocialPostUrl } from '@/lib/socialUrlPolicy';
+import { validateSocialPostUrl } from '@/lib/socialUrlPolicy';
 import { moderateSubmission } from '@/lib/moderation';
 import { findNearbyPoi } from '@/lib/nearbyPoi';
 import { toast } from 'sonner';
@@ -340,11 +340,11 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
     if (loading || submitLockRef.current) return;
     setSubmitError('');
     if (!draftPhotosReady) {
-      setSubmitError('Private draft photos could not be loaded. Reconnect and resume the draft before publishing.');
+      setSubmitError(t('addSpotUi.photosUnavailable'));
       focusError(errorSummaryRef);
       return;
     }
-    const requiredErrors = validateRequiredSpotFields({ title, description, attested });
+    const requiredErrors = Object.fromEntries(Object.keys(validateRequiredSpotFields({ title, description, attested })).map(key => [key, t(`addSpotUi.validation${key[0].toUpperCase()}${key.slice(1)}`)]));
     if (Object.keys(requiredErrors).length) {
       setFieldErrors(requiredErrors);
       const firstError = requiredErrors.title || requiredErrors.description || requiredErrors.attested;
@@ -356,11 +356,11 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
 
     const socialValidation = socialUrl ? validateSocialPostUrl(socialUrl) : null;
     if (socialUrl && !socialValidation?.ok) {
-      toast.error(INVALID_SOCIAL_URL_MESSAGE);
+      toast.error(t('addSpotUi.invalidSocial'));
       return;
     }
     if (socialUrl && (!user || user.isAnonymous || user.emailVerified !== true)) {
-      toast.error('A verified account is required to add a social post.');
+      toast.error(t('addSpotUi.socialAccountRequired'));
       return;
     }
     // Anti-spam / moderation pre-check (client-side UX only — the
@@ -373,15 +373,10 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
       windowMs: 10 * 60 * 1000, // 5 new spots / 10 minutes / device
     });
     if (!modCheck.allowed) {
-      // Note: 'moderation.*' keys don't exist in locales/translations.js —
-      // t() falls back to returning the raw key string (not null/undefined)
-      // for missing keys, so using `t(key) || fallback` here would silently
-      // show the ugly key text to users instead of the fallback. Using
-      // plain English directly until these are added to every language file.
       toast.error(
         modCheck.reasonKey === 'moderation.tooManySubmissions'
-          ? 'You are adding spots too quickly. Please wait a few minutes and try again.'
-          : 'This description looks like spam. Please rewrite it and try again.'
+          ? t('addSpotUi.tooManySubmissions')
+          : t('addSpotUi.spamDescription')
       );
       return;
     }
@@ -522,7 +517,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
         <div className="sticky top-0 z-30 bg-white/90 dark:bg-card/90 px-6 pt-5 pb-3 border-b border-gray-100/80 dark:border-border flex items-center justify-between backdrop-blur-xl">
           <div className="flex items-center gap-2">
             <MapPin className="w-5 h-5 text-green-600" />
-            <h2 id="add-spot-title" className="text-lg font-bold text-gray-900 dark:text-foreground">{draft ? 'Resume draft' : t('addSpot.title')}</h2>
+            <h2 id="add-spot-title" className="text-lg font-bold text-gray-900 dark:text-foreground">{t(draft ? 'addSpotUi.resumeDraft' : 'addSpot.title')}</h2>
           </div>
           <button type="button" onClick={requestClose} aria-label={t('common.close')} className="min-h-11 min-w-11 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-accent">
             <X className="w-5 h-5 text-gray-500 dark:text-muted-foreground" />
@@ -553,17 +548,17 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
           {draftError && (
             <div ref={errorSummaryRef} role="alert" tabIndex={-1} className="flex gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900 outline-none focus:ring-2 focus:ring-red-400 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100">
               <AlertCircle className="h-5 w-5 shrink-0" />
-              <div><p>{draftError}</p>{draftPhotoRefs.length > 0 && <div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={() => setPhotoReloadKey(value => value + 1)} className="min-h-10 rounded-xl border border-red-300 px-3 font-semibold">Retry photos</button><button type="button" onClick={() => { setDraftPhotoRefs([]); setImageFiles([]); setImagePreviews([]); setDraftPhotosReady(true); setDraftError(''); }} className="min-h-10 rounded-xl border border-red-300 px-3 font-semibold">Remove missing photos</button></div>}</div>
+              <div><p>{draftError}</p>{draftPhotoRefs.length > 0 && <div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={() => setPhotoReloadKey(value => value + 1)} className="min-h-10 rounded-xl border border-red-300 px-3 font-semibold">{t('addSpotUi.retryPhotos')}</button><button type="button" onClick={() => { setDraftPhotoRefs([]); setImageFiles([]); setImagePreviews([]); setDraftPhotosReady(true); setDraftError(''); }} className="min-h-10 rounded-xl border border-red-300 px-3 font-semibold">{t('addSpotUi.removeMissingPhotos')}</button></div>}</div>
             </div>
           )}
 
           <section aria-labelledby="essential-information-title" className="space-y-4">
             <div>
-              <p id="essential-information-title" className="text-sm font-bold text-gray-900 dark:text-foreground">Essential information</p>
-              <p className="mt-1 text-xs text-gray-500 dark:text-muted-foreground">Name the place clearly and tell people what makes it worth finding.</p>
+              <p id="essential-information-title" className="text-sm font-bold text-gray-900 dark:text-foreground">{t('addSpotUi.essential')}</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-muted-foreground">{t('addSpotUi.essentialHint')}</p>
             </div>
             <div>
-              <label htmlFor="new-spot-name" className="mb-1 block text-sm font-semibold text-gray-700 dark:text-foreground">Spot name <span className="text-red-500" aria-hidden="true">*</span></label>
+              <label htmlFor="new-spot-name" className="mb-1 block text-sm font-semibold text-gray-700 dark:text-foreground">{t('addSpotUi.spotName')} <span className="text-red-500" aria-hidden="true">*</span></label>
               <input
                 ref={titleRef}
                 id="new-spot-name"
@@ -577,10 +572,10 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
                 }}
                 aria-invalid={Boolean(fieldErrors.title)}
                 aria-describedby={fieldErrors.title ? 'new-spot-name-error' : 'new-spot-name-help'}
-                placeholder="e.g. Old Quarry Viewpoint"
+                placeholder={t('addSpotUi.namePlaceholder')}
                 className={`w-full rounded-xl border bg-white px-4 py-3 text-base text-gray-900 outline-none focus:ring-2 dark:bg-background dark:text-foreground ${fieldErrors.title ? 'border-red-400 focus:ring-red-300' : 'border-gray-200 focus:ring-green-500 dark:border-border'}`}
               />
-              <p id="new-spot-name-help" className="mt-1.5 text-xs text-gray-500 dark:text-muted-foreground">Use the real local or commonly known name when one exists.</p>
+              <p id="new-spot-name-help" className="mt-1.5 text-xs text-gray-500 dark:text-muted-foreground">{t('addSpotUi.nameHint')}</p>
               {fieldErrors.title && <p id="new-spot-name-error" className="mt-1.5 text-xs font-semibold text-red-600">{fieldErrors.title}</p>}
             </div>
 
@@ -591,7 +586,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
               <button
                 type="button"
                 onClick={toggleVoice}
-                aria-label={listening ? 'Stop voice description' : 'Describe this spot by voice'}
+                aria-label={t(listening ? 'addSpotUi.voiceStop' : 'addSpotUi.voiceStart')}
                 aria-pressed={listening}
                 className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
                   listening
@@ -646,18 +641,18 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
           </div>
           <div className="flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:bg-accent/50 dark:text-muted-foreground">
             <MapPin className="h-4 w-4 shrink-0 text-green-600" aria-hidden="true" />
-            <span>Map position: {Number(latlng.lat).toFixed(5)}, {Number(latlng.lng).toFixed(5)}</span>
+            <span>{t('addSpotUi.mapPosition', { lat: new Intl.NumberFormat(language, { maximumFractionDigits: 5 }).format(Number(latlng.lat)), lng: new Intl.NumberFormat(language, { maximumFractionDigits: 5 }).format(Number(latlng.lng)) })}</span>
           </div>
           </section>
 
           <details className="group rounded-2xl border border-gray-200 dark:border-border">
             <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-bold marker:content-none">
-              <span><span className="block">Optional enrichment</span><span className="mt-0.5 block text-xs font-normal text-gray-500 dark:text-muted-foreground">Practical details, photos and social links</span></span>
+              <span><span className="block">{t('addSpotUi.optional')}</span><span className="mt-0.5 block text-xs font-normal text-gray-500 dark:text-muted-foreground">{t('addSpotUi.optionalHint')}</span></span>
               <ChevronDown className="h-5 w-5 text-gray-400 transition-transform group-open:rotate-180" aria-hidden="true" />
             </summary>
             <div className="space-y-5 border-t border-gray-200 p-4 dark:border-border">
           {draft && [overallRating, accessRating, conditionRating, safetyRating, crowdednessRating].some(value => value > 0) && (
-            <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">Ratings saved in an older draft are kept in that private draft but will not be published as community ratings. Visitors can rate the spot after publication.</p>
+            <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">{t('addSpotUi.oldDraftRatings')}</p>
           )}
 
           {/* Category tags */}
@@ -675,7 +670,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
                       : ''
                   }`}
                 >
-                  {emoji} #{id}
+                  {emoji} {t(`spotTags.${id}`)}
                 </button>
               ))}
             </div>
@@ -734,23 +729,23 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
           {/* Photos */}
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <label className="text-sm font-semibold text-gray-600 dark:text-foreground">Photos</label>
+              <label className="text-sm font-semibold text-gray-600 dark:text-foreground">{t('addSpotUi.photos')}</label>
               <span className="text-xs text-gray-400 dark:text-muted-foreground">{imageFiles.length}/3</span>
             </div>
             {imagePreviews.length > 0 && (
               <div className="mb-3 grid grid-cols-3 gap-2">
                 {imagePreviews.map((preview, index) => (
                   <div key={preview} className="relative aspect-square overflow-hidden rounded-2xl">
-                    <img src={preview} alt={`Spot preview ${index + 1}`} className="h-full w-full object-cover" />
+                    <img src={preview} alt={t('addSpotUi.photoPreview', { number: index + 1 })} className="h-full w-full object-cover" />
                     <button
                       type="button"
                       onClick={() => removeImage(index)}
-                      aria-label={`Remove photo ${index + 1}`}
+                      aria-label={t('addSpotUi.removePhoto', { number: index + 1 })}
                       className="absolute right-1.5 top-1.5 rounded-full bg-black/60 p-1.5 text-white backdrop-blur-sm"
                     >
                       <X className="h-4 w-4" />
                     </button>
-                    {index === 0 && <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white">Cover</span>}
+                    {index === 0 && <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white">{t('addSpotUi.cover')}</span>}
                   </div>
                 ))}
               </div>
@@ -758,24 +753,24 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
             {imageFiles.length < 3 && (
               <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-border rounded-2xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-accent transition-colors focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-400">
                 <Camera className="w-8 h-8 text-gray-400 dark:text-muted-foreground mb-1" />
-                <span className="text-sm text-gray-500 dark:text-muted-foreground">Add up to {3 - imageFiles.length} more photo{3 - imageFiles.length === 1 ? '' : 's'}</span>
-                <span className="mt-1 text-xs text-gray-400">Choose several at once or add them one by one</span>
+                <span className="text-sm text-gray-500 dark:text-muted-foreground">{t('addSpotUi.addPhotos', { count: 3 - imageFiles.length })}</span>
+                <span className="mt-1 text-xs text-gray-400">{t('addSpotUi.photoHint')}</span>
                 <input type="file" accept={IMAGE_ACCEPT} multiple onChange={handleImageChange} disabled={!draftPhotosReady} className="sr-only" />
               </label>
             )}
-            {(savingDraft || uploadingImage) && photoProgress > 0 && <p className="mt-2 text-xs font-medium text-blue-700 dark:text-blue-300" role="status">Saving photos… {photoProgress}%</p>}
-            {!user && imageFiles.length > 0 && <p className="mt-2 text-xs leading-5 text-amber-700 dark:text-amber-300">Guest draft photos are stored privately in this browser when IndexedDB is available. They do not sync to another device and may be removed if browser site data is cleared.</p>}
+            {(savingDraft || uploadingImage) && photoProgress > 0 && <p className="mt-2 text-xs font-medium text-blue-700 dark:text-blue-300" role="status">{t('addSpotUi.savingPhotos', { percent: photoProgress })}</p>}
+            {!user && imageFiles.length > 0 && <p className="mt-2 text-xs leading-5 text-amber-700 dark:text-amber-300">{t('addSpotUi.guestPhotos')}</p>}
           </div>
 
           {/* Optional social post. The callable backend attaches this only
               after the spot exists and independently validates it again. */}
           <div className="rounded-2xl border border-gray-200 p-4 dark:border-border">
-            <label htmlFor="new-spot-social-url" className="text-sm font-semibold text-gray-700 dark:text-foreground">Instagram or TikTok post</label>
-            <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-muted-foreground">Optional. Useful when you do not have a photo. Supported: Instagram posts/reels and TikTok videos.</p>
-            <input id="new-spot-social-url" type="url" inputMode="url" enterKeyHint="done" value={socialUrl} onChange={event => setSocialUrl(event.target.value)} autoCapitalize="none" autoCorrect="off" spellCheck="false" placeholder="Paste a supported post link" className="mt-3 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-base outline-none focus:ring-2 focus:ring-green-500 dark:border-border dark:bg-background" />
-            {socialUrl && validateSocialPostUrl(socialUrl).ok && <p className="mt-2 text-xs font-medium text-green-700 dark:text-green-400">✓ {validateSocialPostUrl(socialUrl).provider === 'instagram' ? 'Instagram post' : 'TikTok video'} recognized</p>}
-            {socialUrl && !validateSocialPostUrl(socialUrl).ok && <p className="mt-2 text-xs text-red-600">{INVALID_SOCIAL_URL_MESSAGE}</p>}
-            {socialUrl && (!user || user.isAnonymous || user.emailVerified !== true) && <p className="mt-2 text-xs text-amber-600">Sign in with a verified account to attach social content.</p>}
+            <label htmlFor="new-spot-social-url" className="text-sm font-semibold text-gray-700 dark:text-foreground">{t('addSpotUi.socialPost')}</label>
+            <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-muted-foreground">{t('addSpotUi.socialHint')}</p>
+            <input id="new-spot-social-url" type="url" inputMode="url" enterKeyHint="done" value={socialUrl} onChange={event => setSocialUrl(event.target.value)} autoCapitalize="none" autoCorrect="off" spellCheck="false" placeholder={t('addSpotUi.socialPlaceholder')} className="mt-3 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-base outline-none focus:ring-2 focus:ring-green-500 dark:border-border dark:bg-background" />
+            {socialUrl && validateSocialPostUrl(socialUrl).ok && <p className="mt-2 text-xs font-medium text-green-700 dark:text-green-400">✓ {t('addSpotUi.recognized', { provider: t(validateSocialPostUrl(socialUrl).provider === 'instagram' ? 'addSpotUi.instagramPost' : 'addSpotUi.tiktokVideo') })}</p>}
+            {socialUrl && !validateSocialPostUrl(socialUrl).ok && <p className="mt-2 text-xs text-red-600">{t('addSpotUi.invalidSocial')}</p>}
+            {socialUrl && (!user || user.isAnonymous || user.emailVerified !== true) && <p className="mt-2 text-xs text-amber-600">{t('addSpotUi.verifiedSocial')}</p>}
           </div>
             </div>
           </details>
@@ -785,7 +780,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
         <div className="px-6 pt-3">
           <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-xs leading-relaxed ${fieldErrors.attested ? 'border-red-400 bg-red-50 dark:bg-red-950/20' : 'border-gray-200 dark:border-border'}`}>
             <input type="checkbox" checked={attested} onChange={event => { setAttested(event.target.checked); if (event.target.checked) setFieldErrors(current => ({ ...current, attested: '' })); }} className="mt-0.5 h-4 w-4 shrink-0 accent-green-600" />
-            <span>I confirm the information is accurate to the best of my knowledge, and that I own or have permission to share any photos. The contribution will be public under the <a href="/TermsAndConditions" target="_blank" rel="noopener noreferrer" className="font-semibold underline">Terms</a>.</span>
+            <span>{t('addSpotUi.attestationStart')}{' '}<a href="/TermsAndConditions" target="_blank" rel="noopener noreferrer" className="font-semibold underline">{t('addSpotUi.terms')}</a>.</span>
           </label>
           {fieldErrors.attested && <p className="mt-1.5 text-xs font-semibold text-red-600">{fieldErrors.attested}</p>}
         </div>
@@ -808,15 +803,15 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
       <DraftConfirmationDialog
         open={showCloseChoices}
         onOpenChange={setShowCloseChoices}
-        title="Keep your progress?"
-        description="Save this as an unpublished draft, discard the changes, or return to editing."
-        confirmLabel={savingDraft ? 'Saving…' : 'Save Draft'}
+        title={t('addSpotUi.keepProgress')}
+        description={t('addSpotUi.keepProgressHint')}
+        confirmLabel={t(savingDraft ? 'accountSecurity.saving' : 'addSpotUi.saveDraft')}
         onConfirm={handleSaveDraft}
-        secondaryLabel="Discard"
+        secondaryLabel={t('addSpotUi.discard')}
         onSecondary={onClose}
         busy={savingDraft}
       >
-        {!user && imageFiles.length > 0 && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">The {imageFiles.length === 1 ? 'photo' : 'photos'} will be stored in this browser only. Clearing site data, private-browsing cleanup, or storage limits can remove guest photos.</p>}
+        {!user && imageFiles.length > 0 && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">{t('addSpotUi.guestDraftPhotos', { count: imageFiles.length })}</p>}
       </DraftConfirmationDialog>
     </div>
   );

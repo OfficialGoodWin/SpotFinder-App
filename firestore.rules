@@ -248,6 +248,26 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Phase 1 official POI authoring database. Public delivery will use
+    // validated, versioned static assets. All writes go through a callable
+    // that checks the signed admin claim and commits a revision transaction.
+    match /official_poi_changes/{docId} {
+      allow read: if isSuperAdmin();
+      allow write: if false;
+    }
+    match /official_poi_revisions/{docId} {
+      allow read: if isSuperAdmin();
+      allow write: if false;
+    }
+    match /official_poi_audit/{docId} {
+      allow read: if isSuperAdmin();
+      allow write: if false;
+    }
+    match /official_poi_publications/{docId} {
+      allow read: if isSuperAdmin();
+      allow write: if false;
+    }
+
     // ── IP bans (superadmin only) ─────────────────────────────────────────────
     match /ip_bans/{ip} {
       allow read: if isSuperAdmin();

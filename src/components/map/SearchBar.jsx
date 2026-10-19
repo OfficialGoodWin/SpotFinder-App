@@ -161,23 +161,24 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
         <div className="flex items-center px-3 gap-1.5">
           <Search className="w-4 h-4 text-gray-400 dark:text-muted-foreground flex-shrink-0" />
           <input
+            data-spotfinder-search
             ref={inputRef}
             value={query}
             onChange={e => setQuery(e.target.value)}
             onFocus={() => setFocused(true)}
             placeholder={t('search.placeholder')}
-            aria-label="Search places and community spots"
+            aria-label={t('searchUi.searchLabel')}
             className="flex-1 py-3 text-sm outline-none bg-transparent text-gray-800 dark:text-foreground placeholder-gray-400 dark:placeholder-muted-foreground min-w-0"
           />
           {query && (
-            <button onClick={() => { setQuery(''); closeDropdown(); }} className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg hover:bg-muted" aria-label="Clear search">
+            <button onClick={() => { setQuery(''); closeDropdown(); }} className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg hover:bg-muted" aria-label={t('searchUi.clear')}>
               <X className="w-3.5 h-3.5 text-gray-400 dark:text-muted-foreground" />
             </button>
           )}
           <button
             onMouseDown={e => { e.preventDefault(); toggleMic(); }}
             type="button"
-            aria-label={listening ? 'Stop voice search' : 'Start voice search'}
+            aria-label={t(listening ? 'searchUi.voiceStop' : 'searchUi.voiceStart')}
             aria-pressed={listening}
             className={`grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg transition-colors ${listening ? 'bg-red-500 text-white' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
           >
@@ -185,7 +186,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
           </button>
           <div className="w-px h-5 bg-gray-200 dark:bg-border flex-shrink-0" />
 
-          <button type="button" onClick={() => onOpenNearbyFilters?.()} className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:ring-2 focus-visible:ring-primary" title="Nearby spots" aria-label="Open nearby spots filters">
+          <button type="button" onClick={() => onOpenNearbyFilters?.()} className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:ring-2 focus-visible:ring-primary" title={t('nearbyUi.title')} aria-label={t('searchUi.nearbyFilters')}>
             <Compass className="h-5 w-5" />
           </button>
         </div>
@@ -256,7 +257,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
                       onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); onNavigate({ lat: pos.lat, lng: pos.lon ?? pos.lng, label: item.name || item.label }); closeDropdown(); }}
                       onClick={e => { if (e.detail === 0) { onNavigate({ lat: pos.lat, lng: pos.lon ?? pos.lng, label: item.name || item.label }); closeDropdown(); } }}
                       className="grid min-h-11 min-w-11 place-items-center text-primary hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-primary dark:hover:bg-accent"
-                      aria-label={`Navigate to ${item.name || item.label}`}
+                      aria-label={t('searchUi.navigateTo', { name: item.name || item.label })}
                     >
                       <Navigation className="w-5 h-5" />
                     </button>
@@ -270,7 +271,7 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
                 <button
                   onMouseDown={e => { e.preventDefault(); onSelectSpot?.(spot); setQuery(getSpotDisplayName(spot, language)); closeDropdown(); }}
                   onTouchEnd={e => { e.preventDefault(); onSelectSpot?.(spot); setQuery(getSpotDisplayName(spot, language)); closeDropdown(); }}
-                  aria-label={`Open ${getSpotDisplayName(spot, language)}`}
+                  aria-label={t('searchUi.openSpot', { name: getSpotDisplayName(spot, language) })}
                   className="flex-1 text-left px-4 py-2.5 flex items-center gap-3"
                 >
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-green-100 dark:bg-green-900/30">

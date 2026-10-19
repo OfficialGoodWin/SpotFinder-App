@@ -87,6 +87,28 @@ const callFn = (name) => async (payload) => {
   const { data } = await fn(payload);
   return data;
 };
+
+// Official authoring is read by claimed admins and written only by the callable.
+export const adminSaveOfficialPoi = callFn('adminSaveOfficialPoi');
+export async function getOfficialPoiChange(id) {
+  const { db: firestore } = getFirebaseServices();
+  const snapshot = await getDoc(doc(firestore, 'official_poi_changes', id));
+  return snapshot.exists() ? snapshot.data() : null;
+}
+export async function getOfficialPoiRevisions(id) {
+  const { db: firestore } = getFirebaseServices();
+  const snapshot = await getDocs(query(collection(firestore, 'official_poi_revisions'), where('id', '==', id), limit(100)));
+  return snapshot.docs.map(item => item.data()).sort((a, b) => b.revision - a.revision);
+}
+export async function findOfficialPoiChanges(id) {
+  const { db: firestore } = getFirebaseServices();
+  if (id) {
+    const record = await getOfficialPoiChange(id);
+    return record ? [record] : [];
+  }
+  const snapshot = await getDocs(query(collection(firestore, 'official_poi_changes'), orderBy('updatedAt', 'desc'), limit(50)));
+  return snapshot.docs.map(item => item.data());
+}
  
 // Detect WebView / in-app browsers that block Google OAuth popup
 export const isRestrictedBrowser = () => {
