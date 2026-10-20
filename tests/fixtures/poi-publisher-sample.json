@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "publicationVersion": "reviewed-stations-2026-10-20-v1",
+  "records": [
+    {
+      "canonicalId": "osm:node:24569684",
+      "lookupId": "24569684",
+      "category": "train",
+      "position": { "lon": 14.4303111, "lat": 50.0743299 },
+      "tileFeature": { "id": 24569684, "category": "train", "lon": 14.4303111, "lat": 50.0743299, "name": "I. P. Pavlova", "wikidataId": "Q1880944", "archiveSha256": "9be8d8fc2278afb99ab611461dcd76044d35de5095acd94162bf9aaebeb58edd" },
+      "source": { "originalName": "I. P. Pavlova", "osmNames": { "cs": "I. P. Pavlova", "ru": "И. П. Павлова" }, "wikidataId": "Q1880944" },
+      "review": "Exact typed candidate source feature and original-PBF identity index comparison."
+    },
+    {
+      "canonicalId": "osm:node:24569759",
+      "lookupId": "24569759",
+      "category": "train",
+      "position": { "lon": 14.4542345, "lat": 50.1241376 },
+      "tileFeature": { "id": 24569759, "category": "train", "lon": 14.4542345, "lat": 50.1241376, "name": "Kobylisy", "archiveSha256": "9be8d8fc2278afb99ab611461dcd76044d35de5095acd94162bf9aaebeb58edd" },
+      "source": { "originalName": "Kobylisy", "osmNames": { "cs": "Kobylisy", "de": "Kobilis", "ru": "Кобылисы" } },
+      "review": "Exact typed candidate source feature and original-PBF identity index comparison."
+    },
+    {
+      "canonicalId": "osm:node:24595941",
+      "lookupId": "24595941",
+      "category": "train",
+      "position": { "lon": 14.611991, "lat": 50.1165761 },
+      "tileFeature": { "id": 24595941, "category": "train", "lon": 14.611991, "lat": 50.1165761, "name": "Praha-Horní Počernice", "wikidataId": "Q18590823", "archiveSha256": "9be8d8fc2278afb99ab611461dcd76044d35de5095acd94162bf9aaebeb58edd" },
+      "source": { "originalName": "Praha-Horní Počernice", "osmNames": { "cs": "Praha-Horní Počernice", "de": "Prag-Ober Potschernitz" }, "wikidataId": "Q18590823" },
+      "review": "Exact typed candidate source feature and original-PBF identity index comparison."
+    },
+    {
+      "canonicalId": "osm:node:24602019",
+      "lookupId": "24602019",
+      "category": "train",
+      "position": { "lon": 14.5174758, "lat": 50.2627183 },
+      "tileFeature": { "id": 24602019, "category": "train", "lon": 14.5174758, "lat": 50.2627183, "name": "Neratovice", "wikidataId": "Q18180433", "archiveSha256": "9be8d8fc2278afb99ab611461dcd76044d35de5095acd94162bf9aaebeb58edd" },
+      "source": { "originalName": "Neratovice", "osmNames": { "de": "Neratowitz" }, "wikidataId": "Q18180433" },
+      "review": "Exact typed candidate source feature and original-PBF identity index comparison."
+    },
+    {
+      "canonicalId": "osm:node:24697051",
+      "lookupId": "24697051",
+      "category": "train",
+      "position": { "lon": 14.7545098, "lat": 50.1582123 },
+      "tileFeature": { "id": 24697051, "category": "train", "lon": 14.7545098, "lat": 50.1582123, "name": "Čelákovice", "wikidataId": "Q18180161", "archiveSha256": "9be8d8fc2278afb99ab611461dcd76044d35de5095acd94162bf9aaebeb58edd" },
+      "source": { "originalName": "Čelákovice", "osmNames": { "cs": "Čelákovice", "de": "Czelakowitz", "ru": "Челаковице", "sr": "Челаковице" }, "wikidataId": "Q18180161" },
+      "review": "Exact typed candidate source feature and original-PBF identity index comparison."
+    }
+  ]
+}

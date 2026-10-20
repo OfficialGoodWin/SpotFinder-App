@@ -10,7 +10,8 @@ test('published station row joins the verified legacy tile feature and resolves 
   const coordinates = { lon: 14.434125423431396, lat: 50.08350372246943 };
   assert.deepEqual(poiDetailTile(coordinates.lon, coordinates.lat), { x: 553, y: 346 });
   assert.equal(shard.schemaVersion, 1);
-  assert.equal(shard.items.length, 1);
+  assert.ok(shard.items.length >= 1);
+  assert.equal(shard.items.filter(item => String(item.id) === String(properties.id)).length, 1);
   const detail = shard.items.find(item => String(item.id) === String(properties.id));
   assert.equal(detail.canonical_id, 'osm:node:24569897');
   assert.deepEqual(detail.nameProvenance, { cs: 'osm:name:cs', en: 'osm:name:en', de: 'osm:name:de' });

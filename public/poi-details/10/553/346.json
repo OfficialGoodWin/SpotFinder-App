@@ -1,8 +1,52 @@
 {
   "schemaVersion": 1,
-  "publicationVersion": "single-poi-2026-10-19-v1",
-  "generatedAt": "2026-10-19T20:37:25Z",
+  "publicationVersion": "reviewed-stations-2026-10-20-v1",
+  "generatedAt": "2026-10-20T15:36:49.750Z",
   "items": [
+    {
+      "id": "24569684",
+      "canonical_id": "osm:node:24569684",
+      "osm_type": "node",
+      "osm_id": "24569684",
+      "originalName": "I. P. Pavlova",
+      "osmNames": {
+        "cs": "I. P. Pavlova",
+        "ru": "И. П. Павлова"
+      },
+      "nameProvenance": {
+        "cs": "osm:name:cs",
+        "ru": "osm:name:ru"
+      },
+      "source": "OpenStreetMap",
+      "sourceIdentity": {
+        "canonicalId": "osm:node:24569684",
+        "legacyTileId": 24569684,
+        "evidence": "Reviewed live feature and verified original-PBF identity index"
+      }
+    },
+    {
+      "id": "24569759",
+      "canonical_id": "osm:node:24569759",
+      "osm_type": "node",
+      "osm_id": "24569759",
+      "originalName": "Kobylisy",
+      "osmNames": {
+        "cs": "Kobylisy",
+        "de": "Kobilis",
+        "ru": "Кобылисы"
+      },
+      "nameProvenance": {
+        "cs": "osm:name:cs",
+        "de": "osm:name:de",
+        "ru": "osm:name:ru"
+      },
+      "source": "OpenStreetMap",
+      "sourceIdentity": {
+        "canonicalId": "osm:node:24569759",
+        "legacyTileId": 24569759,
+        "evidence": "Reviewed live feature and verified original-PBF identity index"
+      }
+    },
     {
       "id": "24569897",
       "canonical_id": "osm:node:24569897",
@@ -24,6 +68,71 @@
         "canonicalId": "osm:node:24569897",
         "legacyTileId": 24569897,
         "evidence": "Reviewed legacy identity index and direct PMTiles z16 feature match"
+      }
+    },
+    {
+      "id": "24595941",
+      "canonical_id": "osm:node:24595941",
+      "osm_type": "node",
+      "osm_id": "24595941",
+      "originalName": "Praha-Horní Počernice",
+      "osmNames": {
+        "cs": "Praha-Horní Počernice",
+        "de": "Prag-Ober Potschernitz"
+      },
+      "nameProvenance": {
+        "cs": "osm:name:cs",
+        "de": "osm:name:de"
+      },
+      "source": "OpenStreetMap",
+      "sourceIdentity": {
+        "canonicalId": "osm:node:24595941",
+        "legacyTileId": 24595941,
+        "evidence": "Reviewed live feature and verified original-PBF identity index"
+      }
+    },
+    {
+      "id": "24602019",
+      "canonical_id": "osm:node:24602019",
+      "osm_type": "node",
+      "osm_id": "24602019",
+      "originalName": "Neratovice",
+      "osmNames": {
+        "de": "Neratowitz"
+      },
+      "nameProvenance": {
+        "de": "osm:name:de"
+      },
+      "source": "OpenStreetMap",
+      "sourceIdentity": {
+        "canonicalId": "osm:node:24602019",
+        "legacyTileId": 24602019,
+        "evidence": "Reviewed live feature and verified original-PBF identity index"
+      }
+    },
+    {
+      "id": "24697051",
+      "canonical_id": "osm:node:24697051",
+      "osm_type": "node",
+      "osm_id": "24697051",
+      "originalName": "Čelákovice",
+      "osmNames": {
+        "cs": "Čelákovice",
+        "de": "Czelakowitz",
+        "ru": "Челаковице",
+        "sr": "Челаковице"
+      },
+      "nameProvenance": {
+        "cs": "osm:name:cs",
+        "de": "osm:name:de",
+        "ru": "osm:name:ru",
+        "sr": "osm:name:sr"
+      },
+      "source": "OpenStreetMap",
+      "sourceIdentity": {
+        "canonicalId": "osm:node:24697051",
+        "legacyTileId": 24697051,
+        "evidence": "Reviewed live feature and verified original-PBF identity index"
       }
     }
   ]

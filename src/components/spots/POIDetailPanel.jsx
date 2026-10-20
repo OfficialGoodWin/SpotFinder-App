@@ -312,7 +312,13 @@ function FullSheet({ poi, displayName, displayDescription, shortSummary, categor
   const [submitting, setSubmitting] = useState(false);
   const [ratingDone, setRatingDone] = useState(false);
 
-  const tags = poi.tags || {};
+  const published = poi.enrichment || {};
+  const tags = { ...(poi.tags || {}),
+    ...(Object.prototype.hasOwnProperty.call(published, 'phone') ? { phone: published.phone } : {}),
+    ...(Object.prototype.hasOwnProperty.call(published, 'website') ? { website: published.website } : {}),
+    ...(Object.prototype.hasOwnProperty.call(published, 'openingHours') ? { opening_hours: published.openingHours } : {}),
+    ...(published.attributes || {}),
+  };
   const phone = getPhone(tags), website = getWebsite(tags), email = getEmail(tags);
   const ohRaw = getHours(tags), hoursLabel = openingHoursLabel(ohRaw);
   const avg = sfRating?.count > 0 ? sfRating.avg : 0;
