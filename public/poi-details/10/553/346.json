@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "publicationVersion": "single-poi-2026-10-19-v1",
+  "generatedAt": "2026-10-19T20:37:25Z",
+  "items": [
+    {
+      "id": "24569897",
+      "canonical_id": "osm:node:24569897",
+      "osm_type": "node",
+      "osm_id": "24569897",
+      "originalName": "Hlavní nádraží",
+      "osmNames": {
+        "cs": "Hlavní nádraží",
+        "en": "Main Station",
+        "de": "Hauptbahnhof"
+      },
+      "nameProvenance": {
+        "cs": "osm:name:cs",
+        "en": "osm:name:en",
+        "de": "osm:name:de"
+      },
+      "source": "OpenStreetMap",
+      "sourceIdentity": {
+        "canonicalId": "osm:node:24569897",
+        "legacyTileId": 24569897,
+        "evidence": "Reviewed legacy identity index and direct PMTiles z16 feature match"
+      }
+    }
+  ]
+}
