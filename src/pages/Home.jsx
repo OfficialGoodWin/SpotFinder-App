@@ -892,7 +892,7 @@ export default function Home() {
           userPos={userPos}
           loading={poiLoading}
           onFlyTo={(pos) => setFlyTo(pos)}
-          onNavigate={(poi) => openNavigation({ lat: poi.lat, lng: poi.lon, label: poi.name })}
+          onNavigate={(poi) => openNavigation({ lat: poi.lat, lng: poi.lon, label: poi.displayName || poi.name })}
           onSelect={(poi) => setSelectedPOI(poi)}
           onClose={() => { setShowPOIPanel(false); setSelectedPOICategory(null); setSelectedPOI(null); }}
         />

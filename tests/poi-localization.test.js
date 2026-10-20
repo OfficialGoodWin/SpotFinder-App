@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ambientPoiNameExpression, poiLocaleCandidates, resolveVisiblePoiText } from '../src/lib/poiLocalization.js';
 import { createPoiDetailShardReader } from '../src/lib/poiDetailShard.js';
+import en from '../src/locales/translations_en.js';
+import cs from '../src/locales/translations_cs.js';
+import de from '../src/locales/translations_de.js';
 
 const properties = { id: 'node/10', name: 'Pražský hrad', 'name:cs': 'Pražský hrad', 'name:en': 'Prague Castle', 'name:de': 'Prager Burg',
   'description:de': 'Burganlage in Prag', wikidata: 'Q193369' };
@@ -47,4 +50,22 @@ test('published detail shard values reach the locale resolver; missing shards re
   const missing = createPoiDetailShardReader(async () => ({ status: 404, ok: false }));
   assert.equal(await missing(14.6, 50.1), null);
   assert.equal(resolveVisiblePoiText({ ...poi, enrichment: null }, 'de').name, 'Prager Burg');
+});
+
+test('published original name remains available without a tile name', () => {
+  const published = { originalName: 'Hlavní nádraží', osmNames: { cs: 'Hlavní nádraží', en: 'Main Station', de: 'Hauptbahnhof' } };
+  const record = { enrichment: published };
+  assert.equal(resolveVisiblePoiText(record, 'de').name, 'Hauptbahnhof');
+  assert.equal(resolveVisiblePoiText(record, 'en').name, 'Main Station');
+  assert.equal(resolveVisiblePoiText(record, 'cs').name, 'Hlavní nádraží');
+  assert.equal(resolveVisiblePoiText(record, 'fr').name, 'Hlavní nádraží');
+  assert.equal(resolveVisiblePoiText(record, 'de').originalName, 'Hlavní nádraží');
+  assert.equal(resolveVisiblePoiText({ name: 'Different station' }, 'de').name, 'Different station');
+});
+
+test('official edit action and alternate-name caption have Czech, English, and German catalog values', () => {
+  assert.equal(en.officialEditor.editThisPoi, 'Edit this POI');
+  assert.equal(cs.officialEditor.editThisPoi, 'Upravit toto POI');
+  assert.equal(de.officialEditor.editThisPoi, 'Diesen POI bearbeiten');
+  for (const catalog of [en, cs, de]) assert.match(catalog.poiDetailUi.originalName, /\{name\}/);
 });

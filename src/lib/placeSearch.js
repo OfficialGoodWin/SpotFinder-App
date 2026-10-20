@@ -1,4 +1,5 @@
 import { searchMapySuggestions } from '@/api/mapyPOIService';
+import { dedupePlaceResults } from './placeSearchDedupe.js';
 
 const languageCode = language => String(language || 'en').toLowerCase().split('-')[0];
 
@@ -33,17 +34,6 @@ function normalizeMapy(item) {
   };
 }
 
-const dedupe = items => {
-  const seen = new Set();
-  return items.filter(item => {
-    if (!item.name || !validPosition(item.position)) return false;
-    const key = `${item.name.toLocaleLowerCase()}|${item.position.lat.toFixed(4)}|${item.position.lon.toFixed(4)}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-};
-
 export async function searchPlaces(query, { center, language = 'en', signal, limit = 10 } = {}) {
   const lang = languageCode(language);
   const params = new URLSearchParams({
@@ -62,6 +52,6 @@ export async function searchPlaces(query, { center, language = 'en', signal, lim
   if (signal?.aborted) return [];
   const osm = sources[0].status === 'fulfilled' ? sources[0].value.map(item => normalizeNominatim(item, lang)) : [];
   const mapy = sources[1].status === 'fulfilled' ? sources[1].value.map(normalizeMapy) : [];
-  return dedupe([...mapy, ...osm]).slice(0, limit);
+  return dedupePlaceResults([...mapy, ...osm]).slice(0, limit);
 }
 

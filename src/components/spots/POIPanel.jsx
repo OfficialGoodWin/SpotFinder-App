@@ -3,6 +3,7 @@ import { Navigation, X } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { getCategoryName } from '@/lib/POICategories';
 import { iconGlyphSVG } from '@/lib/mapIcons';
+import { resolveVisiblePoiText } from '@/lib/poiLocalization';
 
 function haversineKm([lat1, lng1], [lat2, lng2]) {
   const R = 6371;
@@ -31,6 +32,7 @@ const PEEK_SHOW = HEADER_H + 8;
 
 function POIRow({ poi, category, onFlyTo, onNavigate, onSelect, onClose }) {
   const { t, language } = useLanguage();
+  const displayName = resolveVisiblePoiText(poi, language).name;
   const number = new Intl.NumberFormat(language, { maximumFractionDigits: 1 });
   return (
     <div
@@ -43,7 +45,7 @@ function POIRow({ poi, category, onFlyTo, onNavigate, onSelect, onClose }) {
         dangerouslySetInnerHTML={{ __html: iconGlyphSVG(category.key, 18, category.color) }}
       />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-foreground truncate">{poi.name}</p>
+        <p className="text-sm font-semibold text-foreground truncate">{displayName}</p>
         {poi.address && (
           <p className="text-xs text-muted-foreground truncate">{poi.address}</p>
         )}
@@ -64,11 +66,11 @@ function POIRow({ poi, category, onFlyTo, onNavigate, onSelect, onClose }) {
         </div>
       )}
       <button
-        onClick={e => { e.stopPropagation(); onNavigate?.(poi); onClose(); }}
+        onClick={e => { e.stopPropagation(); onNavigate?.({ ...poi, displayName }); onClose(); }}
         className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-colors"
         style={{ background: `${category.color}20`, color: category.color }}
         title={t('poiDetail.navigate')}
-        aria-label={t('searchUi.navigateTo', { name: poi.name })}
+        aria-label={t('searchUi.navigateTo', { name: displayName })}
       >
         <Navigation className="w-4 h-4" />
       </button>

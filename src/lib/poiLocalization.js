@@ -45,7 +45,7 @@ export function resolveVisiblePoiText(poi, locale) {
   const tile = poi?._ambientHit?.properties || {};
   const detail = poi?.enrichment || poi?._ambientHit?.details || {};
   const tags = { ...(detail.tags || {}), ...tile, ...(poi?.tags || {}) };
-  const originalName = text(poi?.name) || text(tile.name) || '';
+  const originalName = text(poi?.name) || text(tile.name) || text(detail.originalName) || '';
   const originalDescription = text(detail.description) || text(detail.originalDescription) || text(tags.description) || text(tags.note);
   const osmNames = { ...(detail.osmNames || {}), ...localizedOsmTags(detail.tags, 'name'), ...localizedOsmTags(tile, 'name'), ...localizedOsmTags(poi?.tags, 'name') };
   const osmDescriptions = { ...(detail.osmDescriptions || {}), ...localizedOsmTags(detail.tags, 'description'), ...localizedOsmTags(tile, 'description'), ...localizedOsmTags(poi?.tags, 'description') };

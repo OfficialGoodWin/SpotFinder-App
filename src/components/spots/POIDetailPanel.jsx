@@ -296,14 +296,14 @@ function MiniBar({ poi, displayName, category, sfRating, photoUrl, photos, onExp
         <ActionBtn icon={Navigation} label={t('poiDetail.navigate')} onClick={onNavigate} color={category.color} />
         <ActionBtn icon={Share2} label={t('poiDetail.share')} onClick={onShare} />
         <ActionBtn icon={Camera} label={t('poiDetail.addPhoto')} onClick={onAddPhoto} disabled={!user} />
-        {onEditOfficial && <ActionBtn icon={Pencil} label={t('officialEditor.editThisPoi', 'Edit this POI')} onClick={onEditOfficial} />}
+        {onEditOfficial && <ActionBtn icon={Pencil} label={t('officialEditor.editThisPoi')} onClick={onEditOfficial} />}
       </div>
     </div>
   );
 }
 
 // ─── Full sheet ───────────────────────────────────────────────────────────────
-function FullSheet({ poi, displayName, displayDescription, shortSummary, category, sfPhotos, sfRating, photos, onClose, onNavigate, onShare, onAddPhoto, onEditOfficial, onSubmitRating, user, onOpenLightbox, onReportPOI, onReportPhoto, socialTargetId }) {
+function FullSheet({ poi, displayName, originalName, displayDescription, shortSummary, category, sfPhotos, sfRating, photos, onClose, onNavigate, onShare, onAddPhoto, onEditOfficial, onSubmitRating, user, onOpenLightbox, onReportPOI, onReportPhoto, socialTargetId }) {
   const { t, language } = useLanguage();
   const closeRef = useRef(null);
   useEffect(() => { closeRef.current?.focus(); }, []);
@@ -371,6 +371,7 @@ function FullSheet({ poi, displayName, displayDescription, shortSummary, categor
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <div className="px-5 pt-4" style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
             <h1 className="break-words pr-10 text-xl font-bold text-foreground leading-tight">{displayName}</h1>
+            {originalName && originalName !== displayName && <p className="mt-0.5 text-xs text-muted-foreground">{t('poiDetailUi.originalName', { name: originalName })}</p>}
             {poi.address && <p className="text-sm text-muted-foreground mt-0.5">{poi.address}</p>}
             {allPhotos[0]?.credit && <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{allPhotos[0].credit}{safeWebsite(allPhotos[0].source) && <> · <a href={safeWebsite(allPhotos[0].source)} target="_blank" rel="noopener noreferrer" className="underline">{t('poiDetailUi.source')}</a></>}{safeWebsite(allPhotos[0].license_url) && <> · <a href={safeWebsite(allPhotos[0].license_url)} target="_blank" rel="noopener noreferrer" className="underline">{t('poiDetailUi.license')}</a></>}</p>}
             <div className="mt-1.5 mb-4">
@@ -382,7 +383,7 @@ function FullSheet({ poi, displayName, displayDescription, shortSummary, categor
 
             <div className="flex flex-wrap gap-2 mb-5">
               <ActionBtn icon={Navigation} label={t('poiDetail.navigate')} onClick={onNavigate} color={category.color} />
-              {onEditOfficial && <ActionBtn icon={Pencil} label={t('officialEditor.editThisPoi', 'Edit this POI')} onClick={onEditOfficial} />}
+              {onEditOfficial && <ActionBtn icon={Pencil} label={t('officialEditor.editThisPoi')} onClick={onEditOfficial} />}
               <ActionBtn icon={Share2} label={t('poiDetail.share')} onClick={onShare} />
               <ActionBtn icon={Camera} label={t('poiDetail.addPhoto')} onClick={onAddPhoto} disabled={!user} />
             </div>
@@ -458,7 +459,7 @@ function FullSheet({ poi, displayName, displayDescription, shortSummary, categor
             )}
 
             <React.Suspense fallback={<div className="my-5 h-24 animate-pulse rounded-2xl bg-gray-100 motion-reduce:animate-none dark:bg-accent" />}>
-              <SocialPostsSection targetType="poi" targetId={socialTargetId} targetName={poi.name} user={user} />
+              <SocialPostsSection targetType="poi" targetId={socialTargetId} targetName={displayName} user={user} />
             </React.Suspense>
 
             {(phone || email || website || poi.lat) && (
@@ -573,7 +574,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, onE
     let cancelled = false;
     reverseGeocodeAddress(poi.lat, poi.lon, language || 'en').then(a => { if (!cancelled && a) setResolvedAddress(a); });
     return () => { cancelled = true; };
-  }, [poi?.id]);
+  }, [poi?.id, poi?.lat, poi?.lon, poi?.address, language]);
 
   useEffect(() => {
     if (!poi) return;
@@ -600,8 +601,8 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, onE
   const handleShare = async () => {
     const url = `https://maps.google.com/?q=${poi.lat},${poi.lon}`;
     try {
-      if (navigator.share) await navigator.share({ title: poi.name, text: poi.address || resolvedAddress || poi.name, url });
-      else if (navigator.clipboard) { await navigator.clipboard.writeText(`${poi.name}\n${url}`); toast.success(t('poiDetail.linkCopied')); }
+      if (navigator.share) await navigator.share({ title: visibleText.name, text: poi.address || resolvedAddress || visibleText.name, url });
+      else if (navigator.clipboard) { await navigator.clipboard.writeText(`${visibleText.name}\n${url}`); toast.success(t('poiDetail.linkCopied')); }
       else window.open(url, '_blank');
     } catch (e) { if (e.name !== 'AbortError') window.open(url, '_blank'); }
   };
@@ -650,7 +651,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, onE
     ));
   };
 
-  const handleNavigate = () => { onNavigate?.({ lat: poi.lat, lng: poi.lon, label: poi.name }); onClose(); };
+  const handleNavigate = () => { onNavigate?.({ lat: poi.lat, lng: poi.lon, label: visibleText.name }); onClose(); };
 
   // All photos merged for lightbox — { url, credit } shape throughout;
   // SpotFinder-hosted photos have no third-party attribution requirement.
@@ -662,13 +663,13 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, onE
 
   const sharedProps = {
     poi: poiForView, category, sfPhotos, sfRating, photos,
-    displayName: visibleText.name, displayDescription: visibleText.description, shortSummary: visibleText.shortSummary,
+    displayName: visibleText.name, originalName: visibleText.originalName, displayDescription: visibleText.description, shortSummary: visibleText.shortSummary,
     socialTargetId: makePOIId(poi.lat, poi.lon, poi.name),
     onClose, onNavigate: handleNavigate, onShare: handleShare,
     onAddPhoto: handleAddPhoto, user,
     onEditOfficial: isSuperAdmin && poi._ambientHit ? () => { onClose(); onEditOfficial?.(poi._ambientHit); } : null,
     onOpenLightbox: (i) => setLightboxIndex(i),
-    onReportPOI: () => setReportTarget({ type: 'poi', id: makePOIId(poi.lat, poi.lon, poi.name), label: poi.name, snapshot: { name: poi.name, lat: poi.lat, lon: poi.lon } }),
+    onReportPOI: () => setReportTarget({ type: 'poi', id: makePOIId(poi.lat, poi.lon, poi.name), label: visibleText.name, snapshot: { name: poi.name, lat: poi.lat, lon: poi.lon } }),
     onReportPhoto: (p) => setReportTarget({ type: 'poi_photo', id: String(p.photoId), label: `photo at ${poi.name}`, snapshot: { name: poi.name, lat: poi.lat, lon: poi.lon, image: p.url } }),
   };
 

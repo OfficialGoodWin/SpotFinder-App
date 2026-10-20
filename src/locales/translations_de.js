@@ -93,6 +93,12 @@ export default {
     "reportSpam": "Spam / Fälschung",
     "reportInaccurate": "Falscher Standort"
   },
+  "officialEditor": {
+    "editThisPoi": "Diesen POI bearbeiten"
+  },
+  "poiDetailUi": {
+    "originalName": "Originalname: {name}"
+  },
   "poiDetail": {
     "navigate": "Navigieren",
     "share": "Teilen",
