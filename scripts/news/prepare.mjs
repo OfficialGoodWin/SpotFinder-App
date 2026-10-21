@@ -37,15 +37,20 @@ for (const name of names) {
   if (article.canonicalUrl !== origin + path) throw new Error(`Published ${name} has wrong canonical URL`);
   if (!Array.isArray(article.body) || article.body.length < 2 || !article.body.some(block => block.type === 'paragraph')) throw new Error(`Published ${name} needs substantive body`);
   if (article.body.some(block => /editorial outline|before publication|what to verify before publication/i.test(JSON.stringify(block)))) throw new Error(`Published ${name} still contains draft instructions`);
-  if (!validImagePath(article.cover.src) || !article.cover.alt || !Number.isInteger(article.cover.width) || !Number.isInteger(article.cover.height) || article.cover.width < 1 || article.cover.height < 1) throw new Error(`Published ${name} needs a local cover and dimensions`);
+  if (!validImagePath(article.cover.src) || !article.cover.alt || !article.cover.credit || !article.cover.caption || !Number.isInteger(article.cover.width) || !Number.isInteger(article.cover.height) || article.cover.width < 1 || article.cover.height < 1) throw new Error(`Published ${name} needs a local cover, dimensions, caption, and photo credit`);
+  if (article.cover.creditUrl && !/^https:\/\/[^\s]+$/.test(article.cover.creditUrl)) throw new Error(`Published ${name} has invalid photo credit URL`);
   await stat(join('public', article.cover.src.slice(1)));
   await checkResponsiveImages(article.cover.srcSet, name);
   for (const block of article.body.filter(item => item.type === 'image')) {
-    if (!validImagePath(block.src) || !block.alt || !Number.isInteger(block.width) || !Number.isInteger(block.height) || block.width < 1 || block.height < 1) throw new Error(`Published ${name} has incomplete body image`);
+    if (!validImagePath(block.src) || !block.alt || !block.caption || !block.credit || !Number.isInteger(block.width) || !Number.isInteger(block.height) || block.width < 1 || block.height < 1) throw new Error(`Published ${name} has incomplete body image or photo credit`);
+    if (block.creditUrl && !/^https:\/\/[^\s]+$/.test(block.creditUrl)) throw new Error(`Published ${name} has invalid body photo credit URL`);
     await stat(join('public', block.src.slice(1)));
     await checkResponsiveImages(block.srcSet, name);
   }
-  for (const spot of article.spotIds || []) if (!/^[A-Za-z0-9_-]{1,128}$/.test(spot.id) || !spot.name) throw new Error(`Published ${name} has invalid spot link`);
+  for (const spot of article.spotIds || []) {
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(spot.id) || !spot.name) throw new Error(`Published ${name} has invalid spot link`);
+    if (!Number.isFinite(spot.lat) || !Number.isFinite(spot.lon) || Math.abs(spot.lat) > 90 || Math.abs(spot.lon) > 180) throw new Error(`Published ${name} needs verified spot coordinates for its map embed`);
+  }
   published.push(article);
 }
 

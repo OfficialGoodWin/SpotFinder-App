@@ -14,7 +14,7 @@ try {
       page.on('request', request => { if (/firebase|googleapis\.com\/identitytoolkit|firestore/.test(request.url())) external.push(request.url()); });
       const response = await page.goto(`${base}/news`, { waitUntil: 'domcontentloaded' });
       assert.equal(response.status(), 200);
-      assert.equal(await page.evaluate(() => document.querySelector('h1')?.textContent), 'Journal.');
+      assert.equal(await page.evaluate(() => document.querySelector('h1')?.textContent), 'Journal');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), 0);
       assert.equal(external.length, 0, 'Journal direct view should make no Firebase requests');
       assert.equal(await page.evaluate(() => Boolean(document.querySelector('a[href="/"]'))), true);
@@ -26,7 +26,7 @@ try {
   const noJs = await browser.newContext({ javaScriptEnabled: false });
   const page = await noJs.newPage();
   await page.goto(`${base}/news`);
-  assert.match(await page.evaluate(() => document.querySelector('main')?.textContent), /Stories worth the journey/);
+  assert.match(await page.evaluate(() => document.querySelector('main')?.textContent), /First stories land in November/);
   assert.equal((await page.goto(`${base}/news/five-places-near-prague`)).status(), 404);
   assert.equal((await page.goto(`${base}/news/unknown`)).status(), 404);
   assert.equal((await page.goto(`${base}/assets/missing.js`)).status(), 404);

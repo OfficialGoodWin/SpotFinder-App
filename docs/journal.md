@@ -2,14 +2,16 @@
 
 The public Journal lives at `/news`. Direct visits use prerendered HTML. The five records in `content/news/` are **draft outlines**, not finished articles. They contain planning notes and are absent from the published bundle, generated pages, and sitemap.
 
+The empty Journal offers a **request by email**. Its form opens a prefilled message to `spotfinder@icloud.com`; it does not store subscribers or send automatically. The visible text explains this. Replace it with a consent and delivery workflow before describing it as a mailing list.
+
 ## Write and review an article
 
-1. Copy a JSON record in `content/news/` or edit one of the five drafts. This is the static content format; `body` is an ordered array of `paragraph`, `heading`, `list`, and `image` blocks. Text is rendered as text by React. Raw HTML is unsupported.
+1. Copy a JSON record in `content/news/` or edit one of the five drafts. This is the static content format; `body` is an ordered array of `paragraph`, `heading`, `list`, `quote`, and `image` blocks. A quote block has `text` and optional `attribution`. Text is rendered as text by React. Raw HTML is unsupported.
 2. Write useful, checked content. Replace every outline and checklist with the final article. Confirm place access, travel details, and the actual release or collaboration facts. Record source notes in the editorial review outside the public article file.
-3. Obtain a written license or permission for an authentic cover photograph. Place an optimized image under `public/news-images/` and set `cover.src`, `width`, `height`, `alt`, and optional `caption`. Responsive alternatives may be listed in `srcSet` and `sizes`. All image URLs must point to local, licensed files.
+3. Obtain a written license or permission for an authentic cover photograph. Place an optimized image under `public/news-images/` and set `cover.src`, `width`, `height`, `alt`, `caption`, and `credit`. Set `creditUrl` when the photographer has a source page. Responsive alternatives may be listed in `srcSet` and `sizes`. All image URLs must point to local, licensed files. Aim for a hero file under 200 KB. The Journal landing photograph is by Tegan Conway under the [Unsplash License](https://unsplash.com/license), with a source link in its visible credit.
 4. Confirm the real author name and whether it is a `Person` or `Organization`. Set `publishedAt` to the actual publication date in `YYYY-MM-DD` format. Set `updatedAt` only when a real update is made.
 5. Set `canonicalUrl` to `https://www.spotfinder.live/news/<slug>` for English or `https://www.spotfinder.live/news/cs/<slug>` for Czech. A Czech variant must be separately written and reviewed. Use the same slug across languages only if the two records are true translations. Article hreflang is emitted only when both variants are published. A Czech Journal landing is generated only when Czech articles exist.
-6. Add `spotIds` only for confirmed public SpotFinder places. Each entry is `{ "id": "real-public-id", "name": "Verified place name" }`. Open every generated `/spot/<id>` link before publishing. A draft may leave the array empty.
+6. Add `spotIds` only for confirmed public SpotFinder places. Each entry needs a real public `id`, verified `name`, and numeric `lat` and `lon` for the small OpenStreetMap embed. Open every generated `/spot/<id>` link before publishing. A draft may leave the array empty.
 7. After owner approval, change `status` to `published`, run `npm run build`, review the generated article and sitemap, then deploy through the normal release process. Revert to `draft` and redeploy to remove an article from the public site.
 
 The build rejects published records with missing required fields, invalid dates, missing cover files, an unexpected canonical, draft outline markers, or malformed spot IDs. Human review is still needed for factual accuracy, permissions, authorship, and spot availability.

@@ -13,7 +13,7 @@ const fixture = {
   language: 'en', category: 'Discover Places', author: { name: 'SpotFinder', type: 'Organization' },
   publishedAt: '2026-10-20', updatedAt: '2026-10-21', status: 'published',
   canonicalUrl: `${origin}/news/verified-viewpoint`,
-  cover: { src: '/news-images/example.webp', alt: 'Verified viewpoint', width: 1200, height: 800 },
+  cover: { src: '/news-images/example.webp', alt: 'Verified viewpoint', width: 1200, height: 800, caption: 'A verified viewpoint.', credit: 'Verified photographer' },
   body: [{ type: 'paragraph', text: 'Useful article body <script>alert(1)</script>' }, { type: 'heading', text: 'Getting there' }],
   spotIds: [{ id: 'real_approved_id', name: 'Verified place' }], relatedSlugs: [],
 };
@@ -49,7 +49,7 @@ test('article body renders without executable HTML and includes ordinary place l
       assert.match(html, /href="\/spot\/real_approved_id"/);
       assert.match(html, /<h1>A verified viewpoint<\/h1>/);
       assert.match(html, /href="\/news"/);
-      assert.match(renderToStaticMarkup(createElement(Journal, { path: '/news/unknown' })), /<h1>404<\/h1>/);
+      assert.match(renderToStaticMarkup(createElement(Journal, { path: '/news/unknown' })), /404 \/ Journal<\/span><h1>This story isn’t on the map\.<\/h1>/);
     } finally { publishedArticles.pop(); }
   } finally { await server.close(); }
 });

@@ -6,6 +6,7 @@ import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import { createServer } from 'vite';
 import react from '@vitejs/plugin-react';
+import { chromium } from 'playwright-core';
 import { headFor, origin } from './document.mjs';
 import { resolve } from 'node:path';
 
@@ -14,8 +15,8 @@ const fixture = {
   language: 'en', category: 'Guides', author: { name: 'SpotFinder', type: 'Organization' },
   publishedAt: '2026-10-20', updatedAt: '2026-10-21',
   canonicalUrl: `${origin}/news/publication-fixture`,
-  cover: { src: '/og-image.png', alt: 'SpotFinder graphic used for a local test only', width: 1200, height: 630 },
-  body: [{ type: 'paragraph', text: 'Temporary article content used only to verify direct HTML delivery.' }, { type: 'heading', text: 'Verification section' }],
+  cover: { src: '/news-images/prague-street.webp', alt: 'Prague street in winter', width: 960, height: 1440, caption: 'A Prague street in winter.', credit: 'Tegan Conway / Unsplash', creditUrl: 'https://unsplash.com/photos/cobblestone-street-with-old-buildings-and-lamppost-CtFdquCYqE8' },
+  body: [{ type: 'paragraph', text: 'Temporary article content used only to verify direct HTML delivery.' }, { type: 'quote', text: 'A local verification quotation.' }, { type: 'heading', text: 'Verification section' }],
   spotIds: [], relatedSlugs: [],
 };
 const output = new URL('../../dist/news/publication-fixture.html', import.meta.url);
@@ -43,6 +44,18 @@ try {
     const data = JSON.parse(source.match(/<script type="application\/ld\+json">([^<]+)<\/script>/)[1]);
     assert.equal(data['@type'], 'BlogPosting');
   }
+  const browser = await chromium.launch({ executablePath: process.env.SPOTFINDER_BROWSER || 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', headless: true });
+  try {
+    for (const width of [390, 1440]) {
+      const page = await browser.newPage({ viewport: { width, height: 844 }, javaScriptEnabled: false });
+      await page.goto('http://127.0.0.1:4173/news/publication-fixture', { waitUntil: 'networkidle' });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0);
+      assert.equal(await page.evaluate(() => { const image = document.querySelector('.journal-hero img'); return Boolean(image?.complete && image.naturalWidth > 0); }), true);
+      assert.equal(await page.evaluate(() => document.querySelectorAll('.journal-body blockquote').length), 1);
+      if (process.env.SPOTFINDER_JOURNAL_SCREENSHOT) await page.screenshot({ path: `.tmp-journal-article-${width}.png`, fullPage: true });
+      await page.close();
+    }
+  } finally { await browser.close(); }
   console.log('Temporary published article: direct visit, refresh, source content, metadata and JSON-LD OK');
 } finally {
   await server.close();
