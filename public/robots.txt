@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://spot-finder-app.vercel.app/sitemap.xml
+Sitemap: https://www.spotfinder.live/sitemap.xml

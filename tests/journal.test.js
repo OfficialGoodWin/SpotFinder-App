@@ -21,7 +21,7 @@ const fixture = {
 test('published article metadata is specific, escaped, and valid JSON-LD', () => {
   const head = headFor(fixture, [fixture]);
   assert.match(head, /<title>A verified viewpoint \| SpotFinder Journal<\/title>/);
-  assert.match(head, /rel="canonical" href="https:\/\/spot-finder-app\.vercel\.app\/news\/verified-viewpoint"/);
+  assert.ok(head.includes(`rel="canonical" href="${origin}/news/verified-viewpoint"`));
   assert.match(head, /article:published_time" content="2026-10-20"/);
   assert.match(head, /og:image:width" content="1200"/);
   assert.doesNotMatch(head, /hreflang=/);
@@ -59,9 +59,9 @@ test('current build has crawlable landing and excludes all drafts', async () => 
   const sitemap = await readFile(new URL('../dist/sitemap.xml', import.meta.url), 'utf8');
   const drafts = (await readdir(new URL('../content/news/', import.meta.url))).filter(name => name.endsWith('.json'));
   assert.match(html, /<h1>Journal/);
-  assert.match(html, /rel="canonical" href="https:\/\/spot-finder-app\.vercel\.app\/news"/);
+  assert.ok(html.includes(`rel="canonical" href="${origin}/news"`));
   assert.match(html, /<main id="main-content"/);
-  assert.match(sitemap, /<loc>https:\/\/spot-finder-app\.vercel\.app\/news<\/loc>/);
+  assert.ok(sitemap.includes(`<loc>${origin}/news</loc>`));
   for (const name of drafts) {
     const draft = JSON.parse(await readFile(new URL(`../content/news/${name}`, import.meta.url), 'utf8'));
     if (draft.status === 'draft') {

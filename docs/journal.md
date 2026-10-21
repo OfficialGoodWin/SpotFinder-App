@@ -8,7 +8,7 @@ The public Journal lives at `/news`. Direct visits use prerendered HTML. The fiv
 2. Write useful, checked content. Replace every outline and checklist with the final article. Confirm place access, travel details, and the actual release or collaboration facts. Record source notes in the editorial review outside the public article file.
 3. Obtain a written license or permission for an authentic cover photograph. Place an optimized image under `public/news-images/` and set `cover.src`, `width`, `height`, `alt`, and optional `caption`. Responsive alternatives may be listed in `srcSet` and `sizes`. All image URLs must point to local, licensed files.
 4. Confirm the real author name and whether it is a `Person` or `Organization`. Set `publishedAt` to the actual publication date in `YYYY-MM-DD` format. Set `updatedAt` only when a real update is made.
-5. Set `canonicalUrl` to `https://spot-finder-app.vercel.app/news/<slug>` for English or `https://spot-finder-app.vercel.app/news/cs/<slug>` for Czech. A Czech variant must be separately written and reviewed. Use the same slug across languages only if the two records are true translations. Article hreflang is emitted only when both variants are published. A Czech Journal landing is generated only when Czech articles exist.
+5. Set `canonicalUrl` to `https://www.spotfinder.live/news/<slug>` for English or `https://www.spotfinder.live/news/cs/<slug>` for Czech. A Czech variant must be separately written and reviewed. Use the same slug across languages only if the two records are true translations. Article hreflang is emitted only when both variants are published. A Czech Journal landing is generated only when Czech articles exist.
 6. Add `spotIds` only for confirmed public SpotFinder places. Each entry is `{ "id": "real-public-id", "name": "Verified place name" }`. Open every generated `/spot/<id>` link before publishing. A draft may leave the array empty.
 7. After owner approval, change `status` to `published`, run `npm run build`, review the generated article and sitemap, then deploy through the normal release process. Revert to `draft` and redeploy to remove an article from the public site.
 
@@ -20,12 +20,12 @@ The build rejects published records with missing required fields, invalid dates,
 
 Vercel `cleanUrls` serves those files at extensionless URLs. The SPA rewrite excludes `/news` and its children, so a missing or draft slug returns the host's real 404. It also excludes `/assets` and paths with file extensions, preserving missing-asset 404s. The existing map and `/spot/:id` route still use the SPA. The service worker only caches `/` as the map shell after a successful map navigation.
 
-The canonical production host is the production URL supplied for this project: `https://spot-finder-app.vercel.app`. Review this setting if the deployment's primary domain changes; update `src/lib/spotLinks.js`, `scripts/news/prepare.mjs`, `scripts/news/prerender.mjs`, `index.html`, `public/robots.txt`, and the source sitemap together.
+The canonical production host is `https://www.spotfinder.live`. The apex domain redirects there. If the primary domain changes, update `src/lib/spotLinks.js`, `scripts/news/document.mjs`, `index.html`, `public/robots.txt`, and the source sitemap together.
 
 ## Search Console after deployment
 
-1. Verify the `https://spot-finder-app.vercel.app/` property in Google Search Console.
-2. Open `https://spot-finder-app.vercel.app/sitemap.xml` and confirm it is reachable and includes only intended URLs.
+1. Verify the `https://www.spotfinder.live/` property in Google Search Console.
+2. Open `https://www.spotfinder.live/sitemap.xml` and confirm it is reachable and includes only intended URLs.
 3. In Search Console, open **Sitemaps**, enter `sitemap.xml`, and submit. Check the report for fetch or parsing errors.
 4. Inspect a published article URL using URL Inspection and test its live page. Use Google's Rich Results Test to inspect article markup.
 

@@ -59,7 +59,7 @@
     },
     {
       "source": "/((?!news(?:/|$)|assets/|api/|.*\\.[^/]+$).*)",
-      "destination": "/index.html"
+      "destination": "/"
     }
   ],
   "functions": {

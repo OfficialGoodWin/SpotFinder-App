@@ -1,4 +1,4 @@
-export const origin = 'https://spot-finder-app.vercel.app';
+export const origin = 'https://www.spotfinder.live';
 export const escape = value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 export const pathFor = article => `/news/${article.language === 'cs' ? 'cs/' : ''}${article.slug}`;
 const json = value => JSON.stringify(value).replace(/</g, '\\u003c');
