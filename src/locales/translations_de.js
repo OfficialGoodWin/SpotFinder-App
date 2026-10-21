@@ -1,4 +1,5 @@
 export default {
+  "imagePrep": { "title": "Foto vorbereiten", "checking": "Foto wird geprüft…", "sourcePreview": "Ausgewähltes Foto vor der Bearbeitung", "resultPreview": "Vorschau des bearbeiteten Fotos", "question": "Wie soll das Foto vorbereitet werden?", "full": "Ganzes Bild behalten", "requiresResize": "(Verkleinerung erforderlich)", "resize": "Seitenverhältnis beim Verkleinern beibehalten", "crop": "Ausgewählten Bereich zuschneiden", "longestSide": "Längste Seite", "maxPixels": "maximal {value} px", "left": "Links", "top": "Oben", "width": "Breite", "height": "Höhe", "ready": "Bereit", "privacy": "Fotos werden als JPEG gespeichert. Die Vorbereitung entfernt übliche EXIF-Daten einschließlich des Standorts.", "reset": "Zurücksetzen", "preparing": "Wird vorbereitet…", "preview": "Ergebnis ansehen", "usePhoto": "Foto verwenden", "uploadInterrupted": "Upload unterbrochen. Bitte erneut versuchen.", "uploaded": "Foto hochgeladen." },
   "common": {
     "cancel": "Abbrechen",
     "save": "Speichern",

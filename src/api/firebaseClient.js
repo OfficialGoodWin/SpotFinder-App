@@ -43,8 +43,10 @@ import {
   arrayUnion,
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { getStorage, ref as storageRef, uploadBytes, uploadBytesResumable, getDownloadURL, getBlob, getMetadata, listAll, deleteObject } from 'firebase/storage';
-import { validateImageDimensions, validateImageFile } from '@/lib/imageUploadValidation';
+import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL, getBlob, getMetadata, listAll, deleteObject } from 'firebase/storage';
+import { validateImageFile } from '@/lib/imageUploadValidation';
+import { isPreparedImage, MAX_UPLOAD_BYTES, prepareImageFile, uploadImageError } from '@/lib/imagePreparation';
+import { waitForUploadTask } from '@/lib/uploadTask';
 import { firebaseConfig } from './firebaseConfig';
 import { getRecaptchaToken } from '@/lib/recaptcha';
 import { filterAndSortNearbySpots, nearbyBounds, normalizeLatLng } from '@/lib/spotDiscovery';
@@ -321,51 +323,16 @@ export const handlePOIError = (error, poiData) => {
   return { blocked: true, fallback: poiData || [] };
 };
  
-// Compress image in-browser, then store the binary file in Firebase Storage.
-// Firestore keeps only a small URL instead of a base64 payload.
-const prepareSpotImageBlob = async (file) => {
-  await validateImageFile(file);
-
-  const blob = await new Promise((resolve, reject) => {
-    const MAX_W = 1200, MAX_H = 1200, QUALITY = 0.78;
-    const reader = new FileReader();
-    reader.onerror = reject;
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onerror = reject;
-      img.onload = () => {
-        let { width, height } = img;
-        try {
-          validateImageDimensions(width, height);
-        } catch (error) {
-          reject(error);
-          return;
-        }
-        if (width > MAX_W || height > MAX_H) {
-          const ratio = Math.min(MAX_W / width, MAX_H / height);
-          width = Math.round(width * ratio);
-          height = Math.round(height * ratio);
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width; canvas.height = height;
-        const context = canvas.getContext('2d');
-        if (!context) {
-          reject(new Error('Image processing is unavailable in this browser.'));
-          return;
-        }
-        context.drawImage(img, 0, 0, width, height);
-        canvas.toBlob(result => result ? resolve(result) : reject(new Error('Image encoding failed')), 'image/jpeg', QUALITY);
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
-
-  if (blob.size > 5 * 1024 * 1024) throw new Error('The processed image is too large to upload.');
-  return blob;
+const prepareSpotImageBlob = async file => {
+  if (isPreparedImage(file)) {
+    await validateImageFile(file);
+    if (file.size > MAX_UPLOAD_BYTES) throw new Error('The prepared photo is over 5 MB. Choose a smaller resize.');
+    return file;
+  }
+  return (await prepareImageFile(file)).file;
 };
 
-export const uploadSpotImage = async (file) => {
+export const uploadSpotImage = async (file, { signal, onProgress } = {}) => {
   const { auth, storage } = getFirebaseServices();
   const uid = auth.currentUser?.uid;
   if (!uid) throw new Error('You must be signed in to upload a photo.');
@@ -374,8 +341,13 @@ export const uploadSpotImage = async (file) => {
   const id = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const path = `community/${uid}/${id}.jpg`;
   const ref = storageRef(storage, path);
-  await uploadBytes(ref, blob, { contentType: 'image/jpeg', cacheControl: 'public,max-age=31536000,immutable' });
-  return getDownloadURL(ref);
+  try {
+    await uploadWithProgress(ref, blob, { contentType: 'image/jpeg', cacheControl: 'public,max-age=31536000,immutable' }, onProgress, signal);
+    if (signal?.aborted) throw new DOMException('Upload interrupted', 'AbortError');
+    await callFn('validateCommunityPhoto')({ path });
+    if (signal?.aborted) throw new DOMException('Upload interrupted', 'AbortError');
+    return await getDownloadURL(ref);
+  } catch (error) { throw uploadImageError(error); }
 };
 
 const SPOT_DRAFTS_COLLECTION = 'spot_drafts';
@@ -385,14 +357,10 @@ const waitForAuthRestore = async (auth) => {
   return auth.currentUser;
 };
 
-const uploadWithProgress = (ref, blob, metadata, onProgress) => new Promise((resolve, reject) => {
-  const task = uploadBytesResumable(ref, blob, metadata);
-  task.on('state_changed', snapshot => {
-    onProgress?.(snapshot.totalBytes ? snapshot.bytesTransferred / snapshot.totalBytes : 0);
-  }, reject, () => resolve(task.snapshot));
-});
+const uploadWithProgress = (ref, blob, metadata, onProgress, signal) =>
+  waitForUploadTask(uploadBytesResumable(ref, blob, metadata), { onProgress, signal });
 
-export const uploadDraftImage = async (file, draftId, onProgress) => {
+export const uploadDraftImage = async (file, draftId, onProgress, signal) => {
   const { auth, storage } = getFirebaseServices();
   const current = await waitForAuthRestore(auth);
   if (!current || current.isAnonymous) throw new Error('Sign in to preserve draft photos across devices.');
@@ -400,7 +368,9 @@ export const uploadDraftImage = async (file, draftId, onProgress) => {
   const id = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const path = `drafts/${current.uid}/${draftId}/${id}.jpg`;
   const ref = storageRef(storage, path);
-  await uploadWithProgress(ref, blob, { contentType: 'image/jpeg', cacheControl: 'private,max-age=0,no-store' }, onProgress);
+  try { await uploadWithProgress(ref, blob, { contentType: 'image/jpeg', cacheControl: 'private,max-age=0,no-store' }, onProgress, signal); }
+  catch (error) { throw uploadImageError(error); }
+  if (signal?.aborted) throw uploadImageError(new DOMException('Upload interrupted', 'AbortError'));
   const metadata = await getMetadata(ref);
   if (Number(metadata.size) !== blob.size) throw new Error('The draft photo upload could not be verified. Please retry.');
   return { path, name: file.name || 'Draft photo', type: 'image/jpeg', size: blob.size };
@@ -946,13 +916,24 @@ export const addPOIPhoto = async (poiId, imageUrl, userEmail) => {
   const { auth, db } = getFirebaseServices();
   const uid = auth.currentUser?.uid;
   if (!uid) throw new Error('Sign in to add a photo');
-  const docRef = await addDoc(collection(db, POI_PHOTOS_COLLECTION), {
+  let path;
+  try { path = decodeURIComponent(new URL(imageUrl).pathname.split('/o/')[1] || ''); }
+  catch { throw new Error('The uploaded photo URL could not be verified. Try again.'); }
+  const prefix = `community/${uid}/`;
+  const filename = path.startsWith(prefix) ? path.slice(prefix.length) : '';
+  if (!/^[A-Za-z0-9-]+\.jpg$/.test(filename)) throw new Error('This uploaded photo does not belong to your account.');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(path));
+  const docRef = doc(db, POI_PHOTOS_COLLECTION, `photo_${Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')}`);
+  if ((await getDoc(docRef)).exists()) return { id: docRef.id, poi_id: poiId, image: imageUrl };
+  try { await setDoc(docRef, {
     poi_id: poiId,
     image: imageUrl,
     created_by: 'registered-account',
     created_by_uid: uid,
     created_date: new Date().toISOString(),
-  });
+  }); } catch (error) {
+    if (!(await getDoc(docRef)).exists()) throw error;
+  }
   return { id: docRef.id, poi_id: poiId, image: imageUrl };
 };
 

@@ -11,6 +11,7 @@ import LiquidSegmentedControl from '../ui/LiquidSegmentedControl';
 import DraftConfirmationDialog from '../ui/DraftConfirmationDialog';
 import { draftToast } from '../ui/draftToast';
 import { IMAGE_ACCEPT, validateImageFileMetadata } from '@/lib/imageUploadValidation';
+import ImagePreparationDialog from './ImagePreparationDialog';
 import { hasMeaningfulAddSpotDraft, validateRequiredSpotFields, voiceErrorMessage } from '@/lib/contributionFlow';
 import { createDraftId, deleteGuestDraft, getGuestDraftOwnerKey, normalizeSpotDraft, saveGuestDraft } from '@/lib/spotDrafts';
 import { deleteGuestDraftPhotos, loadGuestDraftPhoto, persistGuestDraftPhotos, pruneGuestDraftPhotos } from '@/lib/guestDraftPhotos';
@@ -61,6 +62,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
   const [crowdednessRating, setCrowdednessRating] = useState(0);
   const [imageFiles, setImageFiles] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
+  const [photoQueue, setPhotoQueue] = useState([]);
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
   const [interimText, setInterimText] = useState('');
@@ -98,6 +100,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
   const draftSaveLockRef = useRef(false);
   const uploadedPublicPhotosRef = useRef(new Map());
   const selectedPhotoUrlsRef = useRef(new Set());
+  const photoAbortRef = useRef(new AbortController());
   const committedRef = useRef(''); // tracks already-committed final transcript
   const titleRef = useRef(null);
   const descriptionRef = useRef(null);
@@ -158,6 +161,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
 
   useEffect(() => () => recognitionRef.current?.stop(), []);
   useEffect(() => () => {
+    photoAbortRef.current.abort();
     for (const url of selectedPhotoUrlsRef.current) URL.revokeObjectURL(url);
     selectedPhotoUrlsRef.current.clear();
   }, []);
@@ -187,7 +191,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
           let lastError;
           for (let attempt = 0; attempt < 2; attempt += 1) {
             try {
-              uploaded[index] = await uploadDraftImage(imageFiles[index], draftIdRef.current, fraction => setPhotoProgress(Math.round(((index + fraction) / imageFiles.length) * 100)));
+              uploaded[index] = await uploadDraftImage(imageFiles[index], draftIdRef.current, fraction => setPhotoProgress(Math.round(((index + fraction) / imageFiles.length) * 100)), photoAbortRef.current.signal);
               setDraftPhotoRefs([...uploaded]);
               lastError = null;
               break;
@@ -236,20 +240,25 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
   };
 
   const handleImageChange = (e) => {
-    const remaining = 3 - imageFiles.length;
+    const remaining = 3 - imageFiles.length - photoQueue.length;
     const selected = Array.from(e.target.files || []).filter(file => {
       try { validateImageFileMetadata(file); return true; }
       catch (error) { toast.error(error.message); return false; }
     });
-    if (!remaining || !selected.length) return;
+    if (!remaining || !selected.length) { e.target.value = ''; return; }
     const accepted = selected.slice(0, remaining);
-    const acceptedUrls = accepted.map(file => URL.createObjectURL(file));
-    acceptedUrls.forEach(url => selectedPhotoUrlsRef.current.add(url));
-    setImageFiles(current => [...current, ...accepted]);
-    setImagePreviews(current => [...current, ...acceptedUrls]);
-    setDraftPhotoRefs(current => [...current, ...accepted.map(() => null)]);
+    setPhotoQueue(current => [...current, ...accepted]);
     if (selected.length > remaining) toast.info('You can add up to 3 photos per spot.');
     e.target.value = '';
+  };
+
+  const acceptPreparedPhoto = file => {
+    const url = URL.createObjectURL(file);
+    selectedPhotoUrlsRef.current.add(url);
+    setImageFiles(current => [...current, file]);
+    setImagePreviews(current => [...current, url]);
+    setDraftPhotoRefs(current => [...current, null]);
+    setPhotoQueue(current => current.slice(1));
   };
 
   const removeImage = (index) => {
@@ -406,7 +415,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
           let lastError;
           for (let attempt = 0; attempt < 2 && !uploaded; attempt += 1) {
             try {
-              uploaded = await uploadDraftImage(imageFiles[index], draftIdRef.current, fraction => setPhotoProgress(Math.round(((index + fraction) / imageFiles.length) * 100)));
+              uploaded = await uploadDraftImage(imageFiles[index], draftIdRef.current, fraction => setPhotoProgress(Math.round(((index + fraction) / imageFiles.length) * 100)), photoAbortRef.current.signal);
             } catch (error) { lastError = error; }
           }
           if (!uploaded) throw lastError;
@@ -430,7 +439,14 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
     if (imageFiles.length && !(draft && user)) {
       try {
         setUploadingImage(true);
-        image_urls = await uploadSelectedPhotos(imageFiles, uploadSpotImage, uploadedPublicPhotosRef.current);
+        const fractions = imageFiles.map(file => uploadedPublicPhotosRef.current.has(file) ? 1 : 0);
+        image_urls = await uploadSelectedPhotos(imageFiles, (file, index) => uploadSpotImage(file, {
+          signal: photoAbortRef.current.signal,
+          onProgress: fraction => {
+            fractions[index] = fraction;
+            setPhotoProgress(Math.round(fractions.reduce((sum, value) => sum + value, 0) / imageFiles.length * 100));
+          },
+        }), uploadedPublicPhotosRef.current);
       } catch (err) {
         console.error('Image uploads failed:', err);
         setSubmitError(err?.message || 'The photos could not be uploaded. Your changes are still here.');
@@ -472,6 +488,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
     };
 
     try {
+      if (photoAbortRef.current.signal.aborted) throw new Error('Upload interrupted. Reopen your draft and try again.');
       assertOwnerSession();
       await onSave(baseData, socialValidation?.canonicalUrl || '');
       if (draft) {
@@ -813,6 +830,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
       >
         {!user && imageFiles.length > 0 && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">{t('addSpotUi.guestDraftPhotos', { count: imageFiles.length })}</p>}
       </DraftConfirmationDialog>
+      {photoQueue[0] && <ImagePreparationDialog key={`${photoQueue[0].name}-${photoQueue[0].lastModified}-${photoQueue.length}`} file={photoQueue[0]} onConfirm={acceptPreparedPhoto} onCancel={() => setPhotoQueue(current => current.slice(1))} />}
     </div>
   );
 }

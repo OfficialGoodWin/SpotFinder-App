@@ -7,6 +7,7 @@ import LabeledRatingScale from './LabeledRatingScale';
 import { submitCategoryRatings } from '@/api/firebaseClient';
 import { toast } from 'sonner';
 import { IMAGE_ACCEPT, validateImageFileMetadata } from '@/lib/imageUploadValidation';
+import ImagePreparationDialog from './ImagePreparationDialog';
 import { getSpotDisplayName, isMeaningfulSpotTitle } from '@/lib/spotPresentation';
 import DraftConfirmationDialog from '../ui/DraftConfirmationDialog';
 
@@ -35,11 +36,14 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
   ));
   const [description, setDescription] = useState(spot.description || '');
   const [imageFile, setImageFile] = useState(null);
+  const [pendingImage, setPendingImage] = useState(null);
   const existingImageUrls = Array.isArray(spot.image_urls) && spot.image_urls.length ? spot.image_urls : [spot.image_url].filter(Boolean);
   const [imagePreview, setImagePreview] = useState(existingImageUrls[0] || null);
   const [loading, setLoading] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const imageUrlRef = useRef('');
+  const uploadedImageUrlRef = useRef(new Map());
+  const photoAbortRef = useRef(new AbortController());
 
   const [tags, setTags] = useState(spot.tags || []);
   const [cost, setCost] = useState(spot.cost || 'free');
@@ -58,7 +62,7 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
     accessDifficulty !== (spot.access_difficulty || 'easy') || parking !== (spot.parking || 'yes') ||
     JSON.stringify(bestTime) !== JSON.stringify(spot.best_time || []) || directions !== (spot.directions || '') || rating.overall > 0;
   const requestClose = () => { if (!loading) isDirty ? setConfirmDiscard(true) : onClose(); };
-  useEffect(() => () => { if (imageUrlRef.current) URL.revokeObjectURL(imageUrlRef.current); }, []);
+  useEffect(() => () => { photoAbortRef.current.abort(); if (imageUrlRef.current) URL.revokeObjectURL(imageUrlRef.current); }, []);
 
   const toggleTag = (tag) => setTags(t => t.includes(tag) ? t.filter(x => x !== tag) : [...t, tag]);
   const toggleBestTime = (val) => setBestTime(times => val === 'anytime'
@@ -70,10 +74,8 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
     if (file) {
       try { validateImageFileMetadata(file); }
       catch (error) { toast.error(error.message); e.target.value = ''; return; }
-      setImageFile(file);
-      if (imageUrlRef.current) URL.revokeObjectURL(imageUrlRef.current);
-      imageUrlRef.current = URL.createObjectURL(file);
-      setImagePreview(imageUrlRef.current);
+      setPendingImage(file);
+      e.target.value = '';
     }
   };
 
@@ -88,10 +90,14 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
     if (imageFile) {
       try {
         const { uploadSpotImage } = await import('@/api/firebaseClient');
-        image_url = await uploadSpotImage(imageFile);
+        image_url = uploadedImageUrlRef.current.get(imageFile);
+        if (!image_url) {
+          image_url = await uploadSpotImage(imageFile, { signal: photoAbortRef.current.signal });
+          uploadedImageUrlRef.current.set(imageFile, image_url);
+        }
         image_urls = [image_url, ...image_urls.slice(1)];
-      } catch {
-        toast.error(t('editSpotUi.photoUploadFailed'));
+      } catch (error) {
+        toast.error(error?.message || t('editSpotUi.photoUploadFailed'));
         setLoading(false);
         return;
       }
@@ -101,6 +107,7 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
     }
     
     try {
+    if (photoAbortRef.current.signal.aborted) throw new Error('Upload interrupted. Reopen this spot and try again.');
     await onSave({
       ...spot,
       title: title.trim(),
@@ -285,6 +292,14 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
         </div>
       </div>
       <DraftConfirmationDialog open={confirmDiscard} onOpenChange={setConfirmDiscard} title={t('editSpotUi.discardTitle')} description={t('editSpotUi.discardHint')} cancelLabel={t('editSpotUi.keepEditing')} confirmLabel={t('editSpotUi.discardChanges')} onConfirm={onClose} destructive />
+      {pendingImage && <ImagePreparationDialog file={pendingImage} onConfirm={file => {
+        uploadedImageUrlRef.current.clear();
+        setImageFile(file);
+        if (imageUrlRef.current) URL.revokeObjectURL(imageUrlRef.current);
+        imageUrlRef.current = URL.createObjectURL(file);
+        setImagePreview(imageUrlRef.current);
+        setPendingImage(null);
+      }} onCancel={() => setPendingImage(null)} />}
     </div>
   );
 }

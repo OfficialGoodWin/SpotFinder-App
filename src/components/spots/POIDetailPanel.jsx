@@ -8,6 +8,7 @@ import { getCategoryName } from '@/lib/POICategories';
 import { iconGlyphSVG } from '@/lib/mapIcons';
 import ReportDialog from '@/components/moderation/ReportDialog';
 import { IMAGE_ACCEPT, validateImageFileMetadata } from '@/lib/imageUploadValidation';
+import ImagePreparationDialog from './ImagePreparationDialog';
 import { normalizePoiPhotos, openingHoursLabel, safeWebsite } from '@/lib/poiPresentation';
 import { resolveVisiblePoiText } from '@/lib/poiLocalization';
 import { recoverableLazy } from '@/components/ChunkLoadRecovery';
@@ -558,6 +559,11 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, onE
   const [lightboxIndex, setLightboxIndex] = useState(null); // null = closed
   const [resolvedAddress, setResolvedAddress] = useState('');
   const [reportTarget, setReportTarget] = useState(null);
+  const [pendingPhoto, setPendingPhoto] = useState(null);
+  const photoUploadLockRef = useRef(false);
+  const uploadedPhotoUrlRef = useRef(new Map());
+  const photoAbortRef = useRef(new AbortController());
+  useEffect(() => () => photoAbortRef.current.abort(), []);
   const fileInputRef = useRef(null);
   const visibleText = resolveVisiblePoiText(poi, language);
   useEffect(() => {
@@ -609,18 +615,32 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, onE
 
   const handleAddPhoto = () => { if (user) fileInputRef.current?.click(); };
 
-  const handleFileChange = async (e) => {
+  const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try { validateImageFileMetadata(file); }
     catch (error) { toast.error(error.message); e.target.value = ''; return; }
+    setPendingPhoto(file);
+    e.target.value = '';
+  };
+
+  const handlePreparedPhoto = async file => {
+    if (photoUploadLockRef.current) return;
+    photoUploadLockRef.current = true;
     const poiId = makePOIId(poi.lat, poi.lon, poi.name);
     try {
-      const dataUrl = await uploadSpotImage(file);
+      let dataUrl = uploadedPhotoUrlRef.current.get(file);
+      if (!dataUrl) {
+        dataUrl = await uploadSpotImage(file, { signal: photoAbortRef.current.signal });
+        uploadedPhotoUrlRef.current.set(file, dataUrl);
+      }
+      if (photoAbortRef.current.signal.aborted) throw new Error('Upload interrupted. Open the place and try again.');
       await addPOIPhoto(poiId, dataUrl, user.email);
+      uploadedPhotoUrlRef.current.delete(file);
       setSfPhotos(prev => [{ id: Date.now(), image: dataUrl, created_by: user.email }, ...prev]);
-    } catch (err) { console.error('Photo upload failed:', err); toast.error(err?.message || 'The photo could not be uploaded.'); }
-    e.target.value = '';
+      setPendingPhoto(null);
+      toast.success(t('imagePrep.uploaded'));
+    } finally { photoUploadLockRef.current = false; }
   };
 
   const handleSubmitRating = async (rating, comment) => {
@@ -689,6 +709,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, onE
         />
       )}
       <ReportDialog open={!!reportTarget} onClose={() => setReportTarget(null)} user={user} targetType={reportTarget?.type} targetId={reportTarget?.id || ''} targetLabel={reportTarget?.label} targetSnapshot={reportTarget?.snapshot || {}} />
+      {pendingPhoto && <ImagePreparationDialog file={pendingPhoto} onConfirm={handlePreparedPhoto} onCancel={() => setPendingPhoto(null)} />}
     </>
   );
 }

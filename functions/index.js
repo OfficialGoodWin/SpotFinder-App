@@ -26,6 +26,7 @@ const { defineString } = require('firebase-functions/params');
 const { validateSocialPostUrl, INVALID_SOCIAL_URL_MESSAGE } = require('./socialUrlPolicy');
 const { saveOfficialPoi, PoiEditError } = require('./officialPoiService');
 const { readOfficialPoi } = require('./officialPoiReader');
+const { MAX_UPLOAD_BYTES, isJpegBytes } = require('./imageFilePolicy');
 initializeApp();
 const db = getFirestore();
 const adminAuth = getAuth();
@@ -450,6 +451,10 @@ async function promoteDraftPhotos(uid, draftId, draftData) {
     if (!Number.isFinite(size) || size <= 0 || size > 5 * 1024 * 1024 || !/^image\/(jpeg|png|webp)$/.test(metadata.contentType || '')) {
       throw new functions.https.HttpsError('failed-precondition', 'A private draft photo failed validation. Remove it and upload it again.');
     }
+    if (metadata.contentType === 'image/jpeg') {
+      const [bytes] = await source.download();
+      if (!isJpegBytes(bytes)) throw new functions.https.HttpsError('failed-precondition', 'A private draft photo is not a valid prepared JPEG. Remove it and upload it again.');
+    }
     const destinationPath = `community/${uid}/draft-${draftId}-${index}.jpg`;
     const token = crypto.randomUUID();
     const destination = bucket.file(destinationPath);
@@ -463,6 +468,35 @@ async function promoteDraftPhotos(uid, draftId, draftData) {
   }
   return urls;
 }
+
+// Storage rules limit owner, path, size, and declared type. This callable
+// checks the bounded bytes before a new client exposes the URL in a record.
+exports.validateCommunityPhoto = functions.https.onCall(async (data, context) => {
+  const uid = context.auth?.uid;
+  if (!uid) {
+    throw new functions.https.HttpsError('unauthenticated', 'Sign in to upload a photo.');
+  }
+  const path = String(data?.path || '');
+  const prefix = `community/${uid}/`;
+  if (!path.startsWith(prefix) || !/^[A-Za-z0-9-]+\.jpg$/.test(path.slice(prefix.length))) {
+    throw new functions.https.HttpsError('permission-denied', 'This photo does not belong to your account.');
+  }
+  const object = getStorage().bucket().file(path);
+  let metadata;
+  try { [metadata] = await object.getMetadata(); }
+  catch { throw new functions.https.HttpsError('not-found', 'The uploaded photo is missing. Try again.'); }
+  const size = Number(metadata.size);
+  if (!Number.isFinite(size) || size <= 0 || size > MAX_UPLOAD_BYTES || metadata.contentType !== 'image/jpeg') {
+    await object.delete({ ignoreNotFound: true });
+    throw new functions.https.HttpsError('failed-precondition', 'The uploaded photo exceeded 5 MB or was not JPEG. Resize it and try again.');
+  }
+  const [bytes] = await object.download();
+  if (!isJpegBytes(bytes)) {
+    await object.delete({ ignoreNotFound: true });
+    throw new functions.https.HttpsError('failed-precondition', 'The uploaded photo was not a valid JPEG. Try another copy.');
+  }
+  return { size };
+});
 
 function sanitizePoiMatch(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
