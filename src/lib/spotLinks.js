@@ -1,4 +1,4 @@
-export const PUBLIC_ORIGIN = 'https://spotfinder.cz';
+export const PUBLIC_ORIGIN = 'https://spot-finder-app.vercel.app';
 
 export function validSpotId(id) {
   return typeof id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(id);

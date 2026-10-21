@@ -1,10 +1,10 @@
-import { Suspense } from 'react'
+import { Suspense, lazy } from 'react'
 import { Toaster } from "@/components/ui/sonner"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import NavigationTracker from '@/lib/NavigationTracker'
 import { pagesConfig } from './pages.config'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { ThemeProvider } from '@/lib/ThemeContext';
@@ -14,6 +14,8 @@ import ErrorBoundary from '@/lib/ErrorBoundary';
 import ChunkLoadRecovery from '@/components/ChunkLoadRecovery';
 
 const { Pages, Layout, mainPage } = pagesConfig;
+const Journal = lazy(() => import('./news/Journal'));
+const JournalRoute = () => <Journal path={useLocation().pathname} />;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
 const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
 
@@ -54,6 +56,7 @@ const AuthenticatedApp = () => {
   return (
     <>
     <Routes>
+      <Route path="/news/*" element={<Suspense fallback={<RouteFallback />}><JournalRoute /></Suspense>} />
       <Route path="/" element={
         <LayoutWrapper currentPageName={mainPageKey}>
           <MainPage />

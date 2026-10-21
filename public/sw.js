@@ -30,7 +30,7 @@ self.addEventListener('fetch', event => {
     event.respondWith(
       fetch(request, { cache: 'no-cache' })
         .then(async response => {
-          if (response.ok) {
+          if (response.ok && url.pathname === '/') {
             const cachedResponse = response.clone();
             const cache = await caches.open(SHELL_CACHE);
             await cache.put('/', cachedResponse);

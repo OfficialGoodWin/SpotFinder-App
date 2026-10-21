@@ -482,6 +482,7 @@ export default {
       "feature5": "Directions through Google Maps, Mapy.com, or Apple Maps",
       "feature6": "Optional plan previews; checkout disabled by default",
       "technology": "React, MapLibre, Firebase, and external map directions",
+      "journal": "Journal",
       "whatsNew": "Version {version} · What’s new"
     },
     "feedback": {

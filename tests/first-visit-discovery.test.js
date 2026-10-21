@@ -46,7 +46,7 @@ test('featured photographs follow the public gallery order, including legacy dat
 });
 
 test('canonical and legacy links identify the immutable spot ID across reloads', () => {
-  assert.equal(canonicalSpotUrl('castle_01'), 'https://spotfinder.cz/spot/castle_01');
+  assert.equal(canonicalSpotUrl('castle_01'), 'https://spot-finder-app.vercel.app/spot/castle_01');
   assert.deepEqual(spotIdFromLocation('/spot/castle_01', ''), { id: 'castle_01', isSpotLink: true });
   assert.deepEqual(spotIdFromLocation('/', '?spot=castle_01'), { id: 'castle_01', isSpotLink: true });
   assert.equal(validSpotId('../private'), false);

@@ -1,0 +1,20 @@
+{
+  "slug": "scenic-viewpoints-central-bohemia",
+  "title": "Scenic viewpoints in Central Bohemia",
+  "summary": "An accessible guide to verified viewpoints and the journeys to reach them.",
+  "language": "en",
+  "category": "Guides",
+  "author": { "name": "SpotFinder editorial team", "type": "Organization" },
+  "publishedAt": null,
+  "updatedAt": null,
+  "cover": null,
+  "canonicalUrl": "https://spot-finder-app.vercel.app/news/scenic-viewpoints-central-bohemia",
+  "status": "draft",
+  "relatedSlugs": [],
+  "spotIds": [],
+  "body": [
+    { "type": "paragraph", "text": "Editorial outline: Introduce verified viewpoints across Central Bohemia, including route length, terrain, seasonality, and responsible visiting advice." },
+    { "type": "heading", "text": "What to verify before publication" },
+    { "type": "list", "items": ["Check each viewpoint and trail against current official access information.", "Confirm transit or parking details and accessibility limitations.", "Use licensed photographs and real public SpotFinder links only."] }
+  ]
+}

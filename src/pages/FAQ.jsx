@@ -142,7 +142,7 @@ function AboutSection({ t }) {
     <section className="sf-surface overflow-hidden">
       <div className="border-b border-border bg-primary/[0.055] px-5 py-5 sm:px-6"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><MapPin className="h-5 w-5" /></span><div><h2 className="text-xl font-bold">{t('faqPage.about.title')}</h2><p className="text-sm text-muted-foreground">{t('faqPage.about.subtitle')}</p></div></div></div>
       <ul className="grid gap-2 px-5 py-5 sm:grid-cols-2 sm:px-6">{features.map(feature => <li key={feature} className="flex items-start gap-2.5 text-sm text-muted-foreground"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />{feature}</li>)}</ul>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/40 px-5 py-4 text-xs text-muted-foreground sm:px-6"><span>{t('faqPage.about.technology')}</span><a href="/updates" className="inline-flex items-center gap-1.5 font-bold text-primary hover:underline">{t('faqPage.about.whatsNew', { version: APP_VERSION })} <ExternalLink className="h-3.5 w-3.5" /></a></div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/40 px-5 py-4 text-xs text-muted-foreground sm:px-6"><span>{t('faqPage.about.technology')}</span><div className="flex items-center gap-4"><a href="/news" className="font-bold text-primary hover:underline">{t('faqPage.about.journal', 'Journal')}</a><a href="/updates" className="inline-flex items-center gap-1.5 font-bold text-primary hover:underline">{t('faqPage.about.whatsNew', { version: APP_VERSION })} <ExternalLink className="h-3.5 w-3.5" /></a></div></div>
     </section>
   );
 }

@@ -1,0 +1,20 @@
+{
+  "slug": "five-places-near-prague",
+  "title": "Five lesser-known places near Prague",
+  "summary": "A carefully checked shortlist for a day beyond the city.",
+  "language": "en",
+  "category": "Discover Places",
+  "author": { "name": "SpotFinder editorial team", "type": "Organization" },
+  "publishedAt": null,
+  "updatedAt": null,
+  "cover": null,
+  "canonicalUrl": "https://spot-finder-app.vercel.app/news/five-places-near-prague",
+  "status": "draft",
+  "relatedSlugs": [],
+  "spotIds": [],
+  "body": [
+    { "type": "paragraph", "text": "Editorial outline: Select five real places after checking access, current conditions, public transport or parking, and why each is worth visiting." },
+    { "type": "heading", "text": "What to verify before publication" },
+    { "type": "list", "items": ["Use only approved public SpotFinder spot IDs and test every deep link.", "Confirm practical visitor information against reliable sources and note when it was checked.", "Obtain rights to authentic photographs, image credits, and descriptive alt text."] }
+  ]
+}

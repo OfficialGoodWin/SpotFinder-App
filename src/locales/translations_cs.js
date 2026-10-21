@@ -528,6 +528,7 @@ export default {
       "feature5": "Trasy přes Google Maps, Mapy.com nebo Apple Maps",
       "feature6": "Náhledy tarifů; platby jsou standardně vypnuté",
       "technology": "React, MapLibre, Firebase a externí mapové trasy",
+      "journal": "Žurnál",
       "whatsNew": "Verze {version} · Co je nového"
     },
     "feedback": {
