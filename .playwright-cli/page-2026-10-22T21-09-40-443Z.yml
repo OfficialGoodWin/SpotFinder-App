@@ -1,0 +1,44 @@
+- generic [ref=f1e3]:
+  - banner [ref=f1e4]:
+    - generic [ref=f1e5]:
+      - link "SpotFinder map" [ref=f1e6] [cursor=pointer]:
+        - /url: /
+        - img "SpotFinder mark" [ref=f1e7]
+        - generic [ref=f1e10]: SpotFinder
+      - navigation "Journal navigation" [ref=f1e11]:
+        - link "Journal" [ref=f1e12] [cursor=pointer]:
+          - /url: /news
+        - link "Open the map" [ref=f1e13] [cursor=pointer]:
+          - /url: /
+  - main [ref=f1e14]:
+    - generic [ref=f1e15]:
+      - paragraph [ref=f1e16]: SpotFinder / Prague and beyond
+      - heading "Journal" [level=1] [ref=f1e17]
+    - region [ref=f1e18]:
+      - generic [ref=f1e19]:
+        - img "A quiet cobblestone street and pastel buildings in Prague on a winter morning" [ref=f1e21]
+        - generic [ref=f1e22]:
+          - text: "Photograph:"
+          - link "Tegan Conway / Unsplash" [ref=f1e23] [cursor=pointer]:
+            - /url: https://unsplash.com/photos/cobblestone-street-with-old-buildings-and-lamppost-CtFdquCYqE8
+      - generic [ref=f1e24]:
+        - paragraph [ref=f1e25]: 01 / Field notes
+        - heading "First stories land in November." [level=2] [ref=f1e26]
+        - paragraph [ref=f1e27]: We’re starting with places near Prague and how to find them on the map.
+        - generic [ref=f1e28]:
+          - generic [ref=f1e29]: Your email address
+          - generic [ref=f1e30]:
+            - textbox "Your email address" [ref=f1e31]:
+              - /placeholder: name@example.com
+            - button "Request a note" [ref=f1e32] [cursor=pointer]
+          - paragraph [ref=f1e33]: Opens your email app to request a launch note.
+  - contentinfo [ref=f1e34]:
+    - generic [ref=f1e35]:
+      - generic [ref=f1e36]: © SpotFinder
+      - navigation "Footer" [ref=f1e37]:
+        - link "Journal" [ref=f1e38] [cursor=pointer]:
+          - /url: /news
+        - link "Help" [ref=f1e39] [cursor=pointer]:
+          - /url: /FAQ
+        - link "Contact" [ref=f1e40] [cursor=pointer]:
+          - /url: mailto:spotfinder@icloud.com

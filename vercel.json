@@ -57,15 +57,38 @@
       "source": "/nominatim/:path*",
       "destination": "https://nominatim.openstreetmap.org/:path*"
     },
-    {
-      "source": "/((?!news(?:/|$)|assets/|api/|.*\\.[^/]+$).*)",
-      "destination": "/"
-    }
+    { "source": "/spot/:spotId", "destination": "/api/spot-page?spotId=:spotId" },
+    { "source": "/Spot/:spotId", "destination": "/api/spot-page?spotId=:spotId" },
+    { "source": "/Home", "destination": "/" },
+    { "source": "/home", "destination": "/" },
+    { "source": "/FAQ", "destination": "/" },
+    { "source": "/faq", "destination": "/" },
+    { "source": "/Status", "destination": "/" },
+    { "source": "/status", "destination": "/" },
+    { "source": "/StatusAdmin", "destination": "/" },
+    { "source": "/statusadmin", "destination": "/" },
+    { "source": "/Admin", "destination": "/" },
+    { "source": "/admin", "destination": "/" },
+    { "source": "/PrivacyPolicy", "destination": "/" },
+    { "source": "/privacypolicy", "destination": "/" },
+    { "source": "/TermsAndConditions", "destination": "/" },
+    { "source": "/termsandconditions", "destination": "/" },
+    { "source": "/CookiePolicy", "destination": "/" },
+    { "source": "/cookiepolicy", "destination": "/" },
+    { "source": "/RefundPolicy", "destination": "/" },
+    { "source": "/refundpolicy", "destination": "/" },
+    { "source": "/Updates", "destination": "/" },
+    { "source": "/updates", "destination": "/" }
   ],
   "functions": {
     "api/*.js": {
       "memory": 256,
       "maxDuration": 10
+    },
+    "api/spot-page.js": {
+      "memory": 256,
+      "maxDuration": 10,
+      "includeFiles": "dist/index.html"
     }
   }
 }

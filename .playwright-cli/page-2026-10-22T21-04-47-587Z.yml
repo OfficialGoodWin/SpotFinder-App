@@ -1,0 +1,46 @@
+- generic [active]:
+  - generic:
+    - generic [ref=e2]:
+      - heading "SpotFinder community map" [level=1] [ref=e3]
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - generic:
+            - region "Map" [ref=e6]
+            - button "Open Blejski grad" [ref=e7] [cursor=pointer]:
+              - generic [ref=e11]:
+                - generic [ref=e12]: "#Viewpoint"
+                - generic "Short hike" [ref=e13]
+                - generic [ref=e17]: "4.3"
+          - group [ref=e21]:
+            - generic "Toggle attribution" [ref=e22] [cursor=pointer]
+            - generic [ref=e23]:
+              - text: © OpenStreetMap contributors | ©
+              - link "OpenFreeMap" [ref=e24] [cursor=pointer]:
+                - /url: https://openfreemap.org
+              - text: ©
+              - link "OpenStreetMap" [ref=e25] [cursor=pointer]:
+                - /url: https://www.openstreetmap.org/copyright
+        - generic [ref=e26]:
+          - button "Zoom in" [ref=e27] [cursor=pointer]
+          - generic [aria-hidden] [ref=e29]: "15"
+          - button "Zoom out" [ref=e30] [cursor=pointer]
+      - generic [ref=e34]:
+        - textbox "Search places and community spots" [ref=e38]:
+          - /placeholder: Search places...
+        - button "Start voice search" [ref=e39] [cursor=pointer]
+        - button "Open nearby spots filters" [ref=e44] [cursor=pointer]
+      - generic [ref=e49]:
+        - button "Sign in" [ref=e50] [cursor=pointer]
+        - button "Drafts" [ref=e54] [cursor=pointer]
+      - generic [ref=e58]:
+        - button "Add a spot" [ref=e59] [cursor=pointer]
+        - generic [ref=e61]:
+          - generic [ref=e62]:
+            - button "Map layers" [ref=e64] [cursor=pointer]
+            - button "Center map on my location" [ref=e69] [cursor=pointer]
+            - button "Toggle 3D terrain" [ref=e72] [cursor=pointer]:
+              - generic [ref=e73]: 3D
+          - generic [ref=e74]:
+            - button "Open help and FAQ" [ref=e75] [cursor=pointer]
+            - button "Open settings" [ref=e79] [cursor=pointer]
+    - region "Notifications alt+T"

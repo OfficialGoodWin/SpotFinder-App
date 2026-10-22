@@ -1,0 +1,120 @@
+- generic:
+  - generic:
+    - generic [ref=f1e2]:
+      - heading "SpotFinder community map" [level=1] [ref=f1e3]
+      - generic [ref=f1e4]:
+        - generic [ref=f1e5]:
+          - generic:
+            - region "Map" [ref=f1e6]
+            - button "Open Hlavatice" [ref=f1e141] [cursor=pointer]:
+              - generic [ref=f1e145]:
+                - generic [ref=f1e146]: "#Viewpoint"
+                - generic "Short hike" [ref=f1e147]
+                - generic [ref=f1e151]: "5.0"
+          - group [ref=f1e7]:
+            - generic "Toggle attribution" [ref=f1e8] [cursor=pointer]
+            - generic [ref=f1e9]:
+              - text: © OpenStreetMap contributors | ©
+              - link "OpenFreeMap" [ref=f1e10] [cursor=pointer]:
+                - /url: https://openfreemap.org
+              - text: ©
+              - link "OpenStreetMap" [ref=f1e11] [cursor=pointer]:
+                - /url: https://www.openstreetmap.org/copyright
+        - generic [ref=f1e12]:
+          - button "Zoom in" [ref=f1e13] [cursor=pointer]
+          - generic [aria-hidden] [ref=f1e15]: "15"
+          - button "Zoom out" [ref=f1e16] [cursor=pointer]
+      - generic [ref=f1e20]:
+        - textbox "Search places and community spots" [ref=f1e24]:
+          - /placeholder: Search places...
+        - button "Start voice search" [ref=f1e25] [cursor=pointer]
+        - button "Open nearby spots filters" [ref=f1e30] [cursor=pointer]
+      - generic [ref=f1e35]:
+        - button "Sign in" [ref=f1e36] [cursor=pointer]
+        - button "Drafts" [ref=f1e40] [cursor=pointer]
+      - generic [ref=f1e44]:
+        - button "Add a spot" [ref=f1e45] [cursor=pointer]
+        - generic [ref=f1e47]:
+          - generic [ref=f1e48]:
+            - button "Map layers" [ref=f1e50] [cursor=pointer]
+            - button "Center map on my location" [ref=f1e55] [cursor=pointer]
+            - button "Toggle 3D terrain" [ref=f1e58] [cursor=pointer]:
+              - generic [ref=f1e59]: 3D
+          - generic [ref=f1e60]:
+            - button "Open help and FAQ" [ref=f1e61] [cursor=pointer]
+            - button "Open settings" [ref=f1e65] [cursor=pointer]
+      - dialog [ref=f1e155]:
+        - generic [ref=f1e156]:
+          - generic [ref=f1e158]:
+            - generic [ref=f1e164]:
+              - heading "Hlavatice" [level=2] [ref=f1e165]
+              - paragraph [ref=f1e166]: Turnov
+              - paragraph [ref=f1e167]: Added by superadmin on Jul 8, 2026
+            - button "Close" [active] [ref=f1e168] [cursor=pointer]
+          - generic [ref=f1e172]:
+            - button "View Hlavatice photo full screen" [ref=f1e174] [cursor=pointer]:
+              - img "Hlavatice" [ref=f1e175]
+            - paragraph [ref=f1e176]: Rozhlédna Hlavatice - skalní rozhledna. 10/10
+            - generic [ref=f1e177]:
+              - generic [ref=f1e178]: Viewpoint
+              - generic [ref=f1e179]: Sunrise
+              - generic [ref=f1e180]: Photo spot
+              - generic [ref=f1e181]: Hiking
+            - generic [ref=f1e182]:
+              - generic [ref=f1e183]: Free
+              - generic [ref=f1e184]: Bit of a hike
+              - generic [ref=f1e185]: Street parking
+              - generic [ref=f1e186]: Anytime
+            - generic "Spot actions" [ref=f1e187]:
+              - button "Like this spot; 0 likes" [ref=f1e188] [cursor=pointer]:
+                - generic [ref=f1e191]: Like
+                - generic [ref=f1e192]: "0"
+              - button "Save this spot; 0 saves" [ref=f1e193] [cursor=pointer]:
+                - generic [ref=f1e196]: Save
+                - generic [ref=f1e197]: "0"
+              - button "Share this spot" [ref=f1e198] [cursor=pointer]
+            - generic [ref=f1e206]:
+              - paragraph [ref=f1e207]: Overall Rating
+              - generic [ref=f1e208]:
+                - generic [ref=f1e209]:
+                  - generic [ref=f1e210]:
+                    - text: ★
+                    - generic [ref=f1e211]: ★
+                  - generic [ref=f1e212]:
+                    - text: ★
+                    - generic [ref=f1e213]: ★
+                  - generic [ref=f1e214]:
+                    - text: ★
+                    - generic [ref=f1e215]: ★
+                  - generic [ref=f1e216]:
+                    - text: ★
+                    - generic [ref=f1e217]: ★
+                  - generic [ref=f1e218]:
+                    - text: ★
+                    - generic [ref=f1e219]: ★
+                - generic [ref=f1e220]: "5.0"
+                - generic [ref=f1e221]: Based on 1 community rating
+              - paragraph [ref=f1e222]: Overall stars are rated directly; the scales describe what the place is like.
+            - generic [ref=f1e223]:
+              - paragraph [ref=f1e224]: Detailed Ratings
+              - generic [ref=f1e225]:
+                - generic [ref=f1e226]: Parking quality (legacy)
+                - generic [ref=f1e227]: 5.0 (1)
+              - generic [ref=f1e228]:
+                - generic [ref=f1e229]: Scenery (legacy)
+                - generic [ref=f1e230]: 5.0 (1)
+              - generic [ref=f1e231]:
+                - generic [ref=f1e232]: Privacy (legacy)
+                - generic [ref=f1e233]: 5.0 (1)
+            - generic [ref=f1e234]:
+              - paragraph [ref=f1e235]: Rate by category
+              - button "Log in to rate" [ref=f1e236] [cursor=pointer]
+            - region [ref=f1e237]:
+              - generic [ref=f1e239]:
+                - heading "Social posts" [level=2] [ref=f1e240]
+                - paragraph [ref=f1e241]: Posts load only when you choose to view them.
+              - paragraph [ref=f1e246]: No community posts yet.
+          - generic [ref=f1e247]:
+            - button "Report spot" [ref=f1e248] [cursor=pointer]
+            - button "Navigate Here" [ref=f1e251] [cursor=pointer]
+    - region "Notifications alt+T"

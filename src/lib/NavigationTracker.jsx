@@ -35,6 +35,9 @@ export default function NavigationTracker() {
     const key = pathname.toLowerCase().replace(/\/$/, '') || '/';
     const linkedSpot = spotIdFromLocation(pathname, search);
     const validLink = linkedSpot.isSpotLink && validSpotId(linkedSpot.id);
+    // A direct spot request already carries verified, visibility-aware metadata.
+    // Keep it when React hydrates, including noindex for pending-trust spots.
+    if (validLink && document.head.querySelector('meta[name="spotfinder:server-spot"]')?.content === linkedSpot.id) return;
     const articleMatch = /^\/news\/(?:cs\/)?([a-z0-9-]+)$/.exec(key);
     const article = articleMatch && publishedArticles.find(item => item.slug === articleMatch[1] && `/news/${item.language === 'cs' ? 'cs/' : ''}${item.slug}` === key);
     const articlePath = article && `/news/${article.language === 'cs' ? 'cs/' : ''}${article.slug}`;

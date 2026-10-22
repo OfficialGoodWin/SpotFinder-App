@@ -1,0 +1,120 @@
+- generic:
+  - generic:
+    - generic [ref=e2]:
+      - heading "SpotFinder community map" [level=1] [ref=e3]
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - generic:
+            - region "Map" [ref=e6]
+            - button "Open Blejski grad" [ref=e7] [cursor=pointer]:
+              - generic [ref=e11]:
+                - generic [ref=e12]: "#Viewpoint"
+                - generic "Short hike" [ref=e13]
+                - generic [ref=e17]: "4.3"
+          - group [ref=e21]:
+            - generic "Toggle attribution" [ref=e22] [cursor=pointer]
+            - generic [ref=e23]:
+              - text: © OpenStreetMap contributors | ©
+              - link "OpenFreeMap" [ref=e24] [cursor=pointer]:
+                - /url: https://openfreemap.org
+              - text: ©
+              - link "OpenStreetMap" [ref=e25] [cursor=pointer]:
+                - /url: https://www.openstreetmap.org/copyright
+        - generic [ref=e26]:
+          - button "Zoom in" [ref=e27] [cursor=pointer]
+          - generic [aria-hidden] [ref=e29]: "15"
+          - button "Zoom out" [ref=e30] [cursor=pointer]
+      - generic [ref=e34]:
+        - textbox "Search places and community spots" [ref=e38]:
+          - /placeholder: Search places...
+        - button "Start voice search" [ref=e39] [cursor=pointer]
+        - button "Open nearby spots filters" [ref=e44] [cursor=pointer]
+      - generic [ref=e49]:
+        - button "Sign in" [ref=e50] [cursor=pointer]
+        - button "Drafts" [ref=e54] [cursor=pointer]
+      - generic [ref=e58]:
+        - button "Add a spot" [ref=e59] [cursor=pointer]
+        - generic [ref=e61]:
+          - generic [ref=e62]:
+            - button "Map layers" [ref=e64] [cursor=pointer]
+            - button "Center map on my location" [ref=e69] [cursor=pointer]
+            - button "Toggle 3D terrain" [ref=e72] [cursor=pointer]:
+              - generic [ref=e73]: 3D
+          - generic [ref=e74]:
+            - button "Open help and FAQ" [ref=e75] [cursor=pointer]
+            - button "Open settings" [ref=e79] [cursor=pointer]
+      - dialog [ref=e83]:
+        - generic [ref=e84]:
+          - generic [ref=e86]:
+            - generic [ref=e92]:
+              - heading "Blejski grad" [level=2] [ref=e93]
+              - paragraph [ref=e94]: Bled
+              - paragraph [ref=e95]: Added by superadmin on Sep 1, 2026
+            - button "Close" [ref=e96] [cursor=pointer]
+          - generic [ref=e100]:
+            - button "View Blejski grad photo full screen" [ref=e102] [cursor=pointer]:
+              - img "Blejski grad" [ref=e103]
+            - paragraph [ref=e104]: A Castle above a lake either a beautiful view across the Bled Lake in Slovenia.
+            - generic [ref=e105]:
+              - generic [ref=e106]: Viewpoint
+              - generic [ref=e107]: Photo spot
+              - generic [ref=e108]: Hiking
+            - generic [ref=e109]:
+              - generic [ref=e110]: Paid entry
+              - generic [ref=e111]: Bit of a hike
+              - generic [ref=e112]: Plenty of parking
+              - generic [ref=e113]: Anytime
+            - paragraph [ref=e114]: "Paid: go to the castle and pay for a tour and when youre outside you can then see the whole lake Free: at the right of the castle is a small way which leads to a opening where you can see the lake but the view isnt that clear."
+            - generic "Spot actions" [ref=e117]:
+              - button "Like this spot; 0 likes" [ref=e118] [cursor=pointer]:
+                - generic [ref=e121]: Like
+                - generic [ref=e122]: "0"
+              - button "Save this spot; 0 saves" [ref=e123] [cursor=pointer]:
+                - generic [ref=e126]: Save
+                - generic [ref=e127]: "0"
+              - button "Share this spot" [active] [ref=e128] [cursor=pointer]
+            - generic [ref=e136]:
+              - paragraph [ref=e137]: Overall Rating
+              - generic [ref=e138]:
+                - generic [ref=e139]:
+                  - generic [ref=e140]:
+                    - text: ★
+                    - generic [ref=e141]: ★
+                  - generic [ref=e142]:
+                    - text: ★
+                    - generic [ref=e143]: ★
+                  - generic [ref=e144]:
+                    - text: ★
+                    - generic [ref=e145]: ★
+                  - generic [ref=e146]:
+                    - text: ★
+                    - generic [ref=e147]: ★
+                  - generic [ref=e148]:
+                    - text: ★
+                    - generic [ref=e149]: ★
+                - generic [ref=e150]: "4.3"
+                - generic [ref=e151]: Based on 1 community rating
+              - paragraph [ref=e152]: Overall stars are rated directly; the scales describe what the place is like.
+            - generic [ref=e153]:
+              - paragraph [ref=e154]: Detailed Ratings
+              - generic [ref=e155]:
+                - generic [ref=e156]: Parking quality (legacy)
+                - generic [ref=e157]: 5.0 (1)
+              - generic [ref=e158]:
+                - generic [ref=e159]: Scenery (legacy)
+                - generic [ref=e160]: 5.0 (1)
+              - generic [ref=e161]:
+                - generic [ref=e162]: Privacy (legacy)
+                - generic [ref=e163]: 3.0 (1)
+            - generic [ref=e164]:
+              - paragraph [ref=e165]: Rate by category
+              - button "Log in to rate" [ref=e166] [cursor=pointer]
+            - region [ref=e167]:
+              - generic [ref=e169]:
+                - heading "Social posts" [level=2] [ref=e170]
+                - paragraph [ref=e171]: Posts load only when you choose to view them.
+              - paragraph [ref=e176]: No community posts yet.
+          - generic [ref=e177]:
+            - button "Report spot" [ref=e178] [cursor=pointer]
+            - button "Navigate Here" [ref=e181] [cursor=pointer]
+    - region "Notifications alt+T"
