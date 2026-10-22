@@ -356,6 +356,14 @@
 
 /* Very large user-selected type must reflow instead of scaling card spacing
    and horizontal control rows beyond a phone viewport. */
+.sf-settings-panel, .sf-settings-panel .sf-section,
+.sf-settings-panel .sf-settings-row > div,
+.sf-settings-panel .sf-settings-row > div > div { min-width: 0; }
+.sf-settings-panel .sf-section { overflow-wrap: anywhere; }
+.sf-settings-panel [role='combobox'], .sf-settings-panel input[type='range'] { min-width: 0; max-width: 100%; }
+@media (max-width: 480px) {
+  .sf-settings-panel .sf-settings-row { flex-wrap: wrap; }
+}
 html[data-sf-text-scale='large'] .sf-settings-panel .sf-section { padding: 16px; }
 html[data-sf-text-scale='large'] .sf-settings-header { position: relative; align-items: flex-start; padding: 16px 64px 16px 16px; }
 html[data-sf-text-scale='large'] .sf-settings-heading-icon { display: none; }
@@ -373,6 +381,20 @@ html[data-sf-text-scale='large'] .sf-settings-row { align-items: flex-start; fle
 html[data-sf-text-scale='large'] .sf-settings-action-row { flex-wrap: wrap; }
 html[data-sf-text-scale='large'] .sf-settings-action-row > .sf-control { flex-basis: 100%; }
 html[data-sf-text-scale='large'] .sf-settings-action-row > button { width: 100%; }
+@media (max-width: 480px) {
+  html[data-sf-text-scale='large'] .sf-mobile-map-tools { top: max(112px, calc(env(safe-area-inset-top) + 96px)); }
+  html[data-sf-text-scale='large'] .sf-mobile-map-tools > div > button,
+  html[data-sf-text-scale='large'] .sf-mobile-map-tools > div > .relative > button {
+    width: 44px; height: 44px; min-width: 44px; min-height: 44px;
+  }
+  html[data-sf-text-scale='large'] .sf-mobile-map-tools > div > button svg,
+  html[data-sf-text-scale='large'] .sf-mobile-map-tools > div > .relative > button svg { width: 20px; height: 20px; }
+  html[data-sf-text-scale='large'] .sf-mobile-map-tools .relative > .left-full { width: min(13rem, calc(100vw - 90px)); margin-left: 8px; }
+}
+@media (max-width: 480px) {
+  html[data-sf-text-scale='large'] .sf-settings-panel a[href='/updates'] { flex-wrap: wrap; }
+  html[data-sf-text-scale='large'] .sf-settings-panel a[href='/updates'] > .flex-1 { flex-basis: 100%; }
+}
 html[data-sf-text-scale='large'] .sf-collection-header { padding: 16px; }
 html[data-sf-text-scale='large'] .sf-collection-heading { align-items: flex-start; padding-right: 54px; }
 html[data-sf-text-scale='large'] .sf-collection-close {

@@ -5,7 +5,7 @@ import { filterCategories, getCategoryName } from '@/lib/POICategories';
 import { iconGlyphSVG } from '@/lib/mapIcons';
 import { searchPlaces } from '@/lib/placeSearch';
 import { getSpotDisplayName, spotMatchesSearch } from '@/lib/spotPresentation';
-import { searchFailureMessage, voiceErrorMessage } from '@/lib/contributionFlow';
+import { voiceErrorMessage } from '@/lib/contributionFlow';
 
 
 const LANG_TO_BCP47 = {
@@ -20,11 +20,12 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
   const [results, setResults] = useState([]);
   const [spotResults, setSpotResults] = useState([]);
   const [poiCategories, setPoiCategories] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState(false);
   const [listening, setListening] = useState(false);
   const [micError, setMicError] = useState('');
   const [searchError, setSearchError] = useState('');
+  const [searchPhase, setSearchPhase] = useState('idle');
+  const [retryCount, setRetryCount] = useState(0);
   const debounce = useRef(null);
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -55,41 +56,45 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
   };
 
   useEffect(() => {
-    if (!query.trim()) {
+    clearTimeout(debounce.current);
+    searchAbortRef.current?.abort();
+    if (!query.trim() || !focused) {
       setResults([]);
       setSpotResults([]);
       setPoiCategories([]);
       setSearchError('');
+      setSearchPhase('idle');
       return;
     }
-    setPoiCategories(filterCategories(query, language));
+    const categories = filterCategories(query, language);
+    setPoiCategories(categories);
 
     // Search spots by title, description, and hashtag tags (e.g. "#viewpoint")
     const matched = (spots || []).filter(spot => spotMatchesSearch(spot, query, language)).slice(0, 5);
     setSpotResults(matched);
-
-    clearTimeout(debounce.current);
-    searchAbortRef.current?.abort();
+    setResults([]);
+    setSearchError('');
+    setSearchPhase('searching');
     const controller = new AbortController();
     searchAbortRef.current = controller;
     debounce.current = setTimeout(async () => {
-      setLoading(true);
-      setSearchError('');
       try {
         // Merge independent POI/place providers and request one selected UI language.
         const places = await searchPlaces(query, { center: mapCenter, language, signal: controller.signal, limit: 10 });
-        if (!controller.signal.aborted) setResults(places);
-      } catch (error) {
-        if (error?.name !== 'AbortError') {
-          setResults([]);
-          setSearchError(searchFailureMessage(error));
+        if (!controller.signal.aborted) {
+          setResults(places);
+          setSearchPhase(places.length || categories.length || matched.length ? 'results' : 'empty');
         }
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
+      } catch (error) {
+        if (!controller.signal.aborted && error?.name !== 'AbortError') {
+          setResults([]);
+          setSearchError(t('searchUi.unavailable'));
+          setSearchPhase('error');
+        }
       }
     }, 350);
     return () => { clearTimeout(debounce.current); controller.abort(); };
-  }, [query, language, mapCenter?.lat, mapCenter?.lng, spots]);
+  }, [query, language, mapCenter?.lat, mapCenter?.lng, spots, focused, retryCount]);
 
   const handleSelect = (item) => {
     const pos = item.position || item.regionalStructure?.[0];
@@ -152,8 +157,8 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
     else startListening();
   };
 
-  const showDropdown = focused && (poiCategories.length > 0 || results.length > 0 || spotResults.length > 0 || (loading && !!query));
-  const isExpanded = showDropdown || listening || Boolean(searchError) || (micError && !listening);
+  const showDropdown = focused && !!query.trim() && searchPhase !== 'idle';
+  const isExpanded = showDropdown || listening || (micError && !listening);
 
   return (
     <div ref={containerRef} className="sf-map-search absolute left-4 z-[1002]" style={{ top: 'max(1rem, env(safe-area-inset-top))' }}>
@@ -208,13 +213,6 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
             <span className="text-xs font-medium leading-5">{micError}</span>
           </div>
         )}
-        {searchError && !loading && (
-          <div role="status" className="mx-2 mb-2 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            <span className="text-xs font-medium leading-5">{searchError}</span>
-          </div>
-        )}
-
         {showDropdown && (
           <div className="sf-menu-motion border-t border-gray-100 dark:border-border max-h-[min(26rem,65dvh)] overflow-y-auto rounded-b-2xl bg-white/95 dark:bg-card/95 backdrop-blur-xl">
             {poiCategories.map((cat, i) => (
@@ -287,8 +285,21 @@ export default function SearchBar({ onSelect, mapCenter, onNavigate, onSelectCat
               </div>
             ))}
 
-            {loading && !!query && !results.length && !poiCategories.length && !spotResults.length && (
-              <div className="px-4 py-2 text-xs text-gray-400 dark:text-muted-foreground">{t('search.searching')}</div>
+            {searchPhase === 'searching' && (
+              <div role="status" className="px-4 py-2 text-xs text-gray-500 dark:text-muted-foreground">{t('search.searching')}</div>
+            )}
+            {searchPhase === 'empty' && (
+              <div role="status" className="px-4 py-3 text-xs text-gray-600 dark:text-muted-foreground">
+                {t('searchUi.noResults')}
+                <button type="button" onClick={() => { setQuery(''); inputRef.current?.focus(); }} className="ml-2 font-semibold text-primary underline underline-offset-2">{t('searchUi.clear')}</button>
+              </div>
+            )}
+            {searchPhase === 'error' && (
+              <div role="status" className="flex items-center gap-2 px-4 py-3 text-xs text-amber-900 dark:text-amber-200">
+                <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span className="min-w-0 flex-1">{searchError}</span>
+                <button type="button" onClick={() => setRetryCount(count => count + 1)} className="min-h-9 rounded-lg px-2 font-semibold text-primary hover:bg-primary/10">{t('searchUi.retry')}</button>
+              </div>
             )}
           </div>
         )}

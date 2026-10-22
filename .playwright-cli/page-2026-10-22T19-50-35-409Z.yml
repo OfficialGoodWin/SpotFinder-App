@@ -1,0 +1,164 @@
+- generic:
+  - generic:
+    - generic [aria-hidden]:
+      - generic:
+        - heading [level=1]: SpotFinder community map
+        - generic:
+          - generic:
+            - region
+            - group [ref=f7e7]:
+              - generic [ref=f7e185] [cursor=pointer]
+              - generic [ref=f7e9]:
+                - text: © OpenStreetMap contributors | ©
+                - link [ref=f7e186] [cursor=pointer]:
+                  - /url: https://openfreemap.org
+                  - text: OpenFreeMap
+                - text: ©
+                - link [ref=f7e187] [cursor=pointer]:
+                  - /url: https://www.openstreetmap.org/copyright
+                  - text: OpenStreetMap
+          - generic:
+            - button
+            - generic [aria-hidden]: "13"
+            - button
+        - generic:
+          - generic:
+            - generic:
+              - button
+              - button
+        - complementary:
+          - generic:
+            - button
+          - status: Loading community places…
+          - generic:
+            - button: Search a place
+            - button: Continue map
+        - generic:
+          - generic:
+            - button
+            - button
+        - generic:
+          - generic:
+            - generic:
+              - button
+            - button
+            - button: 3D
+            - generic:
+              - button
+        - button [ref=f7e188] [cursor=pointer]
+        - dialog:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - heading [level=2]: Einstellungen
+                  - paragraph: Einstellungen, Datenschutz und Kontosicherheit
+              - button
+            - generic:
+              - generic:
+                - region:
+                  - heading [level=3]: Darstellung
+                  - generic:
+                    - generic:
+                      - generic:
+                        - paragraph: Dunkelmodus
+                        - paragraph: Deaktiviert
+                    - switch
+                - region:
+                  - heading [level=3]: Kartenanzeige
+                  - generic:
+                    - generic:
+                      - generic:
+                        - paragraph: Entdeckungskarte auf der Karte
+                        - paragraph: Show contextual spots and exploration guidance on the map.
+                    - switch [checked]
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - paragraph: Textgröße
+                            - paragraph: Applies throughout SpotFinder.
+                          - status: 200%
+                        - slider: "200"
+                        - generic:
+                          - generic: 75%
+                          - button: Reset to 100%
+                          - generic: 250%
+                - region:
+                  - heading [level=3]: Sprache
+                  - generic:
+                    - generic:
+                      - paragraph: Sprache
+                      - paragraph: Sprache auswählen
+                  - combobox [expanded]:
+                    - generic: 🇩🇪 Deutsch · Partial
+                  - status: Diese Übersetzung ist unvollständig. Einige Ansichten bleiben auf Englisch.
+                - region:
+                  - heading [level=3]: Datenschutz und Rechtliches
+                  - generic:
+                    - button: Cookie-Einstellungen
+                    - link:
+                      - /url: /PrivacyPolicy
+                      - text: Datenschutzerklärung
+                    - link:
+                      - /url: /TermsAndConditions
+                      - text: Nutzungsbedingungen
+                    - link:
+                      - /url: /CookiePolicy
+                      - text: Cookie-Richtlinie
+                    - link:
+                      - /url: /RefundPolicy
+                      - text: Rückerstattungsrichtlinie
+                - region:
+                  - heading [level=3]: App-Informationen
+                  - link:
+                    - /url: /updates
+                    - generic:
+                      - generic: Neuigkeiten
+                      - generic: Release notes and verified changes
+                    - generic: v0.5.6
+                - status: Einstellung automatisch gespeichert
+    - region "Notifications alt+T"
+  - listbox [ref=f7e189]:
+    - option "🇺🇸 English (US)" [ref=f7e190]
+    - option "🇬🇧 English (UK)" [ref=f7e193]
+    - option "🇫🇷 Français · Partial" [ref=f7e196]
+    - option "🇵🇹 Português · Partial" [ref=f7e199]
+    - option "🇪🇸 Español · Partial" [ref=f7e202]
+    - option "🇮🇹 Italiano · Partial" [ref=f7e205]
+    - option "🇩🇪 Deutsch · Partial" [active] [selected] [ref=f7e208]
+    - option "🇵🇱 Polski · Partial" [ref=f7e214]
+    - option "🇨🇿 Čeština · Partial" [ref=f7e217]
+    - option "🇸🇰 Slovenčina · Partial" [ref=f7e220]
+    - option "🇭🇺 Magyar · Partial" [ref=f7e223]
+    - option "🇭🇷 Hrvatski · Partial" [ref=f7e226]
+    - option "🇧🇦 Bosanski · Partial" [ref=f7e229]
+    - option "🇦🇱 Shqip · Partial" [ref=f7e232]
+    - option "🇬🇷 Ελληνικά · Partial" [ref=f7e235]
+    - option "🇹🇷 Türkçe · Partial" [ref=f7e238]
+    - option "🇧🇬 Български · Partial" [ref=f7e241]
+    - option "🇷🇸 Српски · Partial" [ref=f7e244]
+    - option "🇲🇰 Македонски · Partial" [ref=f7e247]
+    - option "🇷🇴 Română · Partial" [ref=f7e250]
+    - option "🇺🇦 Українська · Partial" [ref=f7e253]
+    - option "🇷🇺 Русский · Partial" [ref=f7e256]
+    - option "🇧🇾 Беларуская · Partial" [ref=f7e259]
+    - option "🇱🇹 Lietuvių · Partial" [ref=f7e262]
+    - option "🇱🇻 Latviešu · Partial" [ref=f7e265]
+    - option "🇪🇪 Eesti · Partial" [ref=f7e268]
+    - option "🇫🇮 Suomi · Partial" [ref=f7e271]
+    - option "🇸🇪 Svenska · Partial" [ref=f7e274]
+    - option "🇳🇴 Norsk bokmål · Partial" [ref=f7e277]
+    - option "🇩🇰 Dansk · Partial" [ref=f7e280]
+    - option "🇮🇸 Íslenska · Partial" [ref=f7e283]
+    - option "🇳🇱 Nederlands · Partial" [ref=f7e286]
+    - option "🇱🇺 Lëtzebuergesch · Partial" [ref=f7e289]
+    - option "🇮🇪 Gaeilge · Partial" [ref=f7e292]
+    - option "🇧🇪 Français (Belgique) · Partial" [ref=f7e295]
+    - option "🇧🇪 Nederlands (België) · Partial" [ref=f7e298]
+    - option "🇧🇪 Deutsch (Belgien) · Partial" [ref=f7e301]
+    - option "🇲🇩 Română (Moldova) · Partial" [ref=f7e304]
+    - option "🇽🇰 Shqip (Kosovë) · Partial" [ref=f7e307]
+    - option "🇨🇾 Ελληνικά (Κύπρος) · Partial" [ref=f7e310]
+    - option "🇨🇾 Türkçe (Kıbrıs) · Partial" [ref=f7e313]

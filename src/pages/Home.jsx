@@ -647,7 +647,7 @@ export default function Home() {
       />
 
       {/* Mobile map tools — a thumb-friendly vertical rail that leaves the bottom navigation clear. */}
-      <div className="absolute left-3 top-[max(7rem,calc(env(safe-area-inset-top)+6rem))] z-[1000] sm:hidden transition-all duration-300">
+      <div className="sf-mobile-map-tools absolute left-3 top-[max(7rem,calc(env(safe-area-inset-top)+6rem))] z-[1000] sm:hidden transition-all duration-300">
         <div className="flex flex-col overflow-visible rounded-2xl border border-white/70 bg-white/90 p-1.5 text-slate-700 shadow-[0_10px_32px_rgba(15,23,42,0.2)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-100">
           <MapLayerSwitcher activeLayer={mapLayer} onLayerChange={setMapLayer} menuPlacement="right" />
           <div className="mx-1.5 my-1 h-px bg-slate-200/80 dark:bg-white/10" />

@@ -1,0 +1,69 @@
+- generic:
+  - generic:
+    - generic [ref=f39e2]:
+      - heading "SpotFinder community map" [level=1] [ref=f39e3]
+      - generic [ref=f39e4]:
+        - generic [ref=f39e5]:
+          - generic:
+            - region "Map" [ref=f39e6] [cursor=pointer]
+            - generic "undefined" [ref=f39e7] [cursor=pointer]
+          - group [ref=f39e16]:
+            - generic "Toggle attribution" [ref=f39e17] [cursor=pointer]
+            - generic [ref=f39e18]:
+              - text: © OpenStreetMap contributors | ©
+              - link "OpenFreeMap" [ref=f39e19] [cursor=pointer]:
+                - /url: https://openfreemap.org
+              - text: ©
+              - link "OpenStreetMap" [ref=f39e20] [cursor=pointer]:
+                - /url: https://www.openstreetmap.org/copyright
+        - generic [ref=f39e21]:
+          - button "Zoom in" [ref=f39e22] [cursor=pointer]
+          - generic [aria-hidden] [ref=f39e24]: "15"
+          - button "Zoom out" [ref=f39e25] [cursor=pointer]
+      - generic [ref=f39e29]:
+        - textbox "Search places and community spots" [ref=f39e33]:
+          - /placeholder: Search places...
+          - text: Hrubá Skála
+        - button "Clear search" [ref=f39e34] [cursor=pointer]
+        - button "Start voice search" [ref=f39e38] [cursor=pointer]
+        - button "Open nearby spots filters" [ref=f39e43] [cursor=pointer]
+      - generic [ref=f39e48]:
+        - button "Sign in" [ref=f39e49] [cursor=pointer]
+        - button "Drafts" [ref=f39e53] [cursor=pointer]
+      - generic [ref=f39e57]:
+        - button "Add a spot" [ref=f39e58] [cursor=pointer]
+        - generic [ref=f39e60]:
+          - generic [ref=f39e61]:
+            - button "Map layers" [ref=f39e63] [cursor=pointer]
+            - button "Center map on my location" [ref=f39e68] [cursor=pointer]
+            - button "Toggle 3D terrain" [ref=f39e71] [cursor=pointer]:
+              - generic [ref=f39e72]: 3D
+          - generic [ref=f39e73]:
+            - button "Open help and FAQ" [ref=f39e74] [cursor=pointer]
+            - button "Open settings" [ref=f39e78] [cursor=pointer]
+      - dialog "EA Zámecký hotel Hrubá Skála details" [ref=f39e83]:
+        - button "Close place details" [active] [ref=f39e90] [cursor=pointer]
+        - generic [ref=f39e95]:
+          - heading "EA Zámecký hotel Hrubá Skála" [level=1] [ref=f39e96]
+          - paragraph [ref=f39e97]: "3"
+          - generic [ref=f39e104]:
+            - button "Navigate" [ref=f39e105] [cursor=pointer]
+            - button "Share" [ref=f39e109] [cursor=pointer]
+            - button "Add Photo" [disabled] [ref=f39e117]
+          - generic [ref=f39e123]:
+            - paragraph [ref=f39e124]: No ratings yet — be the first!
+            - generic [ref=f39e125]:
+              - paragraph [ref=f39e126]: Rate this place
+              - paragraph [ref=f39e127]: Sign in to rate this place
+          - region [ref=f39e129]:
+            - generic [ref=f39e131]:
+              - heading "Social posts" [level=2] [ref=f39e132]
+              - paragraph [ref=f39e133]: Posts load only when you choose to view them.
+            - paragraph [ref=f39e138]: No community posts yet.
+          - paragraph [ref=f39e139]: Contact & Info
+          - link "http://www.hrubaskala.cz/" [ref=f39e140] [cursor=pointer]:
+            - /url: http://www.hrubaskala.cz/
+          - link "50.545016, 15.193740" [ref=f39e147] [cursor=pointer]:
+            - /url: https://maps.google.com/?q=50.54501578190309,15.193740427494049
+          - button "Report this place" [ref=f39e155] [cursor=pointer]
+    - region "Notifications alt+T"

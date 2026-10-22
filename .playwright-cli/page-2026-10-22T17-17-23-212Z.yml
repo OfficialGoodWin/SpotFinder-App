@@ -1,0 +1,797 @@
+- generic [ref=e4]:
+  - generic [ref=e6]:
+    - banner [ref=e8]:
+      - link "Home" [ref=e10] [cursor=pointer]:
+        - /url: /
+      - generic [ref=e14]:
+        - generic [ref=e15]:
+          - button "Routes" [ref=e16] [cursor=pointer]
+          - button "Planner" [ref=e18] [cursor=pointer]
+          - button "Features" [ref=e20] [cursor=pointer]
+          - button "Updates" [ref=e22] [cursor=pointer]
+        - button "App" [ref=e24] [cursor=pointer]
+        - button "Login or Signup" [ref=e29] [cursor=pointer]
+    - banner [ref=e31]:
+      - generic [ref=e35]:
+        - heading "Explore beyond the map" [level=1] [ref=e36]
+        - generic [ref=e37]:
+          - button "Signup for Free" [ref=e38] [cursor=pointer]
+          - button "Login" [ref=e40] [cursor=pointer]
+        - paragraph [ref=e42]: Where will you explore next?
+    - generic [ref=e43]:
+      - generic [ref=e45]:
+        - generic [ref=e46]:
+          - generic [ref=e47]:
+            - heading "Get inspired with the komoot mobile app" [level=2] [ref=e48]
+            - generic [ref=e49]: With a free komoot account, you can easily find, customize, and navigate endless outdoor adventures.
+          - generic [ref=e50]:
+            - generic [ref=e51]:
+              - link "Download on the App Store" [ref=e52] [cursor=pointer]:
+                - /url: https://x.bndspn.com/v1/or-jdqap8
+              - link "Android App on Google Play" [ref=e53] [cursor=pointer]:
+                - /url: https://x.bndspn.com/v1/or-z0w587
+            - generic [ref=e54]:
+              - paragraph [ref=e55]: or
+              - button "Join komoot Now" [ref=e56] [cursor=pointer]
+        - img "Store rating" [ref=e61]
+      - generic [ref=e62]:
+        - generic [ref=e63]:
+          - generic [ref=e64]:
+            - generic [ref=e65]: Plan the perfect route
+            - paragraph [ref=e66]: Whether you're looking for smooth asphalt for your road bike, singletracks for your mountain bike, or peaceful trails for your hikes, komoot helps you generate sport-specific routes tailored to your needs and preferences.
+            - generic [ref=e67]:
+              - button "Signup for Free" [ref=e68] [cursor=pointer]
+              - generic [ref=e70]:
+                - paragraph [ref=e71]: or
+                - button "Get the App" [ref=e73] [cursor=pointer]:
+                  - paragraph [ref=e74]: Get the App
+          - img "Community mockup" [ref=e78]
+        - generic [ref=e79]:
+          - generic [ref=e80]:
+            - generic [ref=e81]: Find the right inspiration
+            - paragraph [ref=e82]: From epic mountain escapes to trails close to home, komoot makes it easy to discover routes that fit your style. Filter by distance, difficulty, or public transport links, and set off with confidence—wherever inspiration takes you.
+            - generic [ref=e83]:
+              - button "Signup for Free" [ref=e84] [cursor=pointer]
+              - generic [ref=e86]:
+                - paragraph [ref=e87]: or
+                - button "Get the App" [ref=e89] [cursor=pointer]:
+                  - paragraph [ref=e90]: Get the App
+          - img "Community mockup" [ref=e94]
+        - generic [ref=e95]:
+          - generic [ref=e96]:
+            - generic [ref=e97]: More effective navigation
+            - paragraph [ref=e98]: Even off the beaten track, komoot keeps you on course. With turn-by-turn voice navigation and offline maps, you can stay focused on the moment—not the signal. Just download your route and explore freely, even far from reception.
+            - generic [ref=e99]:
+              - button "Signup for Free" [ref=e100] [cursor=pointer]
+              - generic [ref=e102]:
+                - paragraph [ref=e103]: or
+                - button "Get the App" [ref=e105] [cursor=pointer]:
+                  - paragraph [ref=e106]: Get the App
+          - img "Community mockup" [ref=e110]
+        - generic [ref=e111]:
+          - generic [ref=e112]:
+            - generic [ref=e113]: Share your adventure
+            - paragraph [ref=e114]: Inspire millions of outdoor lovers with photos and suggestions from your latest trip. Share your adventure’s best moments with the largest outdoor community in the world.
+            - generic [ref=e115]:
+              - button "Signup for Free" [ref=e116] [cursor=pointer]
+              - generic [ref=e118]:
+                - paragraph [ref=e119]: or
+                - button "Get the App" [ref=e121] [cursor=pointer]:
+                  - paragraph [ref=e122]: Get the App
+          - img "Community mockup" [ref=e126]
+      - generic [ref=e128]:
+        - generic [ref=e130]:
+          - heading "Discover our Collections" [level=2] [ref=e131]
+          - paragraph [ref=e132]: Browse the best outdoor-ready adventures; selected, curated and tested by komoot. Your own personal guide, they include everything from detailed routes to insider info — so you can just get out and go.
+        - generic [ref=e135]:
+          - link [ref=e137] [cursor=pointer]:
+            - /url: https://www.komoot.com/collection/1159215/north-coast-500-escape-to-the-highlands
+            - generic [ref=e138]:
+              - paragraph [ref=e140]: North Coast 500 – Escape to the Highlands
+              - generic [ref=e142]:
+                - paragraph [ref=e143]: Road Cycling Collection by
+                - paragraph [ref=e146]: Liam Yates
+          - link [ref=e150] [cursor=pointer]:
+            - /url: https://www.komoot.com/collection/291/john-muir-trail-along-the-legendary-trail-through-the-magical-sierra-nevada
+            - generic [ref=e151]:
+              - paragraph [ref=e153]: John Muir Trail – Along the legendary trail through the magical Sierra Nevada
+              - generic [ref=e155]:
+                - paragraph [ref=e156]: Hiking Collection by
+                - paragraph [ref=e159]: Caro "LadyOutdoors"
+          - link [ref=e163] [cursor=pointer]:
+            - /url: https://www.komoot.com/collection/276/gr20-europe-s-toughest-long-distance-hiking-trail-through-corsica
+            - generic [ref=e164]:
+              - paragraph [ref=e166]: GR20 – Europe's toughest long-distance hiking trail through Corsica
+              - generic [ref=e168]:
+                - paragraph [ref=e169]: Hiking Collection by
+                - paragraph [ref=e172]: Vanessa
+          - link [ref=e176] [cursor=pointer]:
+            - /url: https://www.komoot.com/collection/683/the-kerry-way-in-9-stages-over-ireland-s-mountains
+            - generic [ref=e177]:
+              - paragraph [ref=e179]: The Kerry Way — in 9 stages over Ireland's mountains
+              - generic [ref=e181]:
+                - paragraph [ref=e182]: Hiking Collection by
+                - paragraph [ref=e185]: komoot
+          - link [ref=e189] [cursor=pointer]:
+            - /url: https://www.komoot.com/collection/1015999/the-colorado-trail-ten-incredible-days-in-the-rocky-mountains
+            - generic [ref=e190]:
+              - paragraph [ref=e192]: The Colorado Trail — Ten incredible days in the Rocky Mountains
+              - generic [ref=e194]:
+                - paragraph [ref=e195]: Mountain Biking Collection by
+                - paragraph [ref=e198]: Joey
+          - link [ref=e202] [cursor=pointer]:
+            - /url: https://www.komoot.com/collection/898918/second-city-divide-rough-stuff-of-the-north
+            - generic [ref=e203]:
+              - paragraph [ref=e205]: Second City Divide — Rough Stuff Of The North
+              - generic [ref=e207]:
+                - paragraph [ref=e208]: Mountain Biking Collection by
+                - paragraph [ref=e211]: Katherine Moore
+          - link [ref=e215] [cursor=pointer]:
+            - /url: https://www.komoot.com/collection/1086555/an-unforeseen-incredible-journey-cycling-from-india-to-nepal
+            - generic [ref=e216]:
+              - paragraph [ref=e218]: An unforeseen incredible journey – cycling from India to Nepal
+              - generic [ref=e220]:
+                - paragraph [ref=e221]: Cycling Collection by
+                - paragraph [ref=e224]: Robin Patijn - Farawayistan
+          - link [ref=e228] [cursor=pointer]:
+            - /url: https://www.komoot.com/collection/1070173/european-divide-trail-7-600-km-across-the-continent
+            - generic [ref=e229]:
+              - paragraph [ref=e231]: European Divide Trail — 7,600 km across the continent
+              - generic [ref=e233]:
+                - paragraph [ref=e234]: Mountain Biking Collection by
+                - paragraph [ref=e237]: European Divide Trail
+          - link [ref=e241] [cursor=pointer]:
+            - /url: https://www.komoot.com/collection/964786/the-pamir-highway-dushanbe-to-osh-via-the-wakhan-valley
+            - generic [ref=e242]:
+              - paragraph [ref=e244]: The Pamir Highway – Dushanbe to Osh via the Wakhan Valley
+              - generic [ref=e246]:
+                - paragraph [ref=e247]: Cycling Collection by
+                - paragraph [ref=e250]: Robin Patijn - Farawayistan
+          - link [ref=e254] [cursor=pointer]:
+            - /url: https://www.komoot.com/collection/1005106/iceland-divide-lava-fields-icy-glaciers-and-river-crossings
+            - generic [ref=e255]:
+              - paragraph [ref=e257]: Iceland Divide – Lava fields, icy glaciers and river crossings
+              - generic [ref=e259]:
+                - paragraph [ref=e260]: Cycling Collection by
+                - paragraph [ref=e263]: Natt Williams
+          - link [ref=e267] [cursor=pointer]:
+            - /url: https://www.komoot.com/collection/987538/catalunya-trail-bikepacking-in-the-pyrenees
+            - generic [ref=e268]:
+              - paragraph [ref=e270]: Catalunya Trail — Bikepacking in the Pyrenees
+              - generic [ref=e272]:
+                - paragraph [ref=e273]: Cycling Collection by
+                - paragraph [ref=e276]: Katherine Moore
+          - link [ref=e280] [cursor=pointer]:
+            - /url: https://www.komoot.com/collection/427/hebridean-hopscotch-cycling-along-scotland-s-magical-west-coast
+            - generic [ref=e281]:
+              - paragraph [ref=e283]: Hebridean hopscotch — cycling along Scotland's magical west coast
+              - generic [ref=e285]:
+                - paragraph [ref=e286]: Cycling Collection by
+                - paragraph [ref=e289]: komoot
+          - link [ref=e293] [cursor=pointer]:
+            - /url: https://www.komoot.com/collection/1058466/annapurna-circuit-in-nepal-bikepacking-the-roof-of-the-world
+            - generic [ref=e294]:
+              - paragraph [ref=e296]: Annapurna Circuit in Nepal – Bikepacking the roof of the world
+              - generic [ref=e298]:
+                - paragraph [ref=e299]: Mountain Biking Collection by
+                - paragraph [ref=e302]: Robin Patijn - Farawayistan
+          - link [ref=e306] [cursor=pointer]:
+            - /url: https://www.komoot.com/collection/946212/traversing-the-dinaric-alps-bikepacking-from-the-mountains-to-the-sea
+            - generic [ref=e307]:
+              - paragraph [ref=e309]: Traversing the Dinaric Alps — bikepacking from the mountains to the sea
+              - generic [ref=e311]:
+                - paragraph [ref=e312]: Cycling Collection by
+                - paragraph [ref=e315]: Jenny Tough
+          - link [ref=e319] [cursor=pointer]:
+            - /url: https://www.komoot.com/collection/920980/atlas-mountain-race-one-week-one-bike-one-girl
+            - generic [ref=e320]:
+              - paragraph [ref=e322]: Atlas Mountain Race – One week, one bike, one girl
+              - generic [ref=e324]:
+                - paragraph [ref=e325]: Mountain Biking Collection by
+                - paragraph [ref=e328]: Quinda
+      - generic [ref=e331]:
+        - paragraph [ref=e332]: Step into the wild!
+        - paragraph [ref=e333]: There’s more out there than you think! From hidden trails to breathtaking viewpoints, discover the places and routes that don’t make it into guidebooks.
+      - generic [ref=e339]:
+        - generic [ref=e340]:
+          - generic [ref=e342]:
+            - paragraph [ref=e343]: Choose your tour, download it to your smartphone
+            - heading "Ready for your next adventure?" [level=2] [ref=e344]
+          - generic [ref=e345]:
+            - link [ref=e347] [cursor=pointer]:
+              - /url: /smarttour/e1195489824/nisqually-vista-trail
+              - generic [ref=e348]: Easy
+              - paragraph [ref=e359]: Nisqually Vista Trail
+            - link [ref=e363] [cursor=pointer]:
+              - /url: /smarttour/e1031870743/mesa-arch-trail
+              - generic [ref=e364]: Easy
+              - paragraph [ref=e375]: Mesa Arch Trail
+            - link [ref=e379] [cursor=pointer]:
+              - /url: /smarttour/e1085845864/willow-creek-trail
+              - generic [ref=e380]: Moderate
+              - paragraph [ref=e391]: Willow Creek Trail
+            - link [ref=e395] [cursor=pointer]:
+              - /url: /smarttour/e1102715460/fairyland-loop-trail
+              - generic [ref=e396]: Moderate
+              - paragraph [ref=e407]: Fairyland Loop Trail
+            - link [ref=e411] [cursor=pointer]:
+              - /url: /smarttour/e1232999429/lost-dog-trail
+              - generic [ref=e412]: Moderate
+              - paragraph [ref=e423]: Lost Dog Trail
+            - link [ref=e427] [cursor=pointer]:
+              - /url: /smarttour/e1286515562/buzzards-roost-trail
+              - generic [ref=e428]: Easy
+              - paragraph [ref=e439]: Buzzards roost trail
+            - link [ref=e443] [cursor=pointer]:
+              - /url: /smarttour/e1344845380/boardman-lake-trail
+              - generic [ref=e444]: Easy
+              - paragraph [ref=e455]: Boardman Lake Trail
+            - link [ref=e459] [cursor=pointer]:
+              - /url: /smarttour/e1395354446/animas-river-trail
+              - generic [ref=e460]: Easy
+              - paragraph [ref=e472]: Animas River Trail
+            - link [ref=e476] [cursor=pointer]:
+              - /url: /smarttour/e1354231163/lily-mountain-trail
+              - generic [ref=e477]: Moderate
+              - paragraph [ref=e488]: Lily Mountain Trail
+            - link [ref=e492] [cursor=pointer]:
+              - /url: /smarttour/e1668129754/big-dry-creek-trail
+              - generic [ref=e493]: Easy
+              - paragraph [ref=e502]: Big Dry Creek Trail
+        - generic [ref=e507]:
+          - generic [ref=e508]:
+            - link "Zuma Ridge Trail" [ref=e509] [cursor=pointer]:
+              - /url: /smarttour/e701250494/zuma-ridge-trail
+            - link "Horseshoe Lake Trail" [ref=e510] [cursor=pointer]:
+              - /url: /smarttour/e1336514271/horseshoe-lake-trail
+            - link "Double Butte Loop Trail" [ref=e511] [cursor=pointer]:
+              - /url: /smarttour/e1197679074/double-butte-loop-trail
+            - link "Larry Scott Memorial Trail — Port Townsend, Washington" [ref=e512] [cursor=pointer]:
+              - /url: /smarttour/e1364649296/larry-scott-memorial-trail-port-townsend-washington
+            - link "Bolsa Chica Ecological Reserve Trail" [ref=e513] [cursor=pointer]:
+              - /url: /smarttour/e1383342610/bolsa-chica-ecological-reserve-trail
+            - link "Scorpion Canyon Loop Trail" [ref=e514] [cursor=pointer]:
+              - /url: /smarttour/e1045436307/scorpion-canyon-loop-trail
+            - link "Panorama Point via Skyline Trail" [ref=e515] [cursor=pointer]:
+              - /url: /smarttour/e1186921242/panorama-point-via-skyline-trail
+            - link "Wellington Ditch Trail" [ref=e516] [cursor=pointer]:
+              - /url: /smarttour/e782310878/wellington-ditch-trail
+          - generic [ref=e517]:
+            - link "Sand Creek Trail" [ref=e518] [cursor=pointer]:
+              - /url: /smarttour/e1380912837/sand-creek-trail
+            - link "Sequoia Bayview Trail" [ref=e519] [cursor=pointer]:
+              - /url: /smarttour/e1207188599/sequoia-bayview-trail
+            - link "Las Trampas to Mt Diablo Regional Trail" [ref=e520] [cursor=pointer]:
+              - /url: /smarttour/e1412440977/las-trampas-to-mt-diablo-regional-trail
+            - link "Meadow Loop and Ridge Trail" [ref=e521] [cursor=pointer]:
+              - /url: /smarttour/e1187636487/meadow-loop-and-ridge-trail
+            - link "Grizzly Lake Trail" [ref=e522] [cursor=pointer]:
+              - /url: /smarttour/e974305499/grizzly-lake-trail
+            - link "Sykes Hot Springs via Pine Ridge Trail" [ref=e523] [cursor=pointer]:
+              - /url: /smarttour/e1286607962/sykes-hot-springs-via-pine-ridge-trail
+            - link "Barney Lake Trail" [ref=e524] [cursor=pointer]:
+              - /url: /smarttour/e1212474007/barney-lake-trail
+            - link "Hickory Creek Trail" [ref=e525] [cursor=pointer]:
+              - /url: /smarttour/e1038095597/hickory-creek-trail
+          - generic [ref=e526]:
+            - link "Old Dillon Reservoir Trail" [ref=e527] [cursor=pointer]:
+              - /url: /smarttour/e1187475532/old-dillon-reservoir-trail
+            - link "Olallie Trail" [ref=e528] [cursor=pointer]:
+              - /url: /smarttour/e702626049/olallie-trail
+            - link "Weaver Lake Trail" [ref=e529] [cursor=pointer]:
+              - /url: /smarttour/e2041515938/weaver-lake-trail
+            - link "Spiral Point via Rim Trail South" [ref=e530] [cursor=pointer]:
+              - /url: /smarttour/e1412930229/spiral-point-via-rim-trail-south
+            - link "Skull Crack Trail" [ref=e531] [cursor=pointer]:
+              - /url: /smarttour/e1227743879/skull-crack-trail
+            - link "Coyote Peak and Ridge Trail" [ref=e532] [cursor=pointer]:
+              - /url: /smarttour/e807915918/coyote-peak-and-ridge-trail
+            - link "Floating Island and Cathedral Lakes Trail" [ref=e533] [cursor=pointer]:
+              - /url: /smarttour/e1219941345/floating-island-and-cathedral-lakes-trail
+          - generic [ref=e534]:
+            - link "Pipeline Canyon Trail" [ref=e535] [cursor=pointer]:
+              - /url: /smarttour/e1406702612/pipeline-canyon-trail
+            - link "Green Mountain West Ridge Trail" [ref=e536] [cursor=pointer]:
+              - /url: /smarttour/e1192772958/green-mountain-west-ridge-trail
+            - link "Serrano Creek Trail" [ref=e537] [cursor=pointer]:
+              - /url: /smarttour/e1418346640/serrano-creek-trail
+            - link "Pioneer Tree Trail" [ref=e538] [cursor=pointer]:
+              - /url: /smarttour/e1234338877/pioneer-tree-trail
+            - link "Hurkey Creek Trail" [ref=e539] [cursor=pointer]:
+              - /url: /smarttour/e1387713948/hurkey-creek-trail
+            - link "Caliente Mountain Ridge Trail" [ref=e540] [cursor=pointer]:
+              - /url: /smarttour/e712861019/caliente-mountain-ridge-trail
+            - link "Bearfoot Trail" [ref=e541] [cursor=pointer]:
+              - /url: /smarttour/e1695703398/bearfoot-trail
+      - generic [ref=e542]:
+        - generic [ref=e544]:
+          - heading "Browse places" [level=2] [ref=e547]
+          - generic [ref=e548]:
+            - link "Huts" [ref=e550] [cursor=pointer]:
+              - /url: /places/2/huts
+              - paragraph [ref=e560]: Huts
+            - link "Mountain Peaks" [ref=e564] [cursor=pointer]:
+              - /url: /places/3/mountain-peaks
+              - paragraph [ref=e570]: Mountain Peaks
+            - link "Waterfalls" [ref=e574] [cursor=pointer]:
+              - /url: /places/4/waterfalls
+              - paragraph [ref=e584]: Waterfalls
+            - link "Caves" [ref=e588] [cursor=pointer]:
+              - /url: /places/5/caves
+              - paragraph [ref=e595]: Caves
+            - link "Lakes" [ref=e599] [cursor=pointer]:
+              - /url: /places/6/lakes
+              - paragraph [ref=e607]: Lakes
+            - link "Mountain passes" [ref=e611] [cursor=pointer]:
+              - /url: /places/7/mountain-passes
+              - paragraph [ref=e617]: Mountain passes
+            - link "Canyons" [ref=e621] [cursor=pointer]:
+              - /url: /places/8/canyons
+              - paragraph [ref=e628]: Canyons
+            - link "Bike Parks" [ref=e632] [cursor=pointer]:
+              - /url: /places/9/bike-parks
+              - paragraph [ref=e643]: Bike Parks
+            - link "Natural Monuments" [ref=e647] [cursor=pointer]:
+              - /url: /places/10/natural-monuments
+              - paragraph [ref=e654]: Natural Monuments
+            - link "Castles" [ref=e658] [cursor=pointer]:
+              - /url: /places/11/castles
+              - paragraph [ref=e665]: Castles
+        - paragraph [ref=e686]: Your next favorite place is just a scroll away! Browse endless spots to walk, ride, or hike, and start planning your next adventure today.
+      - generic [ref=e688]:
+        - generic [ref=e690]:
+          - paragraph [ref=e691]: Ready to explore?
+          - heading "Discover new routes" [level=2] [ref=e692]
+        - generic [ref=e693]:
+          - link [ref=e695] [cursor=pointer]:
+            - /url: /discover/hiking-trails
+            - paragraph [ref=e700]: Hiking trails & Routes
+          - link [ref=e704] [cursor=pointer]:
+            - /url: /discover/cycling-routes
+            - paragraph [ref=e709]: Bike touring routes & trails
+          - link [ref=e713] [cursor=pointer]:
+            - /url: /discover/mountain-bike-trails
+            - paragraph [ref=e718]: Mountain biking trails
+          - link [ref=e722] [cursor=pointer]:
+            - /url: /discover/road-cycling-routes
+            - paragraph [ref=e727]: Road cycling routes
+          - link [ref=e731] [cursor=pointer]:
+            - /url: /discover/running-trails
+            - paragraph [ref=e736]: Running trails & routes
+          - link [ref=e740] [cursor=pointer]:
+            - /url: /discover/mountain-hikes
+            - paragraph [ref=e745]: Mountain hikes & routes
+      - generic [ref=e748]:
+        - generic [ref=e750]:
+          - generic [ref=e751]:
+            - heading "The best route planner out there. Simple as that." [level=3] [ref=e753]
+            - generic [ref=e754]:
+              - button "Sign up now" [ref=e756] [cursor=pointer]
+              - generic [ref=e758]:
+                - link "Download on the App Store" [ref=e759] [cursor=pointer]:
+                  - /url: https://x.bndspn.com/v1/or-jdqap8
+                - link "Android App on Google Play" [ref=e760] [cursor=pointer]:
+                  - /url: https://x.bndspn.com/v1/or-z0w587
+          - generic:
+            - generic:
+              - img "Store rating"
+        - generic [ref=e761]:
+          - generic [ref=e764]:
+            - paragraph [ref=e765]: 50M +
+            - paragraph [ref=e766]: Outdoor explorers in the komoot community
+          - generic [ref=e767]:
+            - generic [ref=e769]:
+              - paragraph [ref=e770]: 8M +
+              - paragraph [ref=e771]: Routes in over 100 countries – for hikes, rides, and runs
+            - generic [ref=e773]:
+              - paragraph [ref=e774]: 850M +
+              - paragraph [ref=e775]: Photos, tips, and highlights shared by the community
+      - generic [ref=e776]:
+        - generic [ref=e777]:
+          - text: Explore the World
+          - paragraph [ref=e778]: Let's go out!
+        - generic [ref=e780]:
+          - generic [ref=e781]:
+            - button [ref=e782] [cursor=pointer]:
+              - paragraph [ref=e783]: Hiking
+            - button [ref=e784] [cursor=pointer]:
+              - paragraph [ref=e785]: Cycling
+            - button [ref=e786] [cursor=pointer]:
+              - paragraph [ref=e787]: Road cycling
+            - button [ref=e788] [cursor=pointer]:
+              - paragraph [ref=e789]: Mountain biking
+          - generic [ref=e791]:
+            - generic [ref=e792]:
+              - link "United Kingdom" [ref=e794] [cursor=pointer]:
+                - /url: /guide/72314/hiking-in-the-united-kingdom
+              - generic [ref=e797]:
+                - generic [ref=e798]:
+                  - generic [ref=e799]:
+                    - link "England" [ref=e800] [cursor=pointer]:
+                      - /url: /guide/22623/hiking-in-england
+                    - link "Northern Ireland" [ref=e801] [cursor=pointer]:
+                      - /url: /guide/47647/hiking-in-northern-ireland
+                    - link "Scotland" [ref=e802] [cursor=pointer]:
+                      - /url: /guide/58695/hiking-in-scotland
+                    - link "Wales" [ref=e803] [cursor=pointer]:
+                      - /url: /guide/67399/hiking-in-wales
+                    - link "Bath and North East Somerset" [ref=e804] [cursor=pointer]:
+                      - /url: /guide/12783/hiking-in-bath-and-north-east-somerset
+                  - generic [ref=e805]:
+                    - link "County Durham" [ref=e806] [cursor=pointer]:
+                      - /url: /guide/18567/hiking-in-county-durham
+                    - link "Coventry" [ref=e807] [cursor=pointer]:
+                      - /url: /guide/18623/hiking-around-coventry
+                    - link "Craven" [ref=e808] [cursor=pointer]:
+                      - /url: /guide/18651/hiking-in-craven
+                    - link "Cumbria" [ref=e809] [cursor=pointer]:
+                      - /url: /guide/18807/hiking-in-cumbria
+                    - link "Darlington" [ref=e810] [cursor=pointer]:
+                      - /url: /guide/19199/hiking-around-darlington
+                  - generic [ref=e811]:
+                    - link "Herefordshire" [ref=e812] [cursor=pointer]:
+                      - /url: /guide/31291/hiking-in-herefordshire
+                    - link "Hertfordshire" [ref=e813] [cursor=pointer]:
+                      - /url: /guide/31499/hiking-in-hertfordshire
+                    - link "Hinckley And Bosworth" [ref=e814] [cursor=pointer]:
+                      - /url: /guide/3112637/hiking-in-hinckley-and-bosworth
+                    - link "Isle of Wight" [ref=e815] [cursor=pointer]:
+                      - /url: /guide/34143/hiking-in-the-isle-of-wight
+                    - link "Isles of Scilly" [ref=e816] [cursor=pointer]:
+                      - /url: /guide/34147/hiking-on-the-isles-of-scilly
+                  - generic [ref=e817]:
+                    - link "North Somerset" [ref=e818] [cursor=pointer]:
+                      - /url: /guide/47683/hiking-around-north-somerset
+                    - link "Northumberland" [ref=e819] [cursor=pointer]:
+                      - /url: /guide/47687/hiking-in-northumberland
+                    - link "North West Leicestershire" [ref=e820] [cursor=pointer]:
+                      - /url: /guide/3112620/hiking-in-north-west-leicestershire
+                    - link "North Yorkshire" [ref=e821] [cursor=pointer]:
+                      - /url: /guide/47703/hiking-in-north-yorkshire
+                    - link "Nottingham" [ref=e822] [cursor=pointer]:
+                      - /url: /guide/9023/hiking-around-nottingham
+                  - generic [ref=e823]:
+                    - link "Southend-on-Sea" [ref=e824] [cursor=pointer]:
+                      - /url: /guide/60643/hiking-around-southend-on-sea
+                    - link "South Gloucestershire" [ref=e825] [cursor=pointer]:
+                      - /url: /guide/60663/hiking-in-south-gloucestershire
+                    - link "Staffordshire" [ref=e826] [cursor=pointer]:
+                      - /url: /guide/61015/hiking-in-staffordshire
+                    - link "Stockton-on-Tees" [ref=e827] [cursor=pointer]:
+                      - /url: /guide/61847/hiking-around-stockton-on-tees
+                    - link "Suffolk" [ref=e828] [cursor=pointer]:
+                      - /url: /guide/62427/hiking-in-suffolk
+                - button "Show more" [ref=e829] [cursor=pointer]
+              - generic [ref=e831]:
+                - paragraph [ref=e832]: Popular destinations
+                - generic [ref=e834]:
+                  - generic [ref=e835]:
+                    - link "London" [ref=e836] [cursor=pointer]:
+                      - /url: /guide/40895/hiking-around-london
+                    - link "Peak District" [ref=e837] [cursor=pointer]:
+                      - /url: /guide/504665/hiking-in-peak-district
+                    - link "Delamere" [ref=e838] [cursor=pointer]:
+                      - /url: /guide/697887/hiking-around-delamere-forest
+                    - link "Alderley Edge" [ref=e839] [cursor=pointer]:
+                      - /url: /guide/693535/hiking-around-alderley-edge
+                  - generic [ref=e840]:
+                    - link "Edale" [ref=e841] [cursor=pointer]:
+                      - /url: /guide/1669522/hiking-around-edale
+                    - link "Thornham" [ref=e842] [cursor=pointer]:
+                      - /url: /guide/684797/hiking-around-thornham
+                    - link "Glasgow City" [ref=e843] [cursor=pointer]:
+                      - /url: /guide/26639/hiking-around-glasgow
+                    - link "Lake District" [ref=e844] [cursor=pointer]:
+                      - /url: /guide/504699/hiking-in-lake-district
+                  - generic [ref=e845]:
+                    - link "Wales" [ref=e846] [cursor=pointer]:
+                      - /url: /guide/752236/hiking-around-wales
+                    - link "Castleton" [ref=e847] [cursor=pointer]:
+                      - /url: /guide/1698677/hiking-around-castleton
+                    - link "Grassington" [ref=e848] [cursor=pointer]:
+                      - /url: /guide/1763175/hiking-around-grassington
+                    - link "Castleton" [ref=e849] [cursor=pointer]:
+                      - /url: /guide/1686029/hiking-around-castleton
+                  - generic [ref=e850]:
+                    - link "Betws-Y-Coed" [ref=e851] [cursor=pointer]:
+                      - /url: /guide/769032/hiking-around-betws-y-coed
+                    - link "Stratford Upon Avon" [ref=e852] [cursor=pointer]:
+                      - /url: /guide/765700/hiking-around-stratford-upon-avon
+                    - link "Malvern" [ref=e853] [cursor=pointer]:
+                      - /url: /guide/720718/hiking-around-malvern
+                    - link "Bakewell" [ref=e854] [cursor=pointer]:
+                      - /url: /guide/679697/hiking-around-bakewell
+                  - generic [ref=e855]:
+                    - link "North York Moors National Park" [ref=e856] [cursor=pointer]:
+                      - /url: /guide/504648/hiking-in-north-york-moors-national-park
+                    - link "Llangollen" [ref=e857] [cursor=pointer]:
+                      - /url: /guide/1763090/hiking-around-llangollen
+                    - link "Shrewsbury" [ref=e858] [cursor=pointer]:
+                      - /url: /guide/876302/hiking-around-shrewsbury
+                    - link "Greater Manchester" [ref=e859] [cursor=pointer]:
+                      - /url: /guide/27707/hiking-around-greater-manchester
+            - generic [ref=e860]:
+              - link "United States" [ref=e862] [cursor=pointer]:
+                - /url: /guide/72318/hiking-in-the-united-states-of-america
+              - generic [ref=e865]:
+                - generic [ref=e866]:
+                  - generic [ref=e867]:
+                    - link "Alabama" [ref=e868] [cursor=pointer]:
+                      - /url: /guide/9707/hiking-in-alabama
+                    - link "Alaska" [ref=e869] [cursor=pointer]:
+                      - /url: /guide/9723/hiking-in-alaska
+                    - link "Arizona" [ref=e870] [cursor=pointer]:
+                      - /url: /guide/11103/hiking-in-arizona
+                    - link "Arkansas" [ref=e871] [cursor=pointer]:
+                      - /url: /guide/11107/hiking-in-arkansas
+                    - link "California" [ref=e872] [cursor=pointer]:
+                      - /url: /guide/17303/hiking-in-california
+                  - generic [ref=e873]:
+                    - link "Idaho" [ref=e874] [cursor=pointer]:
+                      - /url: /guide/33559/hiking-in-idaho
+                    - link "Illinois" [ref=e875] [cursor=pointer]:
+                      - /url: /guide/33703/hiking-in-illinois
+                    - link "Indiana" [ref=e876] [cursor=pointer]:
+                      - /url: /guide/33843/hiking-in-indiana
+                    - link "Iowa" [ref=e877] [cursor=pointer]:
+                      - /url: /guide/34011/hiking-in-iowa
+                    - link "Kansas" [ref=e878] [cursor=pointer]:
+                      - /url: /guide/35159/hiking-in-kansas
+                  - generic [ref=e879]:
+                    - link "Michigan" [ref=e880] [cursor=pointer]:
+                      - /url: /guide/43623/hiking-in-michigan
+                    - link "Minnesota" [ref=e881] [cursor=pointer]:
+                      - /url: /guide/43807/hiking-in-minnesota
+                    - link "Mississippi" [ref=e882] [cursor=pointer]:
+                      - /url: /guide/43867/hiking-in-mississippi
+                    - link "Missouri" [ref=e883] [cursor=pointer]:
+                      - /url: /guide/43875/hiking-in-missouri
+                    - link "Montana" [ref=e884] [cursor=pointer]:
+                      - /url: /guide/44267/hiking-in-montana
+                  - generic [ref=e885]:
+                    - link "New York" [ref=e886] [cursor=pointer]:
+                      - /url: /guide/46635/hiking-in-new-york
+                    - link "North Carolina" [ref=e887] [cursor=pointer]:
+                      - /url: /guide/47615/hiking-in-north-carolina
+                    - link "North Dakota" [ref=e888] [cursor=pointer]:
+                      - /url: /guide/47619/hiking-in-north-dakota
+                    - link "Ohio" [ref=e889] [cursor=pointer]:
+                      - /url: /guide/49247/hiking-in-ohio
+                    - link "Oklahoma" [ref=e890] [cursor=pointer]:
+                      - /url: /guide/49307/hiking-in-oklahoma
+                  - generic [ref=e891]:
+                    - link "Tennessee" [ref=e892] [cursor=pointer]:
+                      - /url: /guide/63255/hiking-in-tennessee
+                    - link "Texas" [ref=e893] [cursor=pointer]:
+                      - /url: /guide/63411/hiking-in-texas
+                    - link "United States Virgin Islands" [ref=e894] [cursor=pointer]:
+                      - /url: /guide/65119/hiking-in-the-united-states-virgin-islands
+                    - link "Utah" [ref=e895] [cursor=pointer]:
+                      - /url: /guide/65563/hiking-in-utah
+                    - link "Vermont" [ref=e896] [cursor=pointer]:
+                      - /url: /guide/66091/hiking-in-vermont
+                - button "Show more" [ref=e897] [cursor=pointer]
+              - generic [ref=e899]:
+                - paragraph [ref=e900]: Popular destinations
+                - generic [ref=e902]:
+                  - generic [ref=e903]:
+                    - link "Sedona" [ref=e904] [cursor=pointer]:
+                      - /url: /guide/1915342/hiking-around-sedona
+                    - link "Zion National Park" [ref=e905] [cursor=pointer]:
+                      - /url: /guide/1844146/hiking-in-zion-national-park
+                    - link "San Diego" [ref=e906] [cursor=pointer]:
+                      - /url: /guide/1933753/hiking-around-san-diego
+                    - link "Glacier National Park" [ref=e907] [cursor=pointer]:
+                      - /url: /guide/1844214/hiking-in-glacier-national-park
+                  - generic [ref=e908]:
+                    - link "Olympic National Park" [ref=e909] [cursor=pointer]:
+                      - /url: /guide/1844282/hiking-in-olympic-national-park
+                    - link "Grand Teton National Park" [ref=e910] [cursor=pointer]:
+                      - /url: /guide/1844163/hiking-in-grand-teton-national-park
+                    - link "Rocky Mountain National Park" [ref=e911] [cursor=pointer]:
+                      - /url: /guide/1843381/hiking-in-rocky-mountain-national-park
+                    - link "Seattle" [ref=e912] [cursor=pointer]:
+                      - /url: /guide/2394402/hiking-around-seattle
+                  - generic [ref=e913]:
+                    - link "Shenandoah National Park" [ref=e914] [cursor=pointer]:
+                      - /url: /guide/1844316/hiking-in-shenandoah-national-park
+                    - link "Pacifica" [ref=e915] [cursor=pointer]:
+                      - /url: /guide/1935742/hiking-around-pacifica
+                    - link "Capitol Reef National Park" [ref=e916] [cursor=pointer]:
+                      - /url: /guide/1843568/hiking-in-capitol-reef-national-park
+                    - link "North Cascades National Park" [ref=e917] [cursor=pointer]:
+                      - /url: /guide/1843534/hiking-in-north-cascades-national-park
+                  - generic [ref=e918]:
+                    - link "Arches National Park" [ref=e919] [cursor=pointer]:
+                      - /url: /guide/1843789/hiking-in-arches-national-park
+                    - link "Berkeley" [ref=e920] [cursor=pointer]:
+                      - /url: /guide/1934212/hiking-around-berkeley
+                    - link "Big Bend National Park" [ref=e921] [cursor=pointer]:
+                      - /url: /guide/1843602/hiking-in-big-bend-national-park
+                    - link "Waimea Canyon State Park" [ref=e922] [cursor=pointer]:
+                      - /url: /guide/3302068/hiking-in-waimea-canyon-state-park
+                  - generic [ref=e923]:
+                    - link "Capitol Reef National Park" [ref=e924] [cursor=pointer]:
+                      - /url: /guide/17415/hiking-in-capitol-reef-national-park
+                    - link "Cold Spring" [ref=e925] [cursor=pointer]:
+                      - /url: /guide/2207368/hiking-around-cold-spring
+                    - link "Austin" [ref=e926] [cursor=pointer]:
+                      - /url: /guide/2360368/hiking-around-austin
+                    - link "Great Smoky Mountains National Park" [ref=e927] [cursor=pointer]:
+                      - /url: /guide/1844350/hiking-in-great-smoky-mountains-national-park
+            - generic [ref=e928]:
+              - paragraph [ref=e929]: Popular destinations to explore
+              - generic [ref=e930]:
+                - paragraph [ref=e931]: Countries
+                - generic [ref=e933]:
+                  - generic [ref=e934]:
+                    - link "Isle of Man" [ref=e935] [cursor=pointer]:
+                      - /url: /guide/71987/hiking-on-the-isle-of-man
+                    - link "Norway" [ref=e936] [cursor=pointer]:
+                      - /url: /guide/72442/hiking-in-norway
+                  - generic [ref=e937]:
+                    - link "Iceland" [ref=e938] [cursor=pointer]:
+                      - /url: /guide/71967/hiking-in-iceland
+                    - link "Ireland" [ref=e939] [cursor=pointer]:
+                      - /url: /guide/71983/hiking-in-ireland
+                  - generic [ref=e940]:
+                    - link "Switzerland" [ref=e941] [cursor=pointer]:
+                      - /url: /guide/525/hiking-in-switzerland
+                    - link "France" [ref=e942] [cursor=pointer]:
+                      - /url: /guide/533/hiking-in-france
+                  - generic [ref=e943]:
+                    - link "Malta" [ref=e944] [cursor=pointer]:
+                      - /url: /guide/1877/hiking-in-malta
+                    - link "Japan" [ref=e945] [cursor=pointer]:
+                      - /url: /guide/71995/hiking-in-japan
+                  - generic [ref=e946]:
+                    - link "Portugal" [ref=e947] [cursor=pointer]:
+                      - /url: /guide/541/hiking-in-portugal
+                    - link "Germany" [ref=e948] [cursor=pointer]:
+                      - /url: /guide/549/hiking-in-germany
+              - generic [ref=e949]:
+                - paragraph [ref=e950]: Destinations
+                - generic [ref=e952]:
+                  - generic [ref=e953]:
+                    - link "Dolomites" [ref=e954] [cursor=pointer]:
+                      - /url: /guide/1885/hiking-in-the-dolomites
+                    - link "Jasper National Park" [ref=e955] [cursor=pointer]:
+                      - /url: /guide/3295863/hiking-in-jasper-national-park
+                    - link "Banff National Park" [ref=e956] [cursor=pointer]:
+                      - /url: /guide/3284711/hiking-in-banff-national-park
+                  - generic [ref=e957]:
+                    - link "Crete" [ref=e958] [cursor=pointer]:
+                      - /url: /guide/18691/hiking-in-the-crete
+                    - link "Clare" [ref=e959] [cursor=pointer]:
+                      - /url: /guide/18031/hiking-in-clare
+                    - link "Calvados" [ref=e960] [cursor=pointer]:
+                      - /url: /guide/17327/hiking-in-calvados
+                  - generic [ref=e961]:
+                    - link "Pyrenees" [ref=e962] [cursor=pointer]:
+                      - /url: /guide/1777/hiking-in-the-pyrenees
+                    - link "Buttstädt" [ref=e963] [cursor=pointer]:
+                      - /url: /guide/17191/hiking-around-buttstaedt
+                    - link "Wicklow Mountains National Park" [ref=e964] [cursor=pointer]:
+                      - /url: /guide/69191/hiking-in-the-wicklow-mountains-national-park
+                  - generic [ref=e965]:
+                    - link "Carpathian Mountains" [ref=e966] [cursor=pointer]:
+                      - /url: /guide/17471/hiking-in-the-carpathian-mountains
+                    - link "Kootenay National Park" [ref=e967] [cursor=pointer]:
+                      - /url: /guide/3284626/hiking-in-kootenay-national-park
+                    - link "Kaiser Mountains" [ref=e968] [cursor=pointer]:
+                      - /url: /guide/661/hiking-in-the-kaiser-mountains
+                  - generic [ref=e969]:
+                    - link "Landkreis München" [ref=e970] [cursor=pointer]:
+                      - /url: /guide/301/hiking-around-landkreis-muenchen
+                    - link "Sleeping Giant Provincial Park" [ref=e971] [cursor=pointer]:
+                      - /url: /guide/3735173/hiking-in-sleeping-giant-provincial-park
+                    - link "Andalusia" [ref=e972] [cursor=pointer]:
+                      - /url: /guide/72510/hiking-in-andalusia
+      - generic [ref=e973]:
+        - img "background" [ref=e975]
+        - heading "Get ready to conquer new peaks" [level=3] [ref=e977]
+        - button "Sign up for Free" [ref=e978] [cursor=pointer]
+  - contentinfo [ref=e980]:
+    - generic [ref=e990]:
+      - generic [ref=e991]:
+        - generic [ref=e994]:
+          - heading "Explore" [level=6] [ref=e995]
+          - generic [ref=e996]:
+            - link "Routes" [ref=e997] [cursor=pointer]:
+              - /url: /discover
+            - link "Route planner" [ref=e998] [cursor=pointer]:
+              - /url: /plan
+            - link "Features" [ref=e999] [cursor=pointer]:
+              - /url: /features
+            - link "Redeem a voucher" [ref=e1000] [cursor=pointer]:
+              - /url: /account/gift
+            - link "Hikes" [ref=e1001] [cursor=pointer]:
+              - /url: /discover/hiking-trails
+            - link "MTB Trails" [ref=e1002] [cursor=pointer]:
+              - /url: /discover/mountain-bike-trails
+            - link "Road cycling routes" [ref=e1003] [cursor=pointer]:
+              - /url: /discover/road-cycling-routes
+            - link "Bikepacking" [ref=e1004] [cursor=pointer]:
+              - /url: /discover/bikepacking
+            - link "Sitemap" [ref=e1005] [cursor=pointer]:
+              - /url: /sitemap
+        - generic [ref=e1008]:
+          - heading "B2B" [level=6] [ref=e1009]
+          - generic [ref=e1010]:
+            - link "Partners" [ref=e1011] [cursor=pointer]:
+              - /url: https://komoot.business/en
+            - link "Connect" [ref=e1012] [cursor=pointer]:
+              - /url: /connect
+            - link "Embed routes" [ref=e1013] [cursor=pointer]:
+              - /url: /b2b/embed
+        - generic [ref=e1016]:
+          - heading "Company" [level=6] [ref=e1017]
+          - generic [ref=e1018]:
+            - link "Press" [ref=e1019] [cursor=pointer]:
+              - /url: https://newsroom.komoot.com/en
+            - link "What's New" [ref=e1020] [cursor=pointer]:
+              - /url: /whats-new
+            - link "Pioneers" [ref=e1021] [cursor=pointer]:
+              - /url: /pioneers
+            - link "Product Updates" [ref=e1022] [cursor=pointer]:
+              - /url: /product-updates
+            - link "Ambassadors" [ref=e1023] [cursor=pointer]:
+              - /url: /ambassadors
+            - link "Adventure Hub" [ref=e1024] [cursor=pointer]:
+              - /url: /adventure-hub
+            - link "Careers" [ref=e1025] [cursor=pointer]:
+              - /url: https://bndspn.com/careers-komoot
+        - generic [ref=e1028]:
+          - heading "Community" [level=6] [ref=e1029]
+          - generic [ref=e1030]:
+            - link "Help Guides" [ref=e1031] [cursor=pointer]:
+              - /url: /help
+            - link "Support" [ref=e1032] [cursor=pointer]:
+              - /url: https://support.komoot.com/hc/en-us
+            - link "GPX Merge Tool" [ref=e1033] [cursor=pointer]:
+              - /url: /gpx-merge-tool-online
+            - link "GPX Route Video" [ref=e1034] [cursor=pointer]:
+              - /url: /gpx-video-preview
+            - link "Hazard Assessment" [ref=e1035] [cursor=pointer]:
+              - /url: /hazard-assessment
+            - link "Live Tracking" [ref=e1036] [cursor=pointer]:
+              - /url: /live-tracking
+            - link "Experiences" [ref=e1037] [cursor=pointer]:
+              - /url: /guide-experiences
+            - link "Groups" [ref=e1038] [cursor=pointer]:
+              - /url: /groups
+      - generic [ref=e1039]:
+        - generic [ref=e1041]:
+          - heading "Download the app" [level=6] [ref=e1042]
+          - generic [ref=e1044]:
+            - link "Download on the App Store" [ref=e1045] [cursor=pointer]:
+              - /url: https://x.bndspn.com/v1/or-jdqap8
+            - link "Android App on Google Play" [ref=e1046] [cursor=pointer]:
+              - /url: https://x.bndspn.com/v1/or-z0w587
+        - generic [ref=e1050]:
+          - heading "Follow Us on Socials" [level=6] [ref=e1051]
+          - generic [ref=e1053]:
+            - link "instagram" [ref=e1054] [cursor=pointer]:
+              - /url: https://www.instagram.com/komoot
+            - link "youtube" [ref=e1058] [cursor=pointer]:
+              - /url: https://www.youtube.com/komoot
+            - link "facebook" [ref=e1062] [cursor=pointer]:
+              - /url: https://www.facebook.com/komoot
+      - generic [ref=e1065]:
+        - paragraph [ref=e1066]: © komoot GmbH
+        - generic [ref=e1067]:
+          - generic [ref=e1068]:
+            - link "Privacy Policy" [ref=e1070] [cursor=pointer]:
+              - /url: /privacy
+            - link "Terms of Service" [ref=e1074] [cursor=pointer]:
+              - /url: /terms-of-service
+            - button "Cookies preferences" [ref=e1078] [cursor=pointer]
+            - link "Community guidelines" [ref=e1082] [cursor=pointer]:
+              - /url: /community/guidelines
+            - link "Vulnerability disclosure program" [ref=e1086] [cursor=pointer]:
+              - /url: /security/bug-bounty
+            - link "Imprint" [ref=e1090] [cursor=pointer]:
+              - /url: /imprint
+            - link "Information for law enforcement" [ref=e1094] [cursor=pointer]:
+              - /url: /information-law-enforcement
+          - button "English" [ref=e1096] [cursor=pointer]

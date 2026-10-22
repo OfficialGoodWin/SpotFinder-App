@@ -1,0 +1,149 @@
+- generic [ref=e2]:
+  - generic [ref=e6]:
+    - generic [ref=e8]:
+      - button "L Search" [ref=e9] [cursor=pointer]:
+        - text: L
+        - generic [ref=e10]: Search
+      - button "T Route" [ref=e11] [cursor=pointer]:
+        - text: T
+        - generic [ref=e12]: Route
+      - button "Log in to My Mapy" [ref=e13] [cursor=pointer]:
+        - generic [ref=e17]:
+          - generic [ref=e18]: Log in to
+          - text: My Mapy
+    - generic [ref=e19]:
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - textbox "Search" [active] [ref=e23]:
+            - /placeholder: ""
+            - text: Prague Castle
+          - button "Search" [ref=e24] [cursor=pointer]
+          - button [ref=e137] [cursor=pointer]
+          - list [ref=e141]:
+            - listitem [ref=e142]:
+              - generic [ref=e145]:
+                - strong [ref=e146]: Prague Castle
+                - emphasis [ref=e147]: Castle, Prague - Hradčany, Czechia
+            - listitem [ref=e148]:
+              - generic [ref=e151]:
+                - strong [ref=e152]: Prague Castle Riding School
+                - emphasis [ref=e153]: Historic building, U Prašného mostu 53/7, Prague 1 - Hradčany, Czechia
+            - listitem [ref=e154]:
+              - generic [ref=e157]:
+                - strong [ref=e158]: Okoř Castle
+                - emphasis [ref=e159]: Ruin, Okoř, Czechia
+            - listitem [ref=e160]:
+              - generic [ref=e163]:
+                - strong [ref=e164]: Castle Nižbor
+                - emphasis [ref=e165]: Chateau, Na Zámku 261, Nižbor, Czechia
+            - listitem [ref=e166]:
+              - generic [ref=e169]:
+                - strong [ref=e170]: Karlík Castle
+                - emphasis [ref=e171]: Ruin, Mořinka, Czechia
+            - listitem [ref=e172]:
+              - generic [ref=e175]:
+                - strong [ref=e176]: Štiřín Castle
+                - emphasis [ref=e177]: Chateau, Ringhofferova 711, Kamenice - Štiřín, Central Bohemian Region, Czechia
+            - listitem [ref=e178]:
+              - generic [ref=e181]:
+                - strong [ref=e182]: Libeň Castle
+                - emphasis [ref=e183]: Chateau, Zenklova 1/35, Prague 8 - Libeň, Czechia
+            - listitem [ref=e184]:
+              - generic [ref=e187]:
+                - strong [ref=e188]: Castle in Roztoky
+                - emphasis [ref=e189]: Chateau, Zámek 1, Roztoky, Prague-West District, Central Bohemian Region, Czechia
+        - link [ref=e50] [cursor=pointer]:
+          - /url: https://link.mapy.com/gSno/5v84r4rs
+      - generic [ref=e52]:
+        - generic [ref=e54]:
+          - paragraph [ref=e55]: 21. 10. 2026•For selected restaurants in Mapy.com, you will now find the menu directly in the establishment’s details, including the daily menu. This makes it easier to figure out where to go for a meal.
+          - button "Show all new features" [ref=e56] [cursor=pointer]
+        - generic [ref=e57]:
+          - link [ref=e58] [cursor=pointer]:
+            - /url: /
+          - button "English" [ref=e67] [cursor=pointer]
+        - paragraph [ref=e70]:
+          - link "Help" [ref=e71] [cursor=pointer]:
+            - /url: https://help.mapy.com/en/
+          - generic [ref=e72]: •
+          - link "Legend" [ref=e73] [cursor=pointer]:
+            - /url: /en/?lgnd=1
+          - generic [ref=e74]: •
+          - link "Mobile" [ref=e75] [cursor=pointer]:
+            - /url: /en/mobilepromo
+          - generic [ref=e76]: •
+          - link "Advertising" [ref=e77] [cursor=pointer]:
+            - /url: https://www.seznam.cz/reklama/en/obsahovy-web/sluzba-firmy
+          - generic [ref=e78]: •
+          - link "Terms and Licensing" [ref=e79] [cursor=pointer]:
+            - /url: https://licence.mapy.cz/?doc=mapy_pu&lang=en
+          - generic [ref=e80]: •
+          - button "Problems and comments" [ref=e81] [cursor=pointer]
+          - generic [ref=e82]: •
+          - link "Personalization settings" [ref=e83] [cursor=pointer]:
+            - /url: https://account.mapy.com/consents?lang=en
+          - generic [ref=e84]: •
+          - link "For developers" [ref=e85] [cursor=pointer]:
+            - /url: https://developer.mapy.cz/en/
+        - generic [ref=e86]:
+          - generic [ref=e87]:
+            - link "Facebook" [ref=e88] [cursor=pointer]:
+              - /url: https://www.facebook.com/mapy.com/
+            - link "X" [ref=e92] [cursor=pointer]:
+              - /url: https://x.com/mapy_com
+            - link "Instagram" [ref=e96] [cursor=pointer]:
+              - /url: https://www.instagram.com/mapy_com
+          - generic [ref=e100]: •
+          - generic [ref=e101]:
+            - link "Apple Store" [ref=e102] [cursor=pointer]:
+              - /url: https://apps.apple.com/us/app/mapy-com-offline-gps-maps/id411411020?ppid=b9f33cbf-dc8f-4073-a726-a01cd8273321&pt=282263&ct=footer&mt=8
+            - link "Google Play Store" [ref=e106] [cursor=pointer]:
+              - /url: https://play.google.com/store/apps/details?id=cz.seznam.mapy&listing=outdoor_maps_and_trip_planner&utm_source=footer
+    - list
+  - generic [ref=e3]:
+    - generic:
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - button "Switch map" [ref=e111] [cursor=pointer]
+                - button "Aerial" [ref=e112] [cursor=pointer]
+            - button "3D view" [ref=e113] [cursor=pointer]
+          - generic:
+            - button "Go to Premium" [ref=e114] [cursor=pointer]
+            - button "My location" [ref=e115] [cursor=pointer]
+            - generic:
+              - generic:
+                - button "Zoom out" [ref=e116] [cursor=pointer]
+                - button "Zoom in" [ref=e117] [cursor=pointer]
+        - generic [ref=e118]:
+          - heading "Open in app" [level=2] [ref=e119]
+          - link [ref=e120] [cursor=pointer]:
+            - /url: https://apps.apple.com/us/app/mapy-com-offline-gps-maps/id411411020?ppid=b9f33cbf-dc8f-4073-a726-a01cd8273321&pt=282263&ct=web2app&mt=8
+          - link [ref=e121] [cursor=pointer]:
+            - /url: https://play.google.com/store/apps/details?id=cz.seznam.mapy&listing=outdoor_maps_and_trip_planner&utm_source=web2app
+          - button "Close" [ref=e122] [cursor=pointer]
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic: "0"
+                - generic: "50"
+                - generic: "100"
+                - generic: "150"
+              - generic: km
+            - generic [ref=e126]:
+              - text: ©
+              - link "Seznam.cz, a.s." [ref=e127] [cursor=pointer]:
+                - /url: https://o-seznam.cz/
+              - text: ", 2026, Contributors to"
+              - link "OpenStreetMap" [ref=e128] [cursor=pointer]:
+                - /url: https://www.openstreetmap.org/copyright
+              - text: and
+              - link "others" [ref=e129] [cursor=pointer]:
+                - /url: https://licence.mapy.cz/?doc=mapy_attr&lang=en
+          - button
+          - button "Tools" [ref=e130] [cursor=pointer]
+        - button "Close drawer" [ref=e131] [cursor=pointer]
+      - button "Adjust column width" [ref=e134] [cursor=pointer]: ">"

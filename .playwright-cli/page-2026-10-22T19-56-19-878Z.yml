@@ -1,0 +1,65 @@
+- generic:
+  - generic:
+    - generic [ref=f2e1]:
+      - generic [ref=f2e2]:
+        - heading "SpotFinder community map" [level=1] [ref=f2e3]
+        - generic [ref=f2e4]:
+          - generic [ref=f2e5]:
+            - region "Map" [ref=f2e6]
+            - group [ref=f2e7]:
+              - generic "Toggle attribution" [ref=f2e8] [cursor=pointer]
+              - generic [ref=f2e9]:
+                - text: © OpenStreetMap contributors | ©
+                - link "OpenFreeMap" [ref=f2e10] [cursor=pointer]:
+                  - /url: https://openfreemap.org
+                - text: ©
+                - link "OpenStreetMap" [ref=f2e11] [cursor=pointer]:
+                  - /url: https://www.openstreetmap.org/copyright
+          - generic [ref=f2e12]:
+            - button "Zoom in" [active] [ref=f2e13] [cursor=pointer]
+            - generic [aria-hidden] [ref=f2e15]: "14"
+            - button "Zoom out" [ref=f2e16] [cursor=pointer]
+        - generic [ref=f2e20]:
+          - textbox "Search places and community spots" [ref=f2e24]:
+            - /placeholder: Search places...
+          - button "Start voice search" [ref=f2e25] [cursor=pointer]
+          - button "Open nearby spots filters" [ref=f2e30] [cursor=pointer]
+        - generic [ref=f2e35]:
+          - button "Sign in" [ref=f2e36] [cursor=pointer]
+          - button "Drafts" [ref=f2e40] [cursor=pointer]
+        - generic [ref=f2e44]:
+          - button "Add a spot" [ref=f2e45] [cursor=pointer]
+          - generic [ref=f2e47]:
+            - generic [ref=f2e48]:
+              - button "Map layers" [ref=f2e50] [cursor=pointer]
+              - button "Center map on my location" [ref=f2e55] [cursor=pointer]
+              - button "Toggle 3D terrain" [ref=f2e58] [cursor=pointer]:
+                - generic [ref=f2e59]: 3D
+            - generic [ref=f2e60]:
+              - button "Open help and FAQ" [ref=f2e61] [cursor=pointer]
+              - button "Open settings" [ref=f2e65] [cursor=pointer]
+      - region [ref=f2e69]:
+        - generic [ref=f2e70]:
+          - generic [ref=f2e74]:
+            - heading "Cookies & privacy" [level=2] [ref=f2e75]
+            - paragraph [ref=f2e76]:
+              - text: SpotFinder uses storage for sign-in, preferences, and guest drafts. Google Analytics and Google advertising are temporarily disabled, regardless of any choice saved previously. Essential Firebase authentication and reCAPTCHA may still contact Google.
+              - link "Cookie Policy" [ref=f2e77] [cursor=pointer]:
+                - /url: /CookiePolicy
+              - text: ·
+              - link "Privacy Policy" [ref=f2e78] [cursor=pointer]:
+                - /url: /PrivacyPolicy
+          - generic [ref=f2e79]: Functional storage is active. Analytics and advertising controls are unavailable because those services cannot be enabled in this release.
+          - generic [ref=f2e80]:
+            - button "Continue" [ref=f2e81] [cursor=pointer]
+            - button "Keep optional services off" [ref=f2e82] [cursor=pointer]
+    - region "Notifications alt+T"
+  - generic [ref=f2e83]:
+    - generic:
+      - region "Map" [ref=f2e84]
+      - button "Traffic fixture" [ref=f2e85] [cursor=pointer]
+      - button "Admin fixture" [ref=f2e86] [cursor=pointer]
+    - group [ref=f2e87]:
+      - generic "Toggle attribution" [ref=f2e88] [cursor=pointer]
+      - link "MapLibre" [ref=f2e90] [cursor=pointer]:
+        - /url: https://maplibre.org/

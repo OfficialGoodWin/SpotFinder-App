@@ -1,0 +1,124 @@
+- generic:
+  - generic:
+    - generic [ref=f37e2]:
+      - heading "SpotFinder community map" [level=1] [ref=f37e3]
+      - generic [ref=f37e4]:
+        - generic [ref=f37e5]:
+          - region "Map" [ref=f37e6]
+          - group [ref=f37e7]:
+            - generic "Toggle attribution" [ref=f37e348] [cursor=pointer]
+            - generic [ref=f37e9]:
+              - text: © OpenStreetMap contributors | ©
+              - link "OpenFreeMap" [ref=f37e349] [cursor=pointer]:
+                - /url: https://openfreemap.org
+              - text: ©
+              - link "OpenStreetMap" [ref=f37e350] [cursor=pointer]:
+                - /url: https://www.openstreetmap.org/copyright
+        - generic [ref=f37e12]:
+          - button "Zoom in" [ref=f37e351] [cursor=pointer]
+          - generic [aria-hidden] [ref=f37e15]: "13"
+          - button "Zoom out" [ref=f37e352] [cursor=pointer]
+      - generic [ref=f37e20]:
+        - textbox "Search places and community spots" [ref=f37e353]:
+          - /placeholder: Orte suchen...
+        - button "Start voice search" [ref=f37e354] [cursor=pointer]
+        - button "Open nearby spots filters" [ref=f37e355] [cursor=pointer]
+      - complementary "Discover community places" [ref=f37e356]:
+        - generic [ref=f37e35]:
+          - generic [ref=f37e39]:
+            - heading "Featured community places" [level=2] [ref=f37e357]
+            - paragraph [ref=f37e41]: No community spots in this view yet. Explore these places or search another area.
+          - button "Close featured places" [ref=f37e358] [cursor=pointer]
+        - generic "Featured places" [ref=f37e359]:
+          - button "Open Blejski grad" [ref=f37e360] [cursor=pointer]:
+            - generic [ref=f37e49]:
+              - generic [ref=f37e50]: Blejski grad
+              - generic [ref=f37e51]: Bled
+          - button "Open Hlavatice" [ref=f37e361] [cursor=pointer]:
+            - generic [ref=f37e54]:
+              - generic [ref=f37e55]: Hlavatice
+              - generic [ref=f37e56]: Turnov
+          - button "Open Viewpoint" [ref=f37e362] [cursor=pointer]:
+            - generic [ref=f37e59]:
+              - generic [ref=f37e60]: Viewpoint
+              - generic [ref=f37e61]: 47.40, 9.38
+        - generic [ref=f37e62]:
+          - button "Search a place" [ref=f37e363] [cursor=pointer]
+          - button "Continue map" [ref=f37e364] [cursor=pointer]
+      - generic [ref=f37e69]:
+        - button "Anmelden" [ref=f37e365] [cursor=pointer]
+        - button "Drafts" [ref=f37e74] [cursor=pointer]
+      - generic [ref=f37e78]:
+        - button "Add a spot" [ref=f37e366] [cursor=pointer]
+        - generic [ref=f37e81]:
+          - generic [ref=f37e82]:
+            - button "Kartenebenen" [ref=f37e367] [cursor=pointer]
+            - button "Center map on my location" [ref=f37e368] [cursor=pointer]
+            - button "Toggle 3D terrain" [ref=f37e369] [cursor=pointer]:
+              - generic [ref=f37e93]: 3D
+          - generic [ref=f37e94]:
+            - button "Open help and FAQ" [ref=f37e370] [cursor=pointer]
+            - button "Open settings" [ref=f37e371] [cursor=pointer]
+      - dialog [ref=f37e372]:
+        - generic [ref=f37e105]:
+          - generic [ref=f37e106]:
+            - generic [ref=f37e112]:
+              - heading "Einstellungen" [level=2] [ref=f37e373]
+              - paragraph [ref=f37e114]: Einstellungen, Datenschutz und Kontosicherheit
+            - button "Schließen" [ref=f37e374] [cursor=pointer]
+          - generic [ref=f37e120]:
+            - region [ref=f37e375]:
+              - heading "Darstellung" [level=3] [ref=f37e376]
+              - generic [ref=f37e123]:
+                - generic [ref=f37e128]:
+                  - paragraph [ref=f37e129]: Dunkelmodus
+                  - paragraph [ref=f37e130]: Aktiviert
+                - switch "Dunkelmodus" [checked] [ref=f37e377] [cursor=pointer]
+            - region [ref=f37e378]:
+              - heading "Kartenanzeige" [level=3] [ref=f37e379]
+              - generic [ref=f37e135]:
+                - generic [ref=f37e141]:
+                  - paragraph [ref=f37e142]: Entdeckungskarte auf der Karte
+                  - paragraph [ref=f37e143]: Show contextual spots and exploration guidance on the map.
+                - switch "Entdeckungskarte auf der Karte" [checked] [ref=f37e380] [cursor=pointer]
+              - generic [ref=f37e151]:
+                - generic [ref=f37e152]:
+                  - generic [ref=f37e153]:
+                    - paragraph [ref=f37e154]: Textgröße
+                    - paragraph [ref=f37e155]: Applies throughout SpotFinder.
+                  - status [ref=f37e156]: 100%
+                - slider "Text size percentage" [ref=f37e381]: "100"
+                - generic [ref=f37e158]:
+                  - generic [ref=f37e159]: 75%
+                  - button "Reset to 100%" [ref=f37e382] [cursor=pointer]
+                  - generic [ref=f37e161]: 250%
+            - region [ref=f37e383]:
+              - heading "Sprache" [level=3] [ref=f37e384]
+              - generic [ref=f37e169]:
+                - paragraph [ref=f37e170]: Sprache
+                - paragraph [ref=f37e171]: Sprache auswählen
+              - combobox "Sprache auswählen" [active] [ref=f37e385] [cursor=pointer]:
+                - generic: 🇩🇪 Deutsch · Partial
+              - status [ref=f37e175]: Diese Übersetzung ist unvollständig. Einige Ansichten bleiben auf Englisch.
+            - region [ref=f37e386]:
+              - heading "Datenschutz und Rechtliches" [level=3] [ref=f37e387]
+              - generic [ref=f37e180]:
+                - button "Cookie-Einstellungen" [ref=f37e388] [cursor=pointer]
+                - link "Datenschutzerklärung" [ref=f37e389] [cursor=pointer]:
+                  - /url: /PrivacyPolicy
+                - link "Nutzungsbedingungen" [ref=f37e390] [cursor=pointer]:
+                  - /url: /TermsAndConditions
+                - link "Cookie-Richtlinie" [ref=f37e391] [cursor=pointer]:
+                  - /url: /CookiePolicy
+                - link "Rückerstattungsrichtlinie" [ref=f37e392] [cursor=pointer]:
+                  - /url: /RefundPolicy
+            - region [ref=f37e393]:
+              - heading "App-Informationen" [level=3] [ref=f37e394]
+              - link "Neuigkeiten Release notes and verified changes v0.5.6" [ref=f37e395] [cursor=pointer]:
+                - /url: /updates
+                - generic [ref=f37e206]:
+                  - generic [ref=f37e207]: Neuigkeiten
+                  - generic [ref=f37e208]: Release notes and verified changes
+                - generic [ref=f37e209]: v0.5.6
+            - status [ref=f37e210]: Einstellung automatisch gespeichert
+    - region "Notifications alt+T"

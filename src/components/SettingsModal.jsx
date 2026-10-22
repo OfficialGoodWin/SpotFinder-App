@@ -57,8 +57,8 @@ export default function SettingsModal({ onClose, mapExploreEnabled = true, onMap
           </button>
         </header>
 
-        <div className="overflow-y-auto overscroll-contain px-4 py-5 sm:px-7" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
-          <div className="grid gap-4 md:grid-cols-2">
+        <div className="min-w-0 overflow-y-auto overscroll-contain px-4 py-5 sm:px-7" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
+          <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
           <section className="sf-section" aria-labelledby="appearance-title">
             <h3 id="appearance-title" className="mb-4 text-sm font-bold uppercase tracking-wide text-muted-foreground">{t('settings.appearance')}</h3>
             <div className="sf-settings-row flex items-center justify-between gap-4">

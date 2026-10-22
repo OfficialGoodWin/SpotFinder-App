@@ -4,17 +4,26 @@ The public Journal lives at `/news`. Direct visits use prerendered HTML. The fiv
 
 The empty Journal offers a **request by email**. Its form opens a prefilled message to `spotfinder@icloud.com`; it does not store subscribers or send automatically. The visible text explains this. Replace it with a consent and delivery workflow before describing it as a mailing list.
 
+## Quick start for a new story
+
+1. Run `npm run news:new -- your-article-slug` from the repository folder. This creates `content/news/your-article-slug.json` as a **draft** using `docs/article-template.json`. For a Czech article, add `--lang=cs`; its file is `content/news/cs-your-article-slug.json`. Use lowercase words separated by hyphens. The command refuses to overwrite an existing file.
+2. Edit that JSON file. `summary` is the article's short **description** for cards and search results. Choose one of `Discover Places`, `Guides`, `SpotFinder Updates`, or `Community Stories`. Set the real author's `name` and `type` (`Person` or `Organization`). Write the story in the ordered `body` blocks; the template shows paragraphs and a heading. Optional blocks are `list` (`items` array), `quote` (`text` and optional `attribution`), and `image` (same photo fields as `cover`). JSON is the existing content format; Markdown is not read by this build.
+3. Put licensed, optimized photos in `public/news-images/`. Set `cover.src` to `/news-images/filename.webp` (JPEG, PNG, and AVIF also work), plus truthful `alt`, pixel `width` and `height`, visible `caption`, and `credit`. Add `creditUrl` when relevant. Do not use the existing Journal landing photo as your article cover unless its license and relevance are appropriate. Leave `spotIds` empty unless you have verified real public SpotFinder spot IDs and coordinates.
+4. Run `npm run build` once to create the local site, then `npm run news:preview -- your-article-slug`. Open the printed `http://127.0.0.1:4174/news/...` URL. The preview rereads your draft each time you refresh. It serves only on your computer, sends `noindex`, and never adds the draft to `dist`, `/news`, or the sitemap. Press Ctrl+C to stop. For Czech, add `--lang=cs` to the preview command too.
+5. When the story and photo rights are approved, set `publishedAt` to the actual publication date (`YYYY-MM-DD`), keep `updatedAt` null until a real later update, and change `status` to `published`. Run `npm run build` again and check `npm run preview` at `/news`, the direct article URL, and `/sitemap.xml`. Commit and push the article JSON, photo files, and any other intentional changes through the existing Git/Vercel release workflow. There is no separate CMS publish button.
+6. To edit a published story, change the same JSON file and redeploy through that workflow. Set `updatedAt` to the date of a real substantive update. To unpublish, change `status` back to `draft`, rebuild, and redeploy; the route and sitemap entry disappear from the new deployment.
+
 ## Write and review an article
 
-1. Copy a JSON record in `content/news/` or edit one of the five drafts. This is the static content format; `body` is an ordered array of `paragraph`, `heading`, `list`, `quote`, and `image` blocks. A quote block has `text` and optional `attribution`. Text is rendered as text by React. Raw HTML is unsupported.
+1. Use the quick-start command above, or edit one of the five existing draft outlines. The static `body` is an ordered array of `paragraph`, `heading`, `list`, `quote`, and `image` blocks. A quote block has `text` and optional `attribution`. Text is rendered as text by React. Raw HTML is unsupported.
 2. Write useful, checked content. Replace every outline and checklist with the final article. Confirm place access, travel details, and the actual release or collaboration facts. Record source notes in the editorial review outside the public article file.
 3. Obtain a written license or permission for an authentic cover photograph. Place an optimized image under `public/news-images/` and set `cover.src`, `width`, `height`, `alt`, `caption`, and `credit`. Set `creditUrl` when the photographer has a source page. Responsive alternatives may be listed in `srcSet` and `sizes`. All image URLs must point to local, licensed files. Aim for a hero file under 200 KB. The Journal landing photograph is by Tegan Conway under the [Unsplash License](https://unsplash.com/license), with a source link in its visible credit.
 4. Confirm the real author name and whether it is a `Person` or `Organization`. Set `publishedAt` to the actual publication date in `YYYY-MM-DD` format. Set `updatedAt` only when a real update is made.
-5. Set `canonicalUrl` to `https://www.spotfinder.live/news/<slug>` for English or `https://www.spotfinder.live/news/cs/<slug>` for Czech. A Czech variant must be separately written and reviewed. Use the same slug across languages only if the two records are true translations. Article hreflang is emitted only when both variants are published. A Czech Journal landing is generated only when Czech articles exist.
+5. The creation command fills `canonicalUrl` with `https://www.spotfinder.live/news/<slug>` for English or `https://www.spotfinder.live/news/cs/<slug>` for Czech. Keep it aligned with the slug. A Czech variant must be separately written and reviewed. Use the same slug across languages only if the two records are true translations. Article hreflang is emitted only when both variants are published. A Czech Journal landing is generated only when Czech articles exist.
 6. Add `spotIds` only for confirmed public SpotFinder places. Each entry needs a real public `id`, verified `name`, and numeric `lat` and `lon` for the small OpenStreetMap embed. Open every generated `/spot/<id>` link before publishing. A draft may leave the array empty.
-7. After owner approval, change `status` to `published`, run `npm run build`, review the generated article and sitemap, then deploy through the normal release process. Revert to `draft` and redeploy to remove an article from the public site.
+7. After owner approval, follow quick-start step 5. Revert to `draft` and redeploy to remove an article from the public site.
 
-The build rejects published records with missing required fields, invalid dates, missing cover files, an unexpected canonical, draft outline markers, or malformed spot IDs. Human review is still needed for factual accuracy, permissions, authorship, and spot availability.
+The build rejects published records with missing required fields, invalid dates, missing cover files, an unexpected canonical, duplicate titles or descriptions, draft outline markers, or malformed spot IDs. Human review is still needed for factual accuracy, permissions, authorship, and spot availability.
 
 ## SEO and routing
 
@@ -22,7 +31,7 @@ The build rejects published records with missing required fields, invalid dates,
 
 Vercel `cleanUrls` serves those files at extensionless URLs. The SPA rewrite excludes `/news` and its children, so a missing or draft slug returns the host's real 404. It also excludes `/assets` and paths with file extensions, preserving missing-asset 404s. The existing map and `/spot/:id` route still use the SPA. The service worker only caches `/` as the map shell after a successful map navigation.
 
-The canonical production host is `https://www.spotfinder.live`. The apex domain redirects there. If the primary domain changes, update `src/lib/spotLinks.js`, `scripts/news/document.mjs`, `index.html`, `public/robots.txt`, and the source sitemap together.
+The canonical production host is `https://www.spotfinder.live`: the apex domain redirects there, and this host serves the same Vercel deployment as `spot-finder-app.vercel.app`. Both hosts currently return 200 for `/news`, but the HTML canonical points to `www.spotfinder.live`. If the primary domain changes, update `src/lib/spotLinks.js`, `scripts/news/document.mjs`, `index.html`, `public/robots.txt`, and the source sitemap together. Verify the new domain in Vercel before changing these values.
 
 ## Search Console after deployment
 
@@ -30,6 +39,7 @@ The canonical production host is `https://www.spotfinder.live`. The apex domain 
 2. Open `https://www.spotfinder.live/sitemap.xml` and confirm it is reachable and includes only intended URLs.
 3. In Search Console, open **Sitemaps**, enter `sitemap.xml`, and submit. Check the report for fetch or parsing errors.
 4. Inspect a published article URL using URL Inspection and test its live page. Use Google's Rich Results Test to inspect article markup.
+5. In URL Inspection, check whether Google has indexed the canonical URL. If it has not, request indexing after the live page and sitemap are correct; indexing is Google's decision.
 
 Submitting a sitemap requests discovery; it does not guarantee indexing or traffic. No Google News sitemap is generated. See the [Search Console Sitemaps report](https://support.google.com/webmasters/answer/7451001) and [Google's Article structured data guide](https://developers.google.com/search/docs/appearance/structured-data/article).
 

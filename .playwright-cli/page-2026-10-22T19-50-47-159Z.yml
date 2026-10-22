@@ -1,0 +1,119 @@
+- generic:
+  - generic:
+    - generic [ref=f7e2]:
+      - heading "SpotFinder community map" [level=1] [ref=f7e3]
+      - generic [ref=f7e4]:
+        - generic [ref=f7e5]:
+          - region "Map" [ref=f7e6]
+          - group [ref=f7e7]:
+            - generic "Toggle attribution" [ref=f7e319] [cursor=pointer]
+            - generic [ref=f7e9]:
+              - text: © OpenStreetMap contributors | ©
+              - link "OpenFreeMap" [ref=f7e320] [cursor=pointer]:
+                - /url: https://openfreemap.org
+              - text: ©
+              - link "OpenStreetMap" [ref=f7e321] [cursor=pointer]:
+                - /url: https://www.openstreetmap.org/copyright
+        - generic [ref=f7e12]:
+          - button "Přiblížit" [ref=f7e322] [cursor=pointer]
+          - generic [aria-hidden] [ref=f7e15]: "13"
+          - button "Oddálit" [ref=f7e323] [cursor=pointer]
+      - generic [ref=f7e20]:
+        - textbox "Hledat místa a komunitní spoty":
+          - /placeholder: Hledat místa...
+        - button "Spustit hlasové hledání" [ref=f7e324] [cursor=pointer]
+        - button "Otevřít filtry míst v okolí" [ref=f7e325] [cursor=pointer]
+      - complementary "Objevovat komunitní místa" [ref=f7e326]:
+        - generic [ref=f7e34]:
+          - generic:
+            - heading "Vybraná komunitní místa" [level=2]
+            - paragraph: V tomto pohledu zatím nejsou komunitní místa. Prozkoumejte tato místa nebo hledejte v jiné oblasti.
+          - button "Zavřít vybraná místa" [ref=f7e327] [cursor=pointer]
+        - generic "Vybraná místa" [ref=f7e328]:
+          - button "Otevřít Blejski grad" [ref=f7e329] [cursor=pointer]:
+            - generic [ref=f7e331]:
+              - generic [ref=f7e332]: Blejski grad
+              - generic [ref=f7e333]: Bled
+          - button "Otevřít Hlavatice" [ref=f7e334] [cursor=pointer]:
+            - generic [ref=f7e336]:
+              - generic [ref=f7e337]: Hlavatice
+              - generic [ref=f7e338]: Turnov
+          - button "Otevřít Viewpoint" [ref=f7e339] [cursor=pointer]:
+            - generic [ref=f7e341]:
+              - generic [ref=f7e342]: Viewpoint
+              - generic [ref=f7e343]: 47.40, 9.38
+        - generic [ref=f7e42]:
+          - button "Hledat místo" [ref=f7e344] [cursor=pointer]
+          - button "Pokračovat na mapě" [ref=f7e345] [cursor=pointer]
+      - generic [ref=f7e49]:
+        - button "Přihlásit se" [ref=f7e346] [cursor=pointer]
+        - button "Drafts" [ref=f7e54] [cursor=pointer]
+      - generic [ref=f7e59]:
+        - button "Vrstvy mapy" [ref=f7e347] [cursor=pointer]
+        - button "Vycentrovat na mou polohu" [ref=f7e348] [cursor=pointer]
+        - button "Přepnout 3D terén" [ref=f7e349] [cursor=pointer]: 3D
+        - button "Další možnosti mapy" [ref=f7e350] [cursor=pointer]
+      - button "Přidat místo" [ref=f7e351] [cursor=pointer]
+      - dialog [ref=f7e352]:
+        - generic [ref=f7e83]:
+          - generic [ref=f7e84]:
+            - generic [ref=f7e86]:
+              - heading "Nastavení" [level=2] [ref=f7e353]
+              - paragraph [ref=f7e88]: Předvolby, soukromí a zabezpečení účtu
+            - button "Zavřít" [ref=f7e354] [cursor=pointer]
+          - generic [ref=f7e94]:
+            - region [ref=f7e355]:
+              - heading "Vzhled" [level=3] [ref=f7e356]
+              - generic [ref=f7e97]:
+                - generic [ref=f7e102]:
+                  - paragraph [ref=f7e103]: Tmavý režim
+                  - paragraph [ref=f7e104]: Zapnuto
+                - switch "Tmavý režim" [checked] [active] [ref=f7e357] [cursor=pointer]
+            - region [ref=f7e358]:
+              - heading "Zobrazení mapy" [level=3] [ref=f7e359]
+              - generic [ref=f7e109]:
+                - generic [ref=f7e115]:
+                  - paragraph [ref=f7e116]: Karta objevování na mapě
+                  - paragraph [ref=f7e117]: Zobrazovat na mapě související místa a tipy k objevování.
+                - switch "Karta objevování na mapě" [checked] [ref=f7e360] [cursor=pointer]
+              - generic [ref=f7e125]:
+                - generic [ref=f7e126]:
+                  - generic [ref=f7e127]:
+                    - paragraph [ref=f7e128]: Velikost textu
+                    - paragraph [ref=f7e129]: Platí v celé aplikaci SpotFinder.
+                  - status [ref=f7e130]: 200%
+                - slider "Velikost textu v procentech" [ref=f7e361]: "200"
+                - generic [ref=f7e132]:
+                  - generic [ref=f7e133]: 75%
+                  - button "Obnovit na 100 %" [ref=f7e362] [cursor=pointer]
+                  - generic [ref=f7e135]: 250%
+            - region [ref=f7e363]:
+              - heading "Jazyk" [level=3] [ref=f7e364]
+              - generic [ref=f7e143]:
+                - paragraph [ref=f7e144]: Jazyk
+                - paragraph [ref=f7e145]: Vyberte jazyk
+              - combobox "Vyberte jazyk" [ref=f7e365] [cursor=pointer]:
+                - generic: 🇨🇿 Čeština · Částečný překlad
+              - status [ref=f7e149]: Tento překlad není úplný. Některé obrazovky jsou stále v angličtině.
+            - region [ref=f7e366]:
+              - heading "Soukromí a právní informace" [level=3] [ref=f7e367]
+              - generic [ref=f7e154]:
+                - button "Předvolby souborů cookie" [ref=f7e368] [cursor=pointer]
+                - link "Ochrana soukromí" [ref=f7e369] [cursor=pointer]:
+                  - /url: /PrivacyPolicy
+                - link "Obchodní podmínky" [ref=f7e370] [cursor=pointer]:
+                  - /url: /TermsAndConditions
+                - link "Zásady používání cookies" [ref=f7e371] [cursor=pointer]:
+                  - /url: /CookiePolicy
+                - link "Podmínky vrácení peněz" [ref=f7e372] [cursor=pointer]:
+                  - /url: /RefundPolicy
+            - region [ref=f7e373]:
+              - heading "Informace o aplikaci" [level=3] [ref=f7e374]
+              - link "Co je nového Poznámky k vydání a ověřené změny v0.5.6" [ref=f7e375] [cursor=pointer]:
+                - /url: /updates
+                - generic [ref=f7e180]:
+                  - generic [ref=f7e181]: Co je nového
+                  - generic [ref=f7e182]: Poznámky k vydání a ověřené změny
+                - generic [ref=f7e183]: v0.5.6
+            - status [ref=f7e184]: Předvolba uložena automaticky
+    - region "Notifications alt+T"

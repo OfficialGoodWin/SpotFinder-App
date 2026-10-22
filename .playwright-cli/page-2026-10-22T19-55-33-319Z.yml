@@ -1,0 +1,50 @@
+- generic [active]:
+  - generic:
+    - generic [ref=e1]:
+      - generic [ref=e2]:
+        - heading "SpotFinder community map" [level=1] [ref=e3]
+        - generic [ref=e4]:
+          - generic [ref=e5]:
+            - region "Map" [ref=e6]
+            - group [ref=e7]:
+              - generic "Toggle attribution" [ref=e8] [cursor=pointer]
+              - generic [ref=e9]: © OpenStreetMap contributors
+          - generic [ref=e10]:
+            - button "Zoom in" [ref=e11] [cursor=pointer]
+            - generic [aria-hidden] [ref=e13]: "13"
+            - button "Zoom out" [ref=e14] [cursor=pointer]
+        - generic [ref=e18]:
+          - textbox "Search places and community spots" [ref=e22]:
+            - /placeholder: Search places...
+          - button "Start voice search" [ref=e23] [cursor=pointer]
+          - button "Open nearby spots filters" [ref=e28] [cursor=pointer]
+        - generic [ref=e33]:
+          - button "Sign in" [ref=e34] [cursor=pointer]
+          - button "Drafts" [ref=e38] [cursor=pointer]
+        - generic [ref=e42]:
+          - button "Add a spot" [ref=e43] [cursor=pointer]
+          - generic [ref=e45]:
+            - generic [ref=e46]:
+              - button "Map layers" [ref=e48] [cursor=pointer]
+              - button "Center map on my location" [ref=e53] [cursor=pointer]
+              - button "Toggle 3D terrain" [ref=e56] [cursor=pointer]:
+                - generic [ref=e57]: 3D
+            - generic [ref=e58]:
+              - button "Open help and FAQ" [ref=e59] [cursor=pointer]
+              - button "Open settings" [ref=e63] [cursor=pointer]
+      - region [ref=e67]:
+        - generic [ref=e68]:
+          - generic [ref=e72]:
+            - heading "Cookies & privacy" [level=2] [ref=e73]
+            - paragraph [ref=e74]:
+              - text: SpotFinder uses storage for sign-in, preferences, and guest drafts. Google Analytics and Google advertising are temporarily disabled, regardless of any choice saved previously. Essential Firebase authentication and reCAPTCHA may still contact Google.
+              - link "Cookie Policy" [ref=e75] [cursor=pointer]:
+                - /url: /CookiePolicy
+              - text: ·
+              - link "Privacy Policy" [ref=e76] [cursor=pointer]:
+                - /url: /PrivacyPolicy
+          - generic [ref=e77]: Functional storage is active. Analytics and advertising controls are unavailable because those services cannot be enabled in this release.
+          - generic [ref=e78]:
+            - button "Continue" [ref=e79] [cursor=pointer]
+            - button "Keep optional services off" [ref=e80] [cursor=pointer]
+    - region "Notifications alt+T"

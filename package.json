@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "node scripts/news/prepare.mjs && vite build && node scripts/news/prerender.mjs",
+    "news:new": "node scripts/news/new.mjs",
+    "news:preview": "node scripts/news/preview.mjs",
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",

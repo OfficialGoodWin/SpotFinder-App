@@ -1,0 +1,4 @@
+- generic [active]:
+  - generic:
+    - status "Loading page"
+    - region "Notifications alt+T"

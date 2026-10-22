@@ -1,0 +1,57 @@
+- generic [active]:
+  - generic:
+    - generic [ref=e2]:
+      - heading "SpotFinder community map" [level=1] [ref=e3]
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - region "Map" [ref=e63]
+          - group [ref=e64]:
+            - generic "Toggle attribution" [ref=e65] [cursor=pointer]
+            - generic [ref=e66]:
+              - text: © OpenStreetMap contributors | ©
+              - link "OpenFreeMap" [ref=e67] [cursor=pointer]:
+                - /url: https://openfreemap.org
+              - text: ©
+              - link "OpenStreetMap" [ref=e68] [cursor=pointer]:
+                - /url: https://www.openstreetmap.org/copyright
+        - generic [ref=e6]:
+          - button "Zoom in" [ref=e7] [cursor=pointer]
+          - generic [aria-hidden] [ref=e9]: "13"
+          - button "Zoom out" [ref=e10] [cursor=pointer]
+      - generic [ref=e14]:
+        - textbox "Search places and community spots" [ref=e18]:
+          - /placeholder: Search places...
+        - button "Start voice search" [ref=e19] [cursor=pointer]
+        - button "Open nearby spots filters" [ref=e24] [cursor=pointer]
+      - complementary "Discover community places" [ref=e125]:
+        - generic [ref=e126]:
+          - generic [ref=e130]:
+            - heading "Featured community places" [level=2] [ref=e131]
+            - paragraph [ref=e132]: No community spots in this view yet. Explore these places or search another area.
+          - button "Close featured places" [ref=e133] [cursor=pointer]
+        - generic "Featured places" [ref=e137]:
+          - button "Open Blejski grad" [ref=e138] [cursor=pointer]:
+            - generic [ref=e140]:
+              - generic [ref=e141]: Blejski grad
+              - generic [ref=e142]: Bled
+          - button "Open Hlavatice" [ref=e143] [cursor=pointer]:
+            - generic [ref=e145]:
+              - generic [ref=e146]: Hlavatice
+              - generic [ref=e147]: Turnov
+          - button "Open Viewpoint" [ref=e148] [cursor=pointer]:
+            - generic [ref=e150]:
+              - generic [ref=e151]: Viewpoint
+              - generic [ref=e152]: 47.40, 9.38
+        - generic [ref=e153]:
+          - button "Search a place" [ref=e154] [cursor=pointer]
+          - button "Continue map" [ref=e158] [cursor=pointer]
+      - generic [ref=e29]:
+        - button "Sign in" [ref=e30] [cursor=pointer]
+        - button "Drafts" [ref=e34] [cursor=pointer]
+      - generic [ref=e107]:
+        - button "Map layers" [ref=e109] [cursor=pointer]
+        - button "Center on my location" [ref=e115] [cursor=pointer]
+        - button "Toggle 3D terrain" [ref=e118] [cursor=pointer]: 3D
+        - button "More map options" [ref=e120] [cursor=pointer]
+      - button "Add a spot" [ref=e39] [cursor=pointer]
+    - region "Notifications alt+T"

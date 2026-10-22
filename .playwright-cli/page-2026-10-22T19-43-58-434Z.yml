@@ -1,0 +1,118 @@
+- generic:
+  - generic:
+    - generic [ref=e2]:
+      - heading "SpotFinder community map" [level=1] [ref=e3]
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - region "Map" [ref=e63]
+          - group [ref=e64]:
+            - generic "Toggle attribution" [ref=e65] [cursor=pointer]
+            - generic [ref=e66]:
+              - text: © OpenStreetMap contributors | ©
+              - link "OpenFreeMap" [ref=e67] [cursor=pointer]:
+                - /url: https://openfreemap.org
+              - text: ©
+              - link "OpenStreetMap" [ref=e68] [cursor=pointer]:
+                - /url: https://www.openstreetmap.org/copyright
+        - generic [ref=e6]:
+          - button "Zoom in" [ref=e7] [cursor=pointer]
+          - generic [aria-hidden] [ref=e9]: "13"
+          - button "Zoom out" [ref=e10] [cursor=pointer]
+      - generic [ref=e14]:
+        - textbox "Search places and community spots" [ref=e18]:
+          - /placeholder: Search places...
+        - button "Start voice search" [ref=e19] [cursor=pointer]
+        - button "Open nearby spots filters" [ref=e24] [cursor=pointer]
+      - complementary "Discover community places" [ref=e125]:
+        - generic [ref=e126]:
+          - generic [ref=e130]:
+            - heading "Featured community places" [level=2] [ref=e131]
+            - paragraph [ref=e132]: No community spots in this view yet. Explore these places or search another area.
+          - button "Close featured places" [ref=e133] [cursor=pointer]
+        - generic "Featured places" [ref=e137]:
+          - button "Open Blejski grad" [ref=e138] [cursor=pointer]:
+            - generic [ref=e140]:
+              - generic [ref=e141]: Blejski grad
+              - generic [ref=e142]: Bled
+          - button "Open Hlavatice" [ref=e143] [cursor=pointer]:
+            - generic [ref=e145]:
+              - generic [ref=e146]: Hlavatice
+              - generic [ref=e147]: Turnov
+          - button "Open Viewpoint" [ref=e148] [cursor=pointer]:
+            - generic [ref=e150]:
+              - generic [ref=e151]: Viewpoint
+              - generic [ref=e152]: 47.40, 9.38
+        - generic [ref=e153]:
+          - button "Search a place" [ref=e154] [cursor=pointer]
+          - button "Continue map" [ref=e158] [cursor=pointer]
+      - generic [ref=e29]:
+        - button "Sign in" [ref=e30] [cursor=pointer]
+        - button "Drafts" [ref=e34] [cursor=pointer]
+      - generic [ref=e107]:
+        - button "Map layers" [ref=e109] [cursor=pointer]
+        - button "Center on my location" [ref=e115] [cursor=pointer]
+        - button "Toggle 3D terrain" [ref=e118] [cursor=pointer]: 3D
+        - button "More map options" [ref=e120] [cursor=pointer]
+      - button "Add a spot" [ref=e39] [cursor=pointer]
+      - dialog [ref=e169]:
+        - generic [ref=e171]:
+          - generic [ref=e172]:
+            - generic [ref=e178]:
+              - heading "Settings" [level=2] [ref=e179]
+              - paragraph [ref=e180]: Preferences, privacy, and account security
+            - button "Close" [active] [ref=e181] [cursor=pointer]
+          - generic [ref=e186]:
+            - region [ref=e187]:
+              - heading "Appearance" [level=3] [ref=e188]
+              - generic [ref=e189]:
+                - generic [ref=e194]:
+                  - paragraph [ref=e195]: Dark Mode
+                  - paragraph [ref=e196]: Disabled
+                - switch "Dark Mode" [ref=e197] [cursor=pointer]
+            - region [ref=e199]:
+              - heading "Map display" [level=3] [ref=e200]
+              - generic [ref=e201]:
+                - generic [ref=e207]:
+                  - paragraph [ref=e208]: Map discovery card
+                  - paragraph [ref=e209]: Show contextual spots and exploration guidance on the map.
+                - switch "Map discovery card" [checked] [ref=e210] [cursor=pointer]
+              - generic [ref=e217]:
+                - generic [ref=e218]:
+                  - generic [ref=e219]:
+                    - paragraph [ref=e220]: Text size
+                    - paragraph [ref=e221]: Applies throughout SpotFinder.
+                  - status [ref=e222]: 100%
+                - slider "Text size percentage" [ref=e223]: "100"
+                - generic [ref=e224]:
+                  - generic [ref=e225]: 75%
+                  - button "Reset to 100%" [ref=e226] [cursor=pointer]
+                  - generic [ref=e227]: 250%
+            - region [ref=e228]:
+              - heading "Language" [level=3] [ref=e229]
+              - generic [ref=e235]:
+                - paragraph [ref=e236]: Language
+                - paragraph [ref=e237]: Select Language
+              - combobox "Select Language" [ref=e238] [cursor=pointer]:
+                - generic: 🇺🇸 English (US)
+            - region [ref=e241]:
+              - heading "Privacy & legal" [level=3] [ref=e242]
+              - generic [ref=e245]:
+                - button "Cookie preferences" [ref=e246] [cursor=pointer]
+                - link "Privacy Policy" [ref=e249] [cursor=pointer]:
+                  - /url: /PrivacyPolicy
+                - link "Terms & Conditions" [ref=e253] [cursor=pointer]:
+                  - /url: /TermsAndConditions
+                - link "Cookie Policy" [ref=e257] [cursor=pointer]:
+                  - /url: /CookiePolicy
+                - link "Refund Policy" [ref=e261] [cursor=pointer]:
+                  - /url: /RefundPolicy
+            - region [ref=e264]:
+              - heading "App information" [level=3] [ref=e265]
+              - link "What's new Release notes and verified changes v0.5.6" [ref=e266] [cursor=pointer]:
+                - /url: /updates
+                - generic [ref=e271]:
+                  - generic [ref=e272]: What's new
+                  - generic [ref=e273]: Release notes and verified changes
+                - generic [ref=e274]: v0.5.6
+            - status [ref=e275]: Preference saved automatically
+    - region "Notifications alt+T"

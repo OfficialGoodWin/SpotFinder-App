@@ -1,0 +1,1690 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - link "Skip to main content" [ref=e3] [cursor=pointer]:
+      - /url: "#main-content"
+    - navigation [ref=e5]:
+      - link "AllTrails" [ref=e8] [cursor=pointer]:
+        - /url: /
+        - img "AllTrails" [ref=e9]
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - button "Explore" [ref=e18] [cursor=pointer]
+          - button "Saved" [ref=e25] [cursor=pointer]
+          - button "Shop" [ref=e32] [cursor=pointer]
+        - generic [ref=e38]:
+          - button "Get the app" [ref=e39] [cursor=pointer]
+          - button "Log in" [ref=e41] [cursor=pointer]
+  - main [ref=e43]:
+    - main [ref=e44]:
+      - region "Hero carousel" [ref=e45]:
+        - generic [ref=e46]:
+          - img "A hiker seen from behind, walking on a trail surrounded by pine trees." [ref=e47]
+          - generic [ref=e48]:
+            - heading "Find your next adventure" [level=1] [ref=e49]
+            - search [ref=e52]:
+              - generic [ref=e53]: Search by city, park, or trail name
+              - textbox "Search by city, park, or trail name" [ref=e57]
+              - generic [ref=e58]: Begin typing to search, use the up and down arrow keys to navigate, press enter to select
+            - generic [ref=e59]:
+              - link "Create a trip" [ref=e60] [cursor=pointer]:
+                - /url: /trip-assistant?entryPoint=web+homepage+button+group+below+search+bar
+              - link "Build custom route" [ref=e64] [cursor=pointer]:
+                - /url: /explore/custom-routes/new?trigger=home
+              - link "Nearby trails" [ref=e68] [cursor=pointer]:
+                - /url: /explore
+          - generic [ref=e73]:
+            - button "Pause slideshow" [ref=e74] [cursor=pointer]
+            - button "Carousel image 1" [ref=e77]
+            - button "Carousel image 2" [ref=e79]
+            - button "Carousel image 3" [ref=e81]
+            - button "Carousel image 4" [ref=e83]
+            - button "Carousel image 5" [ref=e85]
+      - generic [ref=e107]:
+        - generic [ref=e110]:
+          - heading "Record your activities" [level=2] [ref=e111]
+          - generic [ref=e112]: Never miss a turn with live tracking. Relive every adventure with recaps and sharing.
+          - generic [ref=e113]:
+            - img "This QR code is intended to scan from a smartphone. If you have the AllTrails app, the link will open the app for you. If you don’t have the app, the link will take you to your device’s app store." [ref=e114]
+            - generic [ref=e115]:
+              - link [ref=e116] [cursor=pointer]:
+                - /url: https://alltrails.io/ujRkr9MGmgb
+                - img "Download the AllTrails application on the App Store" [ref=e117]
+              - link [ref=e118] [cursor=pointer]:
+                - /url: https://alltrails.io/pW7o6i6Lmgb
+                - img "Download the AllTrails application on Google Play" [ref=e119]
+        - generic [ref=e126]:
+          - heading "Explore even without service" [level=2] [ref=e127]
+          - generic [ref=e128]: Download maps for trails and parks around the world.
+          - generic [ref=e129]:
+            - img "This QR code is intended to scan from a smartphone. If you have the AllTrails app, the link will open the app for you. If you don’t have the app, the link will take you to your device’s app store." [ref=e130]
+            - generic [ref=e131]:
+              - link [ref=e132] [cursor=pointer]:
+                - /url: https://alltrails.io/ujRkr9MGmgb
+                - img "Download the AllTrails application on the App Store" [ref=e133]
+              - link [ref=e134] [cursor=pointer]:
+                - /url: https://alltrails.io/pW7o6i6Lmgb
+                - img "Download the AllTrails application on Google Play" [ref=e135]
+        - generic [ref=e142]:
+          - heading "Create your own route" [level=2] [ref=e143]
+          - generic [ref=e144]: Build or edit the perfect trail for you.
+          - generic [ref=e145]:
+            - img "This QR code is intended to scan from a smartphone. If you have the AllTrails app, the link will open the app for you. If you don’t have the app, the link will take you to your device’s app store." [ref=e146]
+            - generic [ref=e147]:
+              - link [ref=e148] [cursor=pointer]:
+                - /url: https://alltrails.io/ujRkr9MGmgb
+                - img "Download the AllTrails application on the App Store" [ref=e149]
+              - link [ref=e150] [cursor=pointer]:
+                - /url: https://alltrails.io/pW7o6i6Lmgb
+                - img "Download the AllTrails application on Google Play" [ref=e151]
+      - generic [ref=e157]:
+        - heading "Adventure anywhere" [level=2] [ref=e158]
+        - generic [ref=e159]:
+          - generic [ref=e160]:
+            - heading "Top cities" [level=2] [ref=e161]
+            - generic [ref=e162]:
+              - list [ref=e163]:
+                - listitem [ref=e164]:
+                  - link "Bryce" [ref=e165] [cursor=pointer]:
+                    - /url: /us/utah/bryce
+                - listitem [ref=e166]:
+                  - link "Springdale" [ref=e167] [cursor=pointer]:
+                    - /url: /us/utah/springdale
+                - listitem [ref=e168]:
+                  - link "Sedona" [ref=e169] [cursor=pointer]:
+                    - /url: /us/arizona/sedona
+                - listitem [ref=e170]:
+                  - link "Paradise" [ref=e171] [cursor=pointer]:
+                    - /url: /us/washington/paradise
+                - listitem [ref=e172]:
+                  - link "Estes Park" [ref=e173] [cursor=pointer]:
+                    - /url: /us/colorado/estes-park
+                - listitem [ref=e174]:
+                  - link "Yosemite Valley" [ref=e175] [cursor=pointer]:
+                    - /url: /us/california/yosemite-valley
+                - listitem [ref=e176]:
+                  - link "North Bend" [ref=e177] [cursor=pointer]:
+                    - /url: /us/washington/north-bend
+                - listitem [ref=e178]:
+                  - link "Mehama" [ref=e179] [cursor=pointer]:
+                    - /url: /us/oregon/mehama
+                - listitem [ref=e180]:
+                  - link "Lake Mc Donald" [ref=e181] [cursor=pointer]:
+                    - /url: /us/montana/lake-mc-donald
+                - listitem [ref=e182]:
+                  - link "Moab" [ref=e183] [cursor=pointer]:
+                    - /url: /us/utah/moab
+                - listitem [ref=e184]:
+                  - link "Scottsdale" [ref=e185] [cursor=pointer]:
+                    - /url: /us/arizona/scottsdale
+                - listitem [ref=e186]:
+                  - link "Honolulu" [ref=e187] [cursor=pointer]:
+                    - /url: /hawaii/oahu/honolulu
+                - listitem [ref=e188]:
+                  - link "Boulder" [ref=e189] [cursor=pointer]:
+                    - /url: /us/colorado/boulder
+                - listitem [ref=e190]:
+                  - link "Port Angeles" [ref=e191] [cursor=pointer]:
+                    - /url: /us/washington/port-angeles
+                - listitem [ref=e192]:
+                  - link "Bar Harbor" [ref=e193] [cursor=pointer]:
+                    - /url: /us/maine/bar-harbor
+                - listitem [ref=e194]:
+                  - link "Phoenix" [ref=e195] [cursor=pointer]:
+                    - /url: /us/arizona/phoenix
+                - listitem [ref=e196]:
+                  - link "Austin" [ref=e197] [cursor=pointer]:
+                    - /url: /us/texas/austin
+                - listitem [ref=e198]:
+                  - link "San Diego" [ref=e199] [cursor=pointer]:
+                    - /url: /us/california/san-diego
+                - listitem [ref=e200]:
+                  - link "Big Sur" [ref=e201] [cursor=pointer]:
+                    - /url: /us/california/big-sur
+                - listitem [ref=e202]:
+                  - link "Palm Springs" [ref=e203] [cursor=pointer]:
+                    - /url: /us/california/palm-springs
+                - listitem [ref=e204]:
+                  - link "Tucson" [ref=e205] [cursor=pointer]:
+                    - /url: /us/arizona/tucson
+                - listitem [ref=e206]:
+                  - link "Los Angeles" [ref=e207] [cursor=pointer]:
+                    - /url: /us/california/los-angeles
+                - listitem [ref=e208]:
+                  - link "Las Vegas" [ref=e209] [cursor=pointer]:
+                    - /url: /us/nevada/las-vegas
+                - listitem [ref=e210]:
+                  - link "Gatlinburg" [ref=e211] [cursor=pointer]:
+                    - /url: /us/tennessee/gatlinburg
+                - listitem [ref=e212]:
+                  - link "Santa Fe" [ref=e213] [cursor=pointer]:
+                    - /url: /us/new-mexico/santa-fe
+                - listitem [ref=e214]:
+                  - link "San Antonio" [ref=e215] [cursor=pointer]:
+                    - /url: /us/texas/san-antonio
+                - listitem [ref=e216]:
+                  - link "Asheville" [ref=e217] [cursor=pointer]:
+                    - /url: /us/north-carolina/asheville
+                - listitem [ref=e218]:
+                  - link "San Francisco" [ref=e219] [cursor=pointer]:
+                    - /url: /us/california/san-francisco
+                - listitem [ref=e220]:
+                  - link "Broken Bow" [ref=e221] [cursor=pointer]:
+                    - /url: /us/oklahoma/broken-bow
+                - listitem [ref=e222]:
+                  - link "South Lake Tahoe" [ref=e223] [cursor=pointer]:
+                    - /url: /us/california/south-lake-tahoe
+                - listitem [ref=e224]:
+                  - link "Rancho Palos Verdes" [ref=e225] [cursor=pointer]:
+                    - /url: /us/california/rancho-palos-verdes
+                - listitem [ref=e226]:
+                  - link "Salt Lake City" [ref=e227] [cursor=pointer]:
+                    - /url: /us/utah/salt-lake-city
+                - listitem [ref=e228]:
+                  - link "Big Bear Lake" [ref=e229] [cursor=pointer]:
+                    - /url: /us/california/big-bear-lake
+                - listitem [ref=e230]:
+                  - link "Dallas" [ref=e231] [cursor=pointer]:
+                    - /url: /us/texas/dallas
+                - listitem [ref=e232]:
+                  - link "Idyllwild-Pine Cove" [ref=e233] [cursor=pointer]:
+                    - /url: /us/california/idyllwild-pine-cove
+                - listitem [ref=e234]:
+                  - link "San Jose" [ref=e235] [cursor=pointer]:
+                    - /url: /us/california/san-jose
+                - listitem [ref=e236]:
+                  - link "Laguna Beach" [ref=e237] [cursor=pointer]:
+                    - /url: /us/california/laguna-beach
+                - listitem [ref=e238]:
+                  - link "Houston" [ref=e239] [cursor=pointer]:
+                    - /url: /us/texas/houston
+                - listitem [ref=e240]:
+                  - link "Kailua Kona" [ref=e241] [cursor=pointer]:
+                    - /url: /hawaii/hawaii/kailua-kona
+                - listitem [ref=e242]:
+                  - link "Sacramento" [ref=e243] [cursor=pointer]:
+                    - /url: /us/california/sacramento
+                - listitem [ref=e244]:
+                  - link "Flagstaff" [ref=e245] [cursor=pointer]:
+                    - /url: /us/arizona/flagstaff
+                - listitem [ref=e246]:
+                  - link "Mesa" [ref=e247] [cursor=pointer]:
+                    - /url: /us/arizona/mesa
+                - listitem [ref=e248]:
+                  - link "Cold Spring" [ref=e249] [cursor=pointer]:
+                    - /url: /us/new-york/cold-spring
+                - listitem [ref=e250]:
+                  - link "Santa Cruz" [ref=e251] [cursor=pointer]:
+                    - /url: /us/california/santa-cruz
+                - listitem [ref=e252]:
+                  - link "Seattle" [ref=e253] [cursor=pointer]:
+                    - /url: /us/washington/seattle
+                - listitem [ref=e254]:
+                  - link "Mount Baldy" [ref=e255] [cursor=pointer]:
+                    - /url: /us/california/mount-baldy
+                - listitem [ref=e256]:
+                  - link "Prescott" [ref=e257] [cursor=pointer]:
+                    - /url: /us/arizona/prescott
+                - listitem [ref=e258]:
+                  - link "La Jolla" [ref=e259] [cursor=pointer]:
+                    - /url: /us/california/la-jolla
+                - listitem [ref=e260]:
+                  - link "Harpers Ferry" [ref=e261] [cursor=pointer]:
+                    - /url: /us/west-virginia/harpers-ferry
+                - listitem [ref=e262]:
+                  - link "Portland" [ref=e263] [cursor=pointer]:
+                    - /url: /us/oregon/portland
+                - listitem [ref=e264]:
+                  - link "Denver" [ref=e265] [cursor=pointer]:
+                    - /url: /us/colorado/denver
+                - listitem [ref=e266]:
+                  - link "Colorado Springs" [ref=e267] [cursor=pointer]:
+                    - /url: /us/colorado/colorado-springs
+                - listitem [ref=e268]:
+                  - link "Washington, D.C." [ref=e269] [cursor=pointer]:
+                    - /url: /us/washington-dc/washington
+                - listitem [ref=e270]:
+                  - link "Nashville" [ref=e271] [cursor=pointer]:
+                    - /url: /us/tennessee/nashville
+                - listitem [ref=e272]:
+                  - link "Bend" [ref=e273] [cursor=pointer]:
+                    - /url: /us/oregon/bend
+                - listitem [ref=e274]:
+                  - link "Vancouver" [ref=e275] [cursor=pointer]:
+                    - /url: /canada/british-columbia/vancouver
+                - listitem [ref=e276]:
+                  - link "Riverside" [ref=e277] [cursor=pointer]:
+                    - /url: /us/california/riverside
+                - listitem [ref=e278]:
+                  - link "Ozark" [ref=e279] [cursor=pointer]:
+                    - /url: /us/arkansas/ozark
+                - listitem [ref=e280]:
+                  - link "New York City" [ref=e281] [cursor=pointer]:
+                    - /url: /us/new-york/new-york-city
+                - listitem [ref=e282]:
+                  - link "Breckenridge" [ref=e283] [cursor=pointer]:
+                    - /url: /us/colorado/breckenridge
+              - list [ref=e284]:
+                - listitem [ref=e285]:
+                  - link "Chattanooga" [ref=e286] [cursor=pointer]:
+                    - /url: /us/tennessee/chattanooga
+                - listitem [ref=e287]:
+                  - link "Golden" [ref=e288] [cursor=pointer]:
+                    - /url: /us/colorado/golden
+                - listitem [ref=e289]:
+                  - link "Atlanta" [ref=e290] [cursor=pointer]:
+                    - /url: /us/georgia/atlanta
+                - listitem [ref=e291]:
+                  - link "Bozeman" [ref=e292] [cursor=pointer]:
+                    - /url: /us/montana/bozeman
+                - listitem [ref=e293]:
+                  - link "Fort Collins" [ref=e294] [cursor=pointer]:
+                    - /url: /us/colorado/fort-collins
+                - listitem [ref=e295]:
+                  - link "Charlotte" [ref=e296] [cursor=pointer]:
+                    - /url: /us/north-carolina/charlotte
+                - listitem [ref=e297]:
+                  - link "Black Mountain" [ref=e298] [cursor=pointer]:
+                    - /url: /us/north-carolina/black-mountain
+                - listitem [ref=e299]:
+                  - link "St. George" [ref=e300] [cursor=pointer]:
+                    - /url: /us/utah/st-george--3
+                - listitem [ref=e301]:
+                  - link "Boone" [ref=e302] [cursor=pointer]:
+                    - /url: /us/north-carolina/boone
+                - listitem [ref=e303]:
+                  - link "Orlando" [ref=e304] [cursor=pointer]:
+                    - /url: /us/florida/orlando
+                - listitem [ref=e305]:
+                  - link "Twin Falls" [ref=e306] [cursor=pointer]:
+                    - /url: /us/idaho/twin-falls
+                - listitem [ref=e307]:
+                  - link "Park City" [ref=e308] [cursor=pointer]:
+                    - /url: /us/utah/park-city
+                - listitem [ref=e309]:
+                  - link "Cheyenne" [ref=e310] [cursor=pointer]:
+                    - /url: /us/wyoming/cheyenne
+                - listitem [ref=e311]:
+                  - link "Vancouver" [ref=e312] [cursor=pointer]:
+                    - /url: /us/washington/vancouver
+                - listitem [ref=e313]:
+                  - link "Castle Rock" [ref=e314] [cursor=pointer]:
+                    - /url: /us/colorado/castle-rock
+                - listitem [ref=e315]:
+                  - link "Raleigh" [ref=e316] [cursor=pointer]:
+                    - /url: /us/north-carolina/raleigh
+                - listitem [ref=e317]:
+                  - link "Pittsburgh" [ref=e318] [cursor=pointer]:
+                    - /url: /us/pennsylvania/pittsburgh
+                - listitem [ref=e319]:
+                  - link "Malibu" [ref=e320] [cursor=pointer]:
+                    - /url: /us/california/malibu
+                - listitem [ref=e321]:
+                  - link "Anchorage" [ref=e322] [cursor=pointer]:
+                    - /url: /us/alaska/anchorage
+                - listitem [ref=e323]:
+                  - link "Roanoke" [ref=e324] [cursor=pointer]:
+                    - /url: /us/virginia/roanoke
+                - listitem [ref=e325]:
+                  - link "Boston" [ref=e326] [cursor=pointer]:
+                    - /url: /us/massachusetts/boston
+                - listitem [ref=e327]:
+                  - link "Boise" [ref=e328] [cursor=pointer]:
+                    - /url: /us/idaho/boise
+                - listitem [ref=e329]:
+                  - link "Leavenworth" [ref=e330] [cursor=pointer]:
+                    - /url: /us/washington/leavenworth
+                - listitem [ref=e331]:
+                  - link "Santa Barbara" [ref=e332] [cursor=pointer]:
+                    - /url: /us/california/santa-barbara
+                - listitem [ref=e333]:
+                  - link "Aspen" [ref=e334] [cursor=pointer]:
+                    - /url: /us/colorado/aspen
+                - listitem [ref=e335]:
+                  - link "Richmond" [ref=e336] [cursor=pointer]:
+                    - /url: /us/virginia/richmond
+                - listitem [ref=e337]:
+                  - link "Albuquerque" [ref=e338] [cursor=pointer]:
+                    - /url: /us/new-mexico/albuquerque
+                - listitem [ref=e339]:
+                  - link "Mount Charleston" [ref=e340] [cursor=pointer]:
+                    - /url: /us/nevada/mount-charleston
+                - listitem [ref=e341]:
+                  - link "Buffalo" [ref=e342] [cursor=pointer]:
+                    - /url: /us/new-york/buffalo
+                - listitem [ref=e343]:
+                  - link "Melbourne" [ref=e344] [cursor=pointer]:
+                    - /url: /us/florida/melbourne
+                - listitem [ref=e345]:
+                  - link "Gilbert" [ref=e346] [cursor=pointer]:
+                    - /url: /us/arizona/gilbert
+                - listitem [ref=e347]:
+                  - link "Knoxville" [ref=e348] [cursor=pointer]:
+                    - /url: /us/tennessee/knoxville
+                - listitem [ref=e349]:
+                  - link "Philadelphia" [ref=e350] [cursor=pointer]:
+                    - /url: /us/pennsylvania/philadelphia
+                - listitem [ref=e351]:
+                  - link "Chicago" [ref=e352] [cursor=pointer]:
+                    - /url: /us/illinois/chicago
+                - listitem [ref=e353]:
+                  - link "Reno" [ref=e354] [cursor=pointer]:
+                    - /url: /us/nevada/reno
+                - listitem [ref=e355]:
+                  - link "Auburn" [ref=e356] [cursor=pointer]:
+                    - /url: /us/california/auburn
+                - listitem [ref=e357]:
+                  - link "Toronto" [ref=e358] [cursor=pointer]:
+                    - /url: /canada/ontario/toronto
+                - listitem [ref=e359]:
+                  - link "Miami" [ref=e360] [cursor=pointer]:
+                    - /url: /us/florida/miami
+                - listitem [ref=e361]:
+                  - link "Mammoth Lakes" [ref=e362] [cursor=pointer]:
+                    - /url: /us/california/mammoth-lakes
+                - listitem [ref=e363]:
+                  - link "Branson" [ref=e364] [cursor=pointer]:
+                    - /url: /us/missouri/branson
+                - listitem [ref=e365]:
+                  - link "London" [ref=e366] [cursor=pointer]:
+                    - /url: /canada/ontario/london
+                - listitem [ref=e367]:
+                  - link "High Point" [ref=e368] [cursor=pointer]:
+                    - /url: /us/north-carolina/high-point
+                - listitem [ref=e369]:
+                  - link "Grand Junction" [ref=e370] [cursor=pointer]:
+                    - /url: /us/colorado/grand-junction
+                - listitem [ref=e371]:
+                  - link "Madison" [ref=e372] [cursor=pointer]:
+                    - /url: /us/wisconsin/madison
+                - listitem [ref=e373]:
+                  - link "Cincinnati" [ref=e374] [cursor=pointer]:
+                    - /url: /us/ohio/cincinnati
+                - listitem [ref=e375]:
+                  - link "Fort Worth" [ref=e376] [cursor=pointer]:
+                    - /url: /us/texas/fort-worth
+                - listitem [ref=e377]:
+                  - link "Chino Hills" [ref=e378] [cursor=pointer]:
+                    - /url: /us/california/chino-hills
+                - listitem [ref=e379]:
+                  - link "Lake Arrowhead" [ref=e380] [cursor=pointer]:
+                    - /url: /us/california/lake-arrowhead
+                - listitem [ref=e381]:
+                  - link "Eugene" [ref=e382] [cursor=pointer]:
+                    - /url: /us/oregon/eugene
+                - listitem [ref=e383]:
+                  - link "Durango" [ref=e384] [cursor=pointer]:
+                    - /url: /us/colorado/durango
+                - listitem [ref=e385]:
+                  - link "Tacoma" [ref=e386] [cursor=pointer]:
+                    - /url: /us/washington/tacoma
+                - listitem [ref=e387]:
+                  - link "Vail" [ref=e388] [cursor=pointer]:
+                    - /url: /us/colorado/vail
+                - listitem [ref=e389]:
+                  - link "St. Louis" [ref=e390] [cursor=pointer]:
+                    - /url: /us/missouri/st-louis--2
+                - listitem [ref=e391]:
+                  - link "Mount Shasta" [ref=e392] [cursor=pointer]:
+                    - /url: /us/california/mount-shasta
+                - listitem [ref=e393]:
+                  - link "Baltimore" [ref=e394] [cursor=pointer]:
+                    - /url: /us/maryland/baltimore
+                - listitem [ref=e395]:
+                  - link "Tampa" [ref=e396] [cursor=pointer]:
+                    - /url: /us/florida/tampa
+                - listitem [ref=e397]:
+                  - link "Kansas City" [ref=e398] [cursor=pointer]:
+                    - /url: /us/missouri/kansas-city
+                - listitem [ref=e399]:
+                  - link "Half Moon Bay" [ref=e400] [cursor=pointer]:
+                    - /url: /us/california/half-moon-bay
+                - listitem [ref=e401]:
+                  - link "Minneapolis" [ref=e402] [cursor=pointer]:
+                    - /url: /us/minnesota/minneapolis
+                - listitem [ref=e403]:
+                  - link "Bellingham" [ref=e404] [cursor=pointer]:
+                    - /url: /us/washington/bellingham
+          - generic [ref=e405]:
+            - heading "Top parks" [level=2] [ref=e406]
+            - generic [ref=e407]:
+              - list [ref=e408]:
+                - listitem [ref=e409]:
+                  - link "Bryce Canyon National Park" [ref=e410] [cursor=pointer]:
+                    - /url: /parks/us/utah/bryce-canyon-national-park
+                - listitem [ref=e411]:
+                  - link "Zion National Park" [ref=e412] [cursor=pointer]:
+                    - /url: /parks/us/utah/zion-national-park
+                - listitem [ref=e413]:
+                  - link "Mount Rainier National Park" [ref=e414] [cursor=pointer]:
+                    - /url: /parks/us/washington/mount-rainier-national-park
+                - listitem [ref=e415]:
+                  - link "Rocky Mountain National Park" [ref=e416] [cursor=pointer]:
+                    - /url: /parks/us/colorado/rocky-mountain-national-park
+                - listitem [ref=e417]:
+                  - link "Yosemite National Park" [ref=e418] [cursor=pointer]:
+                    - /url: /parks/us/california/yosemite-national-park
+                - listitem [ref=e419]:
+                  - link "Glacier National Park" [ref=e420] [cursor=pointer]:
+                    - /url: /parks/us/montana/glacier-national-park
+                - listitem [ref=e421]:
+                  - link "Arches National Park" [ref=e422] [cursor=pointer]:
+                    - /url: /parks/us/utah/arches-national-park
+                - listitem [ref=e423]:
+                  - link "Olympic National Park" [ref=e424] [cursor=pointer]:
+                    - /url: /parks/us/washington/olympic-national-park
+                - listitem [ref=e425]:
+                  - link "Acadia National Park" [ref=e426] [cursor=pointer]:
+                    - /url: /parks/us/maine/acadia-national-park
+                - listitem [ref=e427]:
+                  - link "Great Smoky Mountains National Park" [ref=e428] [cursor=pointer]:
+                    - /url: /parks/us/tennessee/great-smoky-mountains-national-park
+                - listitem [ref=e429]:
+                  - link "Shenandoah National Park" [ref=e430] [cursor=pointer]:
+                    - /url: /parks/us/virginia/shenandoah-national-park
+                - listitem [ref=e431]:
+                  - link "Grand Canyon National Park" [ref=e432] [cursor=pointer]:
+                    - /url: /parks/us/arizona/grand-canyon-national-park
+                - listitem [ref=e433]:
+                  - link "Grand Teton National Park" [ref=e434] [cursor=pointer]:
+                    - /url: /parks/us/wyoming/grand-teton-national-park
+                - listitem [ref=e435]:
+                  - link "Hawai'i Volcanoes National Park" [ref=e436] [cursor=pointer]:
+                    - /url: /parks/hawaii/hawaii/hawaii-volcanoes-national-park
+                - listitem [ref=e437]:
+                  - link "Cuyahoga Valley National Park" [ref=e438] [cursor=pointer]:
+                    - /url: /parks/us/ohio/cuyahoga-valley-national-park
+                - listitem [ref=e439]:
+                  - link "Mount Tamalpais State Park" [ref=e440] [cursor=pointer]:
+                    - /url: /parks/us/california/mount-tamalpais-state-park
+                - listitem [ref=e441]:
+                  - link "Big Bend National Park" [ref=e442] [cursor=pointer]:
+                    - /url: /parks/us/texas/big-bend-national-park
+                - listitem [ref=e443]:
+                  - link "Torrey Pines State Natural Reserve" [ref=e444] [cursor=pointer]:
+                    - /url: /parks/us/california/torrey-pines-state-natural-reserve
+                - listitem [ref=e445]:
+                  - link "Red Rock Canyon National Conservation Area" [ref=e446] [cursor=pointer]:
+                    - /url: /parks/us/nevada/red-rock-canyon-national-conservation-area
+                - listitem [ref=e447]:
+                  - link "El Yunque National Forest" [ref=e448] [cursor=pointer]:
+                    - /url: /parks/puerto-rico/east-region/el-yunque-national-forest
+                - listitem [ref=e449]:
+                  - link "Point Lobos State Natural Reserve" [ref=e450] [cursor=pointer]:
+                    - /url: /parks/us/california/point-lobos-state-natural-reserve
+                - listitem [ref=e451]:
+                  - link "Griffith Park" [ref=e452] [cursor=pointer]:
+                    - /url: /parks/us/california/griffith-park
+                - listitem [ref=e453]:
+                  - link "Mount Diablo State Park" [ref=e454] [cursor=pointer]:
+                    - /url: /parks/us/california/mount-diablo-state-park
+                - listitem [ref=e455]:
+                  - link "Joshua Tree National Park" [ref=e456] [cursor=pointer]:
+                    - /url: /parks/us/california/joshua-tree-national-park
+                - listitem [ref=e457]:
+                  - link "Waimea Canyon State Park" [ref=e458] [cursor=pointer]:
+                    - /url: /parks/hawaii/kaua-i--2/waimea-canyon-state-park
+                - listitem [ref=e459]:
+                  - link "Superstition Wilderness" [ref=e460] [cursor=pointer]:
+                    - /url: /parks/us/arizona/superstition-wilderness
+                - listitem [ref=e461]:
+                  - link "North Cascades National Park" [ref=e462] [cursor=pointer]:
+                    - /url: /parks/us/washington/north-cascades-national-park
+                - listitem [ref=e463]:
+                  - link "Valley of Fire State Park" [ref=e464] [cursor=pointer]:
+                    - /url: /parks/us/nevada/valley-of-fire-state-park--2
+                - listitem [ref=e465]:
+                  - link "Saguaro National Park" [ref=e466] [cursor=pointer]:
+                    - /url: /parks/us/arizona/saguaro-national-park
+                - listitem [ref=e467]:
+                  - link "Haleakalā National Park" [ref=e468] [cursor=pointer]:
+                    - /url: /parks/hawaii/maui/haleakala-national-park
+                - listitem [ref=e469]:
+                  - link "Bear Mountain State Park" [ref=e470] [cursor=pointer]:
+                    - /url: /parks/us/new-york/bear-mountain-state-park
+                - listitem [ref=e471]:
+                  - link "Pinnacles National Park" [ref=e472] [cursor=pointer]:
+                    - /url: /parks/us/california/pinnacles-national-park
+                - listitem [ref=e473]:
+                  - link "Columbia River Gorge National Scenic Area" [ref=e474] [cursor=pointer]:
+                    - /url: /parks/us/oregon/columbia-river-gorge-national-scenic-area
+                - listitem [ref=e475]:
+                  - link "Sequoia National Park" [ref=e476] [cursor=pointer]:
+                    - /url: /parks/us/california/sequoia-national-park
+                - listitem [ref=e477]:
+                  - link "New River Gorge National Park and Preserve" [ref=e478] [cursor=pointer]:
+                    - /url: /parks/us/west-virginia/new-river-gorge-national-park-and-preserve
+                - listitem [ref=e479]:
+                  - link "Red Rocks Park" [ref=e480] [cursor=pointer]:
+                    - /url: /parks/us/colorado/red-rocks-park
+                - listitem [ref=e481]:
+                  - link "Red River Gorge Geological Area" [ref=e482] [cursor=pointer]:
+                    - /url: /parks/us/kentucky/red-river-gorge-geological-area--2
+                - listitem [ref=e483]:
+                  - link "Sabino Canyon Recreation Area" [ref=e484] [cursor=pointer]:
+                    - /url: /parks/us/arizona/sabino-canyon-recreation-area
+                - listitem [ref=e485]:
+                  - link "Hocking Hills State Park" [ref=e486] [cursor=pointer]:
+                    - /url: /parks/us/ohio/hocking-hills-state-park
+                - listitem [ref=e487]:
+                  - link "Anza-Borrego Desert State Park" [ref=e488] [cursor=pointer]:
+                    - /url: /parks/us/california/anza-borrego-desert-state-park
+                - listitem [ref=e489]:
+                  - link "White Sands National Park" [ref=e490] [cursor=pointer]:
+                    - /url: /parks/us/new-mexico/white-sands-national-park
+                - listitem [ref=e491]:
+                  - link "Mesa Verde National Park" [ref=e492] [cursor=pointer]:
+                    - /url: /parks/us/colorado/mesa-verde-national-park
+                - listitem [ref=e493]:
+                  - link "Canyonlands National Park" [ref=e494] [cursor=pointer]:
+                    - /url: /parks/us/utah/canyonlands-national-park
+                - listitem [ref=e495]:
+                  - link "Capitol Reef National Park" [ref=e496] [cursor=pointer]:
+                    - /url: /parks/us/utah/capitol-reef-national-park
+                - listitem [ref=e497]:
+                  - link "Lassen Volcanic National Park" [ref=e498] [cursor=pointer]:
+                    - /url: /parks/us/california/lassen-volcanic-national-park
+                - listitem [ref=e499]:
+                  - link "Enchanted Rock State Natural Area" [ref=e500] [cursor=pointer]:
+                    - /url: /parks/us/texas/enchanted-rock-state-natural-area
+                - listitem [ref=e501]:
+                  - link "Indiana Dunes National Park" [ref=e502] [cursor=pointer]:
+                    - /url: /parks/us/indiana/indiana-dunes-national-park
+                - listitem [ref=e503]:
+                  - link "Garner State Park" [ref=e504] [cursor=pointer]:
+                    - /url: /parks/us/texas/garner-state-park
+                - listitem [ref=e505]:
+                  - link "Muir Woods National Monument" [ref=e506] [cursor=pointer]:
+                    - /url: /parks/us/california/muir-woods-national-monument
+                - listitem [ref=e507]:
+                  - link "Silver Falls State Park" [ref=e508] [cursor=pointer]:
+                    - /url: /parks/us/oregon/silver-falls-state-park
+                - listitem [ref=e509]:
+                  - link "Harriman State Park" [ref=e510] [cursor=pointer]:
+                    - /url: /parks/us/new-york/harriman-state-park
+                - listitem [ref=e511]:
+                  - link "Crystal Cove State Park" [ref=e512] [cursor=pointer]:
+                    - /url: /parks/us/california/crystal-cove-state-park
+                - listitem [ref=e513]:
+                  - link "Dolly Sods Wilderness" [ref=e514] [cursor=pointer]:
+                    - /url: /parks/us/west-virginia/dolly-sods-wilderness
+                - listitem [ref=e515]:
+                  - link "Mount Hood National Forest" [ref=e516] [cursor=pointer]:
+                    - /url: /parks/us/oregon/mount-hood-national-forest--2
+                - listitem [ref=e517]:
+                  - link "Big Basin Redwoods State Park" [ref=e518] [cursor=pointer]:
+                    - /url: /parks/us/california/big-basin-redwoods-state-park
+                - listitem [ref=e519]:
+                  - link "Grandfather Mountain State Park" [ref=e520] [cursor=pointer]:
+                    - /url: /parks/us/north-carolina/grandfather-mountain-state-park
+                - listitem [ref=e521]:
+                  - link "Palo Duro Canyon State Park" [ref=e522] [cursor=pointer]:
+                    - /url: /parks/us/texas/palo-duro-canyon-state-park
+                - listitem [ref=e523]:
+                  - link "Delaware Water Gap National Recreation Area" [ref=e524] [cursor=pointer]:
+                    - /url: /parks/us/pennsylvania/delaware-water-gap-national-recreation-area
+                - listitem [ref=e525]:
+                  - link "Fall Creek Falls State Park" [ref=e526] [cursor=pointer]:
+                    - /url: /parks/us/tennessee/fall-creek-falls-state-park
+                - listitem [ref=e527]:
+                  - link "Runyon Canyon Park" [ref=e528] [cursor=pointer]:
+                    - /url: /parks/us/california/runyon-canyon-park
+              - list [ref=e529]:
+                - listitem [ref=e530]:
+                  - link "Wekiwa Springs State Park" [ref=e531] [cursor=pointer]:
+                    - /url: /parks/us/florida/wekiwa-springs-state-park
+                - listitem [ref=e532]:
+                  - link "Silver Glen Springs Recreation Area" [ref=e533] [cursor=pointer]:
+                    - /url: /parks/us/florida/silver-glen-springs-recreation-area
+                - listitem [ref=e534]:
+                  - link "Banff National Park" [ref=e535] [cursor=pointer]:
+                    - /url: /parks/canada/alberta/banff-national-park
+                - listitem [ref=e536]:
+                  - link "Mount Greylock State Reservation" [ref=e537] [cursor=pointer]:
+                    - /url: /parks/us/massachusetts/mount-greylock-state-reservation
+                - listitem [ref=e538]:
+                  - link "Uvas Canyon County Park" [ref=e539] [cursor=pointer]:
+                    - /url: /parks/us/california/uvas-canyon-county-park
+                - listitem [ref=e540]:
+                  - link "Deception Pass State Park" [ref=e541] [cursor=pointer]:
+                    - /url: /parks/us/washington/deception-pass-state-park
+                - listitem [ref=e542]:
+                  - link "Red Rock Canyon State Park" [ref=e543] [cursor=pointer]:
+                    - /url: /parks/us/california/red-rock-canyon-state-park
+                - listitem [ref=e544]:
+                  - link "Golden Gate Canyon State Park" [ref=e545] [cursor=pointer]:
+                    - /url: /parks/us/colorado/golden-gate-canyon-state-park
+                - listitem [ref=e546]:
+                  - link "Brainard Lake Recreation Area" [ref=e547] [cursor=pointer]:
+                    - /url: /parks/us/colorado/brainard-lake-recreation-area
+                - listitem [ref=e548]:
+                  - link "Cold Spring Harbor State Park" [ref=e549] [cursor=pointer]:
+                    - /url: /parks/us/new-york/cold-spring-harbor-state-park
+                - listitem [ref=e550]:
+                  - link "Black Canyon of the Gunnison National Park" [ref=e551] [cursor=pointer]:
+                    - /url: /parks/us/colorado/black-canyon-of-the-gunnison-national-park
+                - listitem [ref=e552]:
+                  - link "Blue Hills Reservation" [ref=e553] [cursor=pointer]:
+                    - /url: /parks/us/massachusetts/blue-hills-reservation
+                - listitem [ref=e554]:
+                  - link "Castle Rock State Park" [ref=e555] [cursor=pointer]:
+                    - /url: /parks/us/california/castle-rock-state-park
+                - listitem [ref=e556]:
+                  - link "Providence Canyon State Park" [ref=e557] [cursor=pointer]:
+                    - /url: /parks/us/georgia/providence-canyon-state-park
+                - listitem [ref=e558]:
+                  - link "Emerald Bay State Park" [ref=e559] [cursor=pointer]:
+                    - /url: /parks/us/california/emerald-bay-state-park
+                - listitem [ref=e560]:
+                  - link "Mission Peak Regional Preserve" [ref=e561] [cursor=pointer]:
+                    - /url: /parks/us/california/mission-peak-regional-preserve
+                - listitem [ref=e562]:
+                  - link "Green Lakes State Park" [ref=e563] [cursor=pointer]:
+                    - /url: /parks/us/new-york/green-lakes-state-park
+                - listitem [ref=e564]:
+                  - link "Armstrong Redwoods State Natural Reserve" [ref=e565] [cursor=pointer]:
+                    - /url: /parks/us/california/armstrong-redwoods-state-natural-reserve
+                - listitem [ref=e566]:
+                  - link "Echo Bluff State Park" [ref=e567] [cursor=pointer]:
+                    - /url: /parks/us/missouri/echo-bluff-state-park
+                - listitem [ref=e568]:
+                  - link "Buttermilk Falls State Park" [ref=e569] [cursor=pointer]:
+                    - /url: /parks/us/new-york/buttermilk-falls-state-park
+                - listitem [ref=e570]:
+                  - link "Yellowstone National Park" [ref=e571] [cursor=pointer]:
+                    - /url: /parks/us/wyoming/yellowstone-national-park
+                - listitem [ref=e572]:
+                  - link "Reinhardt Redwood Regional Park" [ref=e573] [cursor=pointer]:
+                    - /url: /parks/us/california/reinhardt-redwood-regional-park
+                - listitem [ref=e574]:
+                  - link "Mission Trails Regional Park" [ref=e575] [cursor=pointer]:
+                    - /url: /parks/us/california/mission-trails-regional-park
+                - listitem [ref=e576]:
+                  - link "Catskill Park" [ref=e577] [cursor=pointer]:
+                    - /url: /parks/us/new-york/catskill-park
+                - listitem [ref=e578]:
+                  - link "Garrapata State Park" [ref=e579] [cursor=pointer]:
+                    - /url: /parks/us/california/garrapata-state-park
+                - listitem [ref=e580]:
+                  - link "Adirondack Mountain Reserve" [ref=e581] [cursor=pointer]:
+                    - /url: /parks/us/new-york/adirondack-mountain-reserve
+                - listitem [ref=e582]:
+                  - link "Lair o' the Bear Park" [ref=e583] [cursor=pointer]:
+                    - /url: /parks/us/colorado/lair-o-the-bear-park
+                - listitem [ref=e584]:
+                  - link "Coyote Hills Regional Park" [ref=e585] [cursor=pointer]:
+                    - /url: /parks/us/california/coyote-hills-regional-park
+                - listitem [ref=e586]:
+                  - link "Rancho San Antonio Open Space Preserve" [ref=e587] [cursor=pointer]:
+                    - /url: /parks/us/california/rancho-san-antonio-open-space-preserve
+                - listitem [ref=e588]:
+                  - link "Point Mugu State Park" [ref=e589] [cursor=pointer]:
+                    - /url: /parks/us/california/point-mugu-state-park
+                - listitem [ref=e590]:
+                  - link "Mount San Jacinto State Park" [ref=e591] [cursor=pointer]:
+                    - /url: /parks/us/california/mount-san-jacinto-state-park
+                - listitem [ref=e592]:
+                  - link "Arenal Volcano National Park" [ref=e593] [cursor=pointer]:
+                    - /url: /parks/costa-rica/alajuela/parque-nacional-volcan-arenal--3
+                - listitem [ref=e594]:
+                  - link "Rock Island State Park" [ref=e595] [cursor=pointer]:
+                    - /url: /parks/us/tennessee/rock-island-state-park
+                - listitem [ref=e596]:
+                  - link "Purisima Creek Redwoods Open Space Preserve" [ref=e597] [cursor=pointer]:
+                    - /url: /parks/us/california/purisima-creek-redwoods-open-space-preserve
+                - listitem [ref=e598]:
+                  - link "Carbon Canyon Regional Park" [ref=e599] [cursor=pointer]:
+                    - /url: /parks/us/california/carbon-canyon-regional-park
+                - listitem [ref=e600]:
+                  - link "South Mountain Preserve" [ref=e601] [cursor=pointer]:
+                    - /url: /parks/us/arizona/south-mountain-preserve--2
+                - listitem [ref=e602]:
+                  - link "Phoenix Mountain Preserve" [ref=e603] [cursor=pointer]:
+                    - /url: /parks/us/arizona/phoenix-mountain-preserve
+                - listitem [ref=e604]:
+                  - link "Forest Park" [ref=e605] [cursor=pointer]:
+                    - /url: /parks/us/oregon/forest-park
+                - listitem [ref=e606]:
+                  - link "Mount Baker Snoqualmie National Forest" [ref=e607] [cursor=pointer]:
+                    - /url: /parks/us/washington/mount-baker-snoqualmie-national-forest
+                - listitem [ref=e608]:
+                  - link "Death Valley National Park" [ref=e609] [cursor=pointer]:
+                    - /url: /parks/us/california/death-valley-national-park
+                - listitem [ref=e610]:
+                  - link "Watkins Glen State Park" [ref=e611] [cursor=pointer]:
+                    - /url: /parks/us/new-york/watkins-glen-state-park
+                - listitem [ref=e612]:
+                  - link "Elfin Forest Recreational Reserve" [ref=e613] [cursor=pointer]:
+                    - /url: /parks/us/california/elfin-forest-recreational-reserve
+                - listitem [ref=e614]:
+                  - link "Sunol Wilderness Regional Preserve" [ref=e615] [cursor=pointer]:
+                    - /url: /parks/us/california/sunol-wilderness-regional-preserve
+                - listitem [ref=e616]:
+                  - link "Mount Falcon Park" [ref=e617] [cursor=pointer]:
+                    - /url: /parks/us/colorado/mount-falcon-park
+                - listitem [ref=e618]:
+                  - link "Mount Beacon Park" [ref=e619] [cursor=pointer]:
+                    - /url: /parks/us/new-york/mount-beacon-park
+                - listitem [ref=e620]:
+                  - link "Ramapo Valley County Reservation" [ref=e621] [cursor=pointer]:
+                    - /url: /parks/us/new-jersey/ramapo-valley-county-reservation
+                - listitem [ref=e622]:
+                  - link "Cougar Mountain Regional Wildland Park" [ref=e623] [cursor=pointer]:
+                    - /url: /parks/us/washington/cougar-mountain-regional-wildland-park--2
+                - listitem [ref=e624]:
+                  - link "The Forest of Nisene Marks State Park" [ref=e625] [cursor=pointer]:
+                    - /url: /parks/us/california/the-forest-of-nisene-marks-state-park
+                - listitem [ref=e626]:
+                  - link "Red Rock Canyon Open Space" [ref=e627] [cursor=pointer]:
+                    - /url: /parks/us/colorado/red-rock-canyon-open-space
+                - listitem [ref=e628]:
+                  - link "North Table Mountain Park" [ref=e629] [cursor=pointer]:
+                    - /url: /parks/us/colorado/north-table-mountain-park
+                - listitem [ref=e630]:
+                  - link "Kelly Park" [ref=e631] [cursor=pointer]:
+                    - /url: /parks/us/florida/kelly-park--2
+                - listitem [ref=e632]:
+                  - link "Chautauqua Park" [ref=e633] [cursor=pointer]:
+                    - /url: /parks/us/colorado/chautauqua-park
+                - listitem [ref=e634]:
+                  - link "Tonto National Forest" [ref=e635] [cursor=pointer]:
+                    - /url: /parks/us/arizona/tonto-national-forest
+                - listitem [ref=e636]:
+                  - link "Wissahickon Valley Park" [ref=e637] [cursor=pointer]:
+                    - /url: /parks/us/pennsylvania/wissahickon-valley-park
+                - listitem [ref=e638]:
+                  - link "Pictured Rocks National Lakeshore" [ref=e639] [cursor=pointer]:
+                    - /url: /parks/us/michigan/pictured-rocks-national-lakeshore
+                - listitem [ref=e640]:
+                  - link "Franconia Notch State Park" [ref=e641] [cursor=pointer]:
+                    - /url: /parks/us/new-hampshire/franconia-notch-state-park
+                - listitem [ref=e642]:
+                  - link "Guadalupe Mountains National Park" [ref=e643] [cursor=pointer]:
+                    - /url: /parks/us/texas/guadalupe-mountains-national-park
+                - listitem [ref=e644]:
+                  - link "Almaden Quicksilver County Park" [ref=e645] [cursor=pointer]:
+                    - /url: /parks/us/california/almaden-quicksilver-county-park
+                - listitem [ref=e646]:
+                  - link "Indian Peaks Wilderness" [ref=e647] [cursor=pointer]:
+                    - /url: /parks/us/colorado/indian-peaks-wilderness
+                - listitem [ref=e648]:
+                  - link "Kennesaw Mountain National Battlefield Park" [ref=e649] [cursor=pointer]:
+                    - /url: /parks/us/georgia/kennesaw-mountain-national-battlefield-park
+          - generic [ref=e650]:
+            - heading "Top trails" [level=2] [ref=e651]
+            - generic [ref=e652]:
+              - list [ref=e653]:
+                - listitem [ref=e654]:
+                  - link "Navajo Loop and Queens Garden Trail" [ref=e655] [cursor=pointer]:
+                    - /url: /trail/us/utah/navajo-loop-and-queens-garden-trail
+                - listitem [ref=e656]:
+                  - link "Angels Landing Trail" [ref=e657] [cursor=pointer]:
+                    - /url: /trail/us/utah/angels-landing-trail
+                - listitem [ref=e658]:
+                  - link "Devil's Bridge Trail via Dry Creek Road" [ref=e659] [cursor=pointer]:
+                    - /url: /trail/us/arizona/devils-bridge-trail
+                - listitem [ref=e660]:
+                  - link "Skyline Loop" [ref=e661] [cursor=pointer]:
+                    - /url: /trail/us/washington/skyline-trail
+                - listitem [ref=e662]:
+                  - link "Emerald Lake Trail" [ref=e663] [cursor=pointer]:
+                    - /url: /trail/us/colorado/emerald-lake-trail
+                - listitem [ref=e664]:
+                  - link "Vernal and Nevada Falls via Mist Trail" [ref=e665] [cursor=pointer]:
+                    - /url: /trail/us/california/vernal-and-nevada-falls-via-the-mist-trail
+                - listitem [ref=e666]:
+                  - link "Rattlesnake Ledge Trail" [ref=e667] [cursor=pointer]:
+                    - /url: /trail/us/washington/rattlesnake-ledge
+                - listitem [ref=e668]:
+                  - link "Trail of Ten Falls" [ref=e669] [cursor=pointer]:
+                    - /url: /trail/us/oregon/trail-of-ten-falls-canyon-trail
+                - listitem [ref=e670]:
+                  - link "Avalanche Lake" [ref=e671] [cursor=pointer]:
+                    - /url: /trail/us/montana/avalanche-lake--6
+                - listitem [ref=e672]:
+                  - link "Scout Lookout via West Rim Trail" [ref=e673] [cursor=pointer]:
+                    - /url: /trail/us/utah/scout-lookout-trail
+                - listitem [ref=e674]:
+                  - link "Cathedral Rock Trail" [ref=e675] [cursor=pointer]:
+                    - /url: /trail/us/arizona/cathedral-rock-trail
+                - listitem [ref=e676]:
+                  - link "Sky Pond via Glacier Gorge Trail" [ref=e677] [cursor=pointer]:
+                    - /url: /trail/us/colorado/sky-pond-via-glacier-gorge-trail
+                - listitem [ref=e678]:
+                  - link "Upper Yosemite Falls Trail" [ref=e679] [cursor=pointer]:
+                    - /url: /trail/us/california/upper-yosemite-falls-trail
+                - listitem [ref=e680]:
+                  - link "Delicate Arch Trail" [ref=e681] [cursor=pointer]:
+                    - /url: /trail/us/utah/delicate-arch-trail
+                - listitem [ref=e682]:
+                  - link "Snow Lake Trail" [ref=e683] [cursor=pointer]:
+                    - /url: /trail/us/washington/snow-lake-trail
+                - listitem [ref=e684]:
+                  - link "Tom's Thumb Trail" [ref=e685] [cursor=pointer]:
+                    - /url: /trail/us/arizona/toms-thumb-trail
+                - listitem [ref=e686]:
+                  - link "Multnomah Falls via Larch Mountain Trail" [ref=e687] [cursor=pointer]:
+                    - /url: /trail/us/oregon/multnomah-falls-trail
+                - listitem [ref=e688]:
+                  - link "Lands End Trail" [ref=e689] [cursor=pointer]:
+                    - /url: /trail/us/california/lands-end-trail
+                - listitem [ref=e690]:
+                  - link "Bear Canyon to Seven Falls Trail" [ref=e691] [cursor=pointer]:
+                    - /url: /trail/us/arizona/bear-canyon-to-seven-falls-trail
+                - listitem [ref=e692]:
+                  - link "Dog Mountain Trail" [ref=e693] [cursor=pointer]:
+                    - /url: /trail/canada/british-columbia/dog-mountain-trail
+                - listitem [ref=e694]:
+                  - link "Mount Washington via Tuckerman Ravine and Lion Head Trail" [ref=e695] [cursor=pointer]:
+                    - /url: /trail/us/new-hampshire/tuckerman-ravine-trail-to-mount-washington
+                - listitem [ref=e696]:
+                  - link "Quandary Peak Trail" [ref=e697] [cursor=pointer]:
+                    - /url: /trail/us/colorado/quandary-peak-trail
+                - listitem [ref=e698]:
+                  - link "Verna Dunshee Trail and Plank Trail at Mount Tam East Peak" [ref=e699] [cursor=pointer]:
+                    - /url: /trail/us/california/verna-dunshee-trail-and-plank-trail-at-mount-tam-east-peak
+                - listitem [ref=e700]:
+                  - link "Canyon Trail to Waipo'o Falls" [ref=e701] [cursor=pointer]:
+                    - /url: /trail/hawaii/kaua-i--2/canyon-trail-to-waipo-o-falls
+                - listitem [ref=e702]:
+                  - link "The Beehive Loop Trail" [ref=e703] [cursor=pointer]:
+                    - /url: /trail/us/maine/the-beehive-loop-trail
+                - listitem [ref=e704]:
+                  - link "Blue Lake Trail" [ref=e705] [cursor=pointer]:
+                    - /url: /trail/us/washington/blue-lake-trail--7
+                - listitem [ref=e706]:
+                  - link "Guadalupe Peak Trail" [ref=e707] [cursor=pointer]:
+                    - /url: /trail/us/texas/guadalupe-peak-texas-highpoint-trail
+                - listitem [ref=e708]:
+                  - link "Mount Olympus Trail" [ref=e709] [cursor=pointer]:
+                    - /url: /trail/us/utah/mount-olympus-trail
+                - listitem [ref=e710]:
+                  - link "Half Dome via the John Muir Trail (JMT)" [ref=e711] [cursor=pointer]:
+                    - /url: /trail/us/california/half-dome-via-the-john-muir-trail-jmt
+                - listitem [ref=e712]:
+                  - link "Runyon Canyon Trail" [ref=e713] [cursor=pointer]:
+                    - /url: /trail/us/california/runyon-canyon-trail
+                - listitem [ref=e714]:
+                  - link "Steep Ravine Trail" [ref=e715] [cursor=pointer]:
+                    - /url: /trail/us/california/steep-ravine-trail--2
+                - listitem [ref=e716]:
+                  - link "Mount Willard Trail" [ref=e717] [cursor=pointer]:
+                    - /url: /trail/us/new-hampshire/mount-willard
+                - listitem [ref=e718]:
+                  - link "Rough Ridge Overlook Trail" [ref=e719] [cursor=pointer]:
+                    - /url: /trail/us/north-carolina/tanawha-trail-from-rough-ridge-trailhead
+                - listitem [ref=e720]:
+                  - link "Kīlauea Iki and Crater Rim Trail" [ref=e721] [cursor=pointer]:
+                    - /url: /trail/hawaii/hawaii/kilauea-iki-trail-and-crater-rim-trail
+                - listitem [ref=e722]:
+                  - link "Bear Mountain Trail" [ref=e723] [cursor=pointer]:
+                    - /url: /trail/us/arizona/bear-mountain
+                - listitem [ref=e724]:
+                  - link "Seven Bridges Trail" [ref=e725] [cursor=pointer]:
+                    - /url: /trail/us/colorado/seven-bridges-trail
+                - listitem [ref=e726]:
+                  - link "Dragon's Tooth Trail" [ref=e727] [cursor=pointer]:
+                    - /url: /trail/us/virginia/dragons-tooth-trail
+                - listitem [ref=e728]:
+                  - link "Timber Top and Boronda Trail [CLOSED]" [ref=e729] [cursor=pointer]:
+                    - /url: /trail/us/california/timber-top-and-boranda-trail
+                - listitem [ref=e730]:
+                  - link "El Capitan from Yosemite Valley" [ref=e731] [cursor=pointer]:
+                    - /url: /trail/us/california/el-capitan-from-yosemite-valley
+                - listitem [ref=e732]:
+                  - link "Solstice Canyon Trail" [ref=e733] [cursor=pointer]:
+                    - /url: /trail/us/california/solstice-canyon-trail-2
+                - listitem [ref=e734]:
+                  - link "Hollywood Sign via Canyon Drive" [ref=e735] [cursor=pointer]:
+                    - /url: /trail/us/california/hollywood-sign-via-canyon-drive
+                - listitem [ref=e736]:
+                  - link "Goldstrike Canyon Trail" [ref=e737] [cursor=pointer]:
+                    - /url: /trail/us/nevada/gold-strike-hot-springs-trail
+                - listitem [ref=e738]:
+                  - link "Mirror Lake Loop" [ref=e739] [cursor=pointer]:
+                    - /url: /trail/us/oregon/mirror-lake-loop-trail
+                - listitem [ref=e740]:
+                  - link "Castle Rock Trail" [ref=e741] [cursor=pointer]:
+                    - /url: /trail/us/california/castle-rock-trail
+                - listitem [ref=e742]:
+                  - link "Sunset Cliffs Trail" [ref=e743] [cursor=pointer]:
+                    - /url: /trail/us/california/sunset-cliffs-trail
+                - listitem [ref=e744]:
+                  - link "Devil's Punchbowl via Spruce Railroad Trail" [ref=e745] [cursor=pointer]:
+                    - /url: /trail/us/washington/devils-punchbowl-via-spruce-railroad-trail
+                - listitem [ref=e746]:
+                  - link "Trillium Lake Loop" [ref=e747] [cursor=pointer]:
+                    - /url: /trail/us/oregon/trillium-lake-loop-trail
+                - listitem [ref=e748]:
+                  - link "Pikes Peak via Barr Trail" [ref=e749] [cursor=pointer]:
+                    - /url: /trail/us/colorado/pikes-peak-via-barr-trail--2
+                - listitem [ref=e750]:
+                  - link "Rainbow Falls Trail" [ref=e751] [cursor=pointer]:
+                    - /url: /trail/us/tennessee/rainbow-falls-trail
+                - listitem [ref=e752]:
+                  - link "Green Mountain Trail" [ref=e753] [cursor=pointer]:
+                    - /url: /trail/us/colorado/green-mountain-trail--4
+                - listitem [ref=e754]:
+                  - link "Mount Whitney Trail" [ref=e755] [cursor=pointer]:
+                    - /url: /trail/us/california/mount-whitney-via-mount-whitney-trail
+                - listitem [ref=e756]:
+                  - link "Diamond Head Crater (Lēʻahi) Summit Trail" [ref=e757] [cursor=pointer]:
+                    - /url: /trail/hawaii/oahu/diamond-head-leahi-summit-trail
+                - listitem [ref=e758]:
+                  - link "Mount Baldy via Devil's Backbone Trail" [ref=e759] [cursor=pointer]:
+                    - /url: /trail/us/california/mt-baldy-via-devils-backbone-trail
+                - listitem [ref=e760]:
+                  - link "The Manitou Incline" [ref=e761] [cursor=pointer]:
+                    - /url: /trail/us/colorado/the-manitou-incline
+                - listitem [ref=e762]:
+                  - link "Horseshoe Bend Trail" [ref=e763] [cursor=pointer]:
+                    - /url: /trail/us/arizona/horseshoe-bend-trail
+                - listitem [ref=e764]:
+                  - link "Zion Narrows Bottom Up to Big Springs" [ref=e765] [cursor=pointer]:
+                    - /url: /trail/us/utah/zion-narrows-trail-to-imlay-temple-and-big-spring
+                - listitem [ref=e766]:
+                  - link "Point Lobos Loop" [ref=e767] [cursor=pointer]:
+                    - /url: /trail/us/california/point-lobos-loop-trail
+                - listitem [ref=e768]:
+                  - link "Havasu Falls, Mooney Falls, and Beaver Falls" [ref=e769] [cursor=pointer]:
+                    - /url: /trail/us/arizona/havasu-falls-mooney-falls-and-beaver-falls
+                - listitem [ref=e770]:
+                  - link "Cades Cove Loop Road" [ref=e771] [cursor=pointer]:
+                    - /url: /trail/us/tennessee/cades-cove-loop-road
+                - listitem [ref=e772]:
+                  - link "Whiteface Mountain Summit Trail" [ref=e773] [cursor=pointer]:
+                    - /url: /trail/us/new-york/whiteface-mountain-summit-trail
+              - list [ref=e774]:
+                - listitem [ref=e775]:
+                  - link "Mount Saint Helens Summit via Ptarmigan Trail" [ref=e776] [cursor=pointer]:
+                    - /url: /trail/us/washington/mount-saint-helens-summit-via-ptarmigan-trail
+                - listitem [ref=e777]:
+                  - 'link "Mount Denali: West Buttress" [ref=e778] [cursor=pointer]':
+                    - /url: /trail/us/alaska/mount-denali-west-buttress
+                - listitem [ref=e779]:
+                  - link "High Line Park" [ref=e780] [cursor=pointer]:
+                    - /url: /trail/us/new-york/high-line-park
+                - listitem [ref=e781]:
+                  - link "Red Rock Canyon Scenic Drive" [ref=e782] [cursor=pointer]:
+                    - /url: /trail/us/nevada/red-rock-canyon-scenic-drive
+                - listitem [ref=e783]:
+                  - link "Boston's Freedom Trail" [ref=e784] [cursor=pointer]:
+                    - /url: /trail/us/massachusetts/bostons-freedom-trail
+                - listitem [ref=e785]:
+                  - link "Lower Antelope Canyon" [ref=e786] [cursor=pointer]:
+                    - /url: /trail/us/arizona/antelope-canyon
+                - listitem [ref=e787]:
+                  - link "Camelback Mountain via Echo Canyon and Cholla Trail" [ref=e788] [cursor=pointer]:
+                    - /url: /trail/us/arizona/camelback-mountain-via-echo-canyon-and-cholla-trails
+                - listitem [ref=e789]:
+                  - link "Snoqualmie Falls Trail" [ref=e790] [cursor=pointer]:
+                    - /url: /trail/us/washington/snoqualmie-falls-trail
+                - listitem [ref=e791]:
+                  - link "Mount Mitchell Trail" [ref=e792] [cursor=pointer]:
+                    - /url: /trail/us/north-carolina/mount-mitchell-trail--3
+                - listitem [ref=e793]:
+                  - link "The Wave Trail" [ref=e794] [cursor=pointer]:
+                    - /url: /trail/us/utah/the-wave-trail
+                - listitem [ref=e795]:
+                  - link "Pacific Crest Trail" [ref=e796] [cursor=pointer]:
+                    - /url: /trail/us/california/pacific-crest-trail
+                - listitem [ref=e797]:
+                  - link "Mount Diablo via Summit Trail" [ref=e798] [cursor=pointer]:
+                    - /url: /trail/us/california/mount-diablo-via-summit-trail--2
+                - listitem [ref=e799]:
+                  - link "The Flume Gorge Trail" [ref=e800] [cursor=pointer]:
+                    - /url: /trail/us/new-hampshire/the-flume-gorge-trail
+                - listitem [ref=e801]:
+                  - link "Camelback Mountain via Cholla Trail" [ref=e802] [cursor=pointer]:
+                    - /url: /trail/us/arizona/camelback-mountain-via-cholla-trail
+                - listitem [ref=e803]:
+                  - link "Twin Falls Trail" [ref=e804] [cursor=pointer]:
+                    - /url: /trail/us/washington/twin-falls-trail
+                - listitem [ref=e805]:
+                  - link "Black's Beach Trail" [ref=e806] [cursor=pointer]:
+                    - /url: /trail/us/california/blacks-beach-trail
+                - listitem [ref=e807]:
+                  - link "Tampa Riverwalk" [ref=e808] [cursor=pointer]:
+                    - /url: /trail/us/florida/tampa-riverwalk
+                - listitem [ref=e809]:
+                  - link "Maroon Bells Scenic Loop Trail" [ref=e810] [cursor=pointer]:
+                    - /url: /trail/us/colorado/maroon-bells-scenic-loop-trail
+                - listitem [ref=e811]:
+                  - link "Lookout Mountain Trail" [ref=e812] [cursor=pointer]:
+                    - /url: /trail/us/colorado/lookout-mountain-trail
+                - listitem [ref=e813]:
+                  - link "White Rock Lake Trail" [ref=e814] [cursor=pointer]:
+                    - /url: /trail/us/texas/white-rock-lake-trail
+                - listitem [ref=e815]:
+                  - link "Overlook Mountain Trail" [ref=e816] [cursor=pointer]:
+                    - /url: /trail/us/new-york/overlook-mountain-trail
+                - listitem [ref=e817]:
+                  - link "Inca Trail" [ref=e818] [cursor=pointer]:
+                    - /url: /trail/peru/cusco/camino-inca
+                - listitem [ref=e819]:
+                  - link "Eagle Mountain Trail" [ref=e820] [cursor=pointer]:
+                    - /url: /trail/us/minnesota/eagle-mountain-trail
+                - listitem [ref=e821]:
+                  - link "Hurricane Hill via Hurricane Ridge" [ref=e822] [cursor=pointer]:
+                    - /url: /trail/us/washington/hurricane-hill-via-hurricane-ridge
+                - listitem [ref=e823]:
+                  - link "Kaaterskill Falls from Laurel House Road" [ref=e824] [cursor=pointer]:
+                    - /url: /trail/us/new-york/katterskill-falls-from-laurel-house-road
+                - listitem [ref=e825]:
+                  - link "Waimea Valley Trail" [ref=e826] [cursor=pointer]:
+                    - /url: /trail/hawaii/oahu/waimea-valley-trail
+                - listitem [ref=e827]:
+                  - link "Lassen Peak Trail" [ref=e828] [cursor=pointer]:
+                    - /url: /trail/us/california/lassen-peak
+                - listitem [ref=e829]:
+                  - link "Devils Bathtub Trail" [ref=e830] [cursor=pointer]:
+                    - /url: /trail/us/virginia/devils-bathtub-trail
+                - listitem [ref=e831]:
+                  - link "Mount Bonnell Trail" [ref=e832] [cursor=pointer]:
+                    - /url: /trail/us/texas/mount-bonnell-trail
+                - listitem [ref=e833]:
+                  - link "Tahquitz Canyon Loop" [ref=e834] [cursor=pointer]:
+                    - /url: /trail/us/california/tahquitz-canyon-loop-trail
+                - listitem [ref=e835]:
+                  - link "Fossil Creek Falls" [ref=e836] [cursor=pointer]:
+                    - /url: /trail/us/arizona/fossil-creek-waterfall-trail
+                - listitem [ref=e837]:
+                  - link "Mount Adams South Climb Trail" [ref=e838] [cursor=pointer]:
+                    - /url: /trail/us/washington/mount-adams-south-climb-trail
+                - listitem [ref=e839]:
+                  - link "Mount Katahdin and Hamlin Peak Loop" [ref=e840] [cursor=pointer]:
+                    - /url: /trail/us/maine/mount-katahdin-and-hamlin-peak-loop
+                - listitem [ref=e841]:
+                  - link "Kuwohi Observation Tower Trail" [ref=e842] [cursor=pointer]:
+                    - /url: /trail/us/north-carolina/clingmans-dome-observation-tower-trail
+                - listitem [ref=e843]:
+                  - link "Britton Hill - Florida Highpoint" [ref=e844] [cursor=pointer]:
+                    - /url: /trail/us/florida/britton-hill-florida-highpoint
+                - listitem [ref=e845]:
+                  - link "Akaka Falls Trail" [ref=e846] [cursor=pointer]:
+                    - /url: /trail/hawaii/hawaii/akaka-falls-trail
+                - listitem [ref=e847]:
+                  - link "Sol Duc Falls Trail" [ref=e848] [cursor=pointer]:
+                    - /url: /trail/us/washington/sol-duc-falls-nature-trail
+                - listitem [ref=e849]:
+                  - link "Seven Falls Trail" [ref=e850] [cursor=pointer]:
+                    - /url: /trail/us/california/seven-falls-trail
+                - listitem [ref=e851]:
+                  - link "Mount Rainier Standard Summit Route" [ref=e852] [cursor=pointer]:
+                    - /url: /trail/us/washington/mount-rainier-standard-summit-route
+                - listitem [ref=e853]:
+                  - link "Bridal Veil Falls Trail" [ref=e854] [cursor=pointer]:
+                    - /url: /trail/us/washington/bridal-veil-falls-trail
+                - listitem [ref=e855]:
+                  - link "Bridal Veil Falls Trail" [ref=e856] [cursor=pointer]:
+                    - /url: /trail/us/utah/bridal-veil-falls-trail--2
+                - listitem [ref=e857]:
+                  - link "Mariposa Grove of Giant Sequoias Trail" [ref=e858] [cursor=pointer]:
+                    - /url: /trail/us/california/mariposa-grove-of-giant-sequoias-trail
+                - listitem [ref=e859]:
+                  - link "Ruby Beach" [ref=e860] [cursor=pointer]:
+                    - /url: /trail/us/washington/ruby-beach-trail
+                - listitem [ref=e861]:
+                  - link "Bear Lake Loop" [ref=e862] [cursor=pointer]:
+                    - /url: /trail/us/colorado/bear-lake-nature-trail--3
+                - listitem [ref=e863]:
+                  - link "Sugarloaf Mountain and Northern Peaks Trail" [ref=e864] [cursor=pointer]:
+                    - /url: /trail/us/maryland/sugarloaf-mountain-and-northern-peaks-trail
+                - listitem [ref=e865]:
+                  - link "Overlook Trail to McWay Falls [CLOSED]" [ref=e866] [cursor=pointer]:
+                    - /url: /trail/us/california/overlook-trail-to-mcway-falls-and-saddle-rock
+                - listitem [ref=e867]:
+                  - link "Mount Rose Peak Trail" [ref=e868] [cursor=pointer]:
+                    - /url: /trail/us/nevada/mount-rose-trail
+                - listitem [ref=e869]:
+                  - link "Cliff Walk" [ref=e870] [cursor=pointer]:
+                    - /url: /trail/us/rhode-island/cliff-walk
+                - listitem [ref=e871]:
+                  - link "Glacier Point Trail" [ref=e872] [cursor=pointer]:
+                    - /url: /trail/us/california/glacier-point-trail
+                - listitem [ref=e873]:
+                  - link "Cadillac Summit Loop Trail" [ref=e874] [cursor=pointer]:
+                    - /url: /trail/us/maine/cadillac-summit-loop-trail--2
+                - listitem [ref=e875]:
+                  - link "Granite Peak via West Rosebud and Mystic Lakes Route" [ref=e876] [cursor=pointer]:
+                    - /url: /trail/us/montana/granite-peak-trail
+                - listitem [ref=e877]:
+                  - link "Preikestolen (Pulpit Rock)" [ref=e878] [cursor=pointer]:
+                    - /url: /trail/norway/rogaland/preikestolen-ryf75
+                - listitem [ref=e879]:
+                  - link "Lower Yosemite Falls Trail" [ref=e880] [cursor=pointer]:
+                    - /url: /trail/us/california/lower-yosemite-falls-trail
+                - listitem [ref=e881]:
+                  - link "El Yunque Trail [CLOSED]" [ref=e882] [cursor=pointer]:
+                    - /url: /trail/puerto-rico/east-region/el-yunque-trail
+                - listitem [ref=e883]:
+                  - link "Papakolea Green Sand Beach" [ref=e884] [cursor=pointer]:
+                    - /url: /trail/hawaii/hawaii/papakolea-green-sand-beach
+                - listitem [ref=e885]:
+                  - link "Jenny Lake Trail" [ref=e886] [cursor=pointer]:
+                    - /url: /trail/us/wyoming/jenny-lake-trail
+                - listitem [ref=e887]:
+                  - 'link "Mt. Fuji: Yoshida Route [CLOSED]" [ref=e888] [cursor=pointer]':
+                    - /url: /trail/japan/yamanashi/mount-fuji-fujisan-yoshida-trail
+                - listitem [ref=e889]:
+                  - link "Deception Pass Bridge and Beach Trail" [ref=e890] [cursor=pointer]:
+                    - /url: /trail/us/washington/deception-pass-bridge-and-beach-trail
+                - listitem [ref=e891]:
+                  - link "Everest Base Camp Trek" [ref=e892] [cursor=pointer]:
+                    - /url: /trail/nepal/province-1/everest-base-camp-trek
+                - listitem [ref=e893]:
+                  - link "Burgess Falls Trail" [ref=e894] [cursor=pointer]:
+                    - /url: /trail/us/tennessee/burgess-falls-trail
+          - generic [ref=e895]:
+            - heading "Top points of interest" [level=2] [ref=e896]
+            - generic [ref=e897]:
+              - list [ref=e898]:
+                - listitem [ref=e899]:
+                  - link "Lake Crescent" [ref=e900] [cursor=pointer]:
+                    - /url: /poi/us/washington/port-angeles/lake-crescent
+                - listitem [ref=e901]:
+                  - link "Witches Gulch" [ref=e902] [cursor=pointer]:
+                    - /url: /poi/us/wisconsin/wisconsin-dells/witches-gulch-2
+                - listitem [ref=e903]:
+                  - link "Colchuck Lake" [ref=e904] [cursor=pointer]:
+                    - /url: /poi/us/washington/leavenworth/colchuck-lake
+                - listitem [ref=e905]:
+                  - link "Saguaro Lake" [ref=e906] [cursor=pointer]:
+                    - /url: /poi/us/arizona/fort-mcdowell/saguaro-lake
+                - listitem [ref=e907]:
+                  - link "Mount Wachusett" [ref=e908] [cursor=pointer]:
+                    - /url: /poi/us/massachusetts/mount-wachusett
+                - listitem [ref=e909]:
+                  - link "Horsetooth Reservoir" [ref=e910] [cursor=pointer]:
+                    - /url: /poi/us/colorado/fort-collins/horsetooth-reservoir
+                - listitem [ref=e911]:
+                  - link "Lake Ray Hubbard" [ref=e912] [cursor=pointer]:
+                    - /url: /poi/us/texas/rowlett/lake-ray-hubbard
+                - listitem [ref=e913]:
+                  - link "Mount Wilson" [ref=e914] [cursor=pointer]:
+                    - /url: /poi/us/california/mount-wilson
+                - listitem [ref=e915]:
+                  - link "Mossbrae Falls" [ref=e916] [cursor=pointer]:
+                    - /url: /poi/us/california/mossbrae-falls
+                - listitem [ref=e917]:
+                  - link "Tunnel View" [ref=e918] [cursor=pointer]:
+                    - /url: /poi/us/california/yosemite-valley/tunnel-view
+                - listitem [ref=e919]:
+                  - link "Dillon Falls" [ref=e920] [cursor=pointer]:
+                    - /url: /poi/us/oregon/dillon-falls
+                - listitem [ref=e921]:
+                  - link "The Flatirons" [ref=e922] [cursor=pointer]:
+                    - /url: /poi/us/colorado/the-flatirons
+                - listitem [ref=e923]:
+                  - link "Camanche Reservoir" [ref=e924] [cursor=pointer]:
+                    - /url: /poi/us/california/ione/camanche-reservoir
+                - listitem [ref=e925]:
+                  - link "Arch Rock" [ref=e926] [cursor=pointer]:
+                    - /url: /poi/us/tennessee/gatlinburg/arch-rock
+                - listitem [ref=e927]:
+                  - link "Pine Flat Lake" [ref=e928] [cursor=pointer]:
+                    - /url: /poi/us/california/piedra/pine-flat-lake
+                - listitem [ref=e929]:
+                  - link "Lake Hodges" [ref=e930] [cursor=pointer]:
+                    - /url: /poi/us/california/escondido/lake-hodges
+                - listitem [ref=e931]:
+                  - link "Batsto Historical Village" [ref=e932] [cursor=pointer]:
+                    - /url: /poi/us/new-jersey/hammonton/batsto-historical-village
+                - listitem [ref=e933]:
+                  - link "China Cove" [ref=e934] [cursor=pointer]:
+                    - /url: /poi/us/california/carmel/china-cove
+                - listitem [ref=e935]:
+                  - link "Tree of Life" [ref=e936] [cursor=pointer]:
+                    - /url: /poi/us/washington/forks/tree-of-life
+                - listitem [ref=e937]:
+                  - link "Taft Point" [ref=e938] [cursor=pointer]:
+                    - /url: /poi/us/california/taft-point
+                - listitem [ref=e939]:
+                  - link "Fairy Falls" [ref=e940] [cursor=pointer]:
+                    - /url: /poi/us/oregon/fairy-falls
+                - listitem [ref=e941]:
+                  - link "Lake Georgetown" [ref=e942] [cursor=pointer]:
+                    - /url: /poi/us/texas/georgetown/lake-georgetown
+                - listitem [ref=e943]:
+                  - link "Lake Lowell" [ref=e944] [cursor=pointer]:
+                    - /url: /poi/us/idaho/caldwell/lake-lowell
+                - listitem [ref=e945]:
+                  - link "Mount Tamalpais East Peak" [ref=e946] [cursor=pointer]:
+                    - /url: /poi/us/california/mount-tamalpais-east-peak
+                - listitem [ref=e947]:
+                  - link "Mount Lafayette" [ref=e948] [cursor=pointer]:
+                    - /url: /poi/us/new-hampshire/mount-lafayette
+                - listitem [ref=e949]:
+                  - link "Mount Tammany" [ref=e950] [cursor=pointer]:
+                    - /url: /poi/us/new-jersey/mount-tammany
+                - listitem [ref=e951]:
+                  - link "Lake Jacomo" [ref=e952] [cursor=pointer]:
+                    - /url: /poi/us/missouri/blue-springs/lake-jacomo
+                - listitem [ref=e953]:
+                  - link "Pantoll Campground" [ref=e954] [cursor=pointer]:
+                    - /url: /poi/us/california/mill-valley/pantoll-campground
+                - listitem [ref=e955]:
+                  - link "High Rock Lake" [ref=e956] [cursor=pointer]:
+                    - /url: /poi/us/north-carolina/lexington/high-rock-lake-2
+                - listitem [ref=e957]:
+                  - link "Malaga Cove" [ref=e958] [cursor=pointer]:
+                    - /url: /poi/us/california/palos-verdes-estates--2/malaga-cove
+                - listitem [ref=e959]:
+                  - link "Mount Scott" [ref=e960] [cursor=pointer]:
+                    - /url: /poi/us/oklahoma/mount-scott
+                - listitem [ref=e961]:
+                  - link "Lucky Peak" [ref=e962] [cursor=pointer]:
+                    - /url: /poi/us/idaho/lucky-peak
+                - listitem [ref=e963]:
+                  - link "Boynton Canyon" [ref=e964] [cursor=pointer]:
+                    - /url: /poi/us/arizona/sedona/boynton-canyon
+                - listitem [ref=e965]:
+                  - link "Grasshopper Point Picnic Area" [ref=e966] [cursor=pointer]:
+                    - /url: /poi/us/arizona/sedona/grasshopper-point-picnic-area
+                - listitem [ref=e967]:
+                  - link "Lake Robinson" [ref=e968] [cursor=pointer]:
+                    - /url: /poi/us/south-carolina/greer/lake-robinson
+                - listitem [ref=e969]:
+                  - link "Bluff Springs" [ref=e970] [cursor=pointer]:
+                    - /url: /poi/us/new-mexico/cloudcroft/bluff-springs
+                - listitem [ref=e971]:
+                  - link "Pikes Peak" [ref=e972] [cursor=pointer]:
+                    - /url: /poi/us/colorado/pikes-peak
+                - listitem [ref=e973]:
+                  - link "Lake Serene" [ref=e974] [cursor=pointer]:
+                    - /url: /poi/us/washington/gold-bar/lake-serene
+                - listitem [ref=e975]:
+                  - link "Big Meadows Campground" [ref=e976] [cursor=pointer]:
+                    - /url: /poi/us/virginia/madison/big-meadows-campground
+                - listitem [ref=e977]:
+                  - link "Christine Falls" [ref=e978] [cursor=pointer]:
+                    - /url: /poi/us/washington/christine-falls
+                - listitem [ref=e979]:
+                  - link "Crystal Mill" [ref=e980] [cursor=pointer]:
+                    - /url: /poi/us/colorado/marble--2/crystal-mill
+                - listitem [ref=e981]:
+                  - link "Carter Overlook" [ref=e982] [cursor=pointer]:
+                    - /url: /poi/us/virginia/charlottesville/carter-overlook
+                - listitem [ref=e983]:
+                  - link "Emerald Cove" [ref=e984] [cursor=pointer]:
+                    - /url: /poi/us/arizona/white-hills/emerald-cove
+                - listitem [ref=e985]:
+                  - link "Mica Mountain" [ref=e986] [cursor=pointer]:
+                    - /url: /poi/us/arizona/mica-mountain
+                - listitem [ref=e987]:
+                  - link "Council Crest" [ref=e988] [cursor=pointer]:
+                    - /url: /poi/us/oregon/council-crest
+                - listitem [ref=e989]:
+                  - link "Camelback Mountain" [ref=e990] [cursor=pointer]:
+                    - /url: /poi/us/arizona/camelback-mountain
+                - listitem [ref=e991]:
+                  - link "Oak Creek Canyon" [ref=e992] [cursor=pointer]:
+                    - /url: /poi/us/arizona/sedona/oak-creek-canyon
+                - listitem [ref=e993]:
+                  - link "Dripping Springs Campground" [ref=e994] [cursor=pointer]:
+                    - /url: /poi/us/california/temecula/dripping-springs-campground
+                - listitem [ref=e995]:
+                  - link "Mount Snow" [ref=e996] [cursor=pointer]:
+                    - /url: /poi/us/vermont/mount-snow
+                - listitem [ref=e997]:
+                  - link "Dead Mans Cove" [ref=e998] [cursor=pointer]:
+                    - /url: /poi/us/washington/long-beach/dead-mans-cove
+                - listitem [ref=e999]:
+                  - link "Multnomah Falls" [ref=e1000] [cursor=pointer]:
+                    - /url: /poi/us/oregon/multnomah-falls--2
+                - listitem [ref=e1001]:
+                  - link "Hawk Hill" [ref=e1002] [cursor=pointer]:
+                    - /url: /poi/us/california/hawk-hill
+                - listitem [ref=e1003]:
+                  - link "Cadillac Mountain" [ref=e1004] [cursor=pointer]:
+                    - /url: /poi/us/maine/cadillac-mountain
+                - listitem [ref=e1005]:
+                  - link "Toketee Falls" [ref=e1006] [cursor=pointer]:
+                    - /url: /poi/us/oregon/toketee-falls
+                - listitem [ref=e1007]:
+                  - link "Donut Falls" [ref=e1008] [cursor=pointer]:
+                    - /url: /poi/us/utah/donut-falls
+                - listitem [ref=e1009]:
+                  - link "Half Dome" [ref=e1010] [cursor=pointer]:
+                    - /url: /poi/us/california/half-dome
+                - listitem [ref=e1011]:
+                  - link "Great Falls" [ref=e1012] [cursor=pointer]:
+                    - /url: /poi/us/maryland/great-falls
+                - listitem [ref=e1013]:
+                  - link "Rocky Butte" [ref=e1014] [cursor=pointer]:
+                    - /url: /poi/us/oregon/rocky-butte
+                - listitem [ref=e1015]:
+                  - link "The Hole in the Rock" [ref=e1016] [cursor=pointer]:
+                    - /url: /poi/us/arizona/hole-in-the-rock
+                - listitem [ref=e1017]:
+                  - link "Cathedral Rock" [ref=e1018] [cursor=pointer]:
+                    - /url: /poi/us/arizona/cathedral-rock
+              - list [ref=e1019]:
+                - listitem [ref=e1020]:
+                  - link "Manoa Falls" [ref=e1021] [cursor=pointer]:
+                    - /url: /poi/hawaii/hawaii/manoa-falls
+                - listitem [ref=e1022]:
+                  - link "Brown Mountain" [ref=e1023] [cursor=pointer]:
+                    - /url: /poi/us/north-carolina/brown-mountain
+                - listitem [ref=e1024]:
+                  - link "Mount Whitney" [ref=e1025] [cursor=pointer]:
+                    - /url: /poi/us/california/mount-whitney--2
+                - listitem [ref=e1026]:
+                  - link "Waimea Falls" [ref=e1027] [cursor=pointer]:
+                    - /url: /poi/hawaii/hawaii/waimea-falls
+                - listitem [ref=e1028]:
+                  - link "Old Rag Mountain" [ref=e1029] [cursor=pointer]:
+                    - /url: /poi/us/virginia/old-rag-mountain
+                - listitem [ref=e1030]:
+                  - link "Mount Elbert" [ref=e1031] [cursor=pointer]:
+                    - /url: /poi/us/colorado/mount-elbert
+                - listitem [ref=e1032]:
+                  - link "God's Thumb" [ref=e1033] [cursor=pointer]:
+                    - /url: /poi/us/oregon/gods-thumb
+                - listitem [ref=e1034]:
+                  - link "Flagstaff Mountain" [ref=e1035] [cursor=pointer]:
+                    - /url: /poi/us/colorado/flagstaff-mountain
+                - listitem [ref=e1036]:
+                  - link "Longs Peak" [ref=e1037] [cursor=pointer]:
+                    - /url: /poi/us/colorado/longs-peak
+                - listitem [ref=e1038]:
+                  - link "Tahquitz Falls" [ref=e1039] [cursor=pointer]:
+                    - /url: /poi/us/california/tahquitz-falls
+                - listitem [ref=e1040]:
+                  - link "Jones Lake" [ref=e1041] [cursor=pointer]:
+                    - /url: /poi/canada/british-columbia/rosedale--2/wahleach-lake
+                - listitem [ref=e1042]:
+                  - link "Morro Rock" [ref=e1043] [cursor=pointer]:
+                    - /url: /poi/us/california/morro-rock
+                - listitem [ref=e1044]:
+                  - link "Cameron Falls" [ref=e1045] [cursor=pointer]:
+                    - /url: /poi/canada/alberta/cameron-falls
+                - listitem [ref=e1046]:
+                  - link "Seven Sisters Waterfall" [ref=e1047] [cursor=pointer]:
+                    - /url: /poi/us/california/seven-sisters-waterfall
+                - listitem [ref=e1048]:
+                  - link "Eden Falls" [ref=e1049] [cursor=pointer]:
+                    - /url: /poi/us/arkansas/eden-falls
+                - listitem [ref=e1050]:
+                  - link "Tunnel Falls" [ref=e1051] [cursor=pointer]:
+                    - /url: /poi/us/oregon/tunnel-falls
+                - listitem [ref=e1052]:
+                  - link "Strawberry Hill" [ref=e1053] [cursor=pointer]:
+                    - /url: /poi/us/california/strawberry-hill--2
+                - listitem [ref=e1054]:
+                  - link "Creation Falls" [ref=e1055] [cursor=pointer]:
+                    - /url: /poi/us/kentucky/creation-falls
+                - listitem [ref=e1056]:
+                  - link "Bridge to Nowhere" [ref=e1057] [cursor=pointer]:
+                    - /url: /poi/us/california/mount-baldy/bridge-to-nowhere
+                - listitem [ref=e1058]:
+                  - link "Spooner's Cove" [ref=e1059] [cursor=pointer]:
+                    - /url: /poi/us/california/los-osos/spooner-s-cove
+                - listitem [ref=e1060]:
+                  - link "Aguirre Springs Campground" [ref=e1061] [cursor=pointer]:
+                    - /url: /poi/us/new-mexico/organ/aguirre-springs-campground
+                - listitem [ref=e1062]:
+                  - link "Grizzly Peak" [ref=e1063] [cursor=pointer]:
+                    - /url: /poi/us/california/grizzly-peak--3
+                - listitem [ref=e1064]:
+                  - link "Muddy Creek Falls" [ref=e1065] [cursor=pointer]:
+                    - /url: /poi/us/maryland/muddy-creek-falls
+                - listitem [ref=e1066]:
+                  - link "Uetliberg" [ref=e1067] [cursor=pointer]:
+                    - /url: /poi/switzerland/zurich/uetliberg
+                - listitem [ref=e1068]:
+                  - link "Gozalandia Waterfall" [ref=e1069] [cursor=pointer]:
+                    - /url: /poi/us/puerto-rico/cascada-gozalandia
+                - listitem [ref=e1070]:
+                  - link "Lake Pehoé" [ref=e1071] [cursor=pointer]:
+                    - /url: /poi/chile/magallanes/torres-del-paine/lago-pehoe
+                - listitem [ref=e1072]:
+                  - link "Bowman Bay" [ref=e1073] [cursor=pointer]:
+                    - /url: /poi/us/washington/anacortes/bowman-bay
+                - listitem [ref=e1074]:
+                  - link "Rainbow Falls" [ref=e1075] [cursor=pointer]:
+                    - /url: /poi/us/california/rainbow-falls
+                - listitem [ref=e1076]:
+                  - link "South Holston Lake" [ref=e1077] [cursor=pointer]:
+                    - /url: /poi/us/tennessee/bristol/south-holston-lake
+                - listitem [ref=e1078]:
+                  - link "Little Niagara Falls" [ref=e1079] [cursor=pointer]:
+                    - /url: /poi/us/oklahoma/little-niagara-falls
+                - listitem [ref=e1080]:
+                  - link "Mount Cleveland" [ref=e1081] [cursor=pointer]:
+                    - /url: /poi/us/vermont/mount-cleveland
+                - listitem [ref=e1082]:
+                  - link "Stoddard Peak" [ref=e1083] [cursor=pointer]:
+                    - /url: /poi/us/california/stoddard-peak
+                - listitem [ref=e1084]:
+                  - link "Tent Ridge" [ref=e1085] [cursor=pointer]:
+                    - /url: /poi/canada/alberta/tent-ridge
+                - listitem [ref=e1086]:
+                  - link "Devil's Bathtub" [ref=e1087] [cursor=pointer]:
+                    - /url: /poi/us/ohio/devils-bathtub
+                - listitem [ref=e1088]:
+                  - link "Lake Cushman" [ref=e1089] [cursor=pointer]:
+                    - /url: /poi/us/washington/hoodsport/lake-cushman
+                - listitem [ref=e1090]:
+                  - link "Deep Cove" [ref=e1091] [cursor=pointer]:
+                    - /url: /poi/canada/british-columbia/north-vancouver/deep-cove
+                - listitem [ref=e1092]:
+                  - link "Mount Marcy" [ref=e1093] [cursor=pointer]:
+                    - /url: /poi/us/new-york/mount-marcy
+                - listitem [ref=e1094]:
+                  - link "Kalalau Beach" [ref=e1095] [cursor=pointer]:
+                    - /url: /poi/hawaii/kaua-i--2/princeville/kalalau-beach
+                - listitem [ref=e1096]:
+                  - link "Cataract Falls" [ref=e1097] [cursor=pointer]:
+                    - /url: /poi/us/california/cataract-falls
+                - listitem [ref=e1098]:
+                  - link "Mont Saint-Bruno" [ref=e1099] [cursor=pointer]:
+                    - /url: /poi/canada/quebec/mont-saint-bruno
+                - listitem [ref=e1100]:
+                  - link "Lytle Creek" [ref=e1101] [cursor=pointer]:
+                    - /url: /poi/us/california/san-bernardino/lytle-creek
+                - listitem [ref=e1102]:
+                  - link "Baker Beach" [ref=e1103] [cursor=pointer]:
+                    - /url: /poi/us/california/san-francisco/baker-beach
+                - listitem [ref=e1104]:
+                  - link "Cerro Verde" [ref=e1105] [cursor=pointer]:
+                    - /url: /poi/el-salvador/santa-ana/santa-ana/cerro-verde
+                - listitem [ref=e1106]:
+                  - link "Lac aux Castors" [ref=e1107] [cursor=pointer]:
+                    - /url: /poi/canada/quebec/montreal/lac-aux-castors
+                - listitem [ref=e1108]:
+                  - link "Glacier Point" [ref=e1109] [cursor=pointer]:
+                    - /url: /poi/us/california/yosemite-valley/glacier-point
+                - listitem [ref=e1110]:
+                  - link "Mount Diablo" [ref=e1111] [cursor=pointer]:
+                    - /url: /poi/us/california/mount-diablo
+                - listitem [ref=e1112]:
+                  - link "Barclay Lake" [ref=e1113] [cursor=pointer]:
+                    - /url: /poi/us/washington/gold-bar/barclay-lake
+                - listitem [ref=e1114]:
+                  - link "Valley Green Inn" [ref=e1115] [cursor=pointer]:
+                    - /url: /poi/us/pennsylvania/philadelphia/valley-green-inn
+                - listitem [ref=e1116]:
+                  - link "Mont Chauve" [ref=e1117] [cursor=pointer]:
+                    - /url: /poi/canada/quebec/mont-chauve
+                - listitem [ref=e1118]:
+                  - link "Nickajack Lake" [ref=e1119] [cursor=pointer]:
+                    - /url: /poi/us/tennessee/jasper/nickajack-lake
+                - listitem [ref=e1120]:
+                  - link "Hollywood Sign" [ref=e1121] [cursor=pointer]:
+                    - /url: /poi/us/california/los-angeles/hollywood-sign-4
+                - listitem [ref=e1122]:
+                  - link "Bow Lake" [ref=e1123] [cursor=pointer]:
+                    - /url: /poi/canada/alberta/lake-louise/bow-lake
+                - listitem [ref=e1124]:
+                  - link "Hodgdon Meadow Campground" [ref=e1125] [cursor=pointer]:
+                    - /url: /poi/us/california/groveland/hodgdon-meadow-campground
+                - listitem [ref=e1126]:
+                  - link "Tarryall Reservoir" [ref=e1127] [cursor=pointer]:
+                    - /url: /poi/us/colorado/jefferson/tarryall-reservoir
+                - listitem [ref=e1128]:
+                  - link "Venus" [ref=e1129] [cursor=pointer]:
+                    - /url: /poi/us/oregon/venus
+                - listitem [ref=e1130]:
+                  - link "Blood Mountain" [ref=e1131] [cursor=pointer]:
+                    - /url: /poi/us/georgia/blood-mountain
+                - listitem [ref=e1132]:
+                  - link "Mont Kaaikop" [ref=e1133] [cursor=pointer]:
+                    - /url: /poi/canada/quebec/mont-kaaikop
+                - listitem [ref=e1134]:
+                  - link "Old Rag Shelter" [ref=e1135] [cursor=pointer]:
+                    - /url: /poi/us/virginia/syria/old-rag-shelter
+                - listitem [ref=e1136]:
+                  - link "Bend Hill" [ref=e1137] [cursor=pointer]:
+                    - /url: /poi/us/maryland/bend-hill
+  - contentinfo [ref=e1139]:
+    - generic [ref=e1140]:
+      - img "AllTrails" [ref=e1141]
+      - navigation [ref=e1147]:
+        - generic [ref=e1148]:
+          - generic [ref=e1149]:
+            - heading [level=2] [ref=e1151]:
+              - link "Explore" [ref=e1152] [cursor=pointer]:
+                - /url: /explore
+            - list [ref=e1153]:
+              - listitem [ref=e1154]:
+                - link "Countries" [ref=e1155] [cursor=pointer]:
+                  - /url: /directory/countries
+              - listitem [ref=e1156]:
+                - link "Regions" [ref=e1157] [cursor=pointer]:
+                  - /url: /directory/regions/A/1
+              - listitem [ref=e1158]:
+                - link "Cities" [ref=e1159] [cursor=pointer]:
+                  - /url: /directory/cities/A/1
+              - listitem [ref=e1160]:
+                - link "Parks" [ref=e1161] [cursor=pointer]:
+                  - /url: /directory/parks/A/1
+              - listitem [ref=e1162]:
+                - link "Trails" [ref=e1163] [cursor=pointer]:
+                  - /url: /directory/trails/A/1
+              - listitem [ref=e1164]:
+                - link "Points of Interest" [ref=e1165] [cursor=pointer]:
+                  - /url: /directory/poi/A/1
+              - listitem [ref=e1166]:
+                - link "Trail Features" [ref=e1167] [cursor=pointer]:
+                  - /url: /directory/trail-features
+          - generic [ref=e1168]:
+            - heading [level=2] [ref=e1170]:
+              - link "Custom routes & maps" [ref=e1171] [cursor=pointer]:
+                - /url: /signup?returnTo=%2Fexplore%3Fuser-custom-routes%3Dtrue
+            - list [ref=e1172]:
+              - listitem [ref=e1173]:
+                - link "Build custom route" [ref=e1174] [cursor=pointer]:
+                  - /url: /explore/custom-routes/new?trigger=footer
+              - listitem [ref=e1175]:
+                - link "Print maps" [ref=e1176] [cursor=pointer]:
+                  - /url: /explore?print=true
+              - listitem [ref=e1177]:
+                - link "Route converter" [ref=e1178] [cursor=pointer]:
+                  - /url: /converter
+          - generic [ref=e1179]:
+            - heading [level=2] [ref=e1181]:
+              - link "Company" [ref=e1182] [cursor=pointer]:
+                - /url: /about
+            - list [ref=e1183]:
+              - listitem [ref=e1184]:
+                - link "About" [ref=e1185] [cursor=pointer]:
+                  - /url: /about
+              - listitem [ref=e1186]:
+                - link "Jobs" [ref=e1187] [cursor=pointer]:
+                  - /url: /careers
+              - listitem [ref=e1188]:
+                - link "News" [ref=e1189] [cursor=pointer]:
+                  - /url: /press
+              - listitem [ref=e1190]:
+                - link "Ambassadors" [ref=e1191] [cursor=pointer]:
+                  - /url: /ambassadors
+              - listitem [ref=e1192]:
+                - link "Affiliates" [ref=e1193] [cursor=pointer]:
+                  - /url: /affiliates
+          - generic [ref=e1194]:
+            - heading [level=2] [ref=e1196]:
+              - link "Community" [ref=e1197] [cursor=pointer]:
+                - /url: /community
+            - list [ref=e1198]:
+              - listitem [ref=e1199]:
+                - link "What’s new" [ref=e1200] [cursor=pointer]:
+                  - /url: /whats-new
+              - listitem [ref=e1201]:
+                - link "Support" [ref=e1202] [cursor=pointer]:
+                  - /url: https://support.alltrails.com/hc/en-us
+              - listitem [ref=e1203]:
+                - link "Gift membership" [ref=e1204] [cursor=pointer]:
+                  - /url: /gift
+              - listitem [ref=e1205]:
+                - link "AllTrails Gear" [ref=e1206] [cursor=pointer]:
+                  - /url: https://www.alltrails.com/shopify/login
+      - generic [ref=e1207]:
+        - generic [ref=e1209]:
+          - heading "An app for the outdoors" [level=2] [ref=e1210]
+          - generic [ref=e1211]:
+            - link [ref=e1212] [cursor=pointer]:
+              - /url: https://alltrails.io/ujRkr9MGmgb
+              - img "Download the AllTrails application on the App Store" [ref=e1213]
+            - link [ref=e1214] [cursor=pointer]:
+              - /url: https://alltrails.io/pW7o6i6Lmgb
+              - img "Download the AllTrails application on Google Play" [ref=e1215]
+        - generic [ref=e1217]:
+          - heading "Members for the planet" [level=2] [ref=e1218]
+          - generic [ref=e1219]:
+            - link [ref=e1220] [cursor=pointer]:
+              - /url: https://directories.onepercentfortheplanet.org/profile/alltrails-inc
+              - img "1% for the Planet" [ref=e1221]
+            - img "Leave No Trace" [ref=e1222]
+        - generic [ref=e1223]:
+          - heading "Connect with us" [level=2] [ref=e1224]
+          - generic [ref=e1225]:
+            - link "Instagram" [ref=e1226] [cursor=pointer]:
+              - /url: https://www.instagram.com/alltrails
+              - img "Instagram" [ref=e1227]
+            - link "TikTok" [ref=e1233] [cursor=pointer]:
+              - /url: https://www.tiktok.com/@alltrails
+              - img "TikTok" [ref=e1234]
+            - link "Facebook" [ref=e1241] [cursor=pointer]:
+              - /url: https://www.facebook.com/AllTrails
+              - img "Facebook" [ref=e1242]
+            - link "X" [ref=e1248] [cursor=pointer]:
+              - /url: https://www.x.com/alltrails
+              - img "X" [ref=e1249]
+            - link "LinkedIn" [ref=e1256] [cursor=pointer]:
+              - /url: https://www.linkedin.com/company/alltrails
+              - img "LinkedIn" [ref=e1257]
+      - generic [ref=e1263]:
+        - generic [ref=e1265]:
+          - generic [ref=e1266]: © 2010-2026 AllTrails, LLC
+          - generic [ref=e1267]: ALLTRAILS® and the AllTrails Mountain Design are registered trademarks of AllTrails, LLC in the United States as well as certain other jurisdictions.
+          - generic [ref=e1268]:
+            - text: FIND YOUR OUTSIDE™,
+            - img "Plus badge image" [ref=e1269]
+            - text: PLUS™, and
+            - img "Peak badge image" [ref=e1270]
+            - text: PEAK™ are trademarks of AllTrails, LLC.
+        - combobox "Select a language" [ref=e1275]:
+          - option "Select a language" [disabled]
+          - option "English (US)" [selected]
+          - option "English (UK)"
+          - option "Dansk (Danmark)"
+          - option "Deutsch (Deutschland)"
+          - option "Español (España)"
+          - option "Español (Latinoamérica)"
+          - option "Français (France)"
+          - option "Italiano (Italia)"
+          - option "Nederlands (Nederland)"
+          - option "Norsk bokmål (Norge)"
+          - option "Polski (Polska)"
+          - option "Português (Brasil)"
+          - option "Português (Portugal)"
+          - option "Svenska (Sverige)"
+      - generic [ref=e1276]:
+        - link "Privacy Policy" [ref=e1277] [cursor=pointer]:
+          - /url: /privacy
+        - text: •
+        - link "Terms" [ref=e1278] [cursor=pointer]:
+          - /url: /terms
+        - text: •
+        - link "Cookie Policy" [ref=e1279] [cursor=pointer]:
+          - /url: /cookie_policy

@@ -1,0 +1,118 @@
+- generic:
+  - generic:
+    - generic [ref=f2e2]:
+      - heading "SpotFinder community map" [level=1] [ref=f2e3]
+      - generic [ref=f2e27]:
+        - generic [ref=f2e28]:
+          - region "Map" [ref=f2e29]
+          - group [ref=f2e30]:
+            - generic "Toggle attribution" [ref=f2e31] [cursor=pointer]
+            - generic [ref=f2e32]:
+              - text: © OpenStreetMap contributors | ©
+              - link "OpenFreeMap" [ref=f2e33] [cursor=pointer]:
+                - /url: https://openfreemap.org
+              - text: ©
+              - link "OpenStreetMap" [ref=f2e34] [cursor=pointer]:
+                - /url: https://www.openstreetmap.org/copyright
+        - generic [ref=f2e35]:
+          - button "Zoom in" [ref=f2e36] [cursor=pointer]
+          - generic [aria-hidden] [ref=f2e38]: "13"
+          - button "Zoom out" [ref=f2e39] [cursor=pointer]
+      - generic [ref=f2e43]:
+        - textbox "Search places and community spots" [ref=f2e47]:
+          - /placeholder: Search places...
+        - button "Start voice search" [ref=f2e48] [cursor=pointer]
+        - button "Open nearby spots filters" [ref=f2e53] [cursor=pointer]
+      - complementary "Discover community places" [ref=f2e90]:
+        - generic [ref=f2e91]:
+          - generic [ref=f2e95]:
+            - heading "Featured community places" [level=2] [ref=f2e96]
+            - paragraph [ref=f2e97]: No community spots in this view yet. Explore these places or search another area.
+          - button "Close featured places" [ref=f2e98] [cursor=pointer]
+        - generic "Featured places" [ref=f2e109]:
+          - button "Open Blejski grad" [ref=f2e110] [cursor=pointer]:
+            - generic [ref=f2e112]:
+              - generic [ref=f2e113]: Blejski grad
+              - generic [ref=f2e114]: Bled
+          - button "Open Hlavatice" [ref=f2e115] [cursor=pointer]:
+            - generic [ref=f2e117]:
+              - generic [ref=f2e118]: Hlavatice
+              - generic [ref=f2e119]: Turnov
+          - button "Open Viewpoint" [ref=f2e120] [cursor=pointer]:
+            - generic [ref=f2e122]:
+              - generic [ref=f2e123]: Viewpoint
+              - generic [ref=f2e124]: 47.40, 9.38
+        - generic [ref=f2e103]:
+          - button "Search a place" [ref=f2e104] [cursor=pointer]
+          - button "Continue map" [ref=f2e108] [cursor=pointer]
+      - generic [ref=f2e58]:
+        - button "Sign in" [ref=f2e59] [cursor=pointer]
+        - button "Drafts" [ref=f2e63] [cursor=pointer]
+      - generic [ref=f2e68]:
+        - button "Map layers" [ref=f2e70] [cursor=pointer]
+        - button "Center on my location" [ref=f2e76] [cursor=pointer]
+        - button "Toggle 3D terrain" [ref=f2e79] [cursor=pointer]: 3D
+        - button "More map options" [ref=f2e81] [cursor=pointer]
+      - button "Add a spot" [ref=f2e87] [cursor=pointer]
+      - dialog [ref=f2e135]:
+        - generic [ref=f2e137]:
+          - generic [ref=f2e138]:
+            - generic [ref=f2e144]:
+              - heading "Settings" [level=2] [ref=f2e145]
+              - paragraph [ref=f2e146]: Preferences, privacy, and account security
+            - button "Close" [active] [ref=f2e147] [cursor=pointer]
+          - generic [ref=f2e152]:
+            - region [ref=f2e153]:
+              - heading "Appearance" [level=3] [ref=f2e154]
+              - generic [ref=f2e155]:
+                - generic [ref=f2e160]:
+                  - paragraph [ref=f2e161]: Dark Mode
+                  - paragraph [ref=f2e162]: Disabled
+                - switch "Dark Mode" [ref=f2e163] [cursor=pointer]
+            - region [ref=f2e165]:
+              - heading "Map display" [level=3] [ref=f2e166]
+              - generic [ref=f2e167]:
+                - generic [ref=f2e173]:
+                  - paragraph [ref=f2e174]: Map discovery card
+                  - paragraph [ref=f2e175]: Show contextual spots and exploration guidance on the map.
+                - switch "Map discovery card" [checked] [ref=f2e176] [cursor=pointer]
+              - generic [ref=f2e183]:
+                - generic [ref=f2e184]:
+                  - generic [ref=f2e185]:
+                    - paragraph [ref=f2e186]: Text size
+                    - paragraph [ref=f2e187]: Applies throughout SpotFinder.
+                  - status [ref=f2e188]: 100%
+                - slider "Text size percentage" [ref=f2e189]: "100"
+                - generic [ref=f2e190]:
+                  - generic [ref=f2e191]: 75%
+                  - button "Reset to 100%" [ref=f2e192] [cursor=pointer]
+                  - generic [ref=f2e193]: 250%
+            - region [ref=f2e194]:
+              - heading "Language" [level=3] [ref=f2e195]
+              - generic [ref=f2e201]:
+                - paragraph [ref=f2e202]: Language
+                - paragraph [ref=f2e203]: Select Language
+              - combobox "Select Language" [ref=f2e204] [cursor=pointer]:
+                - generic: 🇺🇸 English (US)
+            - region [ref=f2e207]:
+              - heading "Privacy & legal" [level=3] [ref=f2e208]
+              - generic [ref=f2e211]:
+                - button "Cookie preferences" [ref=f2e212] [cursor=pointer]
+                - link "Privacy Policy" [ref=f2e215] [cursor=pointer]:
+                  - /url: /PrivacyPolicy
+                - link "Terms & Conditions" [ref=f2e219] [cursor=pointer]:
+                  - /url: /TermsAndConditions
+                - link "Cookie Policy" [ref=f2e223] [cursor=pointer]:
+                  - /url: /CookiePolicy
+                - link "Refund Policy" [ref=f2e227] [cursor=pointer]:
+                  - /url: /RefundPolicy
+            - region [ref=f2e230]:
+              - heading "App information" [level=3] [ref=f2e231]
+              - link "What's new Release notes and verified changes v0.5.6" [ref=f2e232] [cursor=pointer]:
+                - /url: /updates
+                - generic [ref=f2e237]:
+                  - generic [ref=f2e238]: What's new
+                  - generic [ref=f2e239]: Release notes and verified changes
+                - generic [ref=f2e240]: v0.5.6
+            - status [ref=f2e241]: Preference saved automatically
+    - region "Notifications alt+T"

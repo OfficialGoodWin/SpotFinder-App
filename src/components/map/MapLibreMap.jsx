@@ -22,7 +22,8 @@ import { Minus, Plus } from 'lucide-react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { getBaseStyle } from '../../lib/mapStyle.js';
 import { AMBIENT_CATEGORIES } from '../../lib/ambientCategories.js';
-import { badgeSVG, iconGlyphSVG } from '../../lib/mapIcons.js';
+import { badgeSVG } from '../../lib/mapIcons.js';
+import { createAdminPoiPopupContent, createTrafficPopupContent } from '../../lib/mapPopupContent.js';
 import { useLanguage } from '@/lib/LanguageContext';
 import SpotMarkerIcon from '@/components/spots/SpotMarkerIcon';
 import SpotMarkerThumbnail from '@/components/spots/SpotMarkerThumbnail';
@@ -511,11 +512,12 @@ const escapeHtml = (str) => String(str).replace(/[&<>"']/g, ch => ({ '&': '&amp;
 // anchor/position on the map) is unchanged.
 function makeDot(catKey, color, size = 28, label = '') {
   const el = document.createElement('div');
+  const markerColor = /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#6B7280';
   el.style.cssText = `width:${size}px;height:${size}px;cursor:pointer;user-select:none;`;
   const labelHtml = label
     ? `<div style="position:absolute;top:${size + 2}px;left:50%;transform:translateX(-50%);max-width:120px;width:max-content;text-align:center;font:600 12px/1.15 system-ui,sans-serif;color:#1f2937;text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff,0 0 3px #fff;pointer-events:none;white-space:normal;">${escapeHtml(label)}</div>`
     : '';
-  el.innerHTML = `<div style="width:${size}px;height:${size}px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.35));">${badgeSVG(catKey, color, size)}</div>${labelHtml}`;
+  el.innerHTML = `<div style="width:${size}px;height:${size}px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.35));">${badgeSVG(catKey, markerColor, size)}</div>${labelHtml}`;
   return el;
 }
 
@@ -1315,10 +1317,8 @@ export default function MapLibreMap({
           if (!lngLat) continue;
           const type = isClosure(cat) ? 'closure' : isWorks(cat) ? 'works' : isLane(cat) ? 'lane' : isAccident(cat) ? 'accident' : 'jam';
           const el = makeEl(type);
-          const p = inc.properties || {};
-          const road = p.roadNumbers?.[0] || '';
-          const popup = `<div style="font-size:13px;max-width:200px"><strong style="color:#CC1111">${type === 'closure' ? '⛔ Road Closed' : type === 'works' ? '🚧 Road Works' : type === 'lane' ? 'Lane Closed' : type === 'accident' ? '🚨 Accident' : '🚗 Traffic Jam'}</strong>${road ? `<div>🛣️ ${road}</div>` : ''}${p.from ? `<div>From: ${p.from}</div>` : ''}${p.to ? `<div>To: ${p.to}</div>` : ''}</div>`;
-          const mk = attachMarkerAt(new maplibregl.Marker({ element: el }).setPopup(new maplibregl.Popup({ offset: 10 }).setHTML(popup)), map, lngLat);
+          const popup = createTrafficPopupContent(type, inc.properties || {});
+          const mk = attachMarkerAt(new maplibregl.Marker({ element: el }).setPopup(new maplibregl.Popup({ offset: 10 }).setDOMContent(popup)), map, lngLat);
           incidentMarkers.push(mk);
         }
       } catch (e) { if (e.name !== 'AbortError') console.warn('Incident fetch:', e.message); }
@@ -1384,25 +1384,7 @@ const addAdminMarkers = () => {
     if (poi.postcode) addressParts.push(poi.postcode);
     const addressLine = addressParts.filter(Boolean).join(', ');
 
-    const tooltipIcon = iconGlyphSVG(iconKey, 14, color);
-    const tooltipHTML = `
-      <div style="min-width:220px;font-size:13px;line-height:1.4">
-        <div style="font-weight:600;color:${color};margin-bottom:4px;font-size:14px;display:flex;align-items:center;gap:6px">
-          ${tooltipIcon} ${catConfig.name}
-        </div>
-        <div style="font-weight:500;margin-bottom:6px;color:#111">
-          ${poi.name || catConfig.name}
-        </div>
-        ${addressLine ? `
-          <div style="font-size:12px;color:#555;border-top:1px solid #eee;padding-top:4px">
-            ${poi.houseNumber ? `<div>🏠 ${poi.houseNumber}</div>` : ''}
-            ${poi.street ? `<div>🛣️ ${poi.street}</div>` : ''}
-            ${poi.city ? `<div>🏙️ ${poi.city}</div>` : ''}
-            ${poi.postcode ? `<div>📮 ${poi.postcode}</div>` : ''}
-          </div>
-        ` : ''}
-      </div>
-    `;
+    const tooltipContent = createAdminPoiPopupContent(poi, catConfig);
 
     const syntheticCat = {
       key: iconKey,
@@ -1428,7 +1410,7 @@ const addAdminMarkers = () => {
     };
 
     const mk = attachMarkerAt(new maplibregl.Marker({ element: el, anchor: 'bottom' })
-      .setPopup(new maplibregl.Popup({ offset: [0, -size/2], className: 'admin-poi-popup' }).setHTML(tooltipHTML)), map, lngLat);
+      .setPopup(new maplibregl.Popup({ offset: [0, -size/2], className: 'admin-poi-popup' }).setDOMContent(tooltipContent)), map, lngLat);
 
     el.addEventListener('click', e => { e.stopPropagation(); onSelectPOI?.(syntheticPOI, syntheticCat); });
     adminMarkers.push(mk);

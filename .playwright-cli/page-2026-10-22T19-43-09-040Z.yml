@@ -1,0 +1,28 @@
+- generic [active]:
+  - generic:
+    - generic [ref=e2]:
+      - heading "SpotFinder community map" [level=1] [ref=e3]
+      - generic [ref=e6]:
+        - button "Zoom in" [ref=e7] [cursor=pointer]
+        - generic [aria-hidden] [ref=e9]: "13"
+        - button "Zoom out" [ref=e10] [cursor=pointer]
+      - generic [ref=e14]:
+        - textbox "Search places and community spots" [ref=e18]:
+          - /placeholder: Search places...
+        - button "Start voice search" [ref=e19] [cursor=pointer]
+        - button "Open nearby spots filters" [ref=e24] [cursor=pointer]
+      - generic [ref=e29]:
+        - button "Sign in" [ref=e30] [cursor=pointer]
+        - button "Drafts" [ref=e34] [cursor=pointer]
+      - generic [ref=e38]:
+        - button "Add a spot" [ref=e39] [cursor=pointer]
+        - generic [ref=e41]:
+          - generic [ref=e42]:
+            - button "Map layers" [ref=e44] [cursor=pointer]
+            - button "Center map on my location" [ref=e49] [cursor=pointer]
+            - button "Toggle 3D terrain" [ref=e52] [cursor=pointer]:
+              - generic [ref=e53]: 3D
+          - generic [ref=e54]:
+            - button "Open help and FAQ" [ref=e55] [cursor=pointer]
+            - button "Open settings" [ref=e59] [cursor=pointer]
+    - region "Notifications alt+T"

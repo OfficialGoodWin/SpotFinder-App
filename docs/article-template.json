@@ -1,0 +1,27 @@
+{
+  "slug": "your-article-slug",
+  "title": "",
+  "summary": "",
+  "language": "en",
+  "category": "Guides",
+  "author": { "name": "", "type": "Person" },
+  "publishedAt": null,
+  "updatedAt": null,
+  "cover": {
+    "src": "",
+    "alt": "",
+    "width": null,
+    "height": null,
+    "caption": "",
+    "credit": ""
+  },
+  "canonicalUrl": "",
+  "status": "draft",
+  "relatedSlugs": [],
+  "spotIds": [],
+  "body": [
+    { "type": "paragraph", "text": "" },
+    { "type": "heading", "text": "" },
+    { "type": "paragraph", "text": "" }
+  ]
+}

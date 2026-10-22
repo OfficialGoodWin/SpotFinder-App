@@ -1,0 +1,94 @@
+- generic [ref=f1e3]:
+  - banner [ref=f1e5]:
+    - generic [ref=f1e6]:
+      - link "Home" [ref=f1e7] [cursor=pointer]:
+        - /url: /
+      - generic [ref=f1e13]:
+        - button [ref=f1e14] [cursor=pointer]
+        - textbox "Search" [ref=f1e23]
+    - generic [ref=f1e24]:
+      - generic [ref=f1e25]:
+        - button "Routes" [ref=f1e26] [cursor=pointer]
+        - button "Planner" [ref=f1e28] [cursor=pointer]
+        - button "Features" [ref=f1e30] [cursor=pointer]
+        - button "Updates" [ref=f1e32] [cursor=pointer]
+      - button "App" [ref=f1e34] [cursor=pointer]
+      - button "Login or Signup" [ref=f1e39] [cursor=pointer]
+  - generic [ref=f1e43]:
+    - region "Map" [ref=f1e44]
+    - generic:
+      - generic [ref=f1e45]:
+        - generic [ref=f1e46]:
+          - button "within 19 mi" [ref=f1e48] [cursor=pointer]:
+            - paragraph [ref=f1e51]: within 19 mi
+          - button "Distance/Duration" [ref=f1e53] [cursor=pointer]:
+            - paragraph [ref=f1e56]: Distance/Duration
+          - button "Difficulty" [ref=f1e58] [cursor=pointer]:
+            - paragraph [ref=f1e61]: Difficulty
+          - button "Type" [ref=f1e63] [cursor=pointer]:
+            - paragraph [ref=f1e66]: Type
+          - button "Elevation" [ref=f1e68] [cursor=pointer]:
+            - paragraph [ref=f1e71]: Elevation
+          - button "Surface" [ref=f1e73] [cursor=pointer]:
+            - paragraph [ref=f1e76]: Surface
+          - button "Start from" [ref=f1e78] [cursor=pointer]:
+            - paragraph [ref=f1e81]: Start from
+          - button "Route features" [ref=f1e83] [cursor=pointer]:
+            - paragraph [ref=f1e86]: Route features
+          - button "Rest stops and attractions" [ref=f1e88] [cursor=pointer]:
+            - paragraph [ref=f1e93]: Rest stops and attractions
+          - button "Scenery and nature" [ref=f1e95] [cursor=pointer]:
+            - paragraph [ref=f1e98]: Scenery and nature
+        - 'button "Slide controls: Forward" [ref=f1e99] [cursor=pointer]'
+      - generic:
+        - generic:
+          - generic:
+            - button "Plan New" [ref=f1e104] [cursor=pointer]:
+              - paragraph [ref=f1e107]: Plan New
+            - dialog [ref=f1e108]:
+              - generic [ref=f1e109]:
+                - paragraph [ref=f1e110]: Design your perfect route!
+                - button [ref=f1e111] [cursor=pointer]
+              - paragraph [ref=f1e114]: Start planning from scratch and make it tailored on your needs.
+      - button [ref=f1e117] [cursor=pointer]:
+        - img "map layer" [ref=f1e119]
+        - paragraph [ref=f1e121]: Layers
+      - generic:
+        - generic:
+          - generic:
+            - generic [ref=f1e122]:
+              - button "Drag compass to adjust rotation" [ref=f1e123]:
+                - paragraph [ref=f1e128] [cursor=pointer]: "N"
+              - button "Re-center map" [ref=f1e129] [cursor=pointer]
+              - generic [ref=f1e133]:
+                - button "Zoom In" [ref=f1e134] [cursor=pointer]
+                - button "Zoom Out" [ref=f1e137] [cursor=pointer]
+            - generic [ref=f1e140]: 2 mi
+      - paragraph [ref=f1e146]: To find nearby routes, allow location access in your browser settings.
+      - generic [ref=f1e149]:
+        - generic:
+          - button "Loading Searching..." [disabled]:
+            - img "Loading"
+            - generic: Searching...
+        - paragraph [ref=f1e151]: "Tip: Tap on the map to see routes starting from that location."
+    - generic [ref=f1e153]:
+      - link "Maplibre" [ref=f1e154] [cursor=pointer]:
+        - /url: https://github.com/maplibre/maplibre-gl-js
+      - text: "| ©"
+      - link "komoot" [ref=f1e155] [cursor=pointer]:
+        - /url: http://www.komoot.com
+      - text: "| Map data ©"
+      - link "OpenStreetMap" [ref=f1e156] [cursor=pointer]:
+        - /url: http://www.openstreetmap.org/copyright
+      - text: contributors
+    - generic [ref=f1e157]:
+      - generic [ref=f1e159]:
+        - paragraph [ref=f1e160]: Routes
+        - button "Collapse" [ref=f1e161] [cursor=pointer]
+      - generic [ref=f1e166]:
+        - img "Loading" [ref=f1e168]
+        - generic [ref=f1e172]:
+          - button "Sign up for Free" [ref=f1e173] [cursor=pointer]
+          - generic [ref=f1e177]:
+            - paragraph [ref=f1e178]: Already have an account?
+            - button "Log In" [ref=f1e179] [cursor=pointer]

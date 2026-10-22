@@ -52,6 +52,10 @@ export async function searchPlaces(query, { center, language = 'en', signal, lim
   if (signal?.aborted) return [];
   const osm = sources[0].status === 'fulfilled' ? sources[0].value.map(item => normalizeNominatim(item, lang)) : [];
   const mapy = sources[1].status === 'fulfilled' ? sources[1].value.map(normalizeMapy) : [];
-  return dedupePlaceResults([...mapy, ...osm]).slice(0, limit);
+  const results = dedupePlaceResults([...mapy, ...osm]).slice(0, limit);
+  if (!results.length && sources.some(source => source.status === 'rejected')) {
+    throw new Error('Place search providers unavailable');
+  }
+  return results;
 }
 

@@ -1,0 +1,537 @@
+- generic [ref=f1e2]:
+  - region "Notifications alt+T"
+  - link "Skip to content →":
+    - /url: "#skip-nav"
+  - generic [ref=f1e3]:
+    - banner [ref=f1e4]:
+      - navigation [ref=f1e5]:
+        - list "Site navigation" [ref=f1e7]:
+          - listitem [ref=f1e8]:
+            - link "Navigate to home" [ref=f1e10] [cursor=pointer]:
+              - /url: /homepage
+              - img "Linear" [ref=f1e11]
+          - listitem [ref=f1e14]:
+            - list [ref=f1e15]:
+              - listitem [ref=f1e16]:
+                - button "Product" [ref=f1e17] [cursor=pointer]
+              - listitem [ref=f1e18]:
+                - button "Resources" [ref=f1e19] [cursor=pointer]
+              - listitem [ref=f1e20]:
+                - link "Customers" [ref=f1e21] [cursor=pointer]:
+                  - /url: /customers
+              - listitem [ref=f1e22]:
+                - link "Pricing" [ref=f1e23] [cursor=pointer]:
+                  - /url: /pricing
+              - listitem [ref=f1e24]:
+                - link "Now" [ref=f1e25] [cursor=pointer]:
+                  - /url: /now
+              - listitem [ref=f1e26]:
+                - link "Contact" [ref=f1e27] [cursor=pointer]:
+                  - /url: /contact
+            - list [ref=f1e29]:
+              - listitem [ref=f1e30]:
+                - link "Log in" [ref=f1e32] [cursor=pointer]:
+                  - /url: /login
+              - listitem [ref=f1e33]:
+                - link "Sign up" [ref=f1e34] [cursor=pointer]:
+                  - /url: /signup
+    - main [ref=f1e35]:
+      - generic [ref=f1e37]:
+        - generic [ref=f1e38]:
+          - heading [level=1] [ref=f1e40]:
+            - link "Now" [ref=f1e41] [cursor=pointer]:
+              - /url: /now
+          - generic [ref=f1e42]:
+            - generic [ref=f1e43]:
+              - link "All" [ref=f1e44] [cursor=pointer]:
+                - /url: /now
+              - link "Changelog" [ref=f1e45] [cursor=pointer]:
+                - /url: /changelog
+              - link "Product launches" [ref=f1e46] [cursor=pointer]:
+                - /url: /now/product-launches
+              - link "From the team" [ref=f1e47] [cursor=pointer]:
+                - /url: /now/team
+              - link "From the community" [ref=f1e48] [cursor=pointer]:
+                - /url: /now/community
+              - link "Press" [ref=f1e49] [cursor=pointer]:
+                - /url: /now/press
+            - generic [ref=f1e50]:
+              - button "Search…" [ref=f1e52] [cursor=pointer]
+              - button [ref=f1e56] [cursor=pointer]
+        - generic [ref=f1e61]:
+          - link "Five principles for working with Loops How to turn recurring tasks into shared, reliable workflows. Andrew Moedinger · Oct 13, 2026 →" [ref=f1e62] [cursor=pointer]:
+            - /url: /now/five-principles-working-with-loops
+            - heading "Five principles for working with Loops" [level=3] [ref=f1e65]
+            - generic [ref=f1e67]: How to turn recurring tasks into shared, reliable workflows.
+            - generic [ref=f1e69]:
+              - text: Andrew Moedinger
+              - generic [ref=f1e70]: ·
+              - text: Oct 13, 2026
+              - generic [ref=f1e71]: →
+          - link "AI coding has made CI a bottleneck, so we reworked ours to keep up We cut PR wait time and running costs by rethinking CI as a system, from the infrastructure underneath it to how work gets scheduled and tests get parallelized. Mufeez Amjad · Sep 21, 2026 →" [ref=f1e73] [cursor=pointer]:
+            - /url: /now/ci-bottleneck-reworked
+            - heading "AI coding has made CI a bottleneck, so we reworked ours to keep up" [level=3] [ref=f1e76]
+            - generic [ref=f1e78]: We cut PR wait time and running costs by rethinking CI as a system, from the infrastructure underneath it to how work gets scheduled and tests get parallelized.
+            - generic [ref=f1e80]:
+              - text: Mufeez Amjad
+              - generic [ref=f1e81]: ·
+              - text: Sep 21, 2026
+              - generic [ref=f1e82]: →
+          - link "The coding agent behind 75% of Ramp’s merged PRs Why and how Ramp built an internal coding agent that’s now responsible three of every four PRs the company merges. Customer story · Aug 31, 2026 →" [ref=f1e84] [cursor=pointer]:
+            - /url: /customers/ramp
+            - heading "The coding agent behind 75% of Ramp’s merged PRs" [level=3] [ref=f1e90]
+            - generic [ref=f1e92]: Why and how Ramp built an internal coding agent that’s now responsible three of every four PRs the company merges.
+            - generic [ref=f1e94]:
+              - text: Customer story
+              - generic [ref=f1e95]: ·
+              - text: Aug 31, 2026
+              - generic [ref=f1e96]: →
+          - link "Styling Linear for the future with StyleX A long-running migration that became an exercise in tooling, automation, and designing clearer boundaries for both humans and agents. Kenneth Skovhus · Aug 26, 2026 →" [ref=f1e97] [cursor=pointer]:
+            - /url: /now/styling-linear-for-the-future-stylex
+            - heading "Styling Linear for the future with StyleX" [level=3] [ref=f1e100]
+            - generic [ref=f1e102]: A long-running migration that became an exercise in tooling, automation, and designing clearer boundaries for both humans and agents.
+            - generic [ref=f1e104]:
+              - text: Kenneth Skovhus
+              - generic [ref=f1e105]: ·
+              - text: Aug 26, 2026
+              - generic [ref=f1e106]: →
+          - link "Sharing Linear’s growth with the people building it As Linear passes $100 million in ARR, we’re giving our team another opportunity to participate in the upside. Karri Saarinen · Aug 26, 2026 →" [ref=f1e108] [cursor=pointer]:
+            - /url: /now/sharing-growth-with-the-people-building-linear
+            - heading "Sharing Linear’s growth with the people building it" [level=3] [ref=f1e111]
+            - generic [ref=f1e113]: As Linear passes $100 million in ARR, we’re giving our team another opportunity to participate in the upside.
+            - generic [ref=f1e115]:
+              - text: Karri Saarinen
+              - generic [ref=f1e116]: ·
+              - text: Aug 26, 2026
+              - generic [ref=f1e117]: →
+          - link "Rebuilding Linear’s delta sync read path How we use turbopuffer to keep catch-up latency predictable across more than 20 TB of sync actions. Peter Travers · Aug 18, 2026 →" [ref=f1e119] [cursor=pointer]:
+            - /url: /now/rebuilding-delta-sync-read-path
+            - heading "Rebuilding Linear’s delta sync read path" [level=3] [ref=f1e122]
+            - generic [ref=f1e124]: How we use turbopuffer to keep catch-up latency predictable across more than 20 TB of sync actions.
+            - generic [ref=f1e126]:
+              - text: Peter Travers
+              - generic [ref=f1e127]: ·
+              - text: Aug 18, 2026
+              - generic [ref=f1e128]: →
+        - generic [ref=f1e130]:
+          - heading "Changelog" [level=2] [ref=f1e132]
+          - generic [ref=f1e134]:
+            - link "Slack and GitHub loop triggers Loops automate product work by responding to changes in Linear and connected tools. You can now trigger them from Slack and GitHub, share them as templates, and customize their reasoning levels. Oct 22, 2026" [ref=f1e138] [cursor=pointer]:
+              - /url: /changelog/2026-10-22-slack-and-github-loops
+              - generic [ref=f1e139]:
+                - generic [ref=f1e140]: Slack and GitHub loop triggers
+                - generic [ref=f1e142]: Loops automate product work by responding to changes in Linear and connected tools. You can now trigger them from Slack and GitHub, share them as templates, and customize their reasoning levels.
+                - generic [ref=f1e144]: Oct 22, 2026
+            - link "Stacked pull requests Stacked pull requests are now displayed in Linear Diffs. Move through a stack and see review, CI, and merge status at a glance. Related PRs are grouped into a single collapsible row in Reviews, alongside their issue and project context. Oct 8, 2026" [ref=f1e147] [cursor=pointer]:
+              - /url: /changelog/2026-10-08-stacked-pull-requests
+              - generic [ref=f1e148]:
+                - generic [ref=f1e149]: Stacked pull requests
+                - generic [ref=f1e151]: Stacked pull requests are now displayed in Linear Diffs. Move through a stack and see review, CI, and merge status at a glance. Related PRs are grouped into a single collapsible row in Reviews, alongside their issue and project context.
+                - generic [ref=f1e153]: Oct 8, 2026
+            - link "New controls for Linear coding agent Coding sessions are the shortest path from issue to diff. Assign a task to Linear Agent, and it works in a secure cloud environment to write and test the code before opening a pull request for review. Sep 24, 2026" [ref=f1e156] [cursor=pointer]:
+              - /url: /changelog/2026-09-24-new-controls-for-linear-coding-agent
+              - generic [ref=f1e157]:
+                - generic [ref=f1e158]: New controls for Linear coding agent
+                - generic [ref=f1e160]: Coding sessions are the shortest path from issue to diff. Assign a task to Linear Agent, and it works in a secure cloud environment to write and test the code before opening a pull request for review.
+                - generic [ref=f1e162]: Sep 24, 2026
+          - link "View all →" [ref=f1e165] [cursor=pointer]:
+            - /url: /changelog
+            - generic [ref=f1e166]: View all
+            - generic [ref=f1e167]: →
+        - generic [ref=f1e170]:
+          - 'link "How teams build AI usage patterns in software teams: who is adopting AI, how it reshapes where teams spend their time, and how much more they ship. Tim Qi · Aug 17, 2026 →" [ref=f1e171] [cursor=pointer]':
+            - /url: /data
+            - heading "How teams build" [level=3] [ref=f1e174]
+            - generic [ref=f1e176]: "AI usage patterns in software teams: who is adopting AI, how it reshapes where teams spend their time, and how much more they ship."
+            - generic [ref=f1e178]:
+              - text: Tim Qi
+              - generic [ref=f1e179]: ·
+              - text: Aug 17, 2026
+              - generic [ref=f1e180]: →
+          - link "Coinbase’s bet on agent-first development In January 2026, Chintan asked his entire engineering organisation to delete their IDEs and write zero lines of code. For two weeks, every engineer at Base would have to do their job without touching a code editor. Customer story · Aug 11, 2026 →" [ref=f1e182] [cursor=pointer]:
+            - /url: /customers/coinbase
+            - heading "Coinbase’s bet on agent-first development" [level=3] [ref=f1e188]
+            - generic [ref=f1e190]: In January 2026, Chintan asked his entire engineering organisation to delete their IDEs and write zero lines of code. For two weeks, every engineer at Base would have to do their job without touching a code editor.
+            - generic [ref=f1e192]:
+              - text: Customer story
+              - generic [ref=f1e193]: ·
+              - text: Aug 11, 2026
+              - generic [ref=f1e194]: →
+          - link "How we built Linear Agent The product and engineering decisions we made so Linear Agent can handle complex tasks without becoming unpredictable. Matthijs Wolting · Aug 10, 2026 →" [ref=f1e196] [cursor=pointer]:
+            - /url: /now/how-we-built-linear-agent
+            - heading "How we built Linear Agent" [level=3] [ref=f1e199]
+            - generic [ref=f1e201]: The product and engineering decisions we made so Linear Agent can handle complex tasks without becoming unpredictable.
+            - generic [ref=f1e203]:
+              - text: Matthijs Wolting
+              - generic [ref=f1e204]: ·
+              - text: Aug 10, 2026
+              - generic [ref=f1e205]: →
+          - link "Introducing Loops Describe a recurring job in plain language and Linear Agent will run it on a schedule or in response to events, working from the full context of your workspace. Nan Yu · Jul 20, 2026 →" [ref=f1e206] [cursor=pointer]:
+            - /url: /now/introducing-loops
+            - heading "Introducing Loops" [level=3] [ref=f1e209]
+            - generic [ref=f1e211]: Describe a recurring job in plain language and Linear Agent will run it on a schedule or in response to events, working from the full context of your workspace.
+            - generic [ref=f1e213]:
+              - text: Nan Yu
+              - generic [ref=f1e214]: ·
+              - text: Jul 20, 2026
+              - generic [ref=f1e215]: →
+          - link "Boom Supersonic builds as fast as it flies Boom Supersonic is bringing back supersonic flight before the end of the decade. To move that fast, its engineers borrowed the habits of software, building in short cycles and getting real parts in hand as quickly as they can. Customer story · Jul 15, 2026 →" [ref=f1e217] [cursor=pointer]:
+            - /url: /customers/boom
+            - heading "Boom Supersonic builds as fast as it flies" [level=3] [ref=f1e223]
+            - generic [ref=f1e225]: Boom Supersonic is bringing back supersonic flight before the end of the decade. To move that fast, its engineers borrowed the habits of software, building in short cycles and getting real parts in hand as quickly as they can.
+            - generic [ref=f1e227]:
+              - text: Customer story
+              - generic [ref=f1e228]: ·
+              - text: Jul 15, 2026
+              - generic [ref=f1e229]: →
+          - link "Teaching an agent to auto-fix bugs Some bugs at Linear now get fixed before a single engineer picks them up. Igor has been teaching Linear Agent to catch them in triage and ship the fix on its own. Igor Sechyn · Jun 12, 2026 →" [ref=f1e231] [cursor=pointer]:
+            - /url: /now/linear-agent-bug-fix
+            - heading "Teaching an agent to auto-fix bugs" [level=3] [ref=f1e234]
+            - generic [ref=f1e236]: Some bugs at Linear now get fixed before a single engineer picks them up. Igor has been teaching Linear Agent to catch them in triage and ship the fix on its own.
+            - generic [ref=f1e238]:
+              - text: Igor Sechyn
+              - generic [ref=f1e239]: ·
+              - text: Jun 12, 2026
+              - generic [ref=f1e240]: →
+        - heading "Press" [level=2] [ref=f1e244]
+        - generic [ref=f1e246]:
+          - 'link "Context is now the product: Product leadership when software can build itself Lenny & Friends Summit · Sep 29, 2026 ↗" [ref=f1e247] [cursor=pointer]':
+            - /url: https://www.youtube.com/watch?v=Zn9NZ-r1-C4
+            - generic [ref=f1e248]:
+              - 'heading "Context is now the product: Product leadership when software can build itself" [level=3] [ref=f1e251]'
+              - generic [ref=f1e253]:
+                - generic [ref=f1e254]:
+                  - text: Lenny & Friends Summit
+                  - generic [ref=f1e255]: ·
+                  - text: Sep 29, 2026
+                - generic [ref=f1e256]: ↗
+          - link "Protecting the Thinking Behind Great Design, Inside Linear's Design Team YouTube · Aug 12, 2026 ↗" [ref=f1e258] [cursor=pointer]:
+            - /url: https://www.youtube.com/watch?v=8wqZXOhuJUM
+            - generic [ref=f1e259]:
+              - heading "Protecting the Thinking Behind Great Design, Inside Linear's Design Team" [level=3] [ref=f1e262]
+              - generic [ref=f1e264]:
+                - generic [ref=f1e265]:
+                  - text: YouTube
+                  - generic [ref=f1e266]: ·
+                  - text: Aug 12, 2026
+                - generic [ref=f1e267]: ↗
+          - 'link "The New Standard: a talk with Linear, Raycast, and Anthropic YouTube · May 13, 2026 ↗" [ref=f1e269] [cursor=pointer]':
+            - /url: https://www.youtube.com/watch?v=DhqEDFzI-OM
+            - generic [ref=f1e270]:
+              - 'heading "The New Standard: a talk with Linear, Raycast, and Anthropic" [level=3] [ref=f1e273]'
+              - generic [ref=f1e275]:
+                - generic [ref=f1e276]:
+                  - text: YouTube
+                  - generic [ref=f1e277]: ·
+                  - text: May 13, 2026
+                - generic [ref=f1e278]: ↗
+          - link "AI Agents and the Future of Software Teams with Linear + Sequoia Capital Startup Grind · May 05, 2026 ↗" [ref=f1e280] [cursor=pointer]:
+            - /url: https://www.youtube.com/watch?v=ju7_5eOiWPI
+            - generic [ref=f1e281]:
+              - heading "AI Agents and the Future of Software Teams with Linear + Sequoia Capital" [level=3] [ref=f1e284]
+              - generic [ref=f1e286]:
+                - generic [ref=f1e287]:
+                  - text: Startup Grind
+                  - generic [ref=f1e288]: ·
+                  - text: May 05, 2026
+                - generic [ref=f1e289]: ↗
+        - link "View all →" [ref=f1e291] [cursor=pointer]:
+          - /url: /now/press
+          - generic [ref=f1e292]: View all
+          - generic [ref=f1e293]: →
+        - generic [ref=f1e296]:
+          - link "Now Linear writes the code, too Linear Agent can now write code. With Coding Sessions, it can take a bug from triage all the way to a reviewed fix, without the work ever leaving Linear. Karri Saarinen · Jun 11, 2026 →" [ref=f1e297] [cursor=pointer]:
+            - /url: /now/coding-sessions-for-linear-agent
+            - heading "Now Linear writes the code, too" [level=3] [ref=f1e300]
+            - generic [ref=f1e302]: Linear Agent can now write code. With Coding Sessions, it can take a bug from triage all the way to a reviewed fix, without the work ever leaving Linear.
+            - generic [ref=f1e304]:
+              - text: Karri Saarinen
+              - generic [ref=f1e305]: ·
+              - text: Jun 11, 2026
+              - generic [ref=f1e306]: →
+          - link "Reviewing code in the agent era Agentic coding has puts real pressure on review. One of our engineers shares how he uses Linear Diffs to hold his bar high without drowning in pull requests. Maciek Pekala · Jun 10, 2026 →" [ref=f1e308] [cursor=pointer]:
+            - /url: /now/reviewing-code-in-the-agent-era
+            - heading "Reviewing code in the agent era" [level=3] [ref=f1e311]
+            - generic [ref=f1e313]: Agentic coding has puts real pressure on review. One of our engineers shares how he uses Linear Diffs to hold his bar high without drowning in pull requests.
+            - generic [ref=f1e315]:
+              - text: Maciek Pekala
+              - generic [ref=f1e316]: ·
+              - text: Jun 10, 2026
+              - generic [ref=f1e317]: →
+          - link "Code review should be fast Agents are forcing a change in how we review code. Diffs brings code reviews directly inside Linear, so that the review lives alongside all of your product context. Tuomas Artman · May 28, 2026 →" [ref=f1e319] [cursor=pointer]:
+            - /url: /now/code-review-should-be-fast
+            - heading "Code review should be fast" [level=3] [ref=f1e322]
+            - generic [ref=f1e324]: Agents are forcing a change in how we review code. Diffs brings code reviews directly inside Linear, so that the review lives alongside all of your product context.
+            - generic [ref=f1e326]:
+              - text: Tuomas Artman
+              - generic [ref=f1e327]: ·
+              - text: May 28, 2026
+              - generic [ref=f1e328]: →
+          - link "Code Intelligence for Linear Agent Linear Agent can now read your codebase and answer questions from the source itself. Karri Saarinen · May 14, 2026 →" [ref=f1e329] [cursor=pointer]:
+            - /url: /now/code-intelligence-for-linear-agent
+            - heading "Code Intelligence for Linear Agent" [level=3] [ref=f1e332]
+            - generic [ref=f1e334]: Linear Agent can now read your codebase and answer questions from the source itself.
+            - generic [ref=f1e336]:
+              - text: Karri Saarinen
+              - generic [ref=f1e337]: ·
+              - text: May 14, 2026
+              - generic [ref=f1e338]: →
+          - link "Cars24’s push to being AI-native with Linear In October, Cars24 renewed its Jira license. A few weeks later, they treated that contract as a sunk cost and walked away from it. Customer story · May 13, 2026 →" [ref=f1e340] [cursor=pointer]:
+            - /url: /customers/cars24
+            - heading "Cars24’s push to being AI-native with Linear" [level=3] [ref=f1e343]
+            - generic [ref=f1e345]: In October, Cars24 renewed its Jira license. A few weeks later, they treated that contract as a sunk cost and walked away from it.
+            - generic [ref=f1e347]:
+              - text: Customer story
+              - generic [ref=f1e348]: ·
+              - text: May 13, 2026
+              - generic [ref=f1e349]: →
+          - link "How we hire at Linear Hiring well matters more than hiring fast. We’re happy to take our time, and believe each person who joins the team should raise the bar for the next one. Doug Parker · Apr 28, 2026 →" [ref=f1e351] [cursor=pointer]:
+            - /url: /now/how-we-hire-at-linear
+            - heading "How we hire at Linear" [level=3] [ref=f1e354]
+            - generic [ref=f1e356]: Hiring well matters more than hiring fast. We’re happy to take our time, and believe each person who joins the team should raise the bar for the next one.
+            - generic [ref=f1e358]:
+              - text: Doug Parker
+              - generic [ref=f1e359]: ·
+              - text: Apr 28, 2026
+              - generic [ref=f1e360]: →
+        - heading "Archive" [level=2] [ref=f1e362]
+        - generic [ref=f1e364]:
+          - link "Output isn’t design Karri Saarinen · Apr 17, 2026" [ref=f1e365] [cursor=pointer]:
+            - /url: /now/output-isn-t-design
+            - generic [ref=f1e366]: Output isn’t design
+            - generic [ref=f1e367]:
+              - text: Karri Saarinen
+              - generic [ref=f1e368]: ·
+              - text: Apr 17, 2026
+          - link "How we use Linear Agent at Linear Rhea Purohit · Apr 10, 2026" [ref=f1e369] [cursor=pointer]:
+            - /url: /now/how-we-use-linear-agent-at-linear
+            - generic [ref=f1e370]: How we use Linear Agent at Linear
+            - generic [ref=f1e371]:
+              - text: Rhea Purohit
+              - generic [ref=f1e372]: ·
+              - text: Apr 10, 2026
+          - link "Post mortem on Linear security incident on March 24th, 2026 Jamie Finnigan · Apr 06, 2026" [ref=f1e373] [cursor=pointer]:
+            - /url: /now/linear-incident-on-mar-24th-2026
+            - generic [ref=f1e374]: Post mortem on Linear security incident on March 24th, 2026
+            - generic [ref=f1e375]:
+              - text: Jamie Finnigan
+              - generic [ref=f1e376]: ·
+              - text: Apr 06, 2026
+          - link "Issue tracking is dead Karri Saarinen · Mar 24, 2026" [ref=f1e377] [cursor=pointer]:
+            - /url: /next
+            - generic [ref=f1e378]: Issue tracking is dead
+            - generic [ref=f1e379]:
+              - text: Karri Saarinen
+              - generic [ref=f1e380]: ·
+              - text: Mar 24, 2026
+          - link "A calmer interface for a product in motion Charlie Aufmann, Maxime Heckel · Mar 12, 2026" [ref=f1e381] [cursor=pointer]:
+            - /url: /now/behind-the-latest-design-refresh
+            - generic [ref=f1e382]: A calmer interface for a product in motion
+            - generic [ref=f1e383]:
+              - text: Charlie Aufmann, Maxime Heckel
+              - generic [ref=f1e384]: ·
+              - text: Mar 12, 2026
+          - link "How Cursor builds with Linear Customer story · Feb 04, 2026" [ref=f1e385] [cursor=pointer]:
+            - /url: /customers/cursor
+            - generic [ref=f1e386]: How Cursor builds with Linear
+            - generic [ref=f1e387]:
+              - text: Customer story
+              - generic [ref=f1e388]: ·
+              - text: Feb 04, 2026
+          - link "How Dandelion Chocolate scales craft Customer story · Jan 27, 2026" [ref=f1e389] [cursor=pointer]:
+            - /url: /customers/dandelion-chocolate
+            - generic [ref=f1e390]: How Dandelion Chocolate scales craft
+            - generic [ref=f1e391]:
+              - text: Customer story
+              - generic [ref=f1e392]: ·
+              - text: Jan 27, 2026
+          - link "Design is more than code Karri Saarinen · Dec 19, 2025" [ref=f1e393] [cursor=pointer]:
+            - /url: /now/design-is-more-than-code
+            - generic [ref=f1e394]: Design is more than code
+            - generic [ref=f1e395]:
+              - text: Karri Saarinen
+              - generic [ref=f1e396]: ·
+              - text: Dec 19, 2025
+          - link "How our Customer Experience team works in Linear Alexandra Lapinsky Wilson · Nov 06, 2025" [ref=f1e397] [cursor=pointer]:
+            - /url: /now/cx-in-linear
+            - generic [ref=f1e398]: How our Customer Experience team works in Linear
+            - generic [ref=f1e399]:
+              - text: Alexandra Lapinsky Wilson
+              - generic [ref=f1e400]: ·
+              - text: Nov 06, 2025
+          - link "Continuous planning in Linear Nan Yu · Oct 30, 2025" [ref=f1e401] [cursor=pointer]:
+            - /url: /now/continuous-planning-in-linear
+            - generic [ref=f1e402]: Continuous planning in Linear
+            - generic [ref=f1e403]:
+              - text: Nan Yu
+              - generic [ref=f1e404]: ·
+              - text: Oct 30, 2025
+          - link "Designing remote work at Linear Karri Saarinen · Oct 29, 2025" [ref=f1e405] [cursor=pointer]:
+            - /url: /now/designing-remote-work-at-linear
+            - generic [ref=f1e406]: Designing remote work at Linear
+            - generic [ref=f1e407]:
+              - text: Karri Saarinen
+              - generic [ref=f1e408]: ·
+              - text: Oct 29, 2025
+          - 'link "Self-driving SaaS: When software runs itself Karri Saarinen · Oct 22, 2025" [ref=f1e409] [cursor=pointer]':
+            - /url: /now/self-driving-saas
+            - generic [ref=f1e410]: "Self-driving SaaS: When software runs itself"
+            - generic [ref=f1e411]:
+              - text: Karri Saarinen
+              - generic [ref=f1e412]: ·
+              - text: Oct 22, 2025
+          - link "A Linear spin on Liquid Glass Robb Böhnke · Oct 21, 2025" [ref=f1e413] [cursor=pointer]:
+            - /url: /now/linear-liquid-glass
+            - generic [ref=f1e414]: A Linear spin on Liquid Glass
+            - generic [ref=f1e415]:
+              - text: Robb Böhnke
+              - generic [ref=f1e416]: ·
+              - text: Oct 21, 2025
+          - link "Best practices for designing Linear Dashboards Tim Qi · Oct 07, 2025" [ref=f1e417] [cursor=pointer]:
+            - /url: /now/dashboards-best-practices
+            - generic [ref=f1e418]: Best practices for designing Linear Dashboards
+            - generic [ref=f1e419]:
+              - text: Tim Qi
+              - generic [ref=f1e420]: ·
+              - text: Oct 07, 2025
+          - link "Why we committed to a zero-bugs policy Tuomas Artman, Sabin Roman · Sep 24, 2025" [ref=f1e421] [cursor=pointer]:
+            - /url: /now/zero-bugs-policy
+            - generic [ref=f1e422]: Why we committed to a zero-bugs policy
+            - generic [ref=f1e423]:
+              - text: Tuomas Artman, Sabin Roman
+              - generic [ref=f1e424]: ·
+              - text: Sep 24, 2025
+        - button "Load more" [ref=f1e427] [cursor=pointer]
+        - generic [ref=f1e429]:
+          - heading "Built for the future. Available today." [level=2] [ref=f1e430]
+          - generic [ref=f1e431]:
+            - button "Get started" [ref=f1e432] [cursor=pointer]
+            - button "Contact sales" [ref=f1e433] [cursor=pointer]
+    - contentinfo [ref=f1e434]:
+      - generic [ref=f1e436]:
+        - link [ref=f1e438] [cursor=pointer]:
+          - /url: /
+          - img "Linear Logo" [ref=f1e439]
+        - generic [ref=f1e441]:
+          - heading "Product" [level=3] [ref=f1e442]
+          - list [ref=f1e443]:
+            - listitem [ref=f1e444]:
+              - link "Intake" [ref=f1e445] [cursor=pointer]:
+                - /url: /intake
+            - listitem [ref=f1e446]:
+              - link "Plan" [ref=f1e447] [cursor=pointer]:
+                - /url: /plan
+            - listitem [ref=f1e448]:
+              - link "AI" [ref=f1e449] [cursor=pointer]:
+                - /url: /ai
+            - listitem [ref=f1e450]:
+              - link "Build" [ref=f1e451] [cursor=pointer]:
+                - /url: /build
+            - listitem [ref=f1e452]:
+              - link "Pricing" [ref=f1e453] [cursor=pointer]:
+                - /url: /pricing
+            - listitem [ref=f1e454]:
+              - link "Security" [ref=f1e455] [cursor=pointer]:
+                - /url: /security
+        - generic [ref=f1e456]:
+          - heading "Features" [level=3] [ref=f1e457]
+          - list [ref=f1e458]:
+            - listitem [ref=f1e459]:
+              - link "Asks" [ref=f1e460] [cursor=pointer]:
+                - /url: /asks
+            - listitem [ref=f1e461]:
+              - link "Agents" [ref=f1e462] [cursor=pointer]:
+                - /url: /agents
+            - listitem [ref=f1e463]:
+              - link "Coding Sessions" [ref=f1e464] [cursor=pointer]:
+                - /url: /coding-sessions
+            - listitem [ref=f1e465]:
+              - link "Customer Requests" [ref=f1e466] [cursor=pointer]:
+                - /url: /customer-requests
+            - listitem [ref=f1e467]:
+              - link "Insights" [ref=f1e468] [cursor=pointer]:
+                - /url: /insights
+            - listitem [ref=f1e469]:
+              - link "Mobile" [ref=f1e470] [cursor=pointer]:
+                - /url: /mobile
+            - listitem [ref=f1e471]:
+              - link "Integrations" [ref=f1e472] [cursor=pointer]:
+                - /url: /integrations
+            - listitem [ref=f1e473]:
+              - link "Changelog" [ref=f1e474] [cursor=pointer]:
+                - /url: /changelog
+        - generic [ref=f1e475]:
+          - heading "Company" [level=3] [ref=f1e476]
+          - list [ref=f1e477]:
+            - listitem [ref=f1e478]:
+              - link "About" [ref=f1e479] [cursor=pointer]:
+                - /url: /about
+            - listitem [ref=f1e480]:
+              - link "Customers" [ref=f1e481] [cursor=pointer]:
+                - /url: /customers
+            - listitem [ref=f1e482]:
+              - link "Careers" [ref=f1e483] [cursor=pointer]:
+                - /url: /careers
+            - listitem [ref=f1e484]:
+              - link "Now" [ref=f1e485] [cursor=pointer]:
+                - /url: /now
+            - listitem [ref=f1e486]:
+              - link "Method" [ref=f1e487] [cursor=pointer]:
+                - /url: /method
+            - listitem [ref=f1e488]:
+              - link "Quality" [ref=f1e489] [cursor=pointer]:
+                - /url: /quality
+            - listitem [ref=f1e490]:
+              - link "Brand" [ref=f1e491] [cursor=pointer]:
+                - /url: /brand
+        - generic [ref=f1e492]:
+          - heading "Resources" [level=3] [ref=f1e493]
+          - list [ref=f1e494]:
+            - listitem [ref=f1e495]:
+              - link "Switch" [ref=f1e496] [cursor=pointer]:
+                - /url: /switch
+            - listitem [ref=f1e497]:
+              - link "Download" [ref=f1e498] [cursor=pointer]:
+                - /url: /download
+            - listitem [ref=f1e499]:
+              - link "Documentation" [ref=f1e500] [cursor=pointer]:
+                - /url: /docs
+            - listitem [ref=f1e502]:
+              - link "Developers" [ref=f1e503] [cursor=pointer]:
+                - /url: /developers
+            - listitem [ref=f1e504]:
+              - link "Status" [ref=f1e505] [cursor=pointer]:
+                - /url: https://linearstatus.com
+            - listitem [ref=f1e506]:
+              - link "Enterprise" [ref=f1e507] [cursor=pointer]:
+                - /url: /enterprise
+            - listitem [ref=f1e508]:
+              - link "Startups" [ref=f1e509] [cursor=pointer]:
+                - /url: /startups
+        - generic [ref=f1e510]:
+          - heading "Connect" [level=3] [ref=f1e511]
+          - list [ref=f1e512]:
+            - listitem [ref=f1e513]:
+              - link "Contact us" [ref=f1e514] [cursor=pointer]:
+                - /url: /contact
+            - listitem [ref=f1e515]:
+              - link "Community" [ref=f1e516] [cursor=pointer]:
+                - /url: https://linear.app/join-slack
+            - listitem [ref=f1e517]:
+              - link "X (Twitter)" [ref=f1e518] [cursor=pointer]:
+                - /url: https://x.com/linear
+            - listitem [ref=f1e519]:
+              - link "GitHub" [ref=f1e520] [cursor=pointer]:
+                - /url: https://github.com/linear
+            - listitem [ref=f1e521]:
+              - link "YouTube" [ref=f1e522] [cursor=pointer]:
+                - /url: https://www.youtube.com/@linear
+        - generic [ref=f1e524]:
+          - link "Privacy" [ref=f1e525] [cursor=pointer]:
+            - /url: /privacy
+          - link "Terms" [ref=f1e526] [cursor=pointer]:
+            - /url: /terms
+          - link "DPA" [ref=f1e527] [cursor=pointer]:
+            - /url: /dpa
+          - link "AUP" [ref=f1e528] [cursor=pointer]:
+            - /url: /legal/aup

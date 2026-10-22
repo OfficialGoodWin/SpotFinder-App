@@ -1,0 +1,50 @@
+- generic [active]:
+  - generic:
+    - generic [ref=e2]:
+      - heading "SpotFinder community map" [level=1] [ref=e3]
+      - complementary [ref=e83]:
+        - button "Dismiss introduction" [ref=e84] [cursor=pointer]
+        - generic [ref=e88]:
+          - generic [ref=e89]: Explore beyond the obvious
+          - heading "Find places you didn't know existed." [level=2] [ref=e94]
+          - paragraph [ref=e95]: Explore viewpoints, castles, ruins and hidden places shared on SpotFinder. Browse freely without an account.
+        - generic [ref=e96]:
+          - button "Featured places" [ref=e97] [cursor=pointer]
+          - button "Explore the map" [ref=e101] [cursor=pointer]
+        - button "Find spots near a chosen place" [ref=e102] [cursor=pointer]
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - region "Map" [ref=e6]
+          - group [ref=e7]:
+            - generic "Toggle attribution" [ref=e8] [cursor=pointer]
+            - generic [ref=e9]:
+              - text: © OpenStreetMap contributors | ©
+              - link "OpenFreeMap" [ref=e10] [cursor=pointer]:
+                - /url: https://openfreemap.org
+              - text: ©
+              - link "OpenStreetMap" [ref=e11] [cursor=pointer]:
+                - /url: https://www.openstreetmap.org/copyright
+        - generic [ref=e12]:
+          - button "Zoom in" [ref=e13] [cursor=pointer]
+          - generic [aria-hidden] [ref=e15]: "13"
+          - button "Zoom out" [ref=e16] [cursor=pointer]
+      - generic [ref=e20]:
+        - textbox "Search places and community spots" [ref=e24]:
+          - /placeholder: Search places...
+        - button "Start voice search" [ref=e25] [cursor=pointer]
+        - button "Open nearby spots filters" [ref=e30] [cursor=pointer]
+      - generic [ref=e35]:
+        - button "Sign in" [ref=e36] [cursor=pointer]
+        - button "Drafts" [ref=e40] [cursor=pointer]
+      - generic [ref=e44]:
+        - button "Add a spot" [ref=e45] [cursor=pointer]
+        - generic [ref=e47]:
+          - generic [ref=e48]:
+            - button "Map layers" [ref=e50] [cursor=pointer]
+            - button "Center map on my location" [ref=e55] [cursor=pointer]
+            - button "Toggle 3D terrain" [ref=e58] [cursor=pointer]:
+              - generic [ref=e59]: 3D
+          - generic [ref=e60]:
+            - button "Open help and FAQ" [ref=e61] [cursor=pointer]
+            - button "Open settings" [ref=e65] [cursor=pointer]
+    - region "Notifications alt+T"

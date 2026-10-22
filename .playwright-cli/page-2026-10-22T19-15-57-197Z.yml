@@ -1,0 +1,45 @@
+- generic [active]:
+  - generic:
+    - generic [ref=f1e2]:
+      - heading "SpotFinder community map" [level=1] [ref=f1e3]
+      - complementary [ref=f1e81]:
+        - button "Dismiss introduction" [ref=f1e82] [cursor=pointer]
+        - generic [ref=f1e86]:
+          - generic [ref=f1e87]: Explore beyond the obvious
+          - heading "Find places you didn't know existed." [level=2] [ref=f1e92]
+          - paragraph [ref=f1e93]: Explore viewpoints, castles, ruins and hidden places shared on SpotFinder. Browse freely without an account.
+        - generic [ref=f1e94]:
+          - button "Featured places" [ref=f1e95] [cursor=pointer]
+          - button "Explore the map" [ref=f1e99] [cursor=pointer]
+        - button "Find spots near a chosen place" [ref=f1e100] [cursor=pointer]
+      - generic [ref=f1e4]:
+        - generic [ref=f1e5]:
+          - region "Map" [ref=f1e6]
+          - group [ref=f1e7]:
+            - generic "Toggle attribution" [ref=f1e8] [cursor=pointer]
+            - generic [ref=f1e9]:
+              - text: © OpenStreetMap contributors | ©
+              - link "OpenFreeMap" [ref=f1e10] [cursor=pointer]:
+                - /url: https://openfreemap.org
+              - text: ©
+              - link "OpenStreetMap" [ref=f1e11] [cursor=pointer]:
+                - /url: https://www.openstreetmap.org/copyright
+        - generic [ref=f1e12]:
+          - button "Zoom in" [ref=f1e13] [cursor=pointer]
+          - generic [aria-hidden] [ref=f1e15]: "13"
+          - button "Zoom out" [ref=f1e16] [cursor=pointer]
+      - generic [ref=f1e20]:
+        - textbox "Search places and community spots" [ref=f1e24]:
+          - /placeholder: Search places...
+        - button "Start voice search" [ref=f1e25] [cursor=pointer]
+        - button "Open nearby spots filters" [ref=f1e30] [cursor=pointer]
+      - generic [ref=f1e35]:
+        - button "Sign in" [ref=f1e36] [cursor=pointer]
+        - button "Drafts" [ref=f1e40] [cursor=pointer]
+      - generic [ref=f1e45]:
+        - button "Map layers" [ref=f1e47] [cursor=pointer]
+        - button "Center on my location" [ref=f1e53] [cursor=pointer]
+        - button "Toggle 3D terrain" [ref=f1e56] [cursor=pointer]: 3D
+        - button "More map options" [ref=f1e58] [cursor=pointer]
+      - button "Add a spot" [ref=f1e64] [cursor=pointer]
+    - region "Notifications alt+T"

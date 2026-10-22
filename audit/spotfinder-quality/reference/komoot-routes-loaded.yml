@@ -1,0 +1,305 @@
+- generic [ref=f1e3]:
+  - banner [ref=f1e5]:
+    - generic [ref=f1e6]:
+      - link "Home" [ref=f1e7] [cursor=pointer]:
+        - /url: /
+      - generic [ref=f1e13]:
+        - button [ref=f1e14] [cursor=pointer]
+        - textbox "Search" [ref=f1e23]
+    - generic [ref=f1e24]:
+      - generic [ref=f1e25]:
+        - button "Routes" [ref=f1e26] [cursor=pointer]
+        - button "Planner" [ref=f1e28] [cursor=pointer]
+        - button "Features" [ref=f1e30] [cursor=pointer]
+        - button "Updates" [ref=f1e32] [cursor=pointer]
+      - button "App" [ref=f1e34] [cursor=pointer]
+      - button "Login or Signup" [ref=f1e39] [cursor=pointer]
+  - generic [ref=f1e43]:
+    - region "Map" [ref=f1e44]
+    - generic:
+      - generic [ref=f1e45]:
+        - generic [ref=f1e46]:
+          - button "within 19 mi" [ref=f1e48] [cursor=pointer]:
+            - paragraph [ref=f1e51]: within 19 mi
+          - button "Distance/Duration" [ref=f1e53] [cursor=pointer]:
+            - paragraph [ref=f1e56]: Distance/Duration
+          - button "Difficulty" [ref=f1e58] [cursor=pointer]:
+            - paragraph [ref=f1e61]: Difficulty
+          - button "Type" [ref=f1e63] [cursor=pointer]:
+            - paragraph [ref=f1e66]: Type
+          - button "Elevation" [ref=f1e68] [cursor=pointer]:
+            - paragraph [ref=f1e71]: Elevation
+          - button "Surface" [ref=f1e73] [cursor=pointer]:
+            - paragraph [ref=f1e76]: Surface
+          - button "Start from" [ref=f1e78] [cursor=pointer]:
+            - paragraph [ref=f1e81]: Start from
+          - button "Route features" [ref=f1e83] [cursor=pointer]:
+            - paragraph [ref=f1e86]: Route features
+          - button "Rest stops and attractions" [ref=f1e88] [cursor=pointer]:
+            - paragraph [ref=f1e93]: Rest stops and attractions
+          - button "Scenery and nature" [ref=f1e95] [cursor=pointer]:
+            - paragraph [ref=f1e98]: Scenery and nature
+        - 'button "Slide controls: Forward" [ref=f1e99] [cursor=pointer]'
+      - generic:
+        - generic:
+          - generic:
+            - button "Plan New" [ref=f1e104] [cursor=pointer]:
+              - paragraph [ref=f1e107]: Plan New
+            - dialog [ref=f1e108]:
+              - generic [ref=f1e109]:
+                - paragraph [ref=f1e110]: Design your perfect route!
+                - button [ref=f1e111] [cursor=pointer]
+              - paragraph [ref=f1e114]: Start planning from scratch and make it tailored on your needs.
+      - button [ref=f1e117] [cursor=pointer]:
+        - img "map layer" [ref=f1e119]
+        - paragraph [ref=f1e121]: Layers
+      - generic:
+        - generic:
+          - generic:
+            - generic [ref=f1e122]:
+              - button "Drag compass to adjust rotation" [ref=f1e123]:
+                - paragraph [ref=f1e128] [cursor=pointer]: "N"
+              - button "Re-center map" [ref=f1e129] [cursor=pointer]
+              - generic [ref=f1e133]:
+                - button "Zoom In" [ref=f1e134] [cursor=pointer]
+                - button "Zoom Out" [ref=f1e137] [cursor=pointer]
+            - generic [ref=f1e140]: 5 mi
+      - paragraph [ref=f1e146]: To find nearby routes, allow location access in your browser settings.
+      - generic [ref=f1e149]:
+        - generic:
+          - button "Loading Searching..." [disabled]:
+            - img "Loading"
+            - generic: Searching...
+        - paragraph [ref=f1e151]: "Tip: Tap on the map to see routes starting from that location."
+    - generic [ref=f1e153]:
+      - link "Maplibre" [ref=f1e205] [cursor=pointer]:
+        - /url: https://github.com/maplibre/maplibre-gl-js
+      - text: "| ©"
+      - link "komoot" [ref=f1e206] [cursor=pointer]:
+        - /url: http://www.komoot.com
+      - text: "| Map data ©"
+      - link "OpenStreetMap" [ref=f1e207] [cursor=pointer]:
+        - /url: http://www.openstreetmap.org/copyright
+      - text: contributors
+    - generic [ref=f1e157]:
+      - generic [ref=f1e159]:
+        - paragraph [ref=f1e160]: Routes
+        - button "Collapse" [ref=f1e161] [cursor=pointer]
+      - generic [ref=f1e166]:
+        - generic [ref=f1e208]:
+          - paragraph [ref=f1e209]: 1-12 of 247 hikes
+          - generic [ref=f1e210]:
+            - generic [ref=f1e216] [cursor=pointer]:
+              - generic [ref=f1e217]:
+                - generic: Moderate
+                - generic [ref=f1e218]:
+                  - paragraph [ref=f1e222]: "4.6"
+                  - paragraph [ref=f1e228]: "161"
+              - heading "Pilsner Urquell Brewery Gate – Pilsner Urquell Brewery Museum loop from Pilsen" [level=3] [ref=f1e229]
+              - generic [ref=f1e231]:
+                - paragraph [ref=f1e233]:
+                  - generic [ref=f1e234]: 02:17
+                  - generic [ref=f1e235]: h
+                - paragraph [ref=f1e238]:
+                  - generic [ref=f1e239]: "5.39"
+                  - generic [ref=f1e240]: mi
+                - paragraph [ref=f1e245]:
+                  - generic [ref=f1e246]: "225"
+                  - generic [ref=f1e247]: ft
+            - generic [ref=f1e253] [cursor=pointer]:
+              - generic [ref=f1e254]:
+                - generic: Easy
+                - generic [ref=f1e255]:
+                  - paragraph [ref=f1e259]: "4.6"
+                  - paragraph [ref=f1e265]: "175"
+              - heading "Pilsen Town Hall – Great Synagogue of Pilsen loop from Plzeň hlavní nádraží" [level=3] [ref=f1e266]
+              - generic [ref=f1e268]:
+                - paragraph [ref=f1e270]:
+                  - generic [ref=f1e271]: 01:26
+                  - generic [ref=f1e272]: h
+                - paragraph [ref=f1e275]:
+                  - generic [ref=f1e276]: "3.41"
+                  - generic [ref=f1e277]: mi
+                - paragraph [ref=f1e282]:
+                  - generic [ref=f1e283]: "150"
+                  - generic [ref=f1e284]: ft
+            - generic [ref=f1e290] [cursor=pointer]:
+              - generic [ref=f1e291]:
+                - generic: Moderate
+                - generic [ref=f1e292]:
+                  - paragraph [ref=f1e296]: "4.4"
+                  - paragraph [ref=f1e302]: "46"
+              - heading "Bolevec Reservoir – České Údolí Reservoir loop from Jižní Předměstí" [level=3] [ref=f1e303]
+              - generic [ref=f1e305]:
+                - paragraph [ref=f1e307]:
+                  - generic [ref=f1e308]: 02:39
+                  - generic [ref=f1e309]: h
+                - paragraph [ref=f1e312]:
+                  - generic [ref=f1e313]: "6.21"
+                  - generic [ref=f1e314]: mi
+                - paragraph [ref=f1e319]:
+                  - generic [ref=f1e320]: "325"
+                  - generic [ref=f1e321]: ft
+            - generic [ref=f1e327] [cursor=pointer]:
+              - generic [ref=f1e328]:
+                - generic: Easy
+                - generic [ref=f1e329]:
+                  - paragraph [ref=f1e333]: "4.6"
+                  - paragraph [ref=f1e339]: "98"
+              - heading "Memorial Tree – Bistro at Malý Bolevec loop from přírodní památka Doubí" [level=3] [ref=f1e340]
+              - generic [ref=f1e342]:
+                - paragraph [ref=f1e344]:
+                  - generic [ref=f1e345]: 01:08
+                  - generic [ref=f1e346]: h
+                - paragraph [ref=f1e349]:
+                  - generic [ref=f1e350]: "2.68"
+                  - generic [ref=f1e351]: mi
+                - paragraph [ref=f1e356]:
+                  - generic [ref=f1e357]: "100"
+                  - generic [ref=f1e358]: ft
+            - generic [ref=f1e364] [cursor=pointer]:
+              - generic [ref=f1e365]:
+                - generic: Easy
+                - generic [ref=f1e366]:
+                  - paragraph [ref=f1e370]: "4.6"
+                  - paragraph [ref=f1e376]: "99"
+              - heading "Bistro at Malý Bolevec – Memorial Tree loop from Plzeň-Bílá Hora" [level=3] [ref=f1e377]
+              - generic [ref=f1e379]:
+                - paragraph [ref=f1e381]:
+                  - generic [ref=f1e382]: 01:05
+                  - generic [ref=f1e383]: h
+                - paragraph [ref=f1e386]:
+                  - generic [ref=f1e387]: "2.60"
+                  - generic [ref=f1e388]: mi
+                - paragraph [ref=f1e393]:
+                  - generic [ref=f1e394]: "100"
+                  - generic [ref=f1e395]: ft
+            - generic [ref=f1e401] [cursor=pointer]:
+              - generic [ref=f1e402]:
+                - generic: Hard
+                - generic [ref=f1e403]:
+                  - paragraph [ref=f1e407]: "4.9"
+                  - paragraph [ref=f1e413]: "54"
+              - heading "Hiking loop from Skryje" [level=3] [ref=f1e414]
+              - generic [ref=f1e416]:
+                - paragraph [ref=f1e418]:
+                  - generic [ref=f1e419]: 02:28
+                  - generic [ref=f1e420]: h
+                - paragraph [ref=f1e423]:
+                  - generic [ref=f1e424]: "5.44"
+                  - generic [ref=f1e425]: mi
+                - paragraph [ref=f1e430]:
+                  - generic [ref=f1e431]: "550"
+                  - generic [ref=f1e432]: ft
+            - generic [ref=f1e438] [cursor=pointer]:
+              - generic [ref=f1e439]:
+                - generic: Hard
+                - generic [ref=f1e440]:
+                  - paragraph [ref=f1e444]: "4.8"
+                  - paragraph [ref=f1e450]: "49"
+              - heading "Hiking loop from přírodní rezervace Jezírka" [level=3] [ref=f1e451]
+              - generic [ref=f1e453]:
+                - paragraph [ref=f1e455]:
+                  - generic [ref=f1e456]: 02:32
+                  - generic [ref=f1e457]: h
+                - paragraph [ref=f1e460]:
+                  - generic [ref=f1e461]: "5.67"
+                  - generic [ref=f1e462]: mi
+                - paragraph [ref=f1e467]:
+                  - generic [ref=f1e468]: "450"
+                  - generic [ref=f1e469]: ft
+            - generic [ref=f1e475] [cursor=pointer]:
+              - generic [ref=f1e476]:
+                - generic: Moderate
+                - generic [ref=f1e477]:
+                  - paragraph [ref=f1e481]: "5.0"
+                  - paragraph [ref=f1e487]: "53"
+              - heading "Krkavec Observation Tower – Sytná [Chotíkov] loop from přírodní rezervace Petrovka" [level=3] [ref=f1e488]
+              - generic [ref=f1e490]:
+                - paragraph [ref=f1e492]:
+                  - generic [ref=f1e493]: 02:48
+                  - generic [ref=f1e494]: h
+                - paragraph [ref=f1e497]:
+                  - generic [ref=f1e498]: "6.27"
+                  - generic [ref=f1e499]: mi
+                - paragraph [ref=f1e504]:
+                  - generic [ref=f1e505]: "600"
+                  - generic [ref=f1e506]: ft
+            - generic [ref=f1e512] [cursor=pointer]:
+              - generic [ref=f1e513]:
+                - generic: Moderate
+                - generic [ref=f1e514]:
+                  - paragraph [ref=f1e518]: "4.5"
+                  - paragraph [ref=f1e524]: "56"
+              - heading "View of Vysoký Štont Castle – View from Gutštejn Castle loop from Plzenecká železnice" [level=3] [ref=f1e525]
+              - generic [ref=f1e527]:
+                - paragraph [ref=f1e529]:
+                  - generic [ref=f1e530]: 01:33
+                  - generic [ref=f1e531]: h
+                - paragraph [ref=f1e534]:
+                  - generic [ref=f1e535]: "3.22"
+                  - generic [ref=f1e536]: mi
+                - paragraph [ref=f1e541]:
+                  - generic [ref=f1e542]: "525"
+                  - generic [ref=f1e543]: ft
+            - generic [ref=f1e549] [cursor=pointer]:
+              - generic [ref=f1e550]:
+                - generic: Easy
+                - generic [ref=f1e551]:
+                  - paragraph [ref=f1e555]: "4.2"
+                  - paragraph [ref=f1e561]: "67"
+              - heading "Giraffe Enclosure, Pilsen Zoo – Penguin Enclosure, Pilsen Zoo loop from Pilsen" [level=3] [ref=f1e562]
+              - generic [ref=f1e564]:
+                - paragraph [ref=f1e566]:
+                  - generic [ref=f1e567]: 01:03
+                  - generic [ref=f1e568]: h
+                - paragraph [ref=f1e571]:
+                  - generic [ref=f1e572]: "2.41"
+                  - generic [ref=f1e573]: mi
+                - paragraph [ref=f1e578]:
+                  - generic [ref=f1e579]: "150"
+                  - generic [ref=f1e580]: ft
+            - generic [ref=f1e586] [cursor=pointer]:
+              - generic [ref=f1e587]:
+                - generic: Moderate
+                - generic [ref=f1e588]:
+                  - paragraph [ref=f1e592]: "4.5"
+                  - paragraph [ref=f1e598]: "43"
+              - heading "View of Vysoký Štont Castle – Radyně Castle loop from Losiná" [level=3] [ref=f1e599]
+              - generic [ref=f1e601]:
+                - paragraph [ref=f1e603]:
+                  - generic [ref=f1e604]: 01:22
+                  - generic [ref=f1e605]: h
+                - paragraph [ref=f1e608]:
+                  - generic [ref=f1e609]: "2.84"
+                  - generic [ref=f1e610]: mi
+                - paragraph [ref=f1e615]:
+                  - generic [ref=f1e616]: "500"
+                  - generic [ref=f1e617]: ft
+            - generic [ref=f1e623] [cursor=pointer]:
+              - generic [ref=f1e624]:
+                - generic: Moderate
+                - generic [ref=f1e625]:
+                  - paragraph [ref=f1e629]: "4.3"
+                  - paragraph [ref=f1e635]: "31"
+              - heading "View of the dam – Ruins of Buben Castle loop from Újezd nade Mží" [level=3] [ref=f1e636]
+              - generic [ref=f1e638]:
+                - paragraph [ref=f1e640]:
+                  - generic [ref=f1e641]: 02:05
+                  - generic [ref=f1e642]: h
+                - paragraph [ref=f1e645]:
+                  - generic [ref=f1e646]: "4.80"
+                  - generic [ref=f1e647]: mi
+                - paragraph [ref=f1e652]:
+                  - generic [ref=f1e653]: "325"
+                  - generic [ref=f1e654]: ft
+          - generic [ref=f1e656]:
+            - paragraph [ref=f1e657]: Can't find the perfect route?
+            - paragraph [ref=f1e658]: Start from scratch and make it truly yours.
+            - button "Plan new" [ref=f1e659] [cursor=pointer]
+        - generic [ref=f1e172]:
+          - paragraph [ref=f1e663]: Do you want to see even more hikes?
+          - button "Sign up for Free" [ref=f1e173] [cursor=pointer]
+          - generic [ref=f1e177]:
+            - paragraph [ref=f1e178]: Already have an account?
+            - button "Log In" [ref=f1e179] [cursor=pointer]

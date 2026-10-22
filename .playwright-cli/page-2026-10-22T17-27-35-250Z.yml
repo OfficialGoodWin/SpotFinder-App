@@ -1,0 +1,237 @@
+- generic [ref=e2]:
+  - generic [ref=e6]:
+    - generic [ref=e8]:
+      - button "L Search" [ref=e9] [cursor=pointer]:
+        - text: L
+        - generic [ref=e10]: Search
+      - button "T Route" [ref=e11] [cursor=pointer]:
+        - text: T
+        - generic [ref=e12]: Route
+      - button "Log in to My Mapy" [ref=e13] [cursor=pointer]:
+        - generic [ref=e17]:
+          - generic [ref=e18]: Log in to
+          - text: My Mapy
+    - generic [ref=e19]:
+      - generic [ref=e190]:
+        - generic [ref=e191]:
+          - textbox "Search" [active] [ref=e192]:
+            - /placeholder: Search for a place, business, etc.
+            - text: Prague Castle
+          - button [ref=e193] [cursor=pointer]
+        - link [ref=e198] [cursor=pointer]:
+          - /url: //mapy.com/en/?source=base&id=1916001&gallery=1
+        - generic [ref=e200]:
+          - generic [ref=e201]:
+            - link "Photos" [ref=e202] [cursor=pointer]:
+              - /url: https://mapy.com/en/?source=base&id=1916001&gallery=1
+            - button "3D view" [ref=e203] [cursor=pointer]
+          - heading "Prague Castle" [level=1] [ref=e205]
+          - heading [level=2] [ref=e207]:
+            - link "Castle" [ref=e208] [cursor=pointer]:
+              - /url: https://mapy.com/en/?q=Castle&cat=1
+          - paragraph [ref=e210]: Prague - Hradčany, Czechia
+          - generic [ref=e211]:
+            - generic "Directions" [ref=e212] [cursor=pointer]:
+              - link "Directions" [ref=e213]:
+                - /url: "https://mapy.com/en/?planovani-trasy&rc=9gyYNxXy4n&rs=&rs=base&ri=&ri=1916001&mrp=&mrp={\"c\":111}"
+            - generic "Save" [ref=e215] [cursor=pointer]:
+              - button "Save" [ref=e216]
+            - generic "Share" [ref=e218] [cursor=pointer]:
+              - button "Share" [ref=e219]
+            - button "Trip" [ref=e221] [cursor=pointer]
+        - generic [ref=e232]:
+          - link "4.6 Great 427 reviews" [ref=e233] [cursor=pointer]:
+            - /url: "#"
+            - generic [ref=e234]:
+              - generic [ref=e235]: "4.6"
+              - generic [ref=e236]:
+                - generic [ref=e237]: Great
+                - generic [ref=e238]: 427 reviews
+          - button "Add a rating" [ref=e239] [cursor=pointer]
+        - generic [ref=e245]:
+          - paragraph [ref=e246] [cursor=pointer]:
+            - generic [ref=e249]: Open - today to 22 R
+          - paragraph [ref=e251]: Uvedená otvírací doba platí pro areál Pražského hradu. Otevírací doba návštěvnických objektů a zahrad je odlišná.
+        - generic [ref=e252]:
+          - list [ref=e256]:
+            - listitem [ref=e257]:
+              - link "info@hrad.cz" [ref=e258] [cursor=pointer]:
+                - /url: mailto:info@hrad.cz
+          - list [ref=e262]:
+            - listitem [ref=e263]:
+              - link "www.hrad.cz" [ref=e264] [cursor=pointer]:
+                - /url: https://www.hrad.cz/cs/prazsky-hrad-pro-navstevniky
+        - button "Suggest a correction" [ref=e270] [cursor=pointer]
+        - generic [ref=e273] [cursor=pointer]:
+          - generic [ref=e274]: Weather
+          - generic "clear sky" [ref=e275]
+          - generic [ref=e278]: 8°C
+        - generic [ref=e281]: The world’s largest ancient castle complex has served as the seat of Czech princes, kings, and presidents since the 9th century. The complex consists of an extensive array of palaces and religious buildings representing a variety of architectural styles. Its dominant features include the Gothic St. Vitus, Wenceslas and Vojtěch Cathedral, the Old Royal Palace with the Vladislav Hall, the Romanesque Basilica of St. George, the Rosenberg Palace, and Golden Lane with the Daliborka Tower. The beautifully maintained surrounding gardens, offering breathtaking views of Prague, are also well worth a visit.
+        - generic [ref=e282]:
+          - strong [ref=e283]: "Admission:"
+          - text: Free
+        - generic [ref=e284]:
+          - table [ref=e285]:
+            - rowgroup [ref=e286]:
+              - row [ref=e287]:
+                - cell "date founded:" [ref=e288]
+                - cell "9th century" [ref=e289]
+              - row [ref=e290]:
+                - cell "architectural style:" [ref=e291]
+                - cell "Renaissance, Gothic art, Baroque, Romanesque architecture" [ref=e292]
+              - row [ref=e293]:
+                - cell "architect:" [ref=e294]
+                - cell [ref=e295]:
+                  - link "Matthias of Arras" [ref=e296] [cursor=pointer]:
+                    - /url: https://en.wikipedia.org/wiki/Matthias of Arras
+                  - text: ","
+                  - link "Benedikt Rejt" [ref=e297] [cursor=pointer]:
+                    - /url: https://en.wikipedia.org/wiki/Benedikt Rejt
+                  - text: ","
+                  - link "Jože Plečnik" [ref=e298] [cursor=pointer]:
+                    - /url: https://en.wikipedia.org/wiki/Jože Plečnik
+              - row [ref=e299]:
+                - cell "part of:" [ref=e300]
+                - cell "Pražský hrad" [ref=e301]
+              - row [ref=e302]:
+                - cell "visitors per year:" [ref=e303]
+                - cell "2,551,240" [ref=e304]
+              - row [ref=e305]:
+                - cell "heritage designation:" [ref=e306]
+                - cell "national cultural heritage site" [ref=e307]
+              - row [ref=e308]:
+                - cell "located on route:" [ref=e309]
+                - cell [ref=e310]:
+                  - link "Via Czechia – Midland Trail" [ref=e311] [cursor=pointer]:
+                    - /url: https://mapy.com/en/?source=base&id=2513663
+              - row [ref=e312]:
+                - cell "elevation above sea level:" [ref=e313]
+                - cell "250 m" [ref=e314]
+          - link "Data sources" [ref=e316] [cursor=pointer]:
+            - /url: https://licence.mapy.cz/?doc=mapy_attr&lang=en
+        - generic: f Add photo
+        - generic [ref=e319]:
+          - generic [ref=e320]:
+            - generic [ref=e321] [cursor=pointer]
+            - generic [ref=e324]:
+              - generic [ref=e325]: "4.6"
+              - generic [ref=e326]:
+                - generic [ref=e327]: Great
+                - generic [ref=e328]: 427 reviews
+          - paragraph [ref=e330]:
+            - text: How does it look in person?Share your experience with others
+            - button "Add a rating" [ref=e331] [cursor=pointer]
+        - generic [ref=e337]:
+          - strong [ref=e338]: "Other links:"
+          - link "pamatkovykatalog.cz" [ref=e339] [cursor=pointer]:
+            - /url: https://pamatkovykatalog.cz/prazsky-hrad-13063971
+          - link "cs.wikipedia.org" [ref=e340] [cursor=pointer]:
+            - /url: https://cs.wikipedia.org/wiki/Pražský_hrad
+        - generic [ref=e341]:
+          - strong [ref=e342]: "Related points:"
+          - link "Golden Lane" [ref=e343] [cursor=pointer]:
+            - /url: https://mapy.com/en/?source=base&id=1703240
+          - link "Mihulka" [ref=e344] [cursor=pointer]:
+            - /url: https://mapy.com/en/?source=base&id=1702129
+          - link "Old Royal Palace" [ref=e345] [cursor=pointer]:
+            - /url: https://mapy.com/en/?source=base&id=2086837
+          - link "Prague Castle Riding School" [ref=e346] [cursor=pointer]:
+            - /url: https://mapy.com/en/?source=base&id=1701743
+          - link "St. George's Basilica" [ref=e347] [cursor=pointer]:
+            - /url: https://mapy.com/en/?source=base&id=1702796
+          - link "St. Vitus Cathedral" [ref=e348] [cursor=pointer]:
+            - /url: https://mapy.com/en/?source=base&id=1892282
+          - link "Theresian Institution of Noble Ladies of the Prague Castle" [ref=e349] [cursor=pointer]:
+            - /url: https://mapy.com/en/?source=base&id=2086845
+        - button "g GPS" [ref=e353] [cursor=pointer]
+      - generic [ref=e52]:
+        - text: •
+        - generic [ref=e57]:
+          - link [ref=e58] [cursor=pointer]:
+            - /url: /
+          - button "English" [ref=e67] [cursor=pointer]
+        - paragraph [ref=e70]:
+          - link "Help" [ref=e71] [cursor=pointer]:
+            - /url: https://help.mapy.com/en/
+          - generic [ref=e72]: •
+          - link "Legend" [ref=e73] [cursor=pointer]:
+            - /url: /en/?lgnd=1
+          - generic [ref=e74]: •
+          - link "Mobile" [ref=e75] [cursor=pointer]:
+            - /url: /en/mobilepromo
+          - generic [ref=e76]: •
+          - link "Advertising" [ref=e77] [cursor=pointer]:
+            - /url: https://www.seznam.cz/reklama/en/obsahovy-web/sluzba-firmy
+          - generic [ref=e78]: •
+          - link "Terms and Licensing" [ref=e79] [cursor=pointer]:
+            - /url: https://licence.mapy.cz/?doc=mapy_pu&lang=en
+          - generic [ref=e80]: •
+          - button "Problems and comments" [ref=e81] [cursor=pointer]
+          - generic [ref=e82]: •
+          - link "Personalization settings" [ref=e83] [cursor=pointer]:
+            - /url: https://account.mapy.com/consents?lang=en
+          - generic [ref=e84]: •
+          - link "For developers" [ref=e85] [cursor=pointer]:
+            - /url: https://developer.mapy.cz/en/
+        - generic [ref=e86]:
+          - generic [ref=e87]:
+            - link "Facebook" [ref=e88] [cursor=pointer]:
+              - /url: https://www.facebook.com/mapy.com/
+            - link "X" [ref=e92] [cursor=pointer]:
+              - /url: https://x.com/mapy_com
+            - link "Instagram" [ref=e96] [cursor=pointer]:
+              - /url: https://www.instagram.com/mapy_com
+          - generic [ref=e100]: •
+          - generic [ref=e101]:
+            - link "Apple Store" [ref=e102] [cursor=pointer]:
+              - /url: https://apps.apple.com/us/app/mapy-com-offline-gps-maps/id411411020?ppid=b9f33cbf-dc8f-4073-a726-a01cd8273321&pt=282263&ct=footer&mt=8
+            - link "Google Play Store" [ref=e106] [cursor=pointer]:
+              - /url: https://play.google.com/store/apps/details?id=cz.seznam.mapy&listing=outdoor_maps_and_trip_planner&utm_source=footer
+    - list
+  - generic [ref=e3]:
+    - generic:
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - button "Switch map" [ref=e111] [cursor=pointer]
+                - button "Aerial" [ref=e112] [cursor=pointer]
+            - generic:
+              - generic:
+                - button "3D view" [ref=e113] [cursor=pointer]
+                - button "Panorama" [ref=e354] [cursor=pointer]
+          - generic:
+            - button "Go to Premium" [ref=e114] [cursor=pointer]
+            - button "My location" [ref=e115] [cursor=pointer]
+            - generic:
+              - generic:
+                - button "Zoom out" [ref=e116] [cursor=pointer]
+                - button "Zoom in" [ref=e117] [cursor=pointer]
+        - generic [ref=e118]:
+          - heading "Open in app" [level=2] [ref=e119]
+          - link [ref=e120] [cursor=pointer]:
+            - /url: https://apps.apple.com/us/app/mapy-com-offline-gps-maps/id411411020?ppid=b9f33cbf-dc8f-4073-a726-a01cd8273321&pt=282263&ct=web2app&mt=8
+          - link [ref=e121] [cursor=pointer]:
+            - /url: https://play.google.com/store/apps/details?id=cz.seznam.mapy&listing=outdoor_maps_and_trip_planner&utm_source=web2app
+          - button "Close" [ref=e122] [cursor=pointer]
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic: "0"
+                - generic: "50"
+                - generic: "100"
+                - generic: "150"
+              - generic: m
+            - generic [ref=e126]:
+              - text: ©
+              - link "Seznam.cz, a.s." [ref=e355] [cursor=pointer]:
+                - /url: https://o-seznam.cz/
+              - text: ", 2026 and"
+              - link "others" [ref=e356] [cursor=pointer]:
+                - /url: https://licence.mapy.cz/?doc=mapy_attr&lang=en
+          - button
+          - button "Tools" [ref=e130] [cursor=pointer]
+        - button "Close drawer" [ref=e131] [cursor=pointer]
+      - button "Adjust column width" [ref=e134] [cursor=pointer]: ">"
