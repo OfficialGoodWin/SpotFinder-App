@@ -32,6 +32,8 @@ import SpotMarkerThumbnail from '@/components/spots/SpotMarkerThumbnail';
 // makes Vite emit the file instead of leaving a broken package-relative URL.
 maplibregl.setWorkerUrl(maplibreWorkerUrl);
 
+const mapMotionDuration = milliseconds => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : milliseconds;
+
 
 // ── Road shield generator ─────────────────────────────────────────────────────
 // Draws a real road sign on an offscreen canvas and returns ImageData.
@@ -445,11 +447,11 @@ function applyTerrain(map, enabled) {
         map.setLayoutProperty('terrain-hillshade', 'visibility', 'visible');
       }
       map.setTerrain({ source: 'terrain-dem', exaggeration: 1.8 });
-      map.easeTo({ pitch: Math.max(map.getPitch(), 58), bearing: map.getBearing() || -12, duration: 700 });
+      map.easeTo({ pitch: Math.max(map.getPitch(), 58), bearing: map.getBearing() || -12, duration: mapMotionDuration(700) });
     } else {
       map.setTerrain(null);
       if (map.getLayer('terrain-hillshade')) map.setLayoutProperty('terrain-hillshade', 'visibility', 'none');
-      if (map.getPitch() > 0 || map.getBearing() !== 0) map.easeTo({ pitch: 0, bearing: 0, duration: 500 });
+      if (map.getPitch() > 0 || map.getBearing() !== 0) map.easeTo({ pitch: 0, bearing: 0, duration: mapMotionDuration(500) });
     }
   } catch (e) {
     console.warn('Terrain toggle failed:', e);
@@ -1031,7 +1033,7 @@ export default function MapLibreMap({
     if (!flyTo || !mapRef.current) return;
     const [lat, lng] = flyTo;
     if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) return;
-    mapRef.current.flyTo({ center: [Number(lng), Number(lat)], zoom: clampMapZoom(15), duration: 1000 });
+    mapRef.current.flyTo({ center: [Number(lng), Number(lat)], zoom: clampMapZoom(15), duration: mapMotionDuration(1000) });
   }, [flyTo]);
 
   // One camera path for community spots opened from markers, lists, search,
@@ -1059,14 +1061,14 @@ export default function MapLibreMap({
     const lats = fitBoundsData.map(c => c[0] ?? c.lat ?? c[1]);
     mapRef.current.fitBounds(
       [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-      { padding: 60, duration: 1200, maxZoom: MAP_MAX_ZOOM }
+      { padding: 60, duration: mapMotionDuration(1200), maxZoom: MAP_MAX_ZOOM }
     );
   }, [fitBoundsData]);
 
   // ── zoomToArea ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!zoomToArea || !mapRef.current) return;
-    if (zoomToArea.center) mapRef.current.flyTo({ center: [zoomToArea.center.lng, zoomToArea.center.lat], zoom: 9, duration: 1200 });
+    if (zoomToArea.center) mapRef.current.flyTo({ center: [zoomToArea.center.lng, zoomToArea.center.lat], zoom: 9, duration: mapMotionDuration(1200) });
     else mapRef.current.setZoom(9);
   }, [zoomToArea]);
 
@@ -1551,7 +1553,7 @@ const addAdminMarkers = () => {
       <div className="absolute bottom-24 left-3 z-20 overflow-hidden rounded-2xl border border-white/70 bg-white/90 text-slate-700 shadow-[0_8px_30px_rgba(15,23,42,0.18)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-100 sm:bottom-auto sm:left-auto sm:right-3 sm:top-1/2 sm:-translate-y-1/2">
         <button
           type="button"
-          onClick={() => mapRef.current?.zoomIn({ duration: 250 })}
+          onClick={() => mapRef.current?.zoomIn({ duration: mapMotionDuration(250) })}
           className="grid h-11 w-11 place-items-center transition-colors hover:bg-slate-100 active:bg-slate-200 dark:hover:bg-white/10 dark:active:bg-white/15"
           aria-label={t('mapUi.zoomIn')}
           title={t('mapUi.zoomIn')}
@@ -1563,7 +1565,7 @@ const addAdminMarkers = () => {
         </div>
         <button
           type="button"
-          onClick={() => mapRef.current?.zoomOut({ duration: 250 })}
+          onClick={() => mapRef.current?.zoomOut({ duration: mapMotionDuration(250) })}
           className="grid h-11 w-11 place-items-center transition-colors hover:bg-slate-100 active:bg-slate-200 dark:hover:bg-white/10 dark:active:bg-white/15"
           aria-label={t('mapUi.zoomOut')}
           title={t('mapUi.zoomOut')}

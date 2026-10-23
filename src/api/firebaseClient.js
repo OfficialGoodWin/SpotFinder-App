@@ -10,6 +10,7 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged,
   sendEmailVerification,
+  sendPasswordResetEmail,
   EmailAuthProvider,
   reauthenticateWithCredential,
   reauthenticateWithPopup,
@@ -234,6 +235,11 @@ export const resendVerificationEmail = async () => {
   const { auth } = getFirebaseServices();
   if (!auth.currentUser) throw new Error('Not signed in');
   await sendEmailVerification(auth.currentUser);
+};
+
+export const requestPasswordResetEmail = async (email) => {
+  const { auth } = getFirebaseServices();
+  await sendPasswordResetEmail(auth, String(email || '').trim());
 };
 
 const reauthenticateWithPassword = async (currentPassword) => {
@@ -502,6 +508,26 @@ export const getFeaturedSpotCandidates = async () => {
       return featuredPage;
     }).finally(() => { featuredPending = null; });
   return featuredPending;
+};
+
+// Bounded public discovery pages. The cursor is a Firestore snapshot kept only
+// in memory by the caller; no listener or private collection is involved.
+export const getDiscoverSpotsPage = async (cursor = null, pageSize = 16) => {
+  const { db } = getFirebaseServices();
+  const safeSize = Math.min(24, Math.max(1, Math.floor(Number(pageSize) || 16)));
+  const clauses = [
+    where('is_public', '==', true), where('status', '==', 'published'),
+    orderBy('created_date', 'desc'),
+  ];
+  if (cursor) clauses.push(startAfter(cursor));
+  clauses.push(limit(safeSize + 1));
+  const snapshot = await getDocs(query(collection(db, SPOTS_COLLECTION), ...clauses));
+  const page = snapshot.docs.slice(0, safeSize);
+  return {
+    spots: page.map(spotFromSnapshot),
+    cursor: page[page.length - 1] || null,
+    hasMore: snapshot.docs.length > safeSize,
+  };
 };
 
 // Scalable viewport query: only fetch spots currently inside the map bounds.

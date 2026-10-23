@@ -1,0 +1,6 @@
+- main [ref=e2]:
+  - img "SpotFinder map illustration" [ref=e3]
+  - heading "Page not found" [level=1] [ref=e4]
+  - paragraph [ref=e5]: That page is unavailable. Return to the map to explore places.
+  - link "Back to the map" [ref=e6] [cursor=pointer]:
+    - /url: /

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { X, Camera, MapPin, Mic, Loader2, AlertCircle, ChevronDown } from 'lucide-react';
+import { X, Camera, MapPin, Mic, Loader2, AlertCircle, ChevronDown, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
 import { deleteCloudSpotDraft, getFirebaseServices, loadDraftImageFile, saveCloudSpotDraft, uploadDraftImage, uploadSpotImage } from '@/api/firebaseClient';
@@ -49,7 +49,7 @@ const LANG_TO_BCP47 = {
   ro: 'ro-RO', es: 'es-ES', bg: 'bg-BG',
 };
 
-export default function AddSpotModal({ latlng, draft = null, onClose, onSave, user }) {
+export default function AddSpotModal({ latlng, draft = null, onClose, onSave, user, mobileV2 = false }) {
   const { authUid } = useAuth();
   const { t, language } = useLanguage();
   const spotType = 'general';
@@ -268,6 +268,19 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
     setImageFiles(current => current.filter((_, itemIndex) => itemIndex !== index));
     setImagePreviews(current => current.filter((_, itemIndex) => itemIndex !== index));
     setDraftPhotoRefs(current => current.filter((_, itemIndex) => itemIndex !== index));
+  };
+
+  const moveImage = (from, to) => {
+    if (to < 0 || to >= imageFiles.length) return;
+    const move = rows => {
+      const next = [...rows];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    };
+    setImageFiles(move);
+    setImagePreviews(move);
+    setDraftPhotoRefs(move);
   };
 
   // Voice dictation
@@ -752,8 +765,8 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
             {imagePreviews.length > 0 && (
               <div className="mb-3 grid grid-cols-3 gap-2">
                 {imagePreviews.map((preview, index) => (
-                  <div key={preview} className="relative aspect-square overflow-hidden rounded-2xl">
-                    <img src={preview} alt={t('addSpotUi.photoPreview', { number: index + 1 })} className="h-full w-full object-cover" />
+                  <div key={preview} className={mobileV2 ? 'relative overflow-hidden rounded-xl border border-gray-200 bg-gray-50' : 'relative aspect-square overflow-hidden rounded-2xl'}>
+                    <div className={mobileV2 ? 'aspect-square' : 'h-full w-full'}><img src={preview} alt={t('addSpotUi.photoPreview', { number: index + 1 })} className={mobileV2 ? 'h-full w-full object-contain' : 'h-full w-full object-cover'} /></div>
                     <button
                       type="button"
                       onClick={() => removeImage(index)}
@@ -762,7 +775,8 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
                     >
                       <X className="h-4 w-4" />
                     </button>
-                    {index === 0 && <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white">{t('addSpotUi.cover')}</span>}
+                    {index === 0 && <span className={`rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white ${mobileV2 ? 'absolute bottom-11 left-1' : 'absolute bottom-1.5 left-1.5'}`}>{t('addSpotUi.cover')}</span>}
+                    {mobileV2 && imageFiles.length > 1 && <div className="flex justify-between border-t border-gray-200 bg-white"><button type="button" onClick={() => moveImage(index, index - 1)} disabled={index === 0} aria-label={`Přesunout fotografii ${index + 1} doleva`} className="grid h-10 w-10 place-items-center disabled:opacity-30"><ArrowLeft size={16} /></button><button type="button" onClick={() => moveImage(index, index + 1)} disabled={index === imageFiles.length - 1} aria-label={`Přesunout fotografii ${index + 1} doprava`} className="grid h-10 w-10 place-items-center disabled:opacity-30"><ArrowRight size={16} /></button></div>}
                   </div>
                 ))}
               </div>

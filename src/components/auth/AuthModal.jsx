@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Mail, Lock, User, ArrowRight, ExternalLink, Smartphone, CalendarDays, Eye, EyeOff } from 'lucide-react';
-import { loginWithEmail, registerWithEmail, loginWithGoogle, isRestrictedBrowser, getMfaResolverFromError, getMfaRecaptchaVerifier, clearMfaRecaptchaVerifier, startMfaSignIn, completeMfaSignIn } from '@/api/firebaseClient';
+import { loginWithEmail, registerWithEmail, loginWithGoogle, requestPasswordResetEmail, isRestrictedBrowser, getMfaResolverFromError, getMfaRecaptchaVerifier, clearMfaRecaptchaVerifier, startMfaSignIn, completeMfaSignIn } from '@/api/firebaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { accountBirthDateBounds } from '@/lib/ageEligibility';
@@ -10,7 +10,7 @@ const loginAttempts = { count: 0, lockedUntil: 0 };
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS = 5 * 60 * 1000; // 5 minutes
 
-export default function AuthModal({ onClose, onSuccess = () => {} }) {
+export default function AuthModal({ onClose, onSuccess = () => {}, mobileV2 = false }) {
   const { t, language } = useLanguage();
   const [tab, setTab] = useState('login');
   const [email, setEmail] = useState('');
@@ -23,6 +23,7 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
   const [lockoutRemaining, setLockoutRemaining] = useState(0);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
   const { checkUserAuth } = useAuth();
   const birthDateBounds = accountBirthDateBounds();
   const modalRef = useRef(null);
@@ -167,6 +168,17 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
     } finally { setLoading(false); }
   };
 
+  const handleReset = async event => {
+    event.preventDefault();
+    setLoading(true); setError('');
+    try {
+      await requestPasswordResetEmail(email);
+      setResetSent(true);
+    } catch (err) {
+      setError(err?.code === 'auth/invalid-email' ? t('auth.invalidEmail') : t('auth.somethingWrong'));
+    } finally { setLoading(false); }
+  };
+
   return (
     <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-slate-950/50 p-0 backdrop-blur-[2px] sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
       <div ref={modalRef} className="sf-sheet relative max-h-[96dvh] w-full overflow-y-auto overscroll-contain rounded-t-3xl p-5 sm:max-w-md sm:rounded-3xl sm:p-7" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
@@ -176,16 +188,16 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
 
         <div className="text-center mb-8">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
-            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {mobileV2 ? <img src="/mobile-v2/official-logo.png" alt="SpotFinder" className="h-14 w-14 rounded-2xl object-cover" /> : <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
+            </svg>}
           </div>
           <h2 id="auth-modal-title" className="text-2xl font-bold tracking-tight text-gray-900 dark:text-foreground">
-            {tab === 'login' ? t('auth.welcomeBack') : t('auth.createAccount')}
+            {tab === 'reset' ? (language.startsWith('cs') ? 'Obnovit heslo' : 'Reset password') : tab === 'login' ? t('auth.welcomeBack') : t('auth.createAccount')}
           </h2>
           <p className="text-gray-500 dark:text-muted-foreground mt-2 text-sm">
-            {tab === 'login' ? t('auth.signInSubtitle') : t('auth.registerSubtitle')}
+            {tab === 'reset' ? (language.startsWith('cs') ? 'Pošleme ti odkaz pro nastavení nového hesla.' : 'We will send you a link to choose a new password.') : tab === 'login' ? t('auth.signInSubtitle') : t('auth.registerSubtitle')}
           </p>
         </div>
 
@@ -230,6 +242,7 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
           </div>
         ) : (
         <>
+        {tab === 'reset' ? <form onSubmit={handleReset} className="space-y-4"><label className="block text-sm font-medium" htmlFor="reset-email">{t('auth.email')}</label><input id="reset-email" type="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} className="sf-control w-full" />{error && <div className="sf-status-error" role="alert">{error}</div>}{resetSent && <p role="status" className="text-sm text-green-700 dark:text-green-300">{language.startsWith('cs') ? 'Pokud k této adrese existuje účet, dorazí e-mail s odkazem.' : 'If an account exists for this address, a reset link will arrive by email.'}</p>}<button disabled={loading} className="sf-button-primary w-full">{loading ? t('authMore.sending') : language.startsWith('cs') ? 'Odeslat odkaz' : 'Send reset link'}</button><button type="button" onClick={() => { setTab('login'); setError(''); setResetSent(false); }} className="w-full min-h-11 text-sm text-primary">{language.startsWith('cs') ? 'Zpět na přihlášení' : 'Back to sign in'}</button></form> : <>
         {restricted && (
           <div className="sf-status-warning mb-4 p-4">
             <p className="text-sm text-amber-800 dark:text-amber-300 font-semibold mb-1">⚠️ {t('auth.inAppBrowserTitle')}</p>
@@ -343,10 +356,12 @@ export default function AuthModal({ onClose, onSuccess = () => {} }) {
               : <>{tab === 'login' ? t('auth.signIn') : t('auth.createAccount')}<ArrowRight className="w-5 h-5" /></>}
           </button>
         </form>
+        {mobileV2 && tab === 'login' && <button type="button" onClick={() => { setTab('reset'); setError(''); }} className="mt-3 min-h-11 w-full text-sm font-medium text-primary">{language.startsWith('cs') ? 'Zapomenuté heslo?' : 'Forgot password?'}</button>}
         <button onClick={onClose}
           className="w-full mt-4 py-3 text-gray-500 dark:text-muted-foreground font-medium hover:bg-gray-50 dark:hover:bg-accent transition-colors rounded-2xl text-sm">
           {t('auth.continueAsGuest')}
         </button>
+        </>}
         </>
         )}
       </div>

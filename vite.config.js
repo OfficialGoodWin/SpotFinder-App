@@ -36,7 +36,10 @@ export default defineConfig({
           const isJournal = pathname === '/news' || pathname.startsWith('/news/');
           const isAsset = pathname.startsWith('/assets/');
           if (!isJournal && !isAsset) {
-            if (appRoutes.has(pathname.toLowerCase())) return next();
+            if (appRoutes.has(pathname.toLowerCase()) || pathname === '/new' || pathname.startsWith('/new/')) {
+              if (pathname === '/new' || pathname.startsWith('/new/')) response.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
+              return next();
+            }
             const isStaticFile = /^\/[A-Za-z0-9_./-]+\.[A-Za-z0-9]+$/.test(pathname) && !pathname.includes('..');
             if (isStaticFile && existsSync(path.resolve(__dirname, 'dist', `.${pathname}`))) return next();
             response.statusCode = 404;
