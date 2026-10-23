@@ -14,6 +14,7 @@ import { searchPlaces } from '@/lib/placeSearch';
 import { getGuestDraftOwnerKey, listGuestDrafts, deleteGuestDraft } from '@/lib/spotDrafts';
 import { deleteGuestDraftPhotos } from '@/lib/guestDraftPhotos';
 import { NEARBY_DEFAULT_KM } from '@/lib/nearbyFilters';
+import MobileZoomSlider from './MobileZoomSlider';
 import { APP_VERSION } from '@/config/appVersion';
 import { toast } from 'sonner';
 import { recoverableLazy } from '@/components/ChunkLoadRecovery';
@@ -175,6 +176,7 @@ export default function MobileV2() {
   const [nearbyCount, setNearbyCount] = useState(20);
   const [category, setCategory] = useState('Vše');
   const [mapLayer, setMapLayer] = useState('basic');
+  const [mapInstance, setMapInstance] = useState(null);
   const [layerMenu, setLayerMenu] = useState(false);
   const [terrain, setTerrain] = useState(false);
   const [userPos, setUserPos] = useState(null);
@@ -204,6 +206,7 @@ export default function MobileV2() {
   const [collectionErrors, setCollectionErrors] = useState({});
   const [collectionLoading, setCollectionLoading] = useState(false);
   const mapRef = useRef(null);
+  const zoomDraggingRef = useRef(false);
   const requestRef = useRef(0);
   const cacheRef = useRef(null);
   const nearbyRequestRef = useRef(0);
@@ -228,6 +231,7 @@ export default function MobileV2() {
   useEffect(() => { const update = () => setOnline(navigator.onLine !== false); window.addEventListener('online', update); window.addEventListener('offline', update); return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update); }; }, []);
 
   const refreshMap = useCallback(async () => {
+    if (zoomDraggingRef.current) return;
     const map = mapRef.current;
     if (!map) return;
     const current = map.getCenter(); setCenter({ lat: current.lat, lng: current.lng });
@@ -245,9 +249,18 @@ export default function MobileV2() {
     } catch { if (request === requestRef.current) setSpotsError(true); }
     finally { if (request === requestRef.current) setSpotsLoading(false); }
   }, []);
+  const handleZoomDragStart = useCallback(() => {
+    zoomDraggingRef.current = true;
+    requestRef.current += 1;
+  }, []);
+  const handleZoomDragEnd = useCallback(() => {
+    zoomDraggingRef.current = false;
+    refreshMap();
+  }, [refreshMap]);
   const handleMapReady = useCallback(map => {
     if (mapRef.current) mapRef.current.off('moveend', refreshMap);
     mapRef.current = map;
+    setMapInstance(map);
     if (map) { map.on('moveend', refreshMap); refreshMap(); }
   }, [refreshMap]);
   useEffect(() => () => { requestRef.current += 1; mapRef.current?.off('moveend', refreshMap); }, [refreshMap]);
@@ -422,14 +435,17 @@ export default function MobileV2() {
 
   return <div className={`mobile-v2 ${isDark ? 'v2-dark' : ''}`}>
     <div className={`v2-map-layer ${activeTab === 'map' ? '' : 'v2-map-hidden'}`} aria-hidden={activeTab !== 'map'}>
-      {mapActivated && <Suspense fallback={<div className="v2-map-loading" role="status">Načítám mapu…</div>}><MapLibreMap center={START} flyTo={flyTo} selectedSpotId={selectedSpot?.id || selectedMapSpotId} setMapRef={handleMapReady} addMode={addMode} onMapClick={point => { setAddMode(false); setAddAt(point); }} spots={spots} showSpots onSelectSpot={openSpot} userPos={userPos} selectedPOICategory={null} onSelectPOI={(poi, cat) => { setNearbySize('collapsed'); setSelectedPoi({ poi, cat }); }} isDark={isDark} mapLayer={mapLayer} terrainEnabled={terrain} /></Suspense>}
+      {mapActivated && <Suspense fallback={<div className="v2-map-loading" role="status">Načítám mapu…</div>}><MapLibreMap center={START} flyTo={flyTo} selectedSpotId={selectedSpot?.id || selectedMapSpotId} setMapRef={handleMapReady} addMode={addMode} onMapClick={point => { setAddMode(false); setAddAt(point); }} spots={spots} showSpots onSelectSpot={openSpot} userPos={userPos} selectedPOICategory={null} onSelectPOI={(poi, cat) => { setNearbySize('collapsed'); setSelectedPoi({ poi, cat }); }} isDark={isDark} mapLayer={mapLayer} terrainEnabled={terrain} showZoomControls={false} /></Suspense>}
     </div>
     {activeTab === 'map' && <>
       <div className="v2-map-top"><button className="v2-search-pill" onClick={() => navigate('/new/search')}><img src={LOGO} alt="SpotFinder" /><span>Hledat místa…</span><Mic size={17} /></button></div>
+      <div className={`v2-map-controls${nearbySize !== 'collapsed' ? ' v2-map-controls--sheet-open' : ''}${addMode || geoError ? ' v2-map-controls--message' : ''}`}>
       <div className="v2-map-actions">
         <div className="v2-layer-anchor"><button onClick={() => setLayerMenu(value => !value)} aria-label="Mapové vrstvy"><Layers size={19} /></button>{layerMenu && <div className="v2-layer-menu">{[['basic','Základní'],['outdoor','Turistická'],['aerial','Letecká'],['winter','Zimní'],['traffic','Doprava']].map(([id, label]) => <button key={id} onClick={() => { setMapLayer(id); setLayerMenu(false); }} aria-pressed={mapLayer === id}>{label}</button>)}</div>}</div>
         <button onClick={() => setTerrain(value => !value)} aria-label="Přepnout 3D mapu" aria-pressed={terrain}>3D</button>
         <button onClick={requestGps} aria-label="Moje poloha"><Crosshair size={19} /></button>
+      </div>
+      <MobileZoomSlider map={mapInstance} onDragStart={handleZoomDragStart} onDragEnd={handleZoomDragEnd} />
       </div>
       {addMode && <div className="v2-add-hint"><span>Klepněte na mapu a vyberte polohu místa.</span><button onClick={() => setAddMode(false)} aria-label="Zrušit přidání"><X size={18} /></button></div>}
       {geoError && <div className="v2-geo-error" role="status">{geoError}<button onClick={() => setGeoError('')} aria-label="Zavřít"><X size={16} /></button></div>}

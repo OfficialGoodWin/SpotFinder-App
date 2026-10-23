@@ -809,7 +809,7 @@ export default function MapLibreMap({
   spots, showSpots, onSelectSpot,
   userPos, userAccuracy,
   selectedPOICategory, onSelectPOI, onPOIsLoaded, onLoadingChange,
-  isDark, mapLayer,
+  isDark, mapLayer, showZoomControls = true,
   terrainEnabled,
   adminPOIs, adminClosures, adminNavMode, onAdminMapClick, onSelectOfficialPoi, officialEditorActive,
   adminERouteOverrides, adminRoadOverrides,
@@ -985,8 +985,10 @@ export default function MapLibreMap({
     setMapRef?.(map);
 
     const syncZoom = () => setMapZoom(map.getZoom());
-    map.on('zoom', syncZoom);
-    syncZoom();
+    if (showZoomControls) {
+      map.on('zoom', syncZoom);
+      syncZoom();
+    }
 
     const onOnline = () => setIsOnline(true);
     const onOffline = () => setIsOnline(false);
@@ -996,7 +998,7 @@ export default function MapLibreMap({
     return () => {
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
-      map.off('zoom', syncZoom);
+      if (showZoomControls) map.off('zoom', syncZoom);
       removeStyleRestoration();
       markers.current.spots.forEach(removeSpotMarker);
       markers.current.spots.clear();
@@ -1549,8 +1551,8 @@ const addAdminMarkers = () => {
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
 
-      {/* Compact map zoom control — large enough for touch without obscuring the map. */}
-      <div className="absolute bottom-24 left-3 z-20 overflow-hidden rounded-2xl border border-white/70 bg-white/90 text-slate-700 shadow-[0_8px_30px_rgba(15,23,42,0.18)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-100 sm:bottom-auto sm:left-auto sm:right-3 sm:top-1/2 sm:-translate-y-1/2">
+      {/* The legacy map keeps its compact control; Mobile V2 supplies its own slider. */}
+      {showZoomControls && <div className="absolute bottom-24 left-3 z-20 overflow-hidden rounded-2xl border border-white/70 bg-white/90 text-slate-700 shadow-[0_8px_30px_rgba(15,23,42,0.18)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-100 sm:bottom-auto sm:left-auto sm:right-3 sm:top-1/2 sm:-translate-y-1/2">
         <button
           type="button"
           onClick={() => mapRef.current?.zoomIn({ duration: mapMotionDuration(250) })}
@@ -1572,7 +1574,7 @@ const addAdminMarkers = () => {
         >
           <Minus className="h-5 w-5" strokeWidth={2.25} />
         </button>
-      </div>
+      </div>}
 
       {!isOnline && (
         <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 10, pointerEvents: 'none' }}>
