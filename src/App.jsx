@@ -11,10 +11,11 @@ import { ThemeProvider } from '@/lib/ThemeContext';
 import { LanguageProvider, useLanguage } from '@/lib/LanguageContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ErrorBoundary from '@/lib/ErrorBoundary';
-import ChunkLoadRecovery from '@/components/ChunkLoadRecovery';
+import ChunkLoadRecovery, { recoverableLazy } from '@/components/ChunkLoadRecovery';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const Journal = lazy(() => import('./news/Journal'));
+const MobileV2 = recoverableLazy(() => import('./mobile-v2/MobileV2.jsx'));
 const JournalRoute = () => <Journal path={useLocation().pathname} />;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
 const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
@@ -56,6 +57,7 @@ const AuthenticatedApp = () => {
   return (
     <>
     <Routes>
+      <Route path="/new/*" element={<Suspense fallback={<RouteFallback />}><MobileV2 /></Suspense>} />
       <Route path="/news/*" element={<Suspense fallback={<RouteFallback />}><JournalRoute /></Suspense>} />
       <Route path="/" element={
         <LayoutWrapper currentPageName={mainPageKey}>
