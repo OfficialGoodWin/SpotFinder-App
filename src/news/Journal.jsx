@@ -26,7 +26,7 @@ export { articlePath };
 function BrandHeader({ lang, active = false }) {
   const t = copy[lang];
   return <header className="journal-header"><div className="journal-wrap journal-nav">
-    <a className="journal-brand" href="/" aria-label="SpotFinder map"><svg className="journal-brand-mark" viewBox="0 0 36 42" role="img" aria-label="SpotFinder mark"><path d="M18 2.5C9.3 2.5 2.5 9.3 2.5 18c0 10.5 15.5 21.5 15.5 21.5S33.5 28.5 33.5 18C33.5 9.3 26.7 2.5 18 2.5Z" fill="none" stroke="currentColor" strokeWidth="3"/><circle cx="18" cy="18" r="5.5" fill="currentColor"/></svg><span>SpotFinder</span></a>
+    <a className="journal-brand" href="/" aria-label="SpotFinder map"><img className="journal-brand-mark" src="/icon-192.png" width="34" height="34" alt="" /><span>SpotFinder</span></a>
     <nav aria-label="Journal navigation"><a className={active ? 'journal-nav-current' : undefined} aria-current={active ? 'page' : undefined} href={landingPath(lang)}>{t.journal}</a><a className="journal-map-link" href="/">{t.map}</a></nav>
   </div></header>;
 }

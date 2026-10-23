@@ -44,6 +44,25 @@ try {
     New-IconPng 192 (Join-Path $public 'app-icon-maskable-192.png') 0.72
     New-IconPng 512 (Join-Path $public 'app-icon-maskable-512.png') 0.72
 
+    # Replace the old logo in the shared social preview while preserving its text.
+    $ogPath = Join-Path $public 'og-image.png'
+    $oldOg = [System.Drawing.Bitmap]::FromFile($ogPath)
+    $og = [System.Drawing.Bitmap]::new($oldOg.Width, $oldOg.Height)
+    $ogGraphics = [System.Drawing.Graphics]::FromImage($og)
+    try {
+        $ogGraphics.DrawImageUnscaled($oldOg, 0, 0)
+        $background = [System.Drawing.SolidBrush]::new($oldOg.GetPixel(0, 0))
+        try { $ogGraphics.FillRectangle($background, 100, 145, 340, 340) }
+        finally { $background.Dispose() }
+        $ogGraphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+        $ogGraphics.DrawImage($source, 110, 155, 320, 320)
+    } finally {
+        $ogGraphics.Dispose()
+        $oldOg.Dispose()
+    }
+    try { $og.Save($ogPath, $pngFormat) }
+    finally { $og.Dispose() }
+
     # SVG browsers receive the same pixels as the source PNG.
     $encoded = [Convert]::ToBase64String([IO.File]::ReadAllBytes($sourcePath))
     $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><image width="1024" height="1024" href="data:image/png;base64,' + $encoded + '"/></svg>'
