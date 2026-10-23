@@ -14,5 +14,15 @@
       "x-goog-resumable"
     ],
     "maxAgeSeconds": 3600
+  },
+  {
+    "origin": [
+      "https://www.spotfinder.live",
+      "https://spotfinder.live",
+      "https://spot-finder-app.vercel.app"
+    ],
+    "method": ["GET", "HEAD"],
+    "responseHeader": ["Authorization", "Content-Type", "Content-Length", "ETag"],
+    "maxAgeSeconds": 3600
   }
 ]

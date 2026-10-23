@@ -53,6 +53,7 @@ import { filterAndSortNearbySpots, nearbyBounds, normalizeLatLng } from '@/lib/s
 import { applyReviewedLegacyIdentity } from '@/lib/reviewedLegacySpots';
 import { normalizeSpotDraft } from '@/lib/spotDrafts';
 import { isEligibleBirthDate } from '@/lib/ageEligibility';
+import { createPrivateDraftPhotoLoader, draftPhotoLoadMessage } from '@/lib/privateDraftPhotoLoader';
 
 let app, auth, db, functionsInstance, storage;
 try {
@@ -376,26 +377,19 @@ export const uploadDraftImage = async (file, draftId, onProgress, signal) => {
   return { path, name: file.name || 'Draft photo', type: 'image/jpeg', size: blob.size };
 };
 
+const downloadPrivateDraftPhoto = createPrivateDraftPhotoLoader(path => getBlob(storageRef(getFirebaseServices().storage, path)));
+
 export const loadDraftImageFile = async (photoRef) => {
-  const { auth, storage } = getFirebaseServices();
+  const { auth } = getFirebaseServices();
   const current = await waitForAuthRestore(auth);
-  if (!current || current.isAnonymous || !String(photoRef?.path || '').startsWith(`drafts/${current.uid}/`)) {
-    throw new Error('This private draft photo is not available to the signed-in account.');
+  try {
+    const blob = await downloadPrivateDraftPhoto(current, photoRef);
+    if (auth.currentUser?.uid !== current.uid) throw new Error('This private draft photo is not available to the signed-in account.');
+    return new File([blob], photoRef.name || 'draft-photo.jpg', { type: photoRef.type || blob.type || 'image/jpeg' });
+  } catch (error) {
+    if (error?.message === 'This private draft photo is not available to the signed-in account.') throw error;
+    throw new Error(draftPhotoLoadMessage(error, globalThis.navigator?.onLine === false), { cause: error });
   }
-  let lastError;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      if (attempt) await current.getIdToken(true);
-      const blob = await getBlob(storageRef(storage, photoRef.path));
-      return new File([blob], photoRef.name || 'draft-photo.jpg', { type: photoRef.type || blob.type || 'image/jpeg' });
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  const code = String(lastError?.code || '');
-  if (code.includes('object-not-found')) throw new Error('A saved draft photo is missing. Remove it or upload it again.');
-  if (code.includes('unauthorized') || code.includes('unauthenticated')) throw new Error('Your session cannot access this private photo. Sign in again and retry.');
-  throw new Error(navigator.onLine === false ? 'This draft photo is unavailable offline.' : 'The private draft photo could not be downloaded. Check your connection and retry.');
 };
 
 export const deleteDraftImages = async (draftId) => {

@@ -48,19 +48,25 @@ const EMPTY_COPY = {
 
 function DraftThumbnail({ draft, user, draftOwnerKey }) {
   const [src, setSrc] = useState('');
+  const [error, setError] = useState('');
+  const [retryKey, setRetryKey] = useState(0);
   useEffect(() => {
     let url = '';
     let active = true;
     if (!draft.photo_refs?.[0]) return undefined;
+    setError('');
     const loader = user ? loadDraftImageFile(draft.photo_refs[0]) : loadGuestDraftPhoto(draft.photo_refs[0], draftOwnerKey);
     loader.then(file => {
       if (!active) return;
       url = URL.createObjectURL(file);
       setSrc(url);
-    }).catch(() => {});
+    }).catch(error => {
+      if (active) setError(error?.message || 'Draft photo could not be loaded.');
+    });
     return () => { active = false; if (url) URL.revokeObjectURL(url); };
-  }, [draft.id, draft.photo_refs, draftOwnerKey, user]);
-  return src ? <img src={src} alt="" onError={() => setSrc('')} className="h-full w-full object-cover" /> : <FilePenLine className="h-7 w-7 text-gray-400" aria-hidden="true" />;
+  }, [draft.id, draft.photo_refs, draftOwnerKey, user?.id, retryKey]);
+  if (error) return <button type="button" onClick={() => setRetryKey(value => value + 1)} title={error} aria-label={`${error} Retry photo`} className="grid h-full w-full place-items-center p-2 text-xs text-red-700 dark:text-red-300"><AlertCircle className="h-5 w-5" /><span>Retry photo</span></button>;
+  return src ? <img src={src} alt="" onError={() => { setSrc(''); setError('Draft photo could not be displayed.'); }} className="h-full w-full object-cover" /> : <FilePenLine className="h-7 w-7 text-gray-400" aria-hidden="true" />;
 }
 
 export default function MySpotsPanel({ user, draftOwnerKey, draftOnly = false, initialTab, onClose, onSelectSpot, onResumeDraft }) {
