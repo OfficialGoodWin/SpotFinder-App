@@ -516,7 +516,7 @@ export const getDiscoverSpotsPage = async (cursor = null, pageSize = 16) => {
   const { db } = getFirebaseServices();
   const safeSize = Math.min(24, Math.max(1, Math.floor(Number(pageSize) || 16)));
   const clauses = [
-    where('is_public', '==', true), where('status', '==', 'published'),
+    where('is_public', '==', true), where('status', 'in', ['published', 'pending_trust']),
     orderBy('created_date', 'desc'),
   ];
   if (cursor) clauses.push(startAfter(cursor));

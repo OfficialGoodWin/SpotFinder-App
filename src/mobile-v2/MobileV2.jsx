@@ -1,13 +1,13 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Bookmark, Castle, ChevronDown, ChevronLeft, ChevronRight, Coffee, Compass, Crosshair, Heart, Layers, List, Map as MapIcon, MapPin, Mic, Mountain, Plus, Search, Settings, SlidersHorizontal, Trees, UserRound, X } from 'lucide-react';
+import { Bookmark, ChevronDown, ChevronLeft, ChevronRight, Compass, Crosshair, Heart, Layers, List, Map as MapIcon, MapPin, Mic, Plus, Search, Settings, SlidersHorizontal, UserRound, X } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { LANGUAGES, LANGUAGE_VARIANTS } from '@/locales/translations';
 import { getTextScale, saveTextScale } from '@/lib/textScale';
 import { getPublicSpotsInBounds, getPublicSpotsNear, getPublicSpotById, getDiscoverSpotsPage, getSavedSpots, getLikedSpots, getUserSpots, getCloudSpotDrafts, deleteCloudSpotDraft, getSpotSocialState, toggleSpotSave, createSpot, deleteSpot, updateSpot, addSocialPost, resendVerificationEmail } from '@/api/firebaseClient';
-import { getSpotDisplayName, getSpotLocationLabel, getPublicSpotPhotos, getVerifiedSpotCategory, resolveSpotTitle, spotMatchesSearch } from '@/lib/spotPresentation';
+import { getSpotDisplayName, getSpotLocationLabel, resolveSpotTitle, spotMatchesSearch } from '@/lib/spotPresentation';
 import { filterAndSortNearbySpots, getSpotRating, normalizeLatLng } from '@/lib/spotDiscovery';
 import { getConsent, acknowledgeCurrentPrivacyNotice } from '@/lib/consent';
 import { searchPlaces } from '@/lib/placeSearch';
@@ -15,6 +15,9 @@ import { getGuestDraftOwnerKey, listGuestDrafts, deleteGuestDraft } from '@/lib/
 import { deleteGuestDraftPhotos } from '@/lib/guestDraftPhotos';
 import { NEARBY_DEFAULT_KM } from '@/lib/nearbyFilters';
 import MobileZoomSlider from './MobileZoomSlider';
+import { appendDiscoverPage, isDiscoverEligible } from './discoverSpots';
+import DiscoverCard from './DiscoverCard';
+import { categoryOf, SpotPhoto } from './spotDisplay';
 import { APP_VERSION } from '@/config/appVersion';
 import { toast } from 'sonner';
 import { recoverableLazy } from '@/components/ChunkLoadRecovery';
@@ -38,16 +41,6 @@ const TABS = [
 ];
 const CATEGORIES = ['Vše', 'Vyhlídky', 'Hrady', 'Zříceniny', 'Příroda', 'Kavárny'];
 
-function categoryOf(spot) {
-  const value = String(getVerifiedSpotCategory(spot) || '').toLowerCase();
-  if (/viewpoint|sunset|sunrise|photo/.test(value)) return 'Vyhlídky';
-  if (/castle/.test(value)) return 'Hrady';
-  if (/ruin|historic/.test(value)) return 'Zříceniny';
-  if (/mountain|waterfall|hiking/.test(value)) return 'Příroda';
-  if (/caf|food/.test(value)) return 'Kavárny';
-  return 'Ostatní';
-}
-
 function spotTitle(spot, language = 'cs') {
   const resolved = resolveSpotTitle(spot, language);
   if (!resolved.source.endsWith('fallback')) return resolved.title;
@@ -58,17 +51,6 @@ const spotLocation = spot => {
   const label = getSpotLocationLabel(spot);
   return label === 'Location unavailable' ? 'Poloha neuvedena' : label;
 };
-
-function SpotPhoto({ spot, className = '' }) {
-  const [failed, setFailed] = useState(false);
-  const photo = getPublicSpotPhotos(spot)[0]?.url || spot?.image_url;
-  useEffect(() => setFailed(false), [photo]);
-  const category = categoryOf(spot);
-  const Icon = category === 'Hrady' || category === 'Zříceniny' ? Castle : category === 'Kavárny' ? Coffee : category === 'Příroda' ? Trees : Mountain;
-  return photo && !failed
-    ? <img className={className} src={photo} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />
-    : <span className={`v2-photo-fallback ${className}`} role="img" aria-label={`Fotografie není dostupná: ${category}`}><Icon size={25} strokeWidth={1.5} /></span>;
-}
 
 function SpotRow({ spot, onOpen, onMap, trailing }) {
   const rating = getSpotRating(spot);
@@ -84,6 +66,7 @@ function SpotRow({ spot, onOpen, onMap, trailing }) {
     {trailing || <button className="v2-row-icon" onClick={() => onMap(spot)} aria-label={`Zobrazit na mapě: ${spotTitle(spot)}`}><MapPin size={19} /></button>}
   </div>;
 }
+
 
 function StateMessage({ children, retry }) {
   return <div className="v2-state"><p>{children}</p>{retry && <button className="v2-secondary" onClick={retry}>Zkusit znovu</button>}</div>;
@@ -285,7 +268,8 @@ export default function MobileV2() {
     setDiscoverLoading(true); setFeaturedError(false);
     try {
       const page = await getDiscoverSpotsPage(more ? discoverCursor : null);
-      setFeatured(current => more ? [...(current || []), ...page.spots] : page.spots);
+      const eligible = page.spots.filter(isDiscoverEligible);
+      setFeatured(current => more ? appendDiscoverPage(current, eligible) : eligible);
       setDiscoverCursor(page.cursor);
       setDiscoverMore(page.hasMore);
     } catch { setFeaturedError(true); }
@@ -457,7 +441,7 @@ export default function MobileV2() {
         {nearbySize !== 'collapsed' && <><div className="v2-chips" role="group" aria-label="Kategorie">{CATEGORIES.map(name => <button key={name} className={category === name ? 'active' : ''} onClick={() => setCategory(name)}>{name}</button>)}</div>{nearbyResults && <div className="v2-nearby-context"><span>Komunitní místa · {nearbyFilters.maxDistance === Infinity ? 'širší oblast' : `do ${nearbyFilters.maxDistance} km`}{nearbyFilters.minRating ? ` · ${nearbyFilters.minRating}★+` : ''}</span><select aria-label="Řadit místa" value={nearbySort} onChange={event => setNearbySort(event.target.value)}><option value="distance">Nejbližší</option><option value="rating">Hodnocení</option><option value="newest">Nejnovější</option></select></div>}<div className="v2-nearby-list">{nearbyError ? <StateMessage retry={() => runNearby(nearbyFilters, nearbyMode)}>{nearbyError}</StateMessage> : nearbyLoading || spotsLoading && !nearbyResults ? <StateMessage>Načítám místa…</StateMessage> : spotsError && !nearbyResults ? <StateMessage retry={refreshMap}>Místa se nepodařilo načíst.</StateMessage> : visibleSpots.length ? <>{visibleSpots.slice(0, nearbyCount).map(spot => <SpotRow key={spot.id} spot={spot} onOpen={openSpot} onMap={openOnMap} />)}{visibleSpots.length > nearbyCount && <button className="v2-load-more" onClick={() => setNearbyCount(value => value + 20)}>Načíst další místa</button>}</> : <StateMessage>{nearbyResults ? nearbyComplete ? 'V této vzdálenosti nejsou místa podle vybraných filtrů.' : 'V načtené oblasti nejsou odpovídající místa.' : 'V zobrazené oblasti nejsou místa v této kategorii. Posuňte mapu nebo změňte filtr.'}</StateMessage>}</div><button className="v2-expand-control" onClick={() => setNearbySize(value => value === 'full' ? 'partial' : 'full')}>{nearbySize === 'full' ? 'Zmenšit seznam' : 'Zobrazit více'}</button></>}
       </section>
     </>}
-    {activeTab === 'discover' && <section className="v2-page"><header className="v2-page-header"><h1>Objevit</h1><p>Místa sdílená komunitou</p></header><div className="v2-chips" role="group" aria-label="Kategorie">{CATEGORIES.map(name => <button key={name} className={category === name ? 'active' : ''} onClick={() => setCategory(name)}>{name}</button>)}</div><div className="v2-scroll v2-discover-list">{featuredError && featured === null ? <StateMessage retry={() => loadDiscover()}>Místa se nepodařilo načíst.</StateMessage> : featured === null ? <StateMessage>Načítám místa…</StateMessage> : <>{featuredVisible.length ? featuredVisible.map(spot => <article className="v2-discover-card" key={spot.id}><button onClick={() => openSpot(spot)}><SpotPhoto spot={spot} className="v2-discover-photo" /><span className="v2-discover-copy"><small>{categoryOf(spot)} · {spotLocation(spot)}</small><strong>{spotTitle(spot, language)}</strong></span></button><div className="v2-discover-actions"><button disabled={savingSpotId === spot.id || savedIds.has(spot.id)} onClick={() => saveDiscoverSpot(spot)}><Bookmark size={16} fill={savedIds.has(spot.id) ? 'currentColor' : 'none'} /> {savedIds.has(spot.id) ? 'Uložené' : 'Uložit'}</button><button onClick={() => openSpot(spot)}>Detail</button><button onClick={() => openOnMap(spot)}><MapPin size={16} /> Na mapě</button></div></article>) : <StateMessage>V načtených místech tato kategorie zatím není.</StateMessage>}{featuredError && <StateMessage retry={() => loadDiscover(true)}>Další místa se nepodařilo načíst.</StateMessage>}{discoverMore && !featuredError && <button className="v2-load-more" disabled={discoverLoading} onClick={() => loadDiscover(true)}>{discoverLoading ? 'Načítám…' : 'Načíst další místa'}</button>}</>}</div></section>}
+    {activeTab === 'discover' && <section className="v2-page"><header className="v2-page-header"><h1>Objevit</h1><p>Místa sdílená komunitou</p></header><div className="v2-chips" role="group" aria-label="Kategorie">{CATEGORIES.map(name => <button key={name} className={category === name ? 'active' : ''} onClick={() => setCategory(name)}>{name}</button>)}</div><div className="v2-scroll v2-discover-list">{featuredError && featured === null ? <StateMessage retry={() => loadDiscover()}>Místa se nepodařilo načíst.</StateMessage> : featured === null ? <StateMessage>Načítám místa…</StateMessage> : <>{featuredVisible.length ? featuredVisible.map(spot => <DiscoverCard key={spot.id} spot={spot} title={spotTitle(spot, language)} location={spotLocation(spot)} savingSpotId={savingSpotId} savedIds={savedIds} onSave={saveDiscoverSpot} onOpen={openSpot} onMap={openOnMap} />) : <StateMessage>V načtených místech tato kategorie zatím není.</StateMessage>}{featuredError && <StateMessage retry={() => loadDiscover(true)}>Další místa se nepodařilo načíst.</StateMessage>}{discoverMore && !featuredError && <button className="v2-load-more" disabled={discoverLoading} onClick={() => loadDiscover(true)}>{discoverLoading ? 'Načítám…' : 'Načíst další místa'}</button>}</>}</div></section>}
     {activeTab === 'collection' && <section className="v2-page"><header className="v2-page-header v2-collection-header"><img src={LOGO} alt="" /><h1>Moje sbírka</h1></header>{!user ? <div className="v2-guest"><Bookmark size={30} /><h2>Ulož si svá oblíbená místa</h2><p>Pro uložená a oblíbená místa se přihlas. Veřejnou mapu můžeš procházet bez účtu.</p><button className="v2-primary" onClick={() => setShowAuth(true)}>Přihlásit se</button><button className="v2-secondary" onClick={() => chooseTab('map')}>Prozkoumat mapu</button></div> : <><div className="v2-segments" role="tablist" aria-label="Moje sbírka">{[['saved','Uložená'],['liked','Líbí se mi'],['created','Vytvořená']].map(([id,label]) => <button role="tab" aria-selected={collectionTab === id} className={collectionTab === id ? 'active' : ''} key={id} onClick={() => setCollectionTab(id)}>{label}{collection[id] && <span> {collection[id].length >= 100 ? '100+' : collection[id].length}</span>}</button>)}</div><div className="v2-collection-tools"><span>{collection[collectionTab] ? `${collection[collectionTab].length >= 100 ? '100+' : collection[collectionTab].length} míst` : 'Načítám…'}</span><button onClick={() => chooseTab('map')}><MapIcon size={16} /> Zobrazit na mapě</button></div><div className="v2-scroll v2-collection-list">{collectionErrors[collectionTab] ? <StateMessage retry={loadCollection}>{collectionErrors[collectionTab]}</StateMessage> : collectionLoading && !collection[collectionTab] ? <StateMessage>Načítám sbírku…</StateMessage> : collection[collectionTab]?.length ? collection[collectionTab].map(spot => <SpotRow key={spot.id} spot={spot} onOpen={openSpot} onMap={openOnMap} trailing={<button className="v2-row-icon" onClick={() => collectionTab === 'saved' ? setUnsaveSpot(spot) : openSpot(spot)} aria-label={`${collectionTab === 'saved' ? 'Odebrat ze sbírky:' : 'Otevřít:'} ${spotTitle(spot)}`}>{collectionTab === 'liked' ? <Heart size={19} fill="currentColor" /> : collectionTab === 'saved' ? <Bookmark size={19} fill="currentColor" /> : <ChevronRight size={19} />}</button>} />) : <StateMessage>{collectionTab === 'saved' ? 'Zatím nemáš uložená místa.' : collectionTab === 'liked' ? 'Zatím se ti nelíbí žádná místa.' : 'Zatím jsi nevytvořil žádné místo.'}</StateMessage>}</div></>}</section>}
     {activeTab === 'profile' && !settingsPage && !draftsPage && !aboutPage && <section className="v2-page"><header className="v2-page-header"><h1>Profil</h1></header><div className="v2-profile-top">{user?.photoURL ? <img src={user.photoURL} alt="" /> : <UserRound size={28} />}<div><strong>{user?.displayName || 'Objevuj jako host'}</strong><small>{user?.email || 'Přihlas se a ukládej oblíbená místa.'}</small></div></div>{user && !user.emailVerified && <div className="v2-verification"><strong>Ověř e-mailovou adresu</strong><p>Pro hodnocení a ukládání míst je potřeba ověřit e-mail.</p><button disabled={verificationBusy} onClick={async () => { setVerificationBusy(true); try { await resendVerificationEmail(); toast.success('Ověřovací e-mail byl odeslán.'); } catch { toast.error('E-mail se nepodařilo odeslat.'); } finally { setVerificationBusy(false); } }}>{verificationBusy ? 'Odesílám…' : 'Poslat ověřovací e-mail'}</button></div>}{!user && <div className="v2-profile-actions"><button className="v2-primary" onClick={() => setShowAuth(true)}>Přihlásit se / vytvořit účet</button><button className="v2-secondary" onClick={() => chooseTab('map')}>Pokračovat jako host</button></div>}<div className="v2-group">{user && <><button onClick={() => chooseTab('collection')}><Bookmark /> Moje sbírka <ChevronRight /></button><button onClick={() => { setCollectionTab('created'); chooseTab('collection'); }}><MapPin /> Vytvořená místa <ChevronRight /></button></>}<button onClick={() => navigate('/new/drafts')}><List /> Rozpracovaná místa <ChevronRight /></button><button onClick={() => navigate('/new/settings')}><Settings /> Nastavení <ChevronRight /></button><a href="/FAQ"><Compass /> Nápověda <ChevronRight /></a><button onClick={() => navigate('/new/about')}><MapPin /> O aplikaci <ChevronRight /></button><a href="/PrivacyPolicy"><Layers /> Soukromí a podmínky <ChevronRight /></a>{user && <button onClick={() => logout().catch(() => toast.error('Odhlášení se nezdařilo.'))}><UserRound /> Odhlásit se <ChevronRight /></button>}</div></section>}
     {settingsPage && <section className="v2-page"><header className="v2-page-header v2-subpage-header"><button onClick={() => navigate('/new/profile')} aria-label="Zpět na profil"><ChevronLeft /></button><h1>Nastavení</h1></header><div className="v2-scroll v2-settings-body"><h2>Vzhled a jazyk</h2><label className="v2-setting-row"><span>Tmavý režim<small>Přepnout vzhled aplikace a mapy.</small></span><input type="checkbox" checked={isDark} onChange={toggleTheme} /></label><label className="v2-setting-row"><span>Velikost textu<small>{textScale} %</small></span><input type="range" min="75" max="250" step="5" value={textScale} onChange={event => setTextScale(saveTextScale(event.target.value))} /></label><label className="v2-setting-row"><span>Jazyk</span><select value={language} onChange={event => setLanguage(event.target.value)}>{[...LANGUAGES, ...LANGUAGE_VARIANTS].map(item => <option key={item.code} value={item.code}>{item.nativeName}</option>)}</select></label><h2>Mapa</h2><label className="v2-setting-row"><span>Vzhled mapy</span><select value={mapLayer} onChange={event => setMapLayer(event.target.value)}><option value="basic">Základní</option><option value="outdoor">Turistická</option><option value="aerial">Letecká</option><option value="winter">Zimní</option><option value="traffic">Doprava</option></select></label><label className="v2-setting-row"><span>3D mapa</span><input type="checkbox" checked={terrain} onChange={event => setTerrain(event.target.checked)} /></label><h2>Účet a aplikace</h2><button className="v2-setting-link" onClick={() => setShowSettings(true)}>Účet a zabezpečení <ChevronRight /></button><a className="v2-setting-link" href="/FAQ">Nápověda <ChevronRight /></a><a className="v2-setting-link" href="/updates">Aktualizace <ChevronRight /></a><a className="v2-setting-link" href="/PrivacyPolicy">Soukromí a právní informace <ChevronRight /></a></div></section>}
