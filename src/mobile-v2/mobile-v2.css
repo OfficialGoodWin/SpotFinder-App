@@ -39,4 +39,20 @@ html[data-sf-text-scale='large'] .mobile-v2 .v2-segments button{min-width:90px;f
 html[data-sf-text-scale='large'] .mobile-v2 .v2-welcome{max-height:48dvh;overflow-y:auto}
 html[data-sf-text-scale='large'] .mobile-v2 .v2-setting-row{align-items:flex-start;flex-direction:column;font-size:.8rem}
 html[data-sf-text-scale='large'] .mobile-v2 .v2-setting-row select,html[data-sf-text-scale='large'] .mobile-v2 .v2-setting-row input[type=range]{max-width:none;width:100%}
+
+/* Mobile V2 menus and sign-out confirmation. Native selects retain platform behavior. */
+.v2-layer-menu{z-index:40;width:min(180px,calc(100vw - 76px));padding:6px;border-radius:12px;box-shadow:0 10px 28px #142b1826;transform-origin:top left;animation:v2-menu-in .14s ease-out}
+.v2-layer-menu button{min-height:44px;padding:10px 12px;font-size:.8125rem}
+.v2-layer-menu button:hover,.v2-layer-menu button:active{background:var(--v2-soft)}
+.v2-layer-menu button[aria-checked=true]{background:var(--v2-soft);color:var(--v2-green);font-weight:700}
+.v2-nearby-context select,.v2-setting-row select{min-height:44px;border:1px solid var(--v2-line);border-radius:9px;background:var(--v2-surface);color:var(--v2-ink);padding:6px 10px;font-size:.8125rem;box-shadow:0 1px 3px #142b1810;color-scheme:light}
+.v2-dark .v2-nearby-context select,.v2-dark .v2-setting-row select{color-scheme:dark}
+.v2-nearby-context select:focus-visible,.v2-setting-row select:focus-visible{outline:2px solid var(--v2-green);outline-offset:2px}
+.v2-signout-confirm{border:1px solid var(--v2-line);border-radius:16px;padding:22px;box-shadow:0 14px 36px #0003;color:var(--v2-ink)}
+.v2-signout-confirm h2{font-size:1.125rem;line-height:1.3;margin-bottom:9px}
+.v2-signout-confirm p{font-size:.875rem;line-height:1.5;margin-bottom:22px}
+.v2-signout-confirm>div{gap:10px}.v2-signout-confirm button{min-height:44px}
+@keyframes v2-menu-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:350px){.v2-signout-confirm>div{flex-direction:column-reverse}.v2-signout-confirm button{width:100%}}
+@media(prefers-reduced-motion:reduce){.v2-layer-menu{animation:none}}
 html[data-sf-text-scale='large'] .mobile-v2 .v2-setting-link{font-size:.8rem}
