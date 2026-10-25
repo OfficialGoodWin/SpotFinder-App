@@ -15,7 +15,7 @@ import ChunkLoadRecovery, { recoverableLazy } from '@/components/ChunkLoadRecove
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const Journal = lazy(() => import('./news/Journal'));
-const MobileV2 = recoverableLazy(() => import('./mobile-v2/MobileV2.jsx'));
+const NewApp = recoverableLazy(() => import('./new/NewApp.jsx'));
 const JournalRoute = () => <Journal path={useLocation().pathname} />;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
 const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
@@ -57,7 +57,7 @@ const AuthenticatedApp = () => {
   return (
     <>
     <Routes>
-      <Route path="/new/*" element={<Suspense fallback={<RouteFallback />}><MobileV2 /></Suspense>} />
+      <Route path="/new/*" element={<Suspense fallback={<RouteFallback />}><NewApp /></Suspense>} />
       <Route path="/news/*" element={<Suspense fallback={<RouteFallback />}><JournalRoute /></Suspense>} />
       <Route path="/" element={
         <LayoutWrapper currentPageName={mainPageKey}>
