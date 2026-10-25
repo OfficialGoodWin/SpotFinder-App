@@ -22,6 +22,7 @@ import SignOutDialog from './SignOutDialog';
 import NewMapHome from '@/new/NewMapHome';
 import NewWelcome from '@/new/NewWelcome';
 import NewConsent from '@/new/NewConsent';
+import QuickAddFlow, { quickAddRecoveryKey } from '@/new/QuickAddFlow';
 import { mapHomeCategoryOf } from '@/new/mapHomeData';
 import { APP_VERSION } from '@/config/appVersion';
 import { toast } from 'sonner';
@@ -125,7 +126,7 @@ function SearchPanel({ spots, center, voiceQuery, onClose, onSpot, onPlace }) {
 }
 
 export default function MobileV2({ redesigned = false }) {
-  const { user, logout } = useAuth();
+  const { user, logout, isLoadingAuth } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const { language, setLanguage } = useLanguage();
   const navigate = useNavigate();
@@ -151,6 +152,8 @@ export default function MobileV2({ redesigned = false }) {
   const [addAt, setAddAt] = useState(null);
   const [draft, setDraft] = useState(null);
   const [addMode, setAddMode] = useState(false);
+  const [quickAdd, setQuickAdd] = useState(null);
+  const [choosingQuickPosition, setChoosingQuickPosition] = useState(false);
   const [nearbySize, setNearbySize] = useState('collapsed');
   const [nearbyMode, setNearbyMode] = useState('map');
   const [nearbyOrigin, setNearbyOrigin] = useState(null);
@@ -209,6 +212,8 @@ export default function MobileV2({ redesigned = false }) {
   const topVoiceRef = useRef(null);
   const collectionRequestRef = useRef(0);
   const draftRequestRef = useRef(0);
+  const quickRecoveryRef = useRef(0);
+  const quickBootRecoveryRef = useRef(false);
   const savedLoadedForRef = useRef('');
   const nearbyTouchYRef = useRef(null);
   const nearbySwipedRef = useRef(false);
@@ -226,6 +231,22 @@ export default function MobileV2({ redesigned = false }) {
   useEffect(() => { const listener = () => setConsent(getConsent().decided); window.addEventListener('spotfinder:consent-changed', listener); return () => window.removeEventListener('spotfinder:consent-changed', listener); }, []);
   useEffect(() => () => topVoiceRef.current?.stop(), []);
   useEffect(() => { const update = () => setOnline(navigator.onLine !== false); window.addEventListener('online', update); window.addEventListener('offline', update); return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update); }; }, []);
+  useEffect(() => {
+    if (!redesigned || isLoadingAuth || quickBootRecoveryRef.current) return;
+    quickBootRecoveryRef.current = true;
+    if (location.pathname !== '/new/map') return;
+    const request = ++quickRecoveryRef.current;
+    void (async () => {
+      try {
+        const recoveryId = localStorage.getItem(quickAddRecoveryKey(user));
+        if (!recoveryId) return;
+        const rows = user ? await getCloudSpotDrafts() : listGuestDrafts(localStorage, getGuestDraftOwnerKey(localStorage));
+        const recovered = rows.find(item => item.id === recoveryId);
+        const coords = normalizeLatLng(recovered);
+        if (coords && request === quickRecoveryRef.current) setQuickAdd({ coords: { lat: coords[0], lng: coords[1] }, draft: recovered });
+      } catch (error) { console.warn('Quick add startup recovery failed', { code: error?.code || error?.name || 'unknown' }); }
+    })();
+  }, [redesigned, isLoadingAuth, location.pathname, user]);
 
   const refreshMap = useCallback(async () => {
     if (zoomDraggingRef.current) return;
@@ -441,11 +462,29 @@ export default function MobileV2({ redesigned = false }) {
     } catch { navigate('/new/search'); toast.error('Mikrofon není dostupný. Zadejte místo ručně.'); }
   };
   const chooseTab = id => {
-    if (id === 'add') { setAddMode(true); navigate('/new/map'); toast.message('Klepněte na mapu, kam chcete přidat místo.'); return; }
+    if (id === 'add') {
+      if (redesigned) {
+        const recoveryRequest = ++quickRecoveryRef.current;
+        setChoosingQuickPosition(true); setNearbySize('collapsed'); navigate('/new/map');
+        void (async () => {
+          try {
+            const recoveryId = localStorage.getItem(quickAddRecoveryKey(user));
+            if (!recoveryId) return;
+            const rows = user ? await getCloudSpotDrafts() : listGuestDrafts(localStorage, getGuestDraftOwnerKey(localStorage));
+            const recovered = rows.find(item => item.id === recoveryId);
+            const coords = normalizeLatLng(recovered);
+            if (coords && recoveryRequest === quickRecoveryRef.current) { setQuickAdd({ coords: { lat: coords[0], lng: coords[1] }, draft: recovered }); setChoosingQuickPosition(false); toast.message('Pokračuješ v rozpracovaném místě.', { action: { label: 'Nové místo', onClick: () => { quickRecoveryRef.current += 1; setQuickAdd(null); setChoosingQuickPosition(true); } } }); }
+          } catch (error) { console.warn('Quick add recovery failed', { code: error?.code || error?.name || 'unknown' }); }
+        })();
+        return;
+      }
+      setAddMode(true); navigate('/new/map'); toast.message('Klepněte na mapu, kam chcete přidat místo.'); return;
+    }
+    if (redesigned) { quickRecoveryRef.current += 1; setChoosingQuickPosition(false); setQuickAdd(null); }
     setAddMode(false); setNearbySize('collapsed'); navigate(id === 'map' ? '/new' : `/new/${id}`);
   };
   const selectSearchPlace = place => { const point = place.position || place.regionalStructure?.[0]; const coords = normalizeLatLng(point); if (coords) { setFlyTo(coords); navigate('/new'); } else toast.error('Toto místo nemá platnou polohu.'); };
-  const selectedNav = addMode || addAt ? 'add' : activeTab;
+  const selectedNav = addMode || addAt || choosingQuickPosition || quickAdd ? 'add' : activeTab;
 
   useEffect(() => {
     if (!layerMenu) return undefined;
@@ -466,12 +505,14 @@ export default function MobileV2({ redesigned = false }) {
     finally { setSignOutBusy(false); }
   };
 
-  return <div className={`mobile-v2 ${isDark ? 'v2-dark' : ''} ${redesigned && nearbySize === 'full' && activeTab === 'map' ? 'sf-new-sheet-full' : ''}`}>
+  return <div className={`mobile-v2 ${isDark ? 'v2-dark' : ''} ${redesigned && nearbySize === 'full' && activeTab === 'map' ? 'sf-new-sheet-full' : ''} ${redesigned && (quickAdd || choosingQuickPosition) ? 'sf-new-adding' : ''}`}>
     <div className={`v2-map-layer ${activeTab === 'map' ? '' : 'v2-map-hidden'}`} aria-hidden={activeTab !== 'map'}>
       {mapActivated && <Suspense fallback={<div className="v2-map-loading" role="status">Načítám mapu…</div>}><MapLibreMap center={START} flyTo={flyTo} selectedSpotId={selectedSpot?.id || selectedMapSpotId} setMapRef={handleMapReady} addMode={addMode} onMapClick={point => { setAddMode(false); setAddAt(point); }} spots={redesigned ? visibleSpots : spots} showSpots onSelectSpot={openSpot} userPos={userPos} selectedPOICategory={null} onSelectPOI={(poi, cat) => { setNearbySize('collapsed'); setSelectedPoi({ poi, cat }); }} isDark={isDark} mapLayer={mapLayer} terrainEnabled={terrain} showZoomControls={false} /></Suspense>}
     </div>
     {activeTab === 'map' && (redesigned ? <>
-      <NewMapHome category={mapCategory} setCategory={setMapCategory} spots={visibleSpots} language={language} loading={spotsLoading || nearbyLoading} error={spotsError || Boolean(nearbyError)} onRetry={() => nearbyResults ? runNearby(nearbyFilters, nearbyMode) : refreshMap()} onSearch={() => { setVoiceQuery(''); navigate('/new/search'); }} onVoiceSearch={startVoiceSearch} onGps={requestGps} geoError={geoError} onDismissGeoError={() => setGeoError('')} map={mapInstance} mapLayer={mapLayer} onMapLayer={setMapLayer} terrain={terrain} onTerrain={() => setTerrain(value => !value)} nearbySize={nearbySize} onNearbySize={setNearbySize} onOpen={openSpot} onSave={saveDiscoverSpot} savedIds={savedIds} savingSpotId={savingSpotId} />
+      {!choosingQuickPosition && !quickAdd && <NewMapHome category={mapCategory} setCategory={setMapCategory} spots={visibleSpots} language={language} loading={spotsLoading || nearbyLoading} error={spotsError || Boolean(nearbyError)} onRetry={() => nearbyResults ? runNearby(nearbyFilters, nearbyMode) : refreshMap()} onSearch={() => { setVoiceQuery(''); navigate('/new/search'); }} onVoiceSearch={startVoiceSearch} onGps={requestGps} geoError={geoError} onDismissGeoError={() => setGeoError('')} map={mapInstance} mapLayer={mapLayer} onMapLayer={setMapLayer} terrain={terrain} onTerrain={() => setTerrain(value => !value)} nearbySize={nearbySize} onNearbySize={setNearbySize} onOpen={openSpot} onSave={saveDiscoverSpot} savedIds={savedIds} savingSpotId={savingSpotId} />}
+      {choosingQuickPosition && <div className="sf-new-position"><div className="sf-new-position-pin"><MapPin size={38} fill="currentColor" /></div><div className="sf-new-position-panel"><span>POLOHA MÍSTA</span><strong>{center.lat.toFixed(5)}, {center.lng.toFixed(5)}</strong><p>Posuň mapu a polohu doladíš.</p><div><button onClick={() => { quickRecoveryRef.current += 1; setChoosingQuickPosition(false); if (!quickAdd) setDraft(null); }}>Zrušit</button><button onClick={() => { quickRecoveryRef.current += 1; const point = mapRef.current?.getCenter(); if (!point) { toast.error('Počkejte, až se mapa načte.'); return; } const coords = { lat: point.lat, lng: point.lng }; if (!Number.isFinite(coords.lat) || !Number.isFinite(coords.lng)) return; setQuickAdd(current => ({ ...current, coords, draft: current?.draft || null })); setChoosingQuickPosition(false); }}>Potvrdit polohu</button></div></div></div>}
+      {quickAdd && <QuickAddFlow key={quickAdd.draft?.id || 'new'} coords={quickAdd.coords} draft={quickAdd.draft} hidden={choosingQuickPosition} user={user} onMove={() => setChoosingQuickPosition(true)} onClose={() => { setQuickAdd(null); setChoosingQuickPosition(false); setDraft(null); }} onAuth={() => setShowAuth(true)} onViewSpot={spot => { setQuickAdd(null); setChoosingQuickPosition(false); openSpot(spot); }} onCreated={created => { if (created.status === 'published') setSpots(rows => [created, ...rows.filter(row => row.id !== created.id)]); cacheRef.current = null; window.dispatchEvent(new CustomEvent('spotfinder:collection-changed')); }} />}
       {addMode && <div className="v2-add-hint"><span>Klepněte na mapu a vyberte polohu místa.</span><button onClick={() => setAddMode(false)} aria-label="Zrušit přidání"><X size={18} /></button></div>}
       {showWelcome && consent && <NewWelcome onExplore={dismissWelcome} onGps={requestGps} onSignIn={() => setShowAuth(true)} />}
       {!consent && <NewConsent onNecessary={() => { acknowledgeCurrentPrivacyNotice(); setConsent(true); }} />}
@@ -500,7 +541,7 @@ export default function MobileV2({ redesigned = false }) {
     {activeTab === 'profile' && !settingsPage && !draftsPage && !aboutPage && <section className="v2-page"><header className="v2-page-header"><h1>Profil</h1></header><div className="v2-profile-top">{user?.photoURL ? <img src={user.photoURL} alt="" /> : <UserRound size={28} />}<div><strong>{user?.displayName || 'Objevuj jako host'}</strong><small>{user?.email || 'Přihlas se a ukládej oblíbená místa.'}</small></div></div>{user && !user.emailVerified && <div className="v2-verification"><strong>Ověř e-mailovou adresu</strong><p>Pro hodnocení a ukládání míst je potřeba ověřit e-mail.</p><button disabled={verificationBusy} onClick={async () => { setVerificationBusy(true); try { await resendVerificationEmail(); toast.success('Ověřovací e-mail byl odeslán.'); } catch { toast.error('E-mail se nepodařilo odeslat.'); } finally { setVerificationBusy(false); } }}>{verificationBusy ? 'Odesílám…' : 'Poslat ověřovací e-mail'}</button></div>}{!user && <div className="v2-profile-actions"><button className="v2-primary" onClick={() => setShowAuth(true)}>Přihlásit se / vytvořit účet</button><button className="v2-secondary" onClick={() => chooseTab('map')}>Pokračovat jako host</button></div>}<div className="v2-group">{user && <><button onClick={() => chooseTab('collection')}><Bookmark /> Moje sbírka <ChevronRight /></button><button onClick={() => { setCollectionTab('created'); chooseTab('collection'); }}><MapPin /> Vytvořená místa <ChevronRight /></button></>}<button onClick={() => navigate('/new/drafts')}><List /> Rozpracovaná místa <ChevronRight /></button><button onClick={() => navigate('/new/settings')}><Settings /> Nastavení <ChevronRight /></button><a href="/FAQ"><Compass /> Nápověda <ChevronRight /></a><button onClick={() => navigate('/new/about')}><MapPin /> O aplikaci <ChevronRight /></button><a href="/PrivacyPolicy"><Layers /> Soukromí a podmínky <ChevronRight /></a>{user && <button onClick={() => setShowSignOut(true)}><UserRound /> Odhlásit se <ChevronRight /></button>}</div></section>}
     {settingsPage && <section className="v2-page"><header className="v2-page-header v2-subpage-header"><button onClick={() => navigate('/new/profile')} aria-label="Zpět na profil"><ChevronLeft /></button><h1>Nastavení</h1></header><div className="v2-scroll v2-settings-body"><h2>Vzhled a jazyk</h2><label className="v2-setting-row"><span>Tmavý režim<small>Přepnout vzhled aplikace a mapy.</small></span><input type="checkbox" checked={isDark} onChange={toggleTheme} /></label><label className="v2-setting-row"><span>Velikost textu<small>{textScale} %</small></span><input type="range" min="75" max="250" step="5" value={textScale} onChange={event => setTextScale(saveTextScale(event.target.value))} /></label><label className="v2-setting-row"><span>Jazyk</span><select value={language} onChange={event => setLanguage(event.target.value)}>{[...LANGUAGES, ...LANGUAGE_VARIANTS].map(item => <option key={item.code} value={item.code}>{item.nativeName}</option>)}</select></label><h2>Mapa</h2><label className="v2-setting-row"><span>Vzhled mapy</span><select value={mapLayer} onChange={event => setMapLayer(event.target.value)}><option value="basic">Základní</option><option value="outdoor">Turistická</option><option value="aerial">Letecká</option><option value="winter">Zimní</option><option value="traffic">Doprava</option></select></label><label className="v2-setting-row"><span>3D mapa</span><input type="checkbox" checked={terrain} onChange={event => setTerrain(event.target.checked)} /></label><h2>Účet a aplikace</h2><button className="v2-setting-link" onClick={() => setShowSettings(true)}>Účet a zabezpečení <ChevronRight /></button><a className="v2-setting-link" href="/FAQ">Nápověda <ChevronRight /></a><a className="v2-setting-link" href="/updates">Aktualizace <ChevronRight /></a><a className="v2-setting-link" href="/PrivacyPolicy">Soukromí a právní informace <ChevronRight /></a></div></section>}
     {aboutPage && <section className="v2-page"><header className="v2-page-header v2-subpage-header"><button onClick={() => navigate('/new/profile')} aria-label="Zpět na profil"><ChevronLeft /></button><h1>O aplikaci</h1></header><div className="v2-about"><img src={LOGO} alt="SpotFinder" /><h2>SpotFinder</h2><p>Objevuj skutečná místa sdílená komunitou a ukládej si ta, ke kterým se chceš vrátit.</p><small>Verze {APP_VERSION}</small><a href="/FAQ">Nápověda</a><a href="/PrivacyPolicy">Soukromí</a><a href="/TermsAndConditions">Podmínky používání</a></div></section>}
-    {draftsPage && <section className="v2-page"><header className="v2-page-header v2-subpage-header"><button onClick={() => navigate('/new/profile')} aria-label="Zpět na profil"><ChevronLeft /></button><h1>Rozpracovaná místa</h1></header><div className="v2-scroll v2-drafts-list">{draftsError ? <StateMessage retry={loadDrafts}>Rozpracovaná místa se nepodařilo načíst.</StateMessage> : draftRows === null ? <StateMessage>Načítám rozpracovaná místa…</StateMessage> : draftRows.length ? draftRows.map(item => <article className="v2-draft-row" key={item.id}><div className="v2-draft-icon"><MapPin size={23} /></div><div className="v2-draft-copy"><strong>{draftTitle(item)}</strong><small>{draftDate(item.updated_at || item.created_at)}</small></div><button className="v2-draft-resume" onClick={() => { const coords = normalizeLatLng(item); if (!coords) { toast.error('Návrh nemá platnou polohu.'); return; } setDraft(item); setAddAt({ lat: coords[0], lng: coords[1] }); navigate('/new/map'); }}>Pokračovat</button><button className="v2-draft-delete" aria-label={`Smazat ${draftTitle(item)}`} onClick={() => setDraftToDelete(item)}><X size={18} /></button></article>) : <StateMessage>Nemáš žádná rozpracovaná místa.</StateMessage>}</div></section>}
+    {draftsPage && <section className="v2-page"><header className="v2-page-header v2-subpage-header"><button onClick={() => navigate('/new/profile')} aria-label="Zpět na profil"><ChevronLeft /></button><h1>Rozpracovaná místa</h1></header><div className="v2-scroll v2-drafts-list">{draftsError ? <StateMessage retry={loadDrafts}>Rozpracovaná místa se nepodařilo načíst.</StateMessage> : draftRows === null ? <StateMessage>Načítám rozpracovaná místa…</StateMessage> : draftRows.length ? draftRows.map(item => <article className="v2-draft-row" key={item.id}><div className="v2-draft-icon"><MapPin size={23} /></div><div className="v2-draft-copy"><strong>{draftTitle(item)}</strong><small>{draftDate(item.updated_at || item.created_at)}</small></div><button className="v2-draft-resume" onClick={() => { const coords = normalizeLatLng(item); if (!coords) { toast.error('Návrh nemá platnou polohu.'); return; } if (redesigned) setQuickAdd({ coords: { lat: coords[0], lng: coords[1] }, draft: item }); else { setDraft(item); setAddAt({ lat: coords[0], lng: coords[1] }); } navigate('/new/map'); }}>Pokračovat</button><button className="v2-draft-delete" aria-label={`Smazat ${draftTitle(item)}`} onClick={() => setDraftToDelete(item)}><X size={18} /></button></article>) : <StateMessage>Nemáš žádná rozpracovaná místa.</StateMessage>}</div></section>}
     {unknownPage && <section className="v2-page v2-not-found"><MapPin size={34} /><h1>Stránka nebyla nalezena</h1><p>Požadovaná stránka není dostupná.</p><button className="v2-primary" onClick={() => navigate('/new')}>Zpět na mapu</button></section>}
     {searchOpen && <SearchPanel spots={spots} center={center} voiceQuery={voiceQuery} onClose={() => { topVoiceRef.current?.stop(); setVoiceQuery(''); navigate(location.key === 'default' ? '/new' : -1); }} onSpot={openSpot} onPlace={selectSearchPlace} />}
     {!online && <div className="v2-offline" role="status">Jsi offline. Některá místa a mapové podklady nemusí být dostupné.</div>}
