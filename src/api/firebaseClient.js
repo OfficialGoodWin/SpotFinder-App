@@ -341,20 +341,25 @@ const prepareSpotImageBlob = async file => {
 
 export const uploadSpotImage = async (file, { signal, onProgress } = {}) => {
   const { auth, storage } = getFirebaseServices();
-  const uid = auth.currentUser?.uid;
+  const uid = (await waitForAuthRestore(auth))?.uid;
   if (!uid) throw new Error('You must be signed in to upload a photo.');
   const blob = await prepareSpotImageBlob(file);
 
   const id = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const path = `community/${uid}/${id}.jpg`;
   const ref = storageRef(storage, path);
+  let uploaded = false;
   try {
     await uploadWithProgress(ref, blob, { contentType: 'image/jpeg', cacheControl: 'public,max-age=31536000,immutable' }, onProgress, signal);
+    uploaded = true;
     if (signal?.aborted) throw new DOMException('Upload interrupted', 'AbortError');
     await callFn('validateCommunityPhoto')({ path });
     if (signal?.aborted) throw new DOMException('Upload interrupted', 'AbortError');
     return await getDownloadURL(ref);
-  } catch (error) { throw uploadImageError(error); }
+  } catch (error) {
+    if (uploaded) await deleteObject(ref).catch(cleanupError => console.warn('Unreferenced spot photo cleanup failed', { code: cleanupError?.code || 'unknown' }));
+    throw uploadImageError(error);
+  }
 };
 
 const SPOT_DRAFTS_COLLECTION = 'spot_drafts';

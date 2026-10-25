@@ -10,9 +10,9 @@ export const markPreparedImage = file => { preparedFiles.add(file); return file;
 
 export function uploadImageError(error) {
   const code = String(error?.code || '');
-  if (code.includes('unauthorized') || code.includes('unauthenticated')) return new Error('Storage permission denied. Sign in again and retry.');
-  if (code.includes('canceled') || error?.name === 'AbortError') return new Error('Upload interrupted. Choose Retry when ready.');
-  if (code.includes('retry-limit') || code.includes('unknown') || globalThis.navigator?.onLine === false) return new Error('Upload interrupted by the connection. Check your network and retry.');
+  if (code.includes('unauthorized') || code.includes('unauthenticated')) return new Error('Storage permission denied. Sign in again and retry.', { cause: error });
+  if (code.includes('canceled') || error?.name === 'AbortError') return new Error('Upload interrupted. Choose Retry when ready.', { cause: error });
+  if (code.includes('retry-limit') || code.includes('unknown') || globalThis.navigator?.onLine === false) return new Error('Upload interrupted by the connection. Check your network and retry.', { cause: error });
   return error instanceof Error ? error : new Error('The photo could not be uploaded. Try again.');
 }
 

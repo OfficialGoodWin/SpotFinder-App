@@ -11,7 +11,7 @@ import LiquidSegmentedControl from '../ui/LiquidSegmentedControl';
 import DraftConfirmationDialog from '../ui/DraftConfirmationDialog';
 import { draftToast } from '../ui/draftToast';
 import { IMAGE_ACCEPT, validateImageFileMetadata } from '@/lib/imageUploadValidation';
-import ImagePreparationDialog from './ImagePreparationDialog';
+import { prepareContributionPhoto } from '@/lib/prepareContributionPhoto';
 import { hasMeaningfulAddSpotDraft, validateRequiredSpotFields, voiceErrorMessage } from '@/lib/contributionFlow';
 import { createDraftId, deleteGuestDraft, getGuestDraftOwnerKey, normalizeSpotDraft, saveGuestDraft } from '@/lib/spotDrafts';
 import { deleteGuestDraftPhotos, loadGuestDraftPhoto, persistGuestDraftPhotos, pruneGuestDraftPhotos } from '@/lib/guestDraftPhotos';
@@ -63,6 +63,8 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
   const [imageFiles, setImageFiles] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
   const [photoQueue, setPhotoQueue] = useState([]);
+  const [preparingPhotos, setPreparingPhotos] = useState(false);
+  const [activePreview, setActivePreview] = useState(0);
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
   const [interimText, setInterimText] = useState('');
@@ -98,7 +100,9 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
   const recognitionRef = useRef(null);
   const submitLockRef = useRef(false);
   const draftSaveLockRef = useRef(false);
+  const photoPreparationLockRef = useRef(false);
   const uploadedPublicPhotosRef = useRef(new Map());
+  const photoDiagnosticsRef = useRef(new Map());
   const selectedPhotoUrlsRef = useRef(new Set());
   const photoAbortRef = useRef(new AbortController());
   const committedRef = useRef(''); // tracks already-committed final transcript
@@ -176,7 +180,12 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
   };
 
   const handleSaveDraft = async () => {
-    if (draftSaveLockRef.current || submitLockRef.current) return;
+    if (draftSaveLockRef.current || submitLockRef.current || photoPreparationLockRef.current) return;
+    if (photoQueue.length) {
+      setDraftError('Některé fotografie ještě nejsou připravené. Zkuste jejich přípravu znovu nebo je odeberte.');
+      setShowCloseChoices(false);
+      return;
+    }
     draftSaveLockRef.current = true;
     setSavingDraft(true);
     setDraftError('');
@@ -197,7 +206,10 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
               break;
             } catch (error) { lastError = error; }
           }
-          if (lastError) throw lastError;
+          if (lastError) {
+            console.error('Spot photo upload failed', { stage: 'draft-upload', imageIndex: index, mimeType: photoDiagnosticsRef.current.get(imageFiles[index])?.type || imageFiles[index]?.type, size: photoDiagnosticsRef.current.get(imageFiles[index])?.size || imageFiles[index]?.size, dimensions: photoDiagnosticsRef.current.get(imageFiles[index]) ? { width: photoDiagnosticsRef.current.get(imageFiles[index]).width, height: photoDiagnosticsRef.current.get(imageFiles[index]).height } : null, conversion: 'prepared-jpeg', code: lastError?.cause?.code || lastError?.code || lastError?.name || 'unknown' });
+            throw new Error(`Fotografii ${index + 1} se nepodařilo uložit do konceptu.`, { cause: lastError });
+          }
         }
         refs = uploaded;
         setDraftPhotoRefs(uploaded);
@@ -220,9 +232,8 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
       window.dispatchEvent(new CustomEvent('spotfinder:drafts-changed'));
       onClose();
     } catch (error) {
-      console.error('Draft save failed:', error);
-      setDraftError(error?.message || 'The draft could not be saved. Your form is still open.');
-      draftToast.saveFailed();
+      console.error('Spot draft save failed', { stage: 'draft-save', code: error?.cause?.code || error?.code || error?.name || 'unknown' });
+      setDraftError(`${error?.message?.startsWith('Fotografii ') ? error.message : 'Koncept se nepodařilo uložit.'} Údaje zůstaly zachovány, zkuste to znovu.`);
       setShowCloseChoices(false);
       focusError(errorSummaryRef);
     } finally {
@@ -239,22 +250,51 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
     });
   };
 
-  const handleImageChange = (e) => {
-    const remaining = 3 - imageFiles.length - photoQueue.length;
-    const selected = Array.from(e.target.files || []).filter(file => {
-      try { validateImageFileMetadata(file); return true; }
-      catch (error) { toast.error(error.message); return false; }
-    });
-    if (!remaining || !selected.length) { e.target.value = ''; return; }
-    const accepted = selected.slice(0, remaining);
-    setPhotoQueue(current => [...current, ...accepted]);
-    if (selected.length > remaining) toast.info('You can add up to 3 photos per spot.');
-    e.target.value = '';
+  const prepareQueuedPhotos = async files => {
+    if (photoPreparationLockRef.current || !files.length) return;
+    photoPreparationLockRef.current = true;
+    setPreparingPhotos(true);
+    setSubmitError('');
+    try {
+      for (let index = 0; index < files.length; index += 1) {
+        const source = files[index];
+        try {
+          const prepared = await prepareContributionPhoto(source);
+          acceptPreparedPhoto(prepared.file, prepared.original);
+          setPhotoQueue(files.slice(index + 1));
+        } catch (error) {
+          console.error('Spot photo selection failed', { stage: 'preparation', imageIndex: index, mimeType: source.type || 'unknown', size: source.size, dimensions: null, conversion: 'failed', code: error?.code || error?.name || 'unknown' });
+          setPhotoQueue(files.slice(index));
+          setSubmitError(`Fotografii ${index + 1} (${source.name}) se nepodařilo připravit. Zkuste to znovu nebo použijte JPEG kopii.`);
+          return;
+        }
+      }
+    } finally {
+      setPreparingPhotos(false);
+      photoPreparationLockRef.current = false;
+    }
   };
 
-  const acceptPreparedPhoto = file => {
+  const handleImageChange = (e) => {
+    if (photoPreparationLockRef.current) return;
+    const picked = Array.from(e.target.files || []);
+    e.target.value = '';
+    const remaining = 3 - imageFiles.length - photoQueue.length;
+    const selected = picked.filter(file => {
+      try { validateImageFileMetadata(file); return true; }
+      catch (error) { toast.error('Soubor není podporovaná fotografie (JPEG, PNG, WebP nebo HEIC/HEIF).'); return false; }
+    });
+    if (!remaining || !selected.length) return;
+    const accepted = selected.slice(0, remaining);
+    setPhotoQueue(accepted);
+    if (selected.length > remaining) toast.info('K jednomu místu lze přidat nejvýše 3 fotografie.');
+    void prepareQueuedPhotos(accepted);
+  };
+
+  const acceptPreparedPhoto = (file, diagnostic) => {
     const url = URL.createObjectURL(file);
     selectedPhotoUrlsRef.current.add(url);
+    photoDiagnosticsRef.current.set(file, diagnostic);
     setImageFiles(current => [...current, file]);
     setImagePreviews(current => [...current, url]);
     setDraftPhotoRefs(current => [...current, null]);
@@ -263,11 +303,13 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
 
   const removeImage = (index) => {
     uploadedPublicPhotosRef.current.delete(imageFiles[index]);
+    photoDiagnosticsRef.current.delete(imageFiles[index]);
     URL.revokeObjectURL(imagePreviews[index]);
     selectedPhotoUrlsRef.current.delete(imagePreviews[index]);
     setImageFiles(current => current.filter((_, itemIndex) => itemIndex !== index));
     setImagePreviews(current => current.filter((_, itemIndex) => itemIndex !== index));
     setDraftPhotoRefs(current => current.filter((_, itemIndex) => itemIndex !== index));
+    setActivePreview(current => Math.max(0, Math.min(current, imageFiles.length - 2)));
   };
 
   const moveImage = (from, to) => {
@@ -359,8 +401,13 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
   };
 
   const handleSave = async () => {
-    if (loading || submitLockRef.current) return;
+    if (loading || submitLockRef.current || photoPreparationLockRef.current) return;
     setSubmitError('');
+    if (photoQueue.length) {
+      setSubmitError('Některé fotografie ještě nejsou připravené. Zkuste jejich přípravu znovu nebo je odeberte.');
+      focusError(errorSummaryRef);
+      return;
+    }
     if (!draftPhotosReady) {
       setSubmitError(t('addSpotUi.photosUnavailable'));
       focusError(errorSummaryRef);
@@ -418,7 +465,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
 
     // A resumed account draft is published from its verified private Storage
     // objects by the server. Persist any photos added during this edit first.
-    if (draft && user && imageFiles.length && draftPhotosReady) {
+    if (user && imageFiles.length && draftPhotosReady) {
       try {
         setUploadingImage(true);
         const refs = [...draftPhotoRefs];
@@ -431,7 +478,10 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
               uploaded = await uploadDraftImage(imageFiles[index], draftIdRef.current, fraction => setPhotoProgress(Math.round(((index + fraction) / imageFiles.length) * 100)), photoAbortRef.current.signal);
             } catch (error) { lastError = error; }
           }
-          if (!uploaded) throw lastError;
+          if (!uploaded) {
+            console.error('Spot photo upload failed', { stage: 'private-upload', imageIndex: index, mimeType: photoDiagnosticsRef.current.get(imageFiles[index])?.type || imageFiles[index]?.type, size: photoDiagnosticsRef.current.get(imageFiles[index])?.size || imageFiles[index]?.size, dimensions: photoDiagnosticsRef.current.get(imageFiles[index]) ? { width: photoDiagnosticsRef.current.get(imageFiles[index]).width, height: photoDiagnosticsRef.current.get(imageFiles[index]).height } : null, conversion: 'prepared-jpeg', code: lastError?.cause?.code || lastError?.code || lastError?.name || 'unknown' });
+            throw new Error(`Fotografii ${index + 1} se nepodařilo nahrát. Zkontrolujte připojení a zkuste to znovu.`, { cause: lastError });
+          }
           refs[index] = uploaded;
           setDraftPhotoRefs([...refs]);
         }
@@ -439,7 +489,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
         assertOwnerSession();
         await saveCloudSpotDraft({ ...currentDraft, photo_refs: refs }, ownerUidRef.current);
       } catch (error) {
-        setSubmitError(error?.message || 'The private photos could not be persisted. Your draft and form are still available.');
+        setSubmitError(error?.message || 'Fotografie se nepodařilo uložit. Údaje zůstaly zachovány, zkuste to znovu.');
         submitLockRef.current = false;
         setLoading(false);
         setUploadingImage(false);
@@ -449,7 +499,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
       }
     }
 
-    if (imageFiles.length && !(draft && user)) {
+    if (imageFiles.length && !user) {
       try {
         setUploadingImage(true);
         const fractions = imageFiles.map(file => uploadedPublicPhotosRef.current.has(file) ? 1 : 0);
@@ -461,8 +511,9 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
           },
         }), uploadedPublicPhotosRef.current);
       } catch (err) {
-        console.error('Image uploads failed:', err);
-        setSubmitError(err?.message || 'The photos could not be uploaded. Your changes are still here.');
+        const failedFile = imageFiles[err?.imageIndex];
+        console.error('Spot photo upload failed', { stage: 'public-upload', imageIndex: err?.imageIndex, mimeType: photoDiagnosticsRef.current.get(failedFile)?.type || failedFile?.type, size: photoDiagnosticsRef.current.get(failedFile)?.size || failedFile?.size, dimensions: photoDiagnosticsRef.current.get(failedFile) ? { width: photoDiagnosticsRef.current.get(failedFile).width, height: photoDiagnosticsRef.current.get(failedFile).height } : null, conversion: 'prepared-jpeg', code: err?.cause?.cause?.code || err?.cause?.code || 'unknown' });
+        setSubmitError(err?.message || 'Fotografie se nepodařilo nahrát. Údaje zůstaly zachovány, zkuste to znovu.');
         submitLockRef.current = false;
         setLoading(false);
         focusError(errorSummaryRef);
@@ -504,7 +555,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
       if (photoAbortRef.current.signal.aborted) throw new Error('Upload interrupted. Reopen your draft and try again.');
       assertOwnerSession();
       await onSave(baseData, socialValidation?.canonicalUrl || '');
-      if (draft) {
+      if (draft || (user && imageFiles.length)) {
         try {
           if (user) await deleteCloudSpotDraft(draftIdRef.current);
           else {
@@ -520,12 +571,14 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
       draftToast.published();
       onClose();
     } catch (err) {
-      console.error('Save failed:', err);
+      console.error('Spot publication failed', { stage: 'publication', code: err?.cause?.code || err?.code || err?.name || 'unknown', imageCount: imageFiles.length });
       const rawMessage = String(err?.message || '');
       const isDescriptionError = /description is required/i.test(rawMessage);
       const message = isDescriptionError
         ? t('addSpot.descriptionRequired')
-        : rawMessage.replace(/^Firebase:\s*/i, '').replace(/\s*\[\d{3}\]\s*$/, '') || t('addSpot.saveErrorMessage');
+        : /one or more images couldn't be saved|internal \[0\]/i.test(rawMessage)
+          ? 'Fotografie se nepodařilo uložit při zveřejnění. Údaje zůstaly zachovány; zkuste to znovu.'
+          : 'Místo se nepodařilo zveřejnit. Údaje a fotografie zůstaly zachovány; zkuste to znovu.';
       setSubmitError(message);
       if (isDescriptionError) {
         setFieldErrors(current => ({ ...current, description: message }));
@@ -569,6 +622,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
               <div className="min-w-0 pt-0.5">
                 <p className="text-sm font-bold">{t('addSpot.saveErrorTitle')}</p>
                 <p className="mt-1 text-xs leading-5 text-red-700 dark:text-red-200">{submitError}</p>
+                <button type="button" onClick={handleSave} disabled={loading || preparingPhotos} className="mt-2 min-h-10 rounded-xl border border-red-300 px-3 text-xs font-semibold disabled:opacity-50">Zkusit znovu</button>
               </div>
               <button type="button" onClick={() => setSubmitError('')} aria-label={t('common.close')} className="absolute right-2.5 top-2.5 rounded-full p-1.5 text-red-500 transition hover:bg-red-100 dark:hover:bg-red-900/60">
                 <X className="h-4 w-4" />
@@ -763,22 +817,26 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
               <span className="text-xs text-gray-400 dark:text-muted-foreground">{imageFiles.length}/3</span>
             </div>
             {imagePreviews.length > 0 && (
-              <div className="mb-3 grid grid-cols-3 gap-2">
+              <div className="mb-3 space-y-2">
+                <img src={imagePreviews[Math.min(activePreview, imagePreviews.length - 1)]} alt={t('addSpotUi.photoPreview', { number: Math.min(activePreview, imagePreviews.length - 1) + 1 })} className="max-h-72 w-full rounded-2xl bg-gray-50 object-contain dark:bg-background" />
+                <div className="grid grid-cols-3 gap-2">
                 {imagePreviews.map((preview, index) => (
-                  <div key={preview} className={mobileV2 ? 'relative overflow-hidden rounded-xl border border-gray-200 bg-gray-50' : 'relative aspect-square overflow-hidden rounded-2xl'}>
-                    <div className={mobileV2 ? 'aspect-square' : 'h-full w-full'}><img src={preview} alt={t('addSpotUi.photoPreview', { number: index + 1 })} className={mobileV2 ? 'h-full w-full object-contain' : 'h-full w-full object-cover'} /></div>
+                  <div key={preview} className="relative overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:bg-background">
+                    <button type="button" onClick={() => setActivePreview(index)} aria-label={t('addSpotUi.photoPreview', { number: index + 1 })} aria-pressed={activePreview === index} className="block h-24 w-full"><img src={preview} alt="" className="h-full w-full object-contain" /></button>
                     <button
                       type="button"
                       onClick={() => removeImage(index)}
+                      disabled={loading || preparingPhotos || savingDraft}
                       aria-label={t('addSpotUi.removePhoto', { number: index + 1 })}
                       className="absolute right-1.5 top-1.5 rounded-full bg-black/60 p-1.5 text-white backdrop-blur-sm"
                     >
                       <X className="h-4 w-4" />
                     </button>
-                    {index === 0 && <span className={`rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white ${mobileV2 ? 'absolute bottom-11 left-1' : 'absolute bottom-1.5 left-1.5'}`}>{t('addSpotUi.cover')}</span>}
-                    {mobileV2 && imageFiles.length > 1 && <div className="flex justify-between border-t border-gray-200 bg-white"><button type="button" onClick={() => moveImage(index, index - 1)} disabled={index === 0} aria-label={`Přesunout fotografii ${index + 1} doleva`} className="grid h-10 w-10 place-items-center disabled:opacity-30"><ArrowLeft size={16} /></button><button type="button" onClick={() => moveImage(index, index + 1)} disabled={index === imageFiles.length - 1} aria-label={`Přesunout fotografii ${index + 1} doprava`} className="grid h-10 w-10 place-items-center disabled:opacity-30"><ArrowRight size={16} /></button></div>}
+                    {index === 0 && <span className="absolute bottom-11 left-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white">{t('addSpotUi.cover')}</span>}
+                    {imageFiles.length > 1 && <div className="flex justify-between border-t border-gray-200 bg-white"><button type="button" onClick={() => moveImage(index, index - 1)} disabled={loading || preparingPhotos || savingDraft || index === 0} aria-label={`Přesunout fotografii ${index + 1} doleva`} className="grid h-10 w-10 place-items-center disabled:opacity-30"><ArrowLeft size={16} /></button><button type="button" onClick={() => moveImage(index, index + 1)} disabled={loading || preparingPhotos || savingDraft || index === imageFiles.length - 1} aria-label={`Přesunout fotografii ${index + 1} doprava`} className="grid h-10 w-10 place-items-center disabled:opacity-30"><ArrowRight size={16} /></button></div>}
                   </div>
                 ))}
+                </div>
               </div>
             )}
             {imageFiles.length < 3 && (
@@ -786,9 +844,11 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
                 <Camera className="w-8 h-8 text-gray-400 dark:text-muted-foreground mb-1" />
                 <span className="text-sm text-gray-500 dark:text-muted-foreground">{t('addSpotUi.addPhotos', { count: 3 - imageFiles.length })}</span>
                 <span className="mt-1 text-xs text-gray-400">{t('addSpotUi.photoHint')}</span>
-                <input type="file" accept={IMAGE_ACCEPT} multiple onChange={handleImageChange} disabled={!draftPhotosReady} className="sr-only" />
+                <input type="file" accept={IMAGE_ACCEPT} multiple onChange={handleImageChange} disabled={!draftPhotosReady || preparingPhotos || !!photoQueue.length || loading} className="sr-only" />
               </label>
             )}
+            {preparingPhotos && <p role="status" className="mt-2 text-xs font-medium text-blue-700 dark:text-blue-300">Připravuji fotografie…</p>}
+            {!preparingPhotos && photoQueue.length > 0 && <div className="mt-2 flex items-center gap-2 text-xs"><span>{photoQueue.length} čekající fotografie</span><button type="button" onClick={() => prepareQueuedPhotos(photoQueue)} className="min-h-10 rounded-xl border border-blue-300 px-3 font-semibold">Zkusit přípravu znovu</button><button type="button" onClick={() => { setPhotoQueue([]); setSubmitError(''); }} className="min-h-10 rounded-xl border border-gray-300 px-3 font-semibold">Odebrat čekající</button></div>}
             {(savingDraft || uploadingImage) && photoProgress > 0 && <p className="mt-2 text-xs font-medium text-blue-700 dark:text-blue-300" role="status">{t('addSpotUi.savingPhotos', { percent: photoProgress })}</p>}
             {!user && imageFiles.length > 0 && <p className="mt-2 text-xs leading-5 text-amber-700 dark:text-amber-300">{t('addSpotUi.guestPhotos')}</p>}
           </div>
@@ -823,10 +883,10 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
           <button
             type="button"
             onClick={handleSave}
-            disabled={loading}
+            disabled={loading || preparingPhotos || !!photoQueue.length || !draftPhotosReady}
             className="flex-2 px-8 py-3 rounded-2xl bg-green-600 text-white font-semibold text-sm hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center gap-2"
           >
-            {(loading || uploadingImage) && <Loader2 className="w-4 h-4 animate-spin" />}
+            {(loading || uploadingImage || preparingPhotos) && <Loader2 className="w-4 h-4 animate-spin" />}
             {loading ? t('addSpot.saving') : t('addSpot.saveSpot')}
           </button>
         </div>
@@ -844,7 +904,6 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
       >
         {!user && imageFiles.length > 0 && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">{t('addSpotUi.guestDraftPhotos', { count: imageFiles.length })}</p>}
       </DraftConfirmationDialog>
-      {photoQueue[0] && <ImagePreparationDialog key={`${photoQueue[0].name}-${photoQueue[0].lastModified}-${photoQueue.length}`} file={photoQueue[0]} onConfirm={acceptPreparedPhoto} onCancel={() => setPhotoQueue(current => current.slice(1))} />}
     </div>
   );
 }

@@ -11,7 +11,12 @@ test('a failed selected photo blocks publication and successful uploads are reus
     if (file.name === 'two' && attempts.get(file.name) === 1) throw new Error('offline');
     return `https://example.test/${file.name}`;
   };
-  await assert.rejects(() => uploadSelectedPhotos(files, upload, cache), /One or more photos could not be uploaded/);
+  await assert.rejects(() => uploadSelectedPhotos(files, upload, cache), error => {
+    assert.match(error.message, /Fotografii 2 \(two\)/);
+    assert.equal(error.imageIndex, 1);
+    assert.equal(error.cause.message, 'offline');
+    return true;
+  });
   assert.equal(cache.size, 2);
   assert.deepEqual(await uploadSelectedPhotos(files, upload, cache), files.map(file => `https://example.test/${file.name}`));
   assert.deepEqual([...attempts.values()], [1, 2, 1]);

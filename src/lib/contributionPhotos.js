@@ -9,8 +9,11 @@ export async function uploadSelectedPhotos(files, upload, cache = new Map()) {
     return url;
   }));
   if (results.some(result => result.status === 'rejected')) {
-    const reason = results.find(result => result.status === 'rejected')?.reason?.message || 'Check your connection and retry.';
-    throw new Error(`One or more photos could not be uploaded. ${reason} Your changes are still here.`);
+    const index = results.findIndex(result => result.status === 'rejected');
+    const cause = results[index].reason;
+    const error = new Error(`Fotografii ${index + 1} (${files[index]?.name || 'bez názvu'}) se nepodařilo nahrát. Zkontrolujte připojení a zkuste to znovu.`, { cause });
+    error.imageIndex = index;
+    throw error;
   }
   return results.map(result => result.value);
 }

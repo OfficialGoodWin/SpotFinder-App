@@ -28,6 +28,7 @@ test('desktop and iPhone-sized browsers preview, resize, crop, and reject corrup
       await page.goto(`${origin}/`, { waitUntil: 'load' });
       const checked = await page.evaluate(async () => {
         const image = await import('/src/lib/imagePreparation.js');
+        const contribution = await import('/src/lib/prepareContributionPhoto.js');
         const validation = await import('/src/lib/imageUploadValidation.js');
         const drafts = await import('/src/lib/guestDraftPhotos.js');
         const fixture = async (width, height, name = 'photo.jpg') => {
@@ -55,6 +56,8 @@ test('desktop and iPhone-sized browsers preview, resize, crop, and reject corrup
         const full = await image.prepareImageFile(normal, { info: normalInfo, mode: 'full' });
         const resized = await image.prepareImageFile(large, { info: largeInfo, mode: 'resize', maxEdge: 3072 });
         const wide = await image.prepareImageFile(panorama, { info: panoInfo, mode: 'resize', maxEdge: 4096 });
+        const selectedNormal = await contribution.prepareContributionPhoto(normal);
+        const selectedWide = await contribution.prepareContributionPhoto(panorama);
         const crop = await image.prepareImageFile(panorama, { info: panoInfo, mode: 'crop', maxEdge: 2048, crop: { x: 0.5, y: 0, width: 0.5, height: 1 } });
         const upright = await image.prepareImageFile(portrait, { info: portraitInfo, mode: 'full' });
         const oriented = await image.prepareImageFile(rotated, { mode: 'full' });
@@ -69,7 +72,7 @@ test('desktop and iPhone-sized browsers preview, resize, crop, and reject corrup
         const restored = await drafts.loadGuestDraftPhoto(draftRef, 'image-test-owner');
         await drafts.deleteGuestDraftPhotos('image-test-owner', 'image-test-draft');
         const bytes = Array.from(new Uint8Array(await wide.file.arrayBuffer()));
-        return { normalInfo, largeInfo, panoInfo, portraitInfo, full: { width: full.width, height: full.height, bytes: full.bytes }, resized: { width: resized.width, height: resized.height, bytes: resized.bytes }, wide: { width: wide.width, height: wide.height, bytes: wide.bytes }, crop: { width: crop.width, height: crop.height, bytes: crop.bytes }, upright: { width: upright.width, height: upright.height }, oriented: { width: oriented.width, height: oriented.height }, corruptMessage, heicMessage, type: validation.detectImageType(new Uint8Array(await wide.file.slice(0, 16).arrayBuffer())), draft: { size: restored.size, type: restored.type }, bytes };
+        return { normalInfo, largeInfo, panoInfo, portraitInfo, full: { width: full.width, height: full.height, bytes: full.bytes }, resized: { width: resized.width, height: resized.height, bytes: resized.bytes }, wide: { width: wide.width, height: wide.height, bytes: wide.bytes }, selectedNormal: { width: selectedNormal.width, height: selectedNormal.height, type: selectedNormal.file.type }, selectedWide: { width: selectedWide.width, height: selectedWide.height, type: selectedWide.file.type }, crop: { width: crop.width, height: crop.height, bytes: crop.bytes }, upright: { width: upright.width, height: upright.height }, oriented: { width: oriented.width, height: oriented.height }, corruptMessage, heicMessage, type: validation.detectImageType(new Uint8Array(await wide.file.slice(0, 16).arrayBuffer())), draft: { size: restored.size, type: restored.type }, bytes };
       });
       assert.equal(checked.panoInfo.width, 11000);
       assert.equal(checked.panoInfo.height, 500);
@@ -77,6 +80,9 @@ test('desktop and iPhone-sized browsers preview, resize, crop, and reject corrup
       assert.deepEqual([checked.full.width, checked.full.height], [1200, 800]);
       assert.equal(checked.resized.width, 3072);
       assert.equal(checked.wide.width, 4096);
+      assert.deepEqual(checked.selectedNormal, { width: 1200, height: 800, type: 'image/jpeg' });
+      assert.equal(checked.selectedWide.width, 4096);
+      assert.ok(checked.selectedWide.width / checked.selectedWide.height > 20);
       assert.ok(checked.wide.width / checked.wide.height > 20);
       assert.ok(checked.crop.width > checked.crop.height);
       assert.deepEqual([checked.upright.width, checked.upright.height], [900, 1800]);
