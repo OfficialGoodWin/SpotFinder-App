@@ -8,6 +8,7 @@ import { prepareContributionPhoto } from '@/lib/prepareContributionPhoto';
 import { moderateSubmission } from '@/lib/moderation';
 import { validateSocialPostUrl } from '@/lib/socialUrlPolicy';
 import { getSpotDisplayName } from '@/lib/spotPresentation';
+import NewPublishConfirmation from './NewPublishConfirmation';
 
 const CATEGORIES = [
   { label: 'Vyhlídka', tag: 'Viewpoint', type: 'viewpoint' },
@@ -19,7 +20,7 @@ const CATEGORIES = [
 const COST = [['free', 'Zdarma'], ['paid', 'Placené'], ['donation', 'Dobrovolné']];
 const EFFORT = [['easy', 'Snadná procházka'], ['moderate', 'Kousek pěšky'], ['hard', 'Výprava']];
 const PARKING = [['yes', 'K dispozici'], ['street', 'Na ulici'], ['paid', 'Placené'], ['no', 'Žádné']];
-const TIMES = [['sunrise', 'Východ slunce'], ['sunset', 'Západ slunce'], ['golden_hour', 'Zlatá hodinka'], ['after_dark', 'Po setmění'], ['anytime', 'Kdykoli']];
+const TIMES = [['sunrise', 'Východ slunce'], ['sunset', 'Západ slunce'], ['golden_hour', 'Zlatá hodinka'], ['night', 'Po setmění'], ['anytime', 'Kdykoli']];
 const validCoords = point => Number.isFinite(point?.lat) && point.lat >= -90 && point.lat <= 90 && Number.isFinite(point?.lng) && point.lng >= -180 && point.lng <= 180;
 export const quickAddRecoveryKey = user => `spotfinder:new:active-draft:${user?.id || getGuestDraftOwnerKey(localStorage)}`;
 const photoError = (index, error) => `Fotografii ${index + 1} se nepodařilo uložit. ${error?.code === 'storage/unauthorized' ? 'Přihlas se znovu.' : 'Zkontroluj připojení a zkus to znovu.'}`;
@@ -45,7 +46,7 @@ export default function QuickAddFlow({ coords, draft, hidden, user, onMove, onCl
   const [form, setForm] = useState(() => ({
     title: initial.current.title, category: initial.current.tags[0] || '', description: initial.current.description,
     cost: initial.current.cost, difficulty: initial.current.accessDifficulty, parking: initial.current.parking,
-    bestTime: initial.current.bestTime, socialUrl: initial.current.socialUrl,
+    bestTime: initial.current.bestTime.map(value => value === 'after_dark' ? 'night' : value), socialUrl: initial.current.socialUrl,
   }));
   const [photos, setPhotos] = useState([]);
   const [pendingPhotos, setPendingPhotos] = useState([]);
@@ -281,7 +282,7 @@ export default function QuickAddFlow({ coords, draft, hidden, user, onMove, onCl
   };
 
   if (hidden) return null;
-  if (result) return <section className="sf-new-quick-add sf-new-quick-add--result" role="status"><div className="sf-new-quick-body"><h1>{result.status === 'published' ? 'Místo je zveřejněné' : 'Místo čeká na schválení'}</h1><p>{result.status === 'published' ? 'Tvé místo je na mapě.' : 'Místo bylo odesláno. Na mapě se zobrazí po kontrole.'}</p>{socialWarning && <p className="sf-new-quick-error">{socialWarning}</p>}<button className="sf-new-quick-primary" onClick={() => result.status === 'published' ? onViewSpot(result) : onClose()}>{result.status === 'published' ? 'Zobrazit místo' : 'Zpět na mapu'}</button></div></section>;
+  if (result) return <NewPublishConfirmation spot={result} socialWarning={socialWarning} onBack={onClose} onView={onViewSpot} onUpdated={updated => { setResult(updated); onCreated(updated); }} />;
   return <section className="sf-new-quick-add" aria-label="Nové místo">
     <header className="sf-new-quick-header"><button type="button" onClick={goodToKnow ? () => setGoodToKnow(false) : close} aria-label={goodToKnow ? 'Zpět' : 'Uložit a zavřít'}>{goodToKnow ? <ChevronLeft /> : <X />}</button><h1>{goodToKnow ? 'Dobré vědět' : 'Nové místo'}</h1><span /></header>
     {goodToKnow ? <div className="sf-new-quick-body sf-new-quick-good">

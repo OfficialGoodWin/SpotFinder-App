@@ -194,6 +194,7 @@ export default function MobileV2({ redesigned = false }) {
   const [discoverMore, setDiscoverMore] = useState(false);
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [savedIds, setSavedIds] = useState(() => new Set());
+  const [savedRefresh, setSavedRefresh] = useState(0);
   const [savingSpotId, setSavingSpotId] = useState('');
   const [unsaveSpot, setUnsaveSpot] = useState(null);
   const [unsaveBusy, setUnsaveBusy] = useState(false);
@@ -328,17 +329,17 @@ export default function MobileV2({ redesigned = false }) {
     setCollection(rows); setCollectionErrors(errors); setCollectionLoading(false);
   }, [user?.email, user?.id]);
   useEffect(() => { if (activeTab === 'collection' && user?.id && !collection.saved && !collectionLoading && !Object.keys(collectionErrors).length) loadCollection(); }, [activeTab, user?.id, collection, collectionLoading, collectionErrors, loadCollection]);
-  useEffect(() => { const clear = () => { collectionRequestRef.current += 1; savedLoadedForRef.current = ''; setCollection({}); setCollectionErrors({}); setCollectionLoading(false); }; window.addEventListener('spotfinder:collection-changed', clear); return () => window.removeEventListener('spotfinder:collection-changed', clear); }, []);
+  useEffect(() => { const clear = () => { collectionRequestRef.current += 1; savedLoadedForRef.current = ''; setSavedRefresh(value => value + 1); setCollection({}); setCollectionErrors({}); setCollectionLoading(false); }; window.addEventListener('spotfinder:collection-changed', clear); return () => window.removeEventListener('spotfinder:collection-changed', clear); }, []);
   useEffect(() => { collectionRequestRef.current += 1; setCollection({}); setCollectionErrors({}); setCollectionLoading(false); }, [user?.id]);
   useEffect(() => { savedLoadedForRef.current = ''; setSavedIds(new Set()); }, [user?.id]);
   useEffect(() => {
-    if (activeTab !== 'discover' || !user?.id || savedLoadedForRef.current === user.id) return;
+    if (!['map', 'discover'].includes(activeTab) || !user?.id || savedLoadedForRef.current === user.id) return;
     let alive = true;
     let completed = false;
     savedLoadedForRef.current = user.id;
     getSavedSpots(user.id, 100).then(rows => { completed = true; if (alive) setSavedIds(new Set(rows.map(item => item.id))); }).catch(() => { savedLoadedForRef.current = ''; });
     return () => { alive = false; if (!completed) savedLoadedForRef.current = ''; };
-  }, [activeTab, user?.id]);
+  }, [activeTab, user?.id, savedRefresh]);
 
   const loadDrafts = useCallback(async () => {
     const request = ++draftRequestRef.current;
@@ -363,6 +364,7 @@ export default function MobileV2({ redesigned = false }) {
         catch { photoCleanupFailed = true; }
       }
       setDraftRows(rows => rows?.filter(item => item.id !== draftToDelete.id) || []);
+      try { if (localStorage.getItem(quickAddRecoveryKey(user)) === draftToDelete.id) localStorage.removeItem(quickAddRecoveryKey(user)); } catch { /* Draft deletion already succeeded. */ }
       setDraftToDelete(null);
       window.dispatchEvent(new CustomEvent('spotfinder:drafts-changed'));
       if (photoCleanupFailed) toast.warning('Návrh byl smazán, ale odstranění některých fotografií se nezdařilo.');
@@ -409,7 +411,7 @@ export default function MobileV2({ redesigned = false }) {
     } catch { toast.error('Místo se nepodařilo odebrat.'); }
     finally { setUnsaveBusy(false); }
   };
-  const closeSpot = () => { setSelectedSpot(null); selectedSpotRef.current = null; if (location.pathname.startsWith('/new/spot/')) navigate(-1); };
+  const closeSpot = () => { setSelectedSpot(null); selectedSpotRef.current = null; if (location.pathname.startsWith('/new/spot/')) navigate(location.key === 'default' ? '/new' : -1); };
   const runNearby = async (filters, mode) => {
     const request = ++nearbyRequestRef.current;
     setFilterLocationError('');
@@ -512,7 +514,7 @@ export default function MobileV2({ redesigned = false }) {
     {activeTab === 'map' && (redesigned ? <>
       {!choosingQuickPosition && !quickAdd && <NewMapHome category={mapCategory} setCategory={setMapCategory} spots={visibleSpots} language={language} loading={spotsLoading || nearbyLoading} error={spotsError || Boolean(nearbyError)} onRetry={() => nearbyResults ? runNearby(nearbyFilters, nearbyMode) : refreshMap()} onSearch={() => { setVoiceQuery(''); navigate('/new/search'); }} onVoiceSearch={startVoiceSearch} onGps={requestGps} geoError={geoError} onDismissGeoError={() => setGeoError('')} map={mapInstance} mapLayer={mapLayer} onMapLayer={setMapLayer} terrain={terrain} onTerrain={() => setTerrain(value => !value)} nearbySize={nearbySize} onNearbySize={setNearbySize} onOpen={openSpot} onSave={saveDiscoverSpot} savedIds={savedIds} savingSpotId={savingSpotId} />}
       {choosingQuickPosition && <div className="sf-new-position"><div className="sf-new-position-pin"><MapPin size={38} fill="currentColor" /></div><div className="sf-new-position-panel"><span>POLOHA MÍSTA</span><strong>{center.lat.toFixed(5)}, {center.lng.toFixed(5)}</strong><p>Posuň mapu a polohu doladíš.</p><div><button onClick={() => { quickRecoveryRef.current += 1; setChoosingQuickPosition(false); if (!quickAdd) setDraft(null); }}>Zrušit</button><button onClick={() => { quickRecoveryRef.current += 1; const point = mapRef.current?.getCenter(); if (!point) { toast.error('Počkejte, až se mapa načte.'); return; } const coords = { lat: point.lat, lng: point.lng }; if (!Number.isFinite(coords.lat) || !Number.isFinite(coords.lng)) return; setQuickAdd(current => ({ ...current, coords, draft: current?.draft || null })); setChoosingQuickPosition(false); }}>Potvrdit polohu</button></div></div></div>}
-      {quickAdd && <QuickAddFlow key={quickAdd.draft?.id || 'new'} coords={quickAdd.coords} draft={quickAdd.draft} hidden={choosingQuickPosition} user={user} onMove={() => setChoosingQuickPosition(true)} onClose={() => { setQuickAdd(null); setChoosingQuickPosition(false); setDraft(null); }} onAuth={() => setShowAuth(true)} onViewSpot={spot => { setQuickAdd(null); setChoosingQuickPosition(false); openSpot(spot); }} onCreated={created => { if (created.status === 'published') setSpots(rows => [created, ...rows.filter(row => row.id !== created.id)]); cacheRef.current = null; window.dispatchEvent(new CustomEvent('spotfinder:collection-changed')); }} />}
+      {quickAdd && <QuickAddFlow key={quickAdd.draft?.id || 'new'} coords={quickAdd.coords} draft={quickAdd.draft} hidden={choosingQuickPosition} user={user} onMove={() => setChoosingQuickPosition(true)} onClose={() => { setQuickAdd(null); setChoosingQuickPosition(false); setDraft(null); }} onAuth={() => setShowAuth(true)} onViewSpot={async spot => { try { const saved = await getPublicSpotById(spot.id); if (!saved) { toast.error('Místo se zatím nepodařilo načíst. Zkus to znovu.'); return; } setQuickAdd(null); setChoosingQuickPosition(false); openSpot(saved); } catch { toast.error('Místo se nepodařilo načíst. Zkus to znovu.'); } }} onCreated={created => { if (created.status === 'published' && created.is_public) setSpots(rows => [created, ...rows.filter(row => row.id !== created.id)]); cacheRef.current = null; window.dispatchEvent(new CustomEvent('spotfinder:collection-changed')); }} />}
       {addMode && <div className="v2-add-hint"><span>Klepněte na mapu a vyberte polohu místa.</span><button onClick={() => setAddMode(false)} aria-label="Zrušit přidání"><X size={18} /></button></div>}
       {showWelcome && consent && <NewWelcome onExplore={dismissWelcome} onGps={requestGps} onSignIn={() => setShowAuth(true)} />}
       {!consent && <NewConsent onNecessary={() => { acknowledgeCurrentPrivacyNotice(); setConsent(true); }} />}
@@ -550,7 +552,7 @@ export default function MobileV2({ redesigned = false }) {
     {draftToDelete && <div className="v2-dialog-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setDraftToDelete(null); }}><section className="v2-confirm" role="alertdialog" aria-modal="true" aria-labelledby="v2-delete-draft-title" onKeyDown={event => { if (event.key === 'Escape') setDraftToDelete(null); }}><h2 id="v2-delete-draft-title">Smazat rozpracované místo?</h2><p>„{draftTitle(draftToDelete)}“ a jeho soukromé fotografie budou odstraněny.</p><div><button autoFocus className="v2-secondary" onClick={() => setDraftToDelete(null)}>Ponechat</button><button className="v2-danger" disabled={draftDeleteBusy} onClick={confirmDeleteDraft}>{draftDeleteBusy ? 'Mažu…' : 'Smazat'}</button></div></section></div>}
     {unsaveSpot && <div className="v2-dialog-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setUnsaveSpot(null); }}><section className="v2-confirm" role="alertdialog" aria-modal="true" aria-labelledby="v2-unsave-title" onKeyDown={event => { if (event.key === 'Escape') setUnsaveSpot(null); }}><h2 id="v2-unsave-title">Odebrat uložené místo?</h2><p>„{getSpotDisplayName(unsaveSpot, language)}“ zmizí ze seznamu uložených míst.</p><div><button autoFocus className="v2-secondary" onClick={() => setUnsaveSpot(null)}>Ponechat</button><button className="v2-secondary" disabled={unsaveBusy} onClick={confirmUnsave}>{unsaveBusy ? 'Odebírám…' : 'Odebrat'}</button></div></section></div>}
     <Suspense fallback={null}>
-      {selectedSpot && !editingSpot && <SpotDetailModal spot={selectedSpot} user={user} onClose={closeSpot} onNavigate={setNavigationDestination} onShowAuth={() => setShowAuth(true)} onEdit={() => { setEditingSpot(selectedSpot); setSelectedSpot(null); }} onDelete={async () => { await deleteSpot(selectedSpot.id); setSpots(rows => rows.filter(row => row.id !== selectedSpot.id)); setCollection({}); cacheRef.current = null; window.dispatchEvent(new CustomEvent('spotfinder:collection-changed')); closeSpot(); }} onSpotUpdate={updated => { selectedSpotRef.current = updated; setSelectedSpot(updated); setSpots(rows => rows.map(row => row.id === updated.id ? updated : row)); }} />}
+      {selectedSpot && !editingSpot && <SpotDetailModal spot={selectedSpot} user={user} redesigned={redesigned} onClose={closeSpot} onNavigate={setNavigationDestination} onShowAuth={() => setShowAuth(true)} onEdit={() => { setEditingSpot(selectedSpot); setSelectedSpot(null); }} onDelete={async () => { await deleteSpot(selectedSpot.id); setSpots(rows => rows.filter(row => row.id !== selectedSpot.id)); setCollection({}); cacheRef.current = null; window.dispatchEvent(new CustomEvent('spotfinder:collection-changed')); closeSpot(); }} onSpotUpdate={updated => { selectedSpotRef.current = updated; setSelectedSpot(updated); setSpots(rows => rows.map(row => row.id === updated.id ? updated : row)); }} />}
       {editingSpot && <EditSpotModal spot={editingSpot} user={user} onClose={() => { setEditingSpot(null); closeSpot(); }} onSave={async updated => { await updateSpot(updated.id, updated); setSpots(rows => rows.map(row => row.id === updated.id ? updated : row)); setCollection({}); cacheRef.current = null; window.dispatchEvent(new CustomEvent('spotfinder:collection-changed')); setEditingSpot(null); closeSpot(); }} />}
       {selectedPoi && <POIDetailPanel poi={selectedPoi.poi} category={selectedPoi.cat} user={user} onClose={() => setSelectedPoi(null)} onNavigate={setNavigationDestination} />}
       {navigationDestination && <NavigationProviderSheet destination={navigationDestination} onClose={() => setNavigationDestination(null)} />}

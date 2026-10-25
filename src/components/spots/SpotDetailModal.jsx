@@ -6,7 +6,7 @@ import { submitCategoryRatings, getSpotSocialState, toggleSpotLike, toggleSpotSa
 import { useLanguage } from '@/lib/LanguageContext';
 import ReportDialog from '@/components/moderation/ReportDialog';
 import { canonicalSpotUrl, shareSpotLink } from '@/lib/spotLinks';
-import { getPublicSpotPhotos, getSpotDisplayName, getSpotLocationLabel, normalizeSpotPhotos } from '@/lib/spotPresentation';
+import { getPublicSpotPhotos, getSpotDisplayName, getSpotLocationLabel, getVerifiedSpotCategory, normalizeSpotPhotos } from '@/lib/spotPresentation';
 import CommunityPhotoGallery from './CommunityPhotoGallery';
 import { setSpotRelationState } from '@/lib/spotSocialState';
 import { toast } from 'sonner';
@@ -19,7 +19,7 @@ const SocialPostsSection = recoverableLazy(() => import('@/components/social/Soc
 
 const RATED_KEY = (spotId, userId) => `sf_rated_${spotId}_${userId || 'guest'}`;
 
-export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, onNavigate, onEdit, onDelete, onSpotUpdate, onShowAuth }) {
+export default function SpotDetailModal({ spot, user, isAdmin = false, redesigned = false, onClose, onNavigate, onEdit, onDelete, onSpotUpdate, onShowAuth }) {
   const { t, language } = useLanguage();
   const [localSpot, setLocalSpot] = useState(spot);
   useEffect(() => setLocalSpot(spot), [spot]);
@@ -175,18 +175,21 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
   const poiWebsite = safeWebsite(poiMatch?.tags?.website || poiMatch?.tags?.['contact:website']);
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/50 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="spot-detail-title" onKeyDown={event => { if (event.key === 'Escape') onClose(); }}>
-      <div className="sf-sheet w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-3xl max-h-[100dvh] sm:max-h-[90dvh] sm:rounded-3xl">
+    <div className={`fixed inset-0 z-[2000] flex items-end justify-center bg-black/50 backdrop-blur-sm${redesigned ? ' sf-new-spot-detail' : ''}`} role="dialog" aria-modal="true" aria-labelledby="spot-detail-title" onKeyDown={event => { if (event.key === 'Escape') onClose(); }}>
+      <div className={`sf-sheet w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-3xl max-h-[100dvh] sm:max-h-[90dvh] sm:rounded-3xl${redesigned ? ' sf-new-detail-sheet' : ''}`}>
+
+        {redesigned && <div className="sf-new-detail-hero"><CommunityPhotoGallery key={localSpot.id} spot={localSpot} photos={detailPhotos} name={displayName} /><button ref={closeButtonRef} type="button" onClick={onClose} aria-label={t('common.close')} className="sf-new-detail-close"><X size={21} /></button><button type="button" onClick={handleSave} disabled={!!socialBusy} aria-pressed={social.saved} aria-label={t(social.saved ? 'spotDetailUi.unsave' : 'spotDetailUi.save')} className={`sf-new-detail-bookmark${social.saved ? ' is-saved' : ''}`}><Bookmark size={21} fill={social.saved ? 'currentColor' : 'none'} /></button></div>}
 
         {/* Header */}
-        <div className="sticky top-0 z-30 bg-white dark:bg-card px-4 sm:px-6 pt-[max(1.25rem,env(safe-area-inset-top))] pb-3 border-b border-gray-100 dark:border-border">
+        <div className={`sticky top-0 z-30 bg-white dark:bg-card px-4 sm:px-6 pt-[max(1.25rem,env(safe-area-inset-top))] pb-3 border-b border-gray-100 dark:border-border${redesigned ? ' sf-new-detail-header' : ''}`}>
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+              {!redesigned && <div className="w-10 h-10 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
                 <MapPin className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              </div>
+              </div>}
               <div className="min-w-0">
                 <h2 id="spot-detail-title" className="break-words text-lg font-bold leading-snug text-gray-900 dark:text-foreground">{displayName}</h2>
+                {redesigned && <span className="sf-new-detail-category">{localSpot.tags?.includes('Other') ? 'Jiné' : localSpot.tags?.[0] ? t(`spotTags.${localSpot.tags[0]}`, getVerifiedSpotCategory(localSpot) || 'Místo') : getVerifiedSpotCategory(localSpot) || 'Místo'}</span>}
                 {poiMatch && displayName !== poiMatch.name && (
                   <p className="text-xs font-medium text-blue-600 dark:text-blue-400">{t('spotDetailUi.alsoKnownAs', { name: poiMatch.name })}</p>
                 )}
@@ -197,15 +200,15 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
                 </p>
               </div>
             </div>
-            <button ref={closeButtonRef} onClick={onClose} aria-label={t('common.close')} className="min-w-[44px] min-h-[44px] shrink-0 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-accent">
+            {!redesigned && <button ref={closeButtonRef} onClick={onClose} aria-label={t('common.close')} className="min-w-[44px] min-h-[44px] shrink-0 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-accent">
               <X className="w-5 h-5 text-gray-500 dark:text-muted-foreground" />
-            </button>
+            </button>}
           </div>
         </div>
 
-        <div className="px-6 py-4 space-y-4">
+        <div className={`px-6 py-4 space-y-4${redesigned ? ' sf-new-detail-body' : ''}`}>
           {/* Community photos, or an honest category fallback when unavailable. */}
-          <CommunityPhotoGallery key={localSpot.id} spot={localSpot} photos={detailPhotos} name={displayName} />
+          {!redesigned && <CommunityPhotoGallery key={localSpot.id} spot={localSpot} photos={detailPhotos} name={displayName} />}
 
           {/* Description */}
           {localSpot.description && (
@@ -215,10 +218,10 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
 
           {/* Tags */}
           {localSpot.tags?.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
+            <div className={`flex flex-wrap gap-1.5${redesigned ? ' sf-new-detail-tags' : ''}`}>
               {localSpot.tags.map(tag => (
                 <span key={tag} className="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">
-                  {t(`spotTags.${tag}`, tag)}
+                  {redesigned && tag === 'Other' ? 'Jiné' : t(`spotTags.${tag}`, tag)}
                 </span>
               ))}
             </div>
@@ -246,7 +249,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
 
           {/* Practical details */}
           {(localSpot.cost || localSpot.access_difficulty || localSpot.parking || localSpot.best_time?.length > 0) && (
-            <div className="flex flex-wrap gap-2 text-xs">
+            <div className={`flex flex-wrap gap-2 text-xs${redesigned ? ' sf-new-detail-practical' : ''}`}>
               {localSpot.cost && (
                 <span className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 font-medium">
                   {t(`addSpot.cost${localSpot.cost[0].toUpperCase()}${localSpot.cost.slice(1)}`)}
@@ -278,15 +281,15 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
           )}
 
           {/* Community actions — counts are server-maintained and update live */}
-          <div className="grid grid-cols-3 gap-2" aria-label={t('spotDetailUi.actions')}>
+          <div className={`grid ${redesigned ? 'grid-cols-2 sf-new-detail-actions' : 'grid-cols-3'} gap-2`} aria-label={t('spotDetailUi.actions')}>
             <button onClick={handleLike} disabled={!!socialBusy} aria-pressed={social.liked} aria-label={t('spotDetailUi.likeAction', { action: t(social.liked ? 'spotDetailUi.unlike' : 'spotDetailUi.like'), count: social.likesCount })} className={`min-h-[48px] rounded-2xl border flex items-center justify-center gap-2 font-semibold text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${social.liked ? 'bg-rose-50 border-rose-200 text-rose-600 dark:bg-rose-950/30 dark:border-rose-900' : 'border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent'}`}>
               <Heart className={`w-5 h-5 ${social.liked ? 'fill-current' : ''}`} />
               <span className="sr-only">{t(social.liked ? 'spotDetailUi.liked' : 'spotDetailUi.like')} </span><span className="tabular-nums text-xs">{new Intl.NumberFormat(language).format(social.likesCount)}</span>
             </button>
-            <button onClick={handleSave} disabled={!!socialBusy} aria-pressed={social.saved} aria-label={t('spotDetailUi.saveAction', { action: t(social.saved ? 'spotDetailUi.unsave' : 'spotDetailUi.save'), count: social.savesCount })} className={`min-h-[48px] rounded-2xl border flex items-center justify-center gap-2 font-semibold text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${social.saved ? 'bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-950/30 dark:border-blue-900' : 'border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent'}`}>
+            {!redesigned && <button onClick={handleSave} disabled={!!socialBusy} aria-pressed={social.saved} aria-label={t('spotDetailUi.saveAction', { action: t(social.saved ? 'spotDetailUi.unsave' : 'spotDetailUi.save'), count: social.savesCount })} className={`min-h-[48px] rounded-2xl border flex items-center justify-center gap-2 font-semibold text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${social.saved ? 'bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-950/30 dark:border-blue-900' : 'border-gray-200 dark:border-border hover:bg-gray-50 dark:hover:bg-accent'}`}>
               <Bookmark className={`w-5 h-5 ${social.saved ? 'fill-current' : ''}`} />
               <span className="sr-only">{t(social.saved ? 'collection.favorites' : 'spotDetailUi.save')} </span><span className="tabular-nums text-xs">{new Intl.NumberFormat(language).format(social.savesCount)}</span>
-            </button>
+            </button>}
             <button onClick={handleShare} className="relative min-h-[48px] rounded-2xl border border-gray-200 dark:border-border flex items-center justify-center hover:bg-gray-50 dark:hover:bg-accent" aria-label={t('spotDetailUi.share')}>{shareTooltip === 'linkCopied' ? <Check className="h-5 w-5 text-green-500" /> : <Share2 className="h-5 w-5 text-blue-500" />}{shareTooltip && <span role="status" className="absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-lg bg-gray-900 px-2 py-1 text-[10px] text-white">{t(`spotDetailUi.${shareTooltip}`)}</span>}</button>
           </div>
           {manualShareUrl && <label className="block text-xs font-medium text-gray-600 dark:text-slate-300">{t('spotDetailUi.spotLink')}
@@ -294,7 +297,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
           </label>}
 
           {/* Overall experience is rated directly and is never inferred from descriptive scales. */}
-          <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-accent rounded-2xl">
+          <div className={`flex items-center gap-3 p-3 bg-gray-50 dark:bg-accent rounded-2xl${redesigned ? ' sf-new-detail-rating' : ''}`}>
             <div className="flex-1">
               <p className="text-xs text-gray-500 dark:text-muted-foreground mb-1">{t('spotDetail.overallRating')}</p>
               {overallCount > 0 ? (
@@ -314,7 +317,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
 
           {/* Category averages display */}
           {hasCategoryRatings && (
-            <div className="space-y-2 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800">
+            <div className={`space-y-2 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800${redesigned ? ' sf-new-detail-rating-breakdown' : ''}`}>
               <p className="text-xs font-bold uppercase tracking-wide text-blue-700 dark:text-blue-300 mb-3">
                 {t('spotDetail.detailedRatings')}
               </p>
@@ -392,7 +395,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 z-20 px-6 pt-3 border-t border-gray-100 dark:border-border bg-white/95 dark:bg-card/95 backdrop-blur-xl flex gap-3 flex-wrap" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+        <div className={`sticky bottom-0 z-20 px-6 pt-3 border-t border-gray-100 dark:border-border bg-white/95 dark:bg-card/95 backdrop-blur-xl flex gap-3 flex-wrap${redesigned ? ' sf-new-detail-footer' : ''}`} style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
           {(isOwner || isAdmin) && (
             <>
               {isOwner && (
@@ -414,7 +417,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, onClose, 
 
           <button
             onClick={() => onNavigate?.(localSpot)}
-            className="flex-1 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-2xl flex items-center justify-center gap-2 transition-colors"
+            className={`flex-1 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-2xl flex items-center justify-center gap-2 transition-colors${redesigned ? ' sf-new-detail-navigate' : ''}`}
           >
             <Navigation className="w-5 h-5" />
             {t('spotDetail.navigateHere')}
