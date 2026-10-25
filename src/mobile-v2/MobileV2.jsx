@@ -21,6 +21,7 @@ import { categoryOf, SpotPhoto } from './spotDisplay';
 import SignOutDialog from './SignOutDialog';
 import NewMapHome from '@/new/NewMapHome';
 import NewWelcome from '@/new/NewWelcome';
+import NewConsent from '@/new/NewConsent';
 import { mapHomeCategoryOf } from '@/new/mapHomeData';
 import { APP_VERSION } from '@/config/appVersion';
 import { toast } from 'sonner';
@@ -82,7 +83,7 @@ function draftDate(value) {
 }
 const draftTitle = item => item?.title?.trim() || 'Nepojmenované místo';
 
-function SearchPanel({ spots, center, onClose, onSpot, onPlace }) {
+function SearchPanel({ spots, center, voiceQuery, onClose, onSpot, onPlace }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [status, setStatus] = useState('idle');
@@ -90,6 +91,7 @@ function SearchPanel({ spots, center, onClose, onSpot, onPlace }) {
   const [voiceError, setVoiceError] = useState('');
   const inputRef = useRef(null);
   useEffect(() => { inputRef.current?.focus(); }, []);
+  useEffect(() => { if (voiceQuery) setQuery(voiceQuery); }, [voiceQuery]);
   useEffect(() => {
     if (!query.trim()) { setResults([]); setStatus('idle'); return; }
     const controller = new AbortController();
@@ -163,6 +165,7 @@ export default function MobileV2({ redesigned = false }) {
   const [nearbyCount, setNearbyCount] = useState(20);
   const [category, setCategory] = useState('Vše');
   const [mapCategory, setMapCategory] = useState('Vše');
+  const [voiceQuery, setVoiceQuery] = useState('');
   const [mapLayer, setMapLayer] = useState('basic');
   const [mapInstance, setMapInstance] = useState(null);
   const [layerMenu, setLayerMenu] = useState(false);
@@ -203,6 +206,7 @@ export default function MobileV2({ redesigned = false }) {
   const cacheRef = useRef(null);
   const nearbyRequestRef = useRef(0);
   const selectedSpotRef = useRef(null);
+  const topVoiceRef = useRef(null);
   const collectionRequestRef = useRef(0);
   const draftRequestRef = useRef(0);
   const savedLoadedForRef = useRef('');
@@ -220,6 +224,7 @@ export default function MobileV2({ redesigned = false }) {
     return () => { document.title = oldTitle; if (created) meta.remove(); else meta.content = old; };
   }, []);
   useEffect(() => { const listener = () => setConsent(getConsent().decided); window.addEventListener('spotfinder:consent-changed', listener); return () => window.removeEventListener('spotfinder:consent-changed', listener); }, []);
+  useEffect(() => () => topVoiceRef.current?.stop(), []);
   useEffect(() => { const update = () => setOnline(navigator.onLine !== false); window.addEventListener('online', update); window.addEventListener('offline', update); return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update); }; }, []);
 
   const refreshMap = useCallback(async () => {
@@ -419,6 +424,22 @@ export default function MobileV2({ redesigned = false }) {
     if (!navigator.geolocation) { setGeoError('Poloha není v tomto zařízení dostupná.'); return; }
     navigator.geolocation.getCurrentPosition(position => { const point = [position.coords.latitude, position.coords.longitude]; setUserPos(point); setFlyTo(point); }, () => setGeoError('Přístup k poloze nebyl povolen. Mapu můžete používat ručně.'), { enableHighAccuracy: true, timeout: 10000 });
   };
+  const startVoiceSearch = () => {
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    setVoiceQuery('');
+    if (!Recognition) { navigate('/new/search'); toast.error('Hlasové vyhledávání není v tomto prohlížeči dostupné.'); return; }
+    try {
+      topVoiceRef.current?.stop();
+      const recognition = new Recognition();
+      recognition.lang = 'cs-CZ';
+      recognition.onresult = event => setVoiceQuery(event.results[0][0].transcript);
+      recognition.onerror = () => toast.error('Mikrofon není dostupný. Zadejte místo ručně.');
+      recognition.onend = () => { if (topVoiceRef.current === recognition) topVoiceRef.current = null; };
+      topVoiceRef.current = recognition;
+      recognition.start();
+      navigate('/new/search');
+    } catch { navigate('/new/search'); toast.error('Mikrofon není dostupný. Zadejte místo ručně.'); }
+  };
   const chooseTab = id => {
     if (id === 'add') { setAddMode(true); navigate('/new/map'); toast.message('Klepněte na mapu, kam chcete přidat místo.'); return; }
     setAddMode(false); setNearbySize('collapsed'); navigate(id === 'map' ? '/new' : `/new/${id}`);
@@ -445,15 +466,15 @@ export default function MobileV2({ redesigned = false }) {
     finally { setSignOutBusy(false); }
   };
 
-  return <div className={`mobile-v2 ${isDark ? 'v2-dark' : ''}`}>
+  return <div className={`mobile-v2 ${isDark ? 'v2-dark' : ''} ${redesigned && nearbySize === 'full' && activeTab === 'map' ? 'sf-new-sheet-full' : ''}`}>
     <div className={`v2-map-layer ${activeTab === 'map' ? '' : 'v2-map-hidden'}`} aria-hidden={activeTab !== 'map'}>
       {mapActivated && <Suspense fallback={<div className="v2-map-loading" role="status">Načítám mapu…</div>}><MapLibreMap center={START} flyTo={flyTo} selectedSpotId={selectedSpot?.id || selectedMapSpotId} setMapRef={handleMapReady} addMode={addMode} onMapClick={point => { setAddMode(false); setAddAt(point); }} spots={redesigned ? visibleSpots : spots} showSpots onSelectSpot={openSpot} userPos={userPos} selectedPOICategory={null} onSelectPOI={(poi, cat) => { setNearbySize('collapsed'); setSelectedPoi({ poi, cat }); }} isDark={isDark} mapLayer={mapLayer} terrainEnabled={terrain} showZoomControls={false} /></Suspense>}
     </div>
     {activeTab === 'map' && (redesigned ? <>
-      <NewMapHome category={mapCategory} setCategory={setMapCategory} spots={visibleSpots} language={language} loading={spotsLoading || nearbyLoading} error={spotsError || Boolean(nearbyError)} onRetry={refreshMap} onSearch={() => navigate('/new/search')} onGps={requestGps} geoError={geoError} onDismissGeoError={() => setGeoError('')} mapLayer={mapLayer} onMapLayer={setMapLayer} terrain={terrain} onTerrain={() => setTerrain(value => !value)} nearbySize={nearbySize} onNearbySize={setNearbySize} onOpen={openSpot} onSave={saveDiscoverSpot} savedIds={savedIds} savingSpotId={savingSpotId} />
+      <NewMapHome category={mapCategory} setCategory={setMapCategory} spots={visibleSpots} language={language} loading={spotsLoading || nearbyLoading} error={spotsError || Boolean(nearbyError)} onRetry={() => nearbyResults ? runNearby(nearbyFilters, nearbyMode) : refreshMap()} onSearch={() => { setVoiceQuery(''); navigate('/new/search'); }} onVoiceSearch={startVoiceSearch} onGps={requestGps} geoError={geoError} onDismissGeoError={() => setGeoError('')} map={mapInstance} mapLayer={mapLayer} onMapLayer={setMapLayer} terrain={terrain} onTerrain={() => setTerrain(value => !value)} nearbySize={nearbySize} onNearbySize={setNearbySize} onOpen={openSpot} onSave={saveDiscoverSpot} savedIds={savedIds} savingSpotId={savingSpotId} />
       {addMode && <div className="v2-add-hint"><span>Klepněte na mapu a vyberte polohu místa.</span><button onClick={() => setAddMode(false)} aria-label="Zrušit přidání"><X size={18} /></button></div>}
-      {showWelcome && <NewWelcome onExplore={dismissWelcome} onGps={requestGps} onSignIn={() => setShowAuth(true)} />}
-      {!consent && <div className="v2-consent"><p>Používáme jen nezbytné úložiště. Analytika a reklama jsou vypnuté. <a href="/PrivacyPolicy">Podrobnosti</a></p><button onClick={() => { acknowledgeCurrentPrivacyNotice(); setConsent(true); }}>Pokračovat</button></div>}
+      {showWelcome && consent && <NewWelcome onExplore={dismissWelcome} onGps={requestGps} onSignIn={() => setShowAuth(true)} />}
+      {!consent && <NewConsent onNecessary={() => { acknowledgeCurrentPrivacyNotice(); setConsent(true); }} />}
     </> : <>
       <div className="v2-map-top"><button className="v2-search-pill" onClick={() => navigate('/new/search')}><img src={LOGO} alt="SpotFinder" /><span>Hledat místa…</span><Mic size={17} /></button></div>
       <div className={`v2-map-controls${nearbySize !== 'collapsed' ? ' v2-map-controls--sheet-open' : ''}${addMode || geoError ? ' v2-map-controls--message' : ''}`}>
@@ -481,7 +502,7 @@ export default function MobileV2({ redesigned = false }) {
     {aboutPage && <section className="v2-page"><header className="v2-page-header v2-subpage-header"><button onClick={() => navigate('/new/profile')} aria-label="Zpět na profil"><ChevronLeft /></button><h1>O aplikaci</h1></header><div className="v2-about"><img src={LOGO} alt="SpotFinder" /><h2>SpotFinder</h2><p>Objevuj skutečná místa sdílená komunitou a ukládej si ta, ke kterým se chceš vrátit.</p><small>Verze {APP_VERSION}</small><a href="/FAQ">Nápověda</a><a href="/PrivacyPolicy">Soukromí</a><a href="/TermsAndConditions">Podmínky používání</a></div></section>}
     {draftsPage && <section className="v2-page"><header className="v2-page-header v2-subpage-header"><button onClick={() => navigate('/new/profile')} aria-label="Zpět na profil"><ChevronLeft /></button><h1>Rozpracovaná místa</h1></header><div className="v2-scroll v2-drafts-list">{draftsError ? <StateMessage retry={loadDrafts}>Rozpracovaná místa se nepodařilo načíst.</StateMessage> : draftRows === null ? <StateMessage>Načítám rozpracovaná místa…</StateMessage> : draftRows.length ? draftRows.map(item => <article className="v2-draft-row" key={item.id}><div className="v2-draft-icon"><MapPin size={23} /></div><div className="v2-draft-copy"><strong>{draftTitle(item)}</strong><small>{draftDate(item.updated_at || item.created_at)}</small></div><button className="v2-draft-resume" onClick={() => { const coords = normalizeLatLng(item); if (!coords) { toast.error('Návrh nemá platnou polohu.'); return; } setDraft(item); setAddAt({ lat: coords[0], lng: coords[1] }); navigate('/new/map'); }}>Pokračovat</button><button className="v2-draft-delete" aria-label={`Smazat ${draftTitle(item)}`} onClick={() => setDraftToDelete(item)}><X size={18} /></button></article>) : <StateMessage>Nemáš žádná rozpracovaná místa.</StateMessage>}</div></section>}
     {unknownPage && <section className="v2-page v2-not-found"><MapPin size={34} /><h1>Stránka nebyla nalezena</h1><p>Požadovaná stránka není dostupná.</p><button className="v2-primary" onClick={() => navigate('/new')}>Zpět na mapu</button></section>}
-    {searchOpen && <SearchPanel spots={spots} center={center} onClose={() => navigate(location.key === 'default' ? '/new' : -1)} onSpot={openSpot} onPlace={selectSearchPlace} />}
+    {searchOpen && <SearchPanel spots={spots} center={center} voiceQuery={voiceQuery} onClose={() => { topVoiceRef.current?.stop(); setVoiceQuery(''); navigate(location.key === 'default' ? '/new' : -1); }} onSpot={openSpot} onPlace={selectSearchPlace} />}
     {!online && <div className="v2-offline" role="status">Jsi offline. Některá místa a mapové podklady nemusí být dostupné.</div>}
     <nav className="v2-nav" aria-label="Hlavní navigace">{TABS.map(([id,label,Icon]) => <button key={id} className={`${selectedNav === id ? 'active' : ''} ${id === 'add' ? 'v2-add-tab' : ''}`} aria-current={selectedNav === id ? 'page' : undefined} onClick={() => chooseTab(id)}><span><Icon size={id === 'add' ? 21 : 19} strokeWidth={1.8} /></span><small>{label}</small></button>)}</nav>
     {showSignOut && <SignOutDialog busy={signOutBusy} onCancel={() => setShowSignOut(false)} onConfirm={confirmSignOut} />}

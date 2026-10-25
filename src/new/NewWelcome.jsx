@@ -11,7 +11,7 @@ export default function NewWelcome({ onExplore, onGps, onSignIn }) {
       <button type="button" className="sf-new-welcome-primary" onClick={onExplore}>Prozkoumat mapu</button>
       <button type="button" className="sf-new-welcome-location" onClick={() => { onExplore(); onGps(); }}><Crosshair size={19} /> Zapnout polohu</button>
       <p className="sf-new-welcome-signin">Máš účet? <button type="button" onClick={() => { onExplore(); onSignIn(); }}>Přihlásit se</button></p>
-      <small>Pokračováním souhlasíš s <a href="/TermsAndConditions">Podmínkami</a> a <a href="/PrivacyPolicy">Zásadami ochrany soukromí</a>.</small>
+      <small><a href="/TermsAndConditions">Podmínky použití</a> · <a href="/PrivacyPolicy">Zásady ochrany soukromí</a></small>
     </section>
   </div>;
 }
