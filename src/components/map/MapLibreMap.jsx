@@ -563,6 +563,53 @@ function removeSpotMarker(marker) {
   marker?.remove();
 }
 
+// Compact discovery markers for /new. The shared map's original markers remain
+// the default for every other route.
+function makeCompactSpotMarker(spot, selected, zoom, language, onClick) {
+  const el = document.createElement('button');
+  el.type = 'button';
+  const photoUrl = getSpotImageInfo(spot)?.url;
+  el.className = `sf-new-map-marker${selected ? ' is-selected' : photoUrl && zoom >= 15.5 ? ' has-photo' : ''}${photoUrl ? '' : ' no-photo'}`;
+  el.setAttribute('aria-label', `${selected ? 'Otevřít' : 'Vybrat'}: ${getSpotDisplayName(spot, language)}`);
+  el.setAttribute('aria-pressed', selected ? 'true' : 'false');
+  if (photoUrl && (selected || zoom >= 15.5)) {
+    const image = document.createElement('img');
+    const fallback = document.createElement('span');
+    fallback.className = 'sf-new-map-marker-dot';
+    fallback.textContent = '•';
+    fallback.hidden = true;
+    image.src = photoUrl;
+    image.alt = '';
+    image.loading = 'lazy';
+    image.onerror = () => { image.remove(); fallback.hidden = false; el.classList.add('no-photo'); };
+    el.appendChild(image);
+    el.appendChild(fallback);
+  }
+  if (selected) {
+    const title = document.createElement('span');
+    title.className = 'sf-new-map-marker-title';
+    title.textContent = getSpotDisplayName(spot, language);
+    el.appendChild(title);
+  } else if (!photoUrl || zoom < 15.5) {
+    const dot = document.createElement('span');
+    dot.className = 'sf-new-map-marker-dot';
+    dot.textContent = '•';
+    el.appendChild(dot);
+  }
+  el.addEventListener('click', event => { event.stopPropagation(); onClick?.(spot); });
+  return el;
+}
+
+function makeCompactClusterMarker(count, onClick) {
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'sf-new-map-cluster';
+  el.textContent = count > 99 ? '99+' : String(count);
+  el.setAttribute('aria-label', `${count} míst poblíž. Přiblížit mapu.`);
+  el.addEventListener('click', event => { event.stopPropagation(); onClick(); });
+  return el;
+}
+
 // ── Pre-baked ambient POI tiles ───────────────────────────────────────────────
 // Optional replacement for the live per-pan Geoapify calls below. When
 // VITE_AMBIENT_TILES_URL is set (a PMTiles file built by
@@ -806,7 +853,7 @@ function registerStyleRestoration(map, getTerrainEnabled, getLanguage, onStyleLo
 export default function MapLibreMap({
   center, flyTo, spotFocus, selectedSpotId, fitBoundsData, zoomToArea, setMapRef,
   addMode, onMapClick,
-  spots, showSpots, onSelectSpot,
+  spots, showSpots, onSelectSpot, compactSpotMarkers = false,
   userPos, userAccuracy,
   selectedPOICategory, onSelectPOI, onPOIsLoaded, onLoadingChange,
   isDark, mapLayer, showZoomControls = true,
@@ -842,6 +889,9 @@ export default function MapLibreMap({
   const markers = useRef({ spots: new Map(), ambient: new Map(), pois: new Map(), user: null });
   const onSelectSpotRef = useRef(onSelectSpot);
   onSelectSpotRef.current = onSelectSpot;
+  const selectedSpotIdRef = useRef(selectedSpotId);
+  selectedSpotIdRef.current = selectedSpotId;
+  const drawCompactSpotsRef = useRef(null);
   const officialEditorRef = useRef({ active: officialEditorActive, select: onSelectOfficialPoi });
   officialEditorRef.current = { active: officialEditorActive, select: onSelectOfficialPoi };
   const onAdminMapClickRef = useRef(onAdminMapClick);
@@ -1080,6 +1130,41 @@ export default function MapLibreMap({
     if (!map) return;
     const m = markers.current.spots;
     if (!showSpots) { m.forEach(removeSpotMarker); m.clear(); return; }
+    if (compactSpotMarkers) {
+      const draw = () => {
+        m.forEach(removeSpotMarker); m.clear();
+        const zoom = map.getZoom();
+        const cell = zoom < 12 ? 84 : zoom < 15.5 ? 66 : 58;
+        const selected = spots.find(spot => String(spot.id) === String(selectedSpotIdRef.current) && validMarkerLngLat(spot.lng, spot.lat));
+        const buckets = new Map();
+        for (const spot of spots) {
+          const position = validMarkerLngLat(spot.lng, spot.lat);
+          if (!spot.id || !position || String(spot.id) === String(selected?.id)) continue;
+          const point = map.project(position);
+          if (point.x < -cell || point.y < -cell || point.x > map.getCanvas().clientWidth + cell || point.y > map.getCanvas().clientHeight + cell) continue;
+          const key = `${Math.floor(point.x / cell)}:${Math.floor(point.y / cell)}`;
+          if (!buckets.has(key)) buckets.set(key, []);
+          buckets.get(key).push(spot);
+        }
+        for (const [key, group] of buckets) {
+          const lng = group.reduce((sum, spot) => sum + Number(spot.lng), 0) / group.length;
+          const lat = group.reduce((sum, spot) => sum + Number(spot.lat), 0) / group.length;
+          const clustered = group.length > 1 || zoom < 14;
+          const el = clustered
+            ? makeCompactClusterMarker(group.length, () => zoom < 18 ? map.easeTo({ center: [lng, lat], zoom: Math.min(18, zoom + 2) }) : onSelectSpotRef.current?.(group[0]))
+            : makeCompactSpotMarker(group[0], false, zoom, language, spot => onSelectSpotRef.current?.(spot));
+          m.set(`new:${key}`, attachMarkerAt(new maplibregl.Marker({ element: el, anchor: clustered ? 'center' : 'bottom' }), map, [lng, lat]));
+        }
+        if (selected) {
+          const el = makeCompactSpotMarker(selected, true, zoom, language, spot => onSelectSpotRef.current?.(spot));
+          m.set(`new:selected:${selected.id}`, attachMarkerAt(new maplibregl.Marker({ element: el, anchor: 'bottom' }), map, [Number(selected.lng), Number(selected.lat)]));
+        }
+      };
+      drawCompactSpotsRef.current = draw;
+      map.on('moveend', draw);
+      draw();
+      return () => { map.off('moveend', draw); if (drawCompactSpotsRef.current === draw) drawCompactSpotsRef.current = null; m.forEach(removeSpotMarker); m.clear(); };
+    }
     const ids = new Set(spots.filter(s => s.id && validMarkerLngLat(s.lng, s.lat)).map(s => String(s.id)));
     m.forEach((x, id) => { if (!ids.has(id)) { removeSpotMarker(x); m.delete(id); } });
     for (const spot of spots) {
@@ -1100,13 +1185,14 @@ export default function MapLibreMap({
       mk.__spotSignature = signature;
       m.set(spotId, mk);
     }
-  }, [language, spots, showSpots]);
+  }, [language, spots, showSpots, compactSpotMarkers]);
 
   useEffect(() => {
+    if (compactSpotMarkers) { drawCompactSpotsRef.current?.(); return; }
     markers.current.spots.forEach((marker, id) => {
       marker.getElement()?.classList.toggle('is-selected', String(selectedSpotId || '') === String(id));
     });
-  }, [selectedSpotId]);
+  }, [selectedSpotId, compactSpotMarkers]);
 
   // ── User location ──────────────────────────────────────────────────────────
   useEffect(() => {

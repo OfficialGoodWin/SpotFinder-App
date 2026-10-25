@@ -16,6 +16,7 @@ import { safeWebsite } from '@/lib/poiPresentation';
 import { recoverableLazy } from '@/components/ChunkLoadRecovery';
 
 const SocialPostsSection = recoverableLazy(() => import('@/components/social/SocialPostsSection'));
+const NewSpotDetailView = recoverableLazy(() => import('@/new/NewSpotDetailView'));
 
 const RATED_KEY = (spotId, userId) => `sf_rated_${spotId}_${userId || 'guest'}`;
 
@@ -176,6 +177,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, redesigne
 
   return (
     <div className={`fixed inset-0 z-[2000] flex items-end justify-center bg-black/50 backdrop-blur-sm${redesigned ? ' sf-new-spot-detail' : ''}`} role="dialog" aria-modal="true" aria-labelledby="spot-detail-title" onKeyDown={event => { if (event.key === 'Escape') onClose(); }}>
+      {redesigned ? <NewSpotDetailView spot={localSpot} photos={detailPhotos} name={displayName} creatorName={creatorName} user={user} isOwner={isOwner} isAdmin={isAdmin} social={social} socialBusy={socialBusy} onSave={handleSave} onLike={handleLike} onShare={handleShare} shareTooltip={shareTooltip} manualShareUrl={manualShareUrl} onClose={onClose} closeButtonRef={closeButtonRef} onNavigate={onNavigate} onEdit={onEdit} onDelete={() => setShowDeleteConfirm(true)} onReport={() => { if (!user) { onShowAuth?.(); return; } setShowReport(true); }} onShowAuth={onShowAuth} rating={overallRating} ratingCount={overallCount} catRows={catRows} legacyRows={legacyRows} ratingSubmitted={ratingSubmitted} pending={{ overall: pendingOverall, access: pendingAccess, condition: pendingCondition, safety: pendingSafety, crowdedness: pendingCrowdedness }} onPending={{ overall: setPendingOverall, access: setPendingAccess, condition: setPendingCondition, safety: setPendingSafety, crowdedness: setPendingCrowdedness }} submitting={submitting} onSubmit={handleSubmitRatings} t={t} language={language} /> :
       <div className={`sf-sheet w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-3xl max-h-[100dvh] sm:max-h-[90dvh] sm:rounded-3xl${redesigned ? ' sf-new-detail-sheet' : ''}`}>
 
         {redesigned && <div className="sf-new-detail-hero"><CommunityPhotoGallery key={localSpot.id} spot={localSpot} photos={detailPhotos} name={displayName} /><button ref={closeButtonRef} type="button" onClick={onClose} aria-label={t('common.close')} className="sf-new-detail-close"><X size={21} /></button><button type="button" onClick={handleSave} disabled={!!socialBusy} aria-pressed={social.saved} aria-label={t(social.saved ? 'spotDetailUi.unsave' : 'spotDetailUi.save')} className={`sf-new-detail-bookmark${social.saved ? ' is-saved' : ''}`}><Bookmark size={21} fill={social.saved ? 'currentColor' : 'none'} /></button></div>}
@@ -423,7 +425,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, redesigne
             {t('spotDetail.navigateHere')}
           </button>
         </div>
-      </div>
+      </div>}
       <ReportDialog open={showReport} onClose={() => setShowReport(false)} user={user} targetType="spot" targetId={String(spot.id)} targetLabel={displayName} targetSnapshot={{ title: displayName, lat: localSpot.lat || '', lon: localSpot.lng || localSpot.lon || '', created_by: localSpot.created_by || '' }} />
       <DraftConfirmationDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}
         title={t('spotDetailUi.deleteTitle')} description={t('spotDetailUi.deleteDescription', { name: displayName })}
