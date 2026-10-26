@@ -21,6 +21,7 @@ import { categoryOf, SpotPhoto } from './spotDisplay';
 import SignOutDialog from './SignOutDialog';
 import NewMapHome from '@/new/NewMapHome';
 import NewWelcome from '@/new/NewWelcome';
+import NewAuth from '@/new/NewAuth';
 import NewConsent from '@/new/NewConsent';
 import QuickAddFlow, { quickAddRecoveryKey } from '@/new/QuickAddFlow';
 import { mapHomeCategoryOf } from '@/new/mapHomeData';
@@ -137,7 +138,8 @@ export default function MobileV2({ redesigned = false }) {
   const aboutPage = tab === 'about';
   const activeTab = settingsPage || draftsPage || aboutPage ? 'profile' : TABS.some(item => item[0] === tab) ? tab : 'map';
   const searchOpen = tab === 'search';
-  const unknownPage = !['map', 'discover', 'collection', 'profile', 'settings', 'drafts', 'about', 'search', 'spot'].includes(tab);
+  const authPage = redesigned && tab === 'auth';
+  const unknownPage = !['map', 'discover', 'collection', 'profile', 'settings', 'drafts', 'about', 'search', 'spot', ...(redesigned ? ['auth'] : [])].includes(tab);
   const [spots, setSpots] = useState([]);
   const [mapActivated, setMapActivated] = useState(activeTab === 'map');
   const [spotsLoading, setSpotsLoading] = useState(true);
@@ -180,6 +182,10 @@ export default function MobileV2({ redesigned = false }) {
   const [showWelcome, setShowWelcome] = useState(() => { try { return localStorage.getItem('spotfinder_mobile_v2_welcome') !== '1'; } catch { return true; } });
   const [consent, setConsent] = useState(() => getConsent().decided);
   const [showAuth, setShowAuth] = useState(false);
+  const closeNewAuth = () => {
+    setShowAuth(false);
+    if (authPage) navigate(location.state?.from?.startsWith('/new') ? location.state.from : '/new', { replace: true });
+  };
   const [showSettings, setShowSettings] = useState(false);
   const [textScale, setTextScale] = useState(() => getTextScale());
   const [verificationBusy, setVerificationBusy] = useState(false);
@@ -517,7 +523,7 @@ export default function MobileV2({ redesigned = false }) {
       {choosingQuickPosition && <div className="sf-new-position"><header className="sf-new-position-top"><strong>Vyber polohu místa</strong><span>Posuň mapu tak, aby značka ukazovala na místo.</span></header><div className="sf-new-position-pin"><MapPin size={42} fill="currentColor" /></div><div className="sf-new-position-controls"><button type="button" onClick={() => mapInstance?.zoomIn()} aria-label="Přiblížit mapu"><Plus size={19} /></button><button type="button" onClick={() => mapInstance?.zoomOut()} aria-label="Oddálit mapu"><Minus size={19} /></button><button type="button" onClick={requestGps} aria-label="Moje poloha"><Crosshair size={19} /></button></div><div className="sf-new-position-panel"><span>POLOHA MÍSTA</span><strong>{center.lat.toFixed(5)}, {center.lng.toFixed(5)}</strong><p>Souřadnice potvrdíš, až bude značka na správném místě.</p><div><button onClick={() => { quickRecoveryRef.current += 1; setChoosingQuickPosition(false); if (!quickAdd) setDraft(null); }}>Zrušit</button><button onClick={() => { quickRecoveryRef.current += 1; const point = mapRef.current?.getCenter(); if (!point) { toast.error('Počkejte, až se mapa načte.'); return; } const coords = { lat: point.lat, lng: point.lng }; if (!Number.isFinite(coords.lat) || !Number.isFinite(coords.lng)) return; setQuickAdd(current => ({ ...current, coords, draft: current?.draft || null })); setChoosingQuickPosition(false); }}>Potvrdit polohu</button></div></div></div>}
       {quickAdd && <QuickAddFlow key={quickAdd.draft?.id || 'new'} coords={quickAdd.coords} draft={quickAdd.draft} hidden={choosingQuickPosition} user={user} onMove={() => setChoosingQuickPosition(true)} onClose={() => { setQuickAdd(null); setChoosingQuickPosition(false); setDraft(null); }} onAuth={() => setShowAuth(true)} onViewSpot={async spot => { try { const saved = await getPublicSpotById(spot.id); if (!saved) { toast.error('Místo se zatím nepodařilo načíst. Zkus to znovu.'); return; } setQuickAdd(null); setChoosingQuickPosition(false); openSpot(saved); } catch { toast.error('Místo se nepodařilo načíst. Zkus to znovu.'); } }} onCreated={created => { if (created.status === 'published' && created.is_public) setSpots(rows => [created, ...rows.filter(row => row.id !== created.id)]); cacheRef.current = null; window.dispatchEvent(new CustomEvent('spotfinder:collection-changed')); }} />}
       {addMode && <div className="v2-add-hint"><span>Klepněte na mapu a vyberte polohu místa.</span><button onClick={() => setAddMode(false)} aria-label="Zrušit přidání"><X size={18} /></button></div>}
-      {showWelcome && consent && <NewWelcome onExplore={dismissWelcome} onGps={requestGps} onSignIn={() => setShowAuth(true)} />}
+      {showWelcome && consent && !authPage && <NewWelcome onExplore={dismissWelcome} onGps={requestGps} onSignIn={() => setShowAuth(true)} />}
       {!consent && <NewConsent onNecessary={() => { acknowledgeCurrentPrivacyNotice(); setConsent(true); }} />}
     </> : <>
       <div className="v2-map-top"><button className="v2-search-pill" onClick={() => navigate('/new/search')}><img src={LOGO} alt="SpotFinder" /><span>Hledat místa…</span><Mic size={17} /></button></div>
@@ -559,7 +565,7 @@ export default function MobileV2({ redesigned = false }) {
       {navigationDestination && <NavigationProviderSheet destination={navigationDestination} onClose={() => setNavigationDestination(null)} />}
       {addAt && <AddSpotModal mobileV2 latlng={addAt} draft={draft} user={user} onClose={() => { setAddAt(null); setDraft(null); }} onSave={async (data, socialUrl = '') => { let created = await createSpot(data); if (socialUrl) { try { await addSocialPost({ url: socialUrl, targetType: 'spot', targetId: String(created.id), targetName: getSpotDisplayName(created, language) }); created = { ...created, has_social: true }; } catch { toast.error('Místo bylo uloženo, ale mediální příspěvek se nepodařilo připojit.'); } } setSpots(rows => [created, ...rows]); cacheRef.current = null; window.dispatchEvent(new CustomEvent('spotfinder:collection-changed')); return created; }} />}
       {showNearbyFilter && <NearbySpotsFilterModal isOpen onClose={() => { setShowNearbyFilter(false); setFilterLocationError(''); }} onApply={runNearby} currentFilters={nearbyFilters} currentMode={nearbyMode} locationError={filterLocationError} busy={nearbyLoading} />}
-      {showAuth && <AuthModal mobileV2 onClose={() => setShowAuth(false)} />}
+      {redesigned && (showAuth || authPage) ? <NewAuth initialScreen={location.pathname.endsWith('/register') ? 'register' : 'login'} onClose={closeNewAuth} /> : showAuth && <AuthModal mobileV2 onClose={() => setShowAuth(false)} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </Suspense>
   </div>;
