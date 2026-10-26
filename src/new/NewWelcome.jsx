@@ -1,5 +1,6 @@
 import React from 'react';
 import { Crosshair, Droplets, Mountain, Route, UtensilsCrossed } from 'lucide-react';
+import { NewLegalLink } from './legalRoutes';
 
 export default function NewWelcome({ onExplore, onGps, onSignIn }) {
   return <div className="sf-new-welcome-backdrop" role="presentation">
@@ -11,7 +12,7 @@ export default function NewWelcome({ onExplore, onGps, onSignIn }) {
       <button type="button" className="sf-new-welcome-primary" onClick={onExplore}>Prozkoumat mapu</button>
       <button type="button" className="sf-new-welcome-location" onClick={() => { onExplore(); onGps(); }}><Crosshair size={19} /> Zapnout polohu</button>
       <p className="sf-new-welcome-signin">Máš účet? <button type="button" onClick={() => { onExplore(); onSignIn(); }}>Přihlásit se</button></p>
-      <small><a href="/TermsAndConditions">Podmínky použití</a> · <a href="/PrivacyPolicy">Zásady ochrany soukromí</a></small>
+      <small><NewLegalLink document="/TermsAndConditions">Podmínky použití</NewLegalLink> · <NewLegalLink document="/PrivacyPolicy">Zásady ochrany soukromí</NewLegalLink></small>
     </section>
   </div>;
 }

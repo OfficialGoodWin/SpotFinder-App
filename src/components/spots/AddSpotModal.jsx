@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { X, Camera, MapPin, Mic, Loader2, AlertCircle, ChevronDown, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
+import { NewLegalLink } from '@/new/legalRoutes';
 import { deleteCloudSpotDraft, getFirebaseServices, loadDraftImageFile, saveCloudSpotDraft, uploadDraftImage, uploadSpotImage } from '@/api/firebaseClient';
 import { validateSocialPostUrl } from '@/lib/socialUrlPolicy';
 import { moderateSubmission } from '@/lib/moderation';
@@ -49,7 +50,7 @@ const LANG_TO_BCP47 = {
   ro: 'ro-RO', es: 'es-ES', bg: 'bg-BG',
 };
 
-export default function AddSpotModal({ latlng, draft = null, onClose, onSave, user, mobileV2 = false }) {
+export default function AddSpotModal({ latlng, draft = null, onClose, onSave, user, mobileV2 = false, redesigned = false }) {
   const { authUid } = useAuth();
   const { t, language } = useLanguage();
   const spotType = 'general';
@@ -871,7 +872,7 @@ export default function AddSpotModal({ latlng, draft = null, onClose, onSave, us
         <div className="px-6 pt-3">
           <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-xs leading-relaxed ${fieldErrors.attested ? 'border-red-400 bg-red-50 dark:bg-red-950/20' : 'border-gray-200 dark:border-border'}`}>
             <input type="checkbox" checked={attested} onChange={event => { setAttested(event.target.checked); if (event.target.checked) setFieldErrors(current => ({ ...current, attested: '' })); }} className="mt-0.5 h-4 w-4 shrink-0 accent-green-600" />
-            <span>{t('addSpotUi.attestationStart')}{' '}<a href="/TermsAndConditions" target="_blank" rel="noopener noreferrer" className="font-semibold underline">{t('addSpotUi.terms')}</a>.</span>
+            <span>{t('addSpotUi.attestationStart')}{' '}{redesigned ? <NewLegalLink document="/TermsAndConditions" target="_blank" rel="noopener noreferrer" className="font-semibold underline">{t('addSpotUi.terms')}</NewLegalLink> : <a href="/TermsAndConditions" target="_blank" rel="noopener noreferrer" className="font-semibold underline">{t('addSpotUi.terms')}</a>}.</span>
           </label>
           {fieldErrors.attested && <p className="mt-1.5 text-xs font-semibold text-red-600">{fieldErrors.attested}</p>}
         </div>

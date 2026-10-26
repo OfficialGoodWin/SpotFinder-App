@@ -429,7 +429,8 @@ function isManagedImageUrl(value, uid) {
 }
 
 async function promoteDraftPhotos(uid, draftId, draftData) {
-  const refs = Array.isArray(draftData?.photo_refs) ? draftData.photo_refs.slice(0, 3) : [];
+  const refs = Array.isArray(draftData?.photo_refs) ? draftData.photo_refs : [];
+  if (refs.length > 5) throw new functions.https.HttpsError('invalid-argument', 'A spot can contain at most five photos.');
   if (!refs.length) return [];
   const bucket = getStorage().bucket();
   const urls = [];
@@ -550,6 +551,7 @@ function deriveSpotCategory(input, poiMatch) {
 // Authoritative spot-creation boundary. Direct Firestore creates are denied,
 // so callers cannot bypass ownership, aggregate, content, or rate checks.
 exports.submitSpot = functions.runWith({ secrets: ['ANTI_SPAM_IP_SALT'] }).https.onCall(async (data, context) => {
+  if (data?._capability === 'spot-photo-limit') return { maxPhotoCount: 5 };
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in to add a spot.');
   const input = data || {};
   const uid = context.auth.uid;
@@ -580,6 +582,9 @@ exports.submitSpot = functions.runWith({ secrets: ['ANTI_SPAM_IP_SALT'] }).https
     throw new functions.https.HttpsError('invalid-argument', 'Invalid spot coordinates.');
   }
   if (!description) throw new functions.https.HttpsError('invalid-argument', 'Description is required.');
+  if (Array.isArray(input.image_urls) && input.image_urls.length > 5) {
+    throw new functions.https.HttpsError('invalid-argument', 'A spot can contain at most five photos.');
+  }
   const submissionAttested = input.submission_attestation?.accepted === true;
 
   const ipHash = hashIp(getRequestIp(context));
@@ -608,7 +613,8 @@ exports.submitSpot = functions.runWith({ secrets: ['ANTI_SPAM_IP_SALT'] }).https
     : [];
   const submittedImageUrls = (Array.isArray(input.image_urls) ? input.image_urls : [])
     .filter(value => typeof value === 'string' && isManagedImageUrl(value, uid));
-  const imageUrls = [...promotedDraftUrls, ...submittedImageUrls].slice(0, 3);
+  const imageUrls = [...promotedDraftUrls, ...submittedImageUrls];
+  if (imageUrls.length > 5) throw new functions.https.HttpsError('invalid-argument', 'A spot can contain at most five photos.');
   const allowedOption = (value, allowed) => allowed.includes(value) ? value : null;
   const list = (value, maxItems, maxLength) => Array.isArray(value)
     ? value.map(item => cleanString(item, maxLength)).filter(Boolean).slice(0, maxItems) : [];

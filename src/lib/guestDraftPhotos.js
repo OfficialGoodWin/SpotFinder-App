@@ -32,7 +32,8 @@ export async function persistGuestDraftPhotos(ownerKey, draftId, files, indexedD
     const generation = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const transaction = db.transaction(STORE_NAME, 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
-    const refs = files.slice(0, 3).map((file, index) => {
+    if (files.length > 5) throw new Error('A draft can contain at most five photos.');
+    const refs = files.map((file, index) => {
       const id = `${prefix}${generation}:${index}`;
       store.put({ id, ownerKey, draftId, blob: file, name: file.name || `photo-${index + 1}`, type: file.type, size: file.size, updatedAt: Date.now() });
       return { local_id: id, name: file.name || `photo-${index + 1}`, type: file.type, size: file.size };

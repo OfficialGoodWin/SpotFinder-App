@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Camera, ChevronLeft, ChevronRight, ImagePlus, MapPin, Mic, X } from 'lucide-react';
-import { addSocialPost, createSpot, deleteCloudSpotDraft, getFirebaseServices, getPublicSpotsNear, loadDraftImageFile, saveCloudSpotDraft, uploadDraftImage, uploadSpotImage } from '@/api/firebaseClient';
+import { Camera, ChevronLeft, ChevronRight, ImagePlus, MapPin, X } from 'lucide-react';
+import { useLanguage } from '@/lib/LanguageContext';
+import { addSocialPost, createSpot, deleteCloudSpotDraft, getFirebaseServices, getPublicSpotsNear, getSpotPhotoLimit, loadDraftImageFile, saveCloudSpotDraft, uploadDraftImage, uploadSpotImage } from '@/api/firebaseClient';
 import { createDraftId, deleteGuestDraft, getGuestDraftOwnerKey, normalizeSpotDraft, saveGuestDraft } from '@/lib/spotDrafts';
 import { deleteGuestDraftPhotos, loadGuestDraftPhoto, persistGuestDraftPhotos, pruneGuestDraftPhotos } from '@/lib/guestDraftPhotos';
 import { IMAGE_ACCEPT, validateImageFileMetadata } from '@/lib/imageUploadValidation';
@@ -9,6 +10,9 @@ import { moderateSubmission } from '@/lib/moderation';
 import { validateSocialPostUrl } from '@/lib/socialUrlPolicy';
 import { getSpotDisplayName } from '@/lib/spotPresentation';
 import NewPublishConfirmation from './NewPublishConfirmation';
+import { NewLegalLink } from './legalRoutes';
+import NewVoiceButton, { NewVoiceStatus } from './NewVoiceButton';
+import { appendSpeechText, useVoiceInput } from './useVoiceInput';
 
 const CATEGORIES = [
   { label: 'Vyhlídka', tag: 'Viewpoint', type: 'viewpoint' },
@@ -21,6 +25,7 @@ const COST = [['free', 'Zdarma'], ['paid', 'Placené'], ['donation', 'Dobrovoln�
 const EFFORT = [['easy', 'Snadná procházka'], ['moderate', 'Kousek pěšky'], ['hard', 'Výprava']];
 const PARKING = [['yes', 'K dispozici'], ['street', 'Na ulici'], ['paid', 'Placené'], ['no', 'Žádné']];
 const TIMES = [['sunrise', 'Východ slunce'], ['sunset', 'Západ slunce'], ['golden_hour', 'Zlatá hodinka'], ['night', 'Po setmění'], ['anytime', 'Kdykoli']];
+const MAX_QUICK_PHOTOS = 5;
 const validCoords = point => Number.isFinite(point?.lat) && point.lat >= -90 && point.lat <= 90 && Number.isFinite(point?.lng) && point.lng >= -180 && point.lng <= 180;
 export const quickAddRecoveryKey = user => `spotfinder:new:active-draft:${user?.id || getGuestDraftOwnerKey(localStorage)}`;
 const photoError = (index, error) => `Fotografii ${index + 1} se nepodařilo uložit. ${error?.code === 'storage/unauthorized' ? 'Přihlas se znovu.' : 'Zkontroluj připojení a zkus to znovu.'}`;
@@ -41,6 +46,7 @@ const photoLog = (stage, index, photo, error) => console.error('Quick add photo 
 });
 
 export default function QuickAddFlow({ coords, draft, hidden, user, onMove, onClose, onAuth, onViewSpot, onCreated }) {
+  const { language } = useLanguage();
   const initial = useRef(normalizeSpotDraft(draft || { id: createDraftId(), ...coords }));
   const draftId = initial.current.id;
   const [form, setForm] = useState(() => ({
@@ -49,6 +55,7 @@ export default function QuickAddFlow({ coords, draft, hidden, user, onMove, onCl
     bestTime: initial.current.bestTime.map(value => value === 'after_dark' ? 'night' : value), socialUrl: initial.current.socialUrl,
   }));
   const [photos, setPhotos] = useState([]);
+  const [photoLimit, setPhotoLimit] = useState(3);
   const [pendingPhotos, setPendingPhotos] = useState([]);
   const [ready, setReady] = useState(!draft?.photo_refs?.length);
   const [photoReload, setPhotoReload] = useState(0);
@@ -70,12 +77,18 @@ export default function QuickAddFlow({ coords, draft, hidden, user, onMove, onCl
   const uploadedPublicPhotosRef = useRef(new Map());
   const latestRef = useRef(null);
   const revisionRef = useRef(0);
-  const voiceRef = useRef(null);
+  const voice = useVoiceInput(language, (key, transcript) => {
+    setForm(current => ({ ...current, [key]: appendSpeechText(current[key], transcript, key === 'title' ? 100 : 2000) }));
+    setDuplicateCheck(null);
+    setError('');
+  });
   const cloud = Boolean(user && !user.isAnonymous);
   const ownerUidRef = useRef(getFirebaseServices().auth.currentUser?.uid || null);
 
   useEffect(() => { photosRef.current = photos; }, [photos]);
-  useEffect(() => () => { photosRef.current.forEach(photo => URL.revokeObjectURL(photo.url)); voiceRef.current?.stop?.(); }, []);
+  useEffect(() => { let active = true; getSpotPhotoLimit().then(limit => { if (active) setPhotoLimit(limit); }); return () => { active = false; }; }, []);
+  useEffect(() => { voice.stop(); }, [hidden, goodToKnow, voice.stop]);
+  useEffect(() => () => { photosRef.current.forEach(photo => URL.revokeObjectURL(photo.url)); }, []);
   useEffect(() => {
     if (!draft?.photo_refs?.length) return undefined;
     if (photosRef.current.length === draft.photo_refs.length) { setReady(true); return undefined; }
@@ -101,6 +114,7 @@ export default function QuickAddFlow({ coords, draft, hidden, user, onMove, onCl
     const revision = revisionRef.current;
     const work = async () => {
       if (!ready) throw new Error('Počkej na načtení uložených fotografií.');
+      if (snapshot.photos.length > MAX_QUICK_PHOTOS) throw new Error('Příliš mnoho fotografií.');
       setSaveState('Ukládám rozpracované místo…');
       const ownerKey = cloud ? null : getGuestDraftOwnerKey(localStorage);
       const data = normalizeSpotDraft({
@@ -153,17 +167,21 @@ export default function QuickAddFlow({ coords, draft, hidden, user, onMove, onCl
 
   const selectPhotos = async event => {
     const picked = [...(event.target.files || [])];
-    const files = picked.slice(0, Math.max(0, 3 - photosRef.current.length - pendingPhotos.length));
     event.target.value = '';
-    if (!files.length || preparing || busy) return;
-    setPreparing(true); setError(picked.length > files.length ? 'K jednomu místu lze přidat nejvýše 3 fotografie.' : '');
-    for (let index = 0; index < files.length; index += 1) {
-      const source = files[index];
+    if (!picked.length || preparing || busy) return;
+    if (picked.length > photoLimit - photosRef.current.length - pendingPhotos.length) {
+      setError(`K jednomu místu lze přidat nejvýše ${photoLimit} fotografií. Vyber méně souborů.`);
+      return;
+    }
+    setPreparing(true); setError('');
+    for (let index = 0; index < picked.length; index += 1) {
+      const source = picked[index];
       try {
         validateImageFileMetadata(source);
         const prepared = await prepareContributionPhoto(source);
         const photo = { id: createDraftId(), file: prepared.file, url: URL.createObjectURL(prepared.file), ref: null, diagnostic: prepared.original };
-        setPhotos(current => { const next = [...current, photo].slice(0, 3); photosRef.current = next; return next; });
+        const next = [...photosRef.current, photo];
+        photosRef.current = next; setPhotos(next);
       } catch (cause) {
         photoLog('preparation', photosRef.current.length + index, { file: source }, cause);
         setPendingPhotos(current => [...current, { id: createDraftId(), file: source }]);
@@ -171,6 +189,25 @@ export default function QuickAddFlow({ coords, draft, hidden, user, onMove, onCl
       }
     }
     setPreparing(false);
+  };
+  const replacePhoto = async (index, event) => {
+    const source = event.target.files?.[0];
+    event.target.value = '';
+    if (!source || preparing || busy) return;
+    setPreparing(true); setError('');
+    try {
+      validateImageFileMetadata(source);
+      const prepared = await prepareContributionPhoto(source);
+      const previous = photosRef.current[index];
+      if (!previous) return;
+      const photo = { id: createDraftId(), file: prepared.file, url: URL.createObjectURL(prepared.file), ref: null, diagnostic: prepared.original };
+      const next = [...photosRef.current]; next[index] = photo;
+      photosRef.current = next; setPhotos(next); setActivePhoto(index);
+      URL.revokeObjectURL(previous.url);
+    } catch (cause) {
+      photoLog('replacement', index, { file: source }, cause);
+      setError(`Fotografii ${index + 1} se nepodařilo nahradit. Zkus JPEG kopii.`);
+    } finally { setPreparing(false); }
   };
   const retryPendingPhoto = async pending => {
     if (preparing || busy) return;
@@ -185,12 +222,6 @@ export default function QuickAddFlow({ coords, draft, hidden, user, onMove, onCl
   };
   const removePhoto = index => setPhotos(current => { const next = current.filter((_, i) => i !== index); URL.revokeObjectURL(current[index].url); photosRef.current = next; setActivePhoto(value => Math.min(value, Math.max(0, next.length - 1))); return next; });
   const movePhoto = (from, to) => setPhotos(current => { if (to < 0 || to >= current.length) return current; const next = [...current]; next.splice(to, 0, next.splice(from, 1)[0]); photosRef.current = next; setActivePhoto(to); return next; });
-  const dictate = key => {
-    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!Recognition) { setError('Hlasové zadávání není v tomto prohlížeči dostupné.'); return; }
-    try { voiceRef.current?.stop?.(); const recognition = new Recognition(); recognition.lang = 'cs-CZ'; recognition.onresult = event => update(key, `${latestRef.current.form[key]} ${event.results[0][0].transcript}`.trim()); recognition.onerror = () => setError('Mikrofon není dostupný. Zadej text ručně.'); voiceRef.current = recognition; recognition.start(); }
-    catch { setError('Mikrofon není dostupný. Zadej text ručně.'); }
-  };
   const close = async () => {
     if (lockRef.current || preparing) return;
     if (pendingPhotos.length) { setError('Nejdřív oprav nebo odeber nepřipravené fotografie. Tyto soubory zatím nelze uložit do návrhu.'); return; }
@@ -209,6 +240,7 @@ export default function QuickAddFlow({ coords, draft, hidden, user, onMove, onCl
   };
   const beginPublish = async () => {
     if (lockRef.current || preparing || !ready) return;
+    if (photos.length > photoLimit) { setError(`Server aktuálně podporuje nejvýše ${photoLimit} fotografie. Před odesláním některé odeber.`); return; }
     if (pendingPhotos.length) { setError('Nejdřív oprav nebo odeber nepřipravené fotografie.'); return; }
     if (!form.title.trim() || !form.category || !validCoords(coords)) { setError('Vyplň název, vyber kategorii a potvrď platnou polohu.'); return; }
     if (photos.length && !rights) { setError('Potvrď, že máš právo fotografie sdílet.'); return; }
@@ -232,6 +264,7 @@ export default function QuickAddFlow({ coords, draft, hidden, user, onMove, onCl
   };
   const publish = async (validatedSocial = null) => {
     if (lockRef.current) return;
+    if (photos.length > photoLimit) { setError(`Server aktuálně podporuje nejvýše ${photoLimit} fotografie. Před odesláním některé odeber.`); return; }
     if (pendingPhotos.length || !form.title.trim() || !form.category || !validCoords(coords) || photos.length > 0 && !rights || !attested) {
       setError('Doplň povinné údaje a oprav nebo odeber nepřipravené fotografie.'); return;
     }
@@ -289,22 +322,23 @@ export default function QuickAddFlow({ coords, draft, hidden, user, onMove, onCl
       <h2>Co pomůže ostatním?</h2><p>Volitelné detaily usnadní plánování návštěvy.</p>
       {[[COST, 'Cena', 'cost'], [EFFORT, 'Náročnost', 'difficulty'], [PARKING, 'Parkování', 'parking']].map(([options, label, key]) => <div className="sf-new-quick-field" key={key}><strong>{label}</strong><div className="sf-new-quick-chips">{options.map(([value, text]) => <button type="button" className={form[key] === value ? 'selected' : ''} key={value} onClick={() => update(key, form[key] === value ? '' : value)}>{text}</button>)}</div></div>)}
       <div className="sf-new-quick-field"><strong>Nejlepší čas</strong><div className="sf-new-quick-chips">{TIMES.map(([value, text]) => <button type="button" className={form.bestTime.includes(value) ? 'selected' : ''} key={value} onClick={() => update('bestTime', value === 'anytime' ? (form.bestTime.includes(value) ? [] : [value]) : form.bestTime.includes(value) ? form.bestTime.filter(item => item !== value) : [...form.bestTime.filter(item => item !== 'anytime'), value])}>{text}</button>)}</div></div>
-      <label className="sf-new-quick-field"><strong>Krátký popis</strong><span className="sf-new-quick-textarea"><textarea maxLength={2000} value={form.description} onChange={event => update('description', event.target.value)} placeholder="Co je na místě zajímavé?" /><button type="button" aria-label="Nadiktovat popis" onClick={() => dictate('description')}><Mic size={20} /></button></span></label>
+      <label className="sf-new-quick-field"><strong>Krátký popis</strong><span className="sf-new-quick-textarea"><textarea maxLength={2000} value={form.description} onChange={event => update('description', event.target.value)} placeholder="Co je na místě zajímavé?" /><NewVoiceButton voice={voice} field="description" label="Nadiktovat popis" /></span><NewVoiceStatus voice={voice} field="description" /></label>
     </div> : <div className="sf-new-quick-body">
-      <div className="sf-new-quick-photo-area">{photos.length ? <><img className="sf-new-quick-hero" src={photos[activePhoto]?.url || photos[0].url} alt={`Fotografie ${activePhoto + 1}`} /><div className="sf-new-quick-thumbs">{photos.map((photo, index) => <div key={photo.id}><button type="button" className={activePhoto === index ? 'selected' : ''} onClick={() => setActivePhoto(index)}><img src={photo.url} alt={`Vybrat fotografii ${index + 1}`} /></button><button type="button" aria-label={`Odebrat fotografii ${index + 1}`} onClick={() => removePhoto(index)}><X size={14} /></button><button type="button" aria-label={`Posunout fotografii ${index + 1} doleva`} disabled={index === 0} onClick={() => movePhoto(index, index - 1)}>←</button><button type="button" aria-label={`Posunout fotografii ${index + 1} doprava`} disabled={index === photos.length - 1} onClick={() => movePhoto(index, index + 1)}>→</button></div>)}</div></> : <div className="sf-new-quick-photo-empty"><ImagePlus size={31} /><strong>Přidej fotky místa</strong><span>Volitelné · maximálně 3 fotografie</span></div>}
-        {photos.length + pendingPhotos.length < 3 && <div className="sf-new-quick-photo-actions"><label><Camera size={17} /> Fotoaparát<input type="file" accept={IMAGE_ACCEPT} capture="environment" onChange={selectPhotos} disabled={preparing || !!busy} /></label><label><ImagePlus size={17} /> Galerie<input type="file" accept={IMAGE_ACCEPT} multiple onChange={selectPhotos} disabled={preparing || !!busy} /></label></div>}
+      <div className="sf-new-quick-photo-area"><span className="sf-new-quick-photo-count" aria-live="polite">{photos.length + pendingPhotos.length} / {photoLimit}</span>{photos.length ? <><img className="sf-new-quick-hero" src={photos[activePhoto]?.url || photos[0].url} alt={`Fotografie ${activePhoto + 1}`} /><div className="sf-new-quick-thumbs">{photos.map((photo, index) => <div key={photo.id}><button type="button" className={activePhoto === index ? 'selected' : ''} onClick={() => setActivePhoto(index)}><img src={photo.url} alt={`Vybrat fotografii ${index + 1}`} /></button><button type="button" aria-label={`Odebrat fotografii ${index + 1}`} onClick={() => removePhoto(index)}><X size={14} /></button><label className="sf-new-quick-replace"><Camera size={14} aria-hidden="true" /><input type="file" aria-label={`Nahradit fotografii ${index + 1}`} accept={IMAGE_ACCEPT} onChange={event => replacePhoto(index, event)} disabled={preparing || !!busy} /></label><button type="button" aria-label={`Posunout fotografii ${index + 1} doleva`} disabled={index === 0} onClick={() => movePhoto(index, index - 1)}>←</button><button type="button" aria-label={`Posunout fotografii ${index + 1} doprava`} disabled={index === photos.length - 1} onClick={() => movePhoto(index, index + 1)}>→</button></div>)}</div></> : <div className="sf-new-quick-photo-empty"><ImagePlus size={31} /><strong>Přidej fotky místa</strong><span>Volitelné · maximálně {photoLimit} fotografií</span></div>}
+        {photos.length + pendingPhotos.length < photoLimit && <div className="sf-new-quick-photo-actions"><label><Camera size={17} /> Fotoaparát<input type="file" accept={IMAGE_ACCEPT} capture="environment" onChange={selectPhotos} disabled={preparing || !!busy} /></label><label><ImagePlus size={17} /> Galerie<input type="file" accept={IMAGE_ACCEPT} multiple onChange={selectPhotos} disabled={preparing || !!busy} /></label></div>}
       </div>
+      {photos.length > photoLimit && <p className="sf-new-quick-error" role="alert">Server aktuálně podporuje nejvýše {photoLimit} fotografie. Návrh zůstává uložený; pro odeslání některé odeber.</p>}
       {pendingPhotos.map(pending => <div className="sf-new-quick-pending" key={pending.id}><span>{pending.file.name || 'Nepřipravená fotografie'}</span><button type="button" onClick={() => retryPendingPhoto(pending)} disabled={preparing || !!busy}>Zkusit znovu</button><button type="button" onClick={() => setPendingPhotos(current => current.filter(item => item.id !== pending.id))}>Odebrat</button></div>)}
       {photos.length > 0 && <label className="sf-new-quick-check"><input type="checkbox" checked={rights} onChange={event => setRights(event.target.checked)} /> Mám právo tyto fotografie sdílet.</label>}
-      <label className="sf-new-quick-field"><strong>Název místa *</strong><span className="sf-new-quick-input"><input maxLength={100} value={form.title} onChange={event => update('title', event.target.value)} placeholder="Jak se místo jmenuje?" /><button type="button" aria-label="Nadiktovat název" onClick={() => dictate('title')}><Mic size={19} /></button></span></label>
+      <label className="sf-new-quick-field"><strong>Název místa *</strong><span className="sf-new-quick-input"><input maxLength={100} value={form.title} onChange={event => update('title', event.target.value)} placeholder="Jak se místo jmenuje?" /><NewVoiceButton voice={voice} field="title" label="Nadiktovat název" /></span><NewVoiceStatus voice={voice} field="title" /></label>
       <div className="sf-new-quick-field"><strong>O jaké místo jde? *</strong><div className="sf-new-quick-chips">{CATEGORIES.map(item => <button type="button" className={form.category === item.tag ? 'selected' : ''} key={item.tag} onClick={() => update('category', item.tag)}>{item.label}</button>)}</div></div>
       <div className="sf-new-quick-location"><MapPin size={21} /><div><strong>Poloha</strong><small>{coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}</small></div><button type="button" onClick={onMove}>Upravit</button></div>
       <button type="button" className="sf-new-quick-more" onClick={() => setGoodToKnow(true)}><span><strong>Dobré vědět</strong><small>Cena, cesta, parkování a krátký popis · volitelné</small></span><ChevronRight size={20} /></button>
       <label className="sf-new-quick-field"><strong>Instagram nebo TikTok · volitelné</strong><input type="url" value={form.socialUrl} onChange={event => update('socialUrl', event.target.value)} placeholder="https://www.instagram.com/p/…" autoCapitalize="off" /></label>
       <p className="sf-new-quick-note">Když nepřidáš popis, odešle se stručný popis podle názvu a kategorie. Zveřejnění podléhá kontrole.</p>
-      <label className="sf-new-quick-check"><input type="checkbox" checked={attested} onChange={event => setAttested(event.target.checked)} /> <span>Souhlasím s <a href="/TermsAndConditions" target="_blank" rel="noopener noreferrer">podmínkami přidávání míst</a>.</span></label>
+      <label className="sf-new-quick-check"><input type="checkbox" checked={attested} onChange={event => setAttested(event.target.checked)} /> <span>Souhlasím s <NewLegalLink document="/TermsAndConditions" target="_blank" rel="noopener noreferrer">podmínkami přidávání míst</NewLegalLink>.</span></label>
       {duplicateCheck && <div className="sf-new-quick-duplicates"><strong>Podobná místa poblíž</strong><p>Podívej se, jestli už místo na mapě není. Pokud jde o jiné místo, pokračuj.</p>{duplicateCheck.map(spot => <button type="button" key={spot.id} onClick={() => viewDuplicate(spot)}>{getSpotDisplayName(spot, 'cs')} <span>Zobrazit</span></button>)}<button type="button" className="sf-new-quick-primary" onClick={() => publish(form.socialUrl.trim() ? validateSocialPostUrl(form.socialUrl.trim()) : null)}>Přesto odeslat</button></div>}
-      {error && <p className="sf-new-quick-error" role="alert">{error} <button type="button" onClick={() => { setError(''); if (!ready) setPhotoReload(value => value + 1); else if (!pendingPhotos.length && form.title.trim() && form.category) void beginPublish(); }}>{!ready || !pendingPhotos.length && form.title.trim() && form.category ? 'Zkusit znovu' : 'Zavřít'}</button></p>}
+      {error && <p className="sf-new-quick-error" role="alert">{error} <button type="button" onClick={() => { setError(''); if (!ready) setPhotoReload(value => value + 1); }}>{!ready ? 'Zkusit znovu' : 'Zavřít'}</button></p>}
     </div>}
     <footer className="sf-new-quick-footer">{goodToKnow ? <button className="sf-new-quick-primary" type="button" onClick={() => setGoodToKnow(false)}>Hotovo</button> : <><p className="sf-new-quick-save-status" role="status">{preparing ? 'Připravuji fotografie…' : busy === 'publishing' ? `Odesílám místo… ${progress ? `${progress} %` : ''}` : busy === 'checking' ? 'Hledám podobná místa…' : busy === 'draft' ? `Ukládám… ${progress ? `${progress} %` : ''}` : saveState}</p><div className="sf-new-quick-buttons"><button type="button" onClick={close} disabled={!!busy || preparing || !ready}>Uložit návrh</button><button type="button" className="sf-new-quick-primary" onClick={beginPublish} disabled={!!busy || preparing || !ready || !!pendingPhotos.length || !form.title.trim() || !form.category || !validCoords(coords)}>Odeslat místo</button></div></>}</footer>
   </section>;

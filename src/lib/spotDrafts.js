@@ -31,7 +31,7 @@ export function normalizeSpotDraft(value = {}) {
     conditionRating: Math.min(5, Math.max(0, Number(value.conditionRating) || 0)),
     safetyRating: Math.min(5, Math.max(0, Number(value.safetyRating) || 0)),
     crowdednessRating: Math.min(5, Math.max(0, Number(value.crowdednessRating) || 0)),
-    photo_refs: Array.isArray(value.photo_refs) ? value.photo_refs.filter(ref => ref && (typeof ref.path === 'string' || typeof ref.local_id === 'string')).slice(0, 3).map(ref => ({
+    photo_refs: Array.isArray(value.photo_refs) ? value.photo_refs.filter(ref => ref && (typeof ref.path === 'string' || typeof ref.local_id === 'string')).slice(0, 5).map(ref => ({
       ...(ref.path ? { path: cleanText(ref.path, 500) } : {}),
       ...(ref.local_id ? { local_id: cleanText(ref.local_id, 500) } : {}),
       name: cleanText(ref.name, 150), type: cleanText(ref.type, 100), size: Number(ref.size) || 0,

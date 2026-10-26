@@ -4,6 +4,7 @@ import { getSpotDisplayName } from '@/lib/spotPresentation';
 import { getSpotRating } from '@/lib/spotDiscovery';
 import { SpotPhoto } from '@/mobile-v2/spotDisplay';
 import { MAP_HOME_CATEGORIES, mapHomeCategoryOf } from './mapHomeData';
+import NewSkeleton from './NewSkeleton';
 
 const icons = { Výhledy: Mountain, Túry: Route, Voda: Droplets, Jídlo: UtensilsCrossed };
 const layers = [['basic', 'Základní'], ['outdoor', 'Turistická'], ['aerial', 'Letecká'], ['winter', 'Zimní'], ['traffic', 'Doprava']];
@@ -23,7 +24,7 @@ function SaveButton({ spot, name, saved, busy, onSave }) {
   return <button type="button" className={`sf-new-save ${saved ? 'is-saved' : ''}`} disabled={busy || saved} aria-label={saved ? `Uloženo: ${name}` : `Uložit: ${name}`} onClick={() => onSave(spot)}><Bookmark size={20} fill={saved ? 'currentColor' : 'none'} /></button>;
 }
 
-export default function NewMapHome({ category, setCategory, spots, language, loading, error, onRetry, onSearch, onVoiceSearch, onGps, geoError, onDismissGeoError, map, mapLayer, onMapLayer, terrain, onTerrain, showZoomButtons = false, nearbySize, onNearbySize, onOpen, onSave, savedIds, savingSpotId }) {
+export default function NewMapHome({ category, setCategory, spots, language, loading, error, onRetry, onSearch, onVoiceSearch, onGps, geoError, onDismissGeoError, map, mapLayer, onMapLayer, terrain, onTerrain, showZoomButtons = false, nearbySize, onNearbySize, onOpen, onSave, savedIds, savingSpotId, collectionMode = false, onExitCollection }) {
   const [layersOpen, setLayersOpen] = useState(false);
   const touchStart = useRef(null);
   const swiped = useRef(false);
@@ -55,9 +56,9 @@ export default function NewMapHome({ category, setCategory, spots, language, loa
   return <>
     <div className="sf-new-top">
       <div className="sf-new-search"><img src="/mobile-v2/official-logo.png" alt="SpotFinder" /><button type="button" onClick={onSearch}>Hledat místa…</button><button className="sf-new-microphone" type="button" onClick={onVoiceSearch} aria-label="Hledat místa hlasem"><Mic size={21} /></button></div>
-      <CategoryChips category={category} setCategory={setCategory} />
+      {!collectionMode && <CategoryChips category={category} setCategory={setCategory} />}
     </div>
-    <div className="sf-new-controls">
+    <div className={`sf-new-controls${nearbySize !== 'collapsed' ? ' is-sheet-open' : ''}`}>
       <button type="button" aria-label="Mapové vrstvy" aria-expanded={layersOpen} onClick={() => setLayersOpen(value => !value)}><Layers size={21} /></button>
       {layersOpen && <div className="sf-new-layer-menu" role="group" aria-label="Mapové vrstvy">{layers.map(([id, label]) => <button type="button" key={id} aria-pressed={mapLayer === id} onClick={() => { onMapLayer(id); setLayersOpen(false); }}>{label}</button>)}</div>}
       <button type="button" aria-label="Přepnout 3D mapu" aria-pressed={terrain} onClick={onTerrain}>3D</button>
@@ -67,9 +68,9 @@ export default function NewMapHome({ category, setCategory, spots, language, loa
     {geoError && <div className="sf-new-geo-error" role="status">{geoError}<button type="button" onClick={onDismissGeoError}>Zavřít</button></div>}
     <section className={`sf-new-nearby sf-new-nearby--${nearbySize}`} aria-label="Poblíž">
       <button className="sf-new-handle" type="button" aria-label={expanded ? 'Změnit velikost seznamu míst' : 'Rozbalit místa poblíž'} onTouchStart={event => { touchStart.current = event.touches[0]?.clientY ?? null; }} onTouchEnd={handleTouchEnd} onClick={() => { if (swiped.current) { swiped.current = false; return; } onNearbySize(nextSize[nearbySize]); }}><span /></button>
-      <div className="sf-new-nearby-heading"><div><h2>Poblíž</h2><p>{loading ? 'Načítám místa…' : `${spots.length} míst na mapě`}</p></div><button type="button" onClick={onGps}><Crosshair size={18} /> Zapnout polohu</button></div>
-      {nearbySize === 'full' && <CategoryChips category={category} setCategory={setCategory} className="sf-new-categories--sheet" />}
-      {error ? <p className="sf-new-state">Místa se nepodařilo načíst. <button type="button" onClick={onRetry}>Zkusit znovu</button></p> : !loading && !spots.length ? <p className="sf-new-state">V této části mapy nejsou místa v dané kategorii. Posuň mapu nebo změň filtr.</p> : expanded ? <div className="sf-new-vertical-list">{spots.map((spot, index) => renderSpot(spot, index, true))}</div> : <div className="sf-new-card-list">{spots.slice(0, 20).map((spot, index) => renderSpot(spot, index))}</div>}
+      <div className="sf-new-nearby-heading"><div><h2>{collectionMode ? 'Moje místa' : 'Poblíž'}</h2><p>{loading ? 'Načítám místa…' : `${spots.length} míst na mapě`}</p></div>{collectionMode ? <button type="button" onClick={onExitCollection}>Komunitní mapa</button> : <button type="button" onClick={onGps}><Crosshair size={18} /> Zapnout polohu</button>}</div>
+      {nearbySize === 'full' && !collectionMode && <CategoryChips category={category} setCategory={setCategory} className="sf-new-categories--sheet" />}
+      {error ? <p className="sf-new-state">Místa se nepodařilo načíst. <button type="button" onClick={onRetry}>Zkusit znovu</button></p> : loading ? <NewSkeleton kind={expanded ? 'nearbyRows' : 'nearbyCards'} /> : !spots.length ? <p className="sf-new-state">{collectionMode ? 'Nemáš žádná veřejná vytvořená, uložená ani oblíbená místa s polohou.' : 'V této části mapy nejsou místa v dané kategorii. Posuň mapu nebo změň filtr.'}</p> : expanded ? <div className="sf-new-vertical-list">{spots.map((spot, index) => renderSpot(spot, index, true))}</div> : <div className="sf-new-card-list">{spots.slice(0, 20).map((spot, index) => renderSpot(spot, index))}</div>}
     </section>
   </>;
 }

@@ -1,0 +1,9 @@
+.sf-new .sf-new-voice-button{position:relative;display:grid;place-items:center;flex:none;width:44px;min-height:44px;border:0;border-radius:12px;background:transparent;color:var(--sf-forest);cursor:pointer}
+.sf-new .sf-new-voice-button.is-listening{background:#dfe9dc;color:var(--sf-forest)}
+.sf-new .sf-new-voice-button.is-listening::after{content:'';position:absolute;inset:3px;border:1px solid currentColor;border-radius:10px;animation:sf-new-voice-pulse 1.5s ease-in-out infinite;pointer-events:none}
+.sf-new .sf-new-voice-button:focus-visible{outline:2px solid var(--sf-forest);outline-offset:2px}
+.sf-new .sf-new-voice-status{display:block;margin:5px 2px 0;color:var(--sf-forest);font-size:.75rem;line-height:1.35}
+.sf-new .sf-new-voice-status.is-error{color:var(--sf-clay)}
+.sf-new .v2-search>.sf-new-voice-status{margin:2px 16px 8px}
+@keyframes sf-new-voice-pulse{50%{opacity:.35}}
+@media(prefers-reduced-motion:reduce){.sf-new .sf-new-voice-button.is-listening::after{animation:none}}

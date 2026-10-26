@@ -6,6 +6,7 @@ import LabeledRatingScale from '@/components/spots/LabeledRatingScale';
 import { recoverableLazy } from '@/components/ChunkLoadRecovery';
 import { getSpotLocationLabel, getVerifiedSpotCategory } from '@/lib/spotPresentation';
 import { safeWebsite } from '@/lib/poiPresentation';
+import NewSkeleton from './NewSkeleton';
 
 const SocialPostsSection = recoverableLazy(() => import('@/components/social/SocialPostsSection'));
 
@@ -51,7 +52,7 @@ export default function NewSpotDetailView({ spot, photos, name, creatorName, use
           {ratingSubmitted && <p>Děkujeme za hodnocení.</p>}
         </div></details>
         {(practical.length > 3 || spot.directions || poi || spot.tags?.length > 1) && <details className="sf-new-detail-section"><summary>Další informace</summary><div className="sf-new-detail-section-content">{practical.length > 0 && <div className="sf-new-detail-chips">{practical.map((label, index) => <span key={`${label}-${index}`}>{label}</span>)}</div>}{spot.directions && <p>{spot.directions}</p>}{spot.tags?.length > 1 && <p>{spot.tags.slice(1).map(tag => t(`spotTags.${tag}`, tag)).join(' · ')}</p>}{poi && <p>{t('spotDetailUi.alsoKnownAs', { name: poi.name })}{poi.address ? ` · ${poi.address}` : ''}</p>}{website && <a href={website} target="_blank" rel="noopener noreferrer">Web místa</a>}</div></details>}
-        <details className="sf-new-detail-section" open={socialOpen} onToggle={event => setSocialOpen(event.currentTarget.open)}><summary>Příspěvky Instagram / TikTok</summary>{socialOpen && <div className="sf-new-detail-section-content"><Suspense fallback={<p>Načítám příspěvky…</p>}><SocialPostsSection targetType="spot" targetId={String(spot.id)} targetName={name} user={user} /></Suspense></div>}</details>
+        <details className="sf-new-detail-section" open={socialOpen} onToggle={event => setSocialOpen(event.currentTarget.open)}><summary>Příspěvky Instagram / TikTok</summary>{socialOpen && <div className="sf-new-detail-section-content"><Suspense fallback={<NewSkeleton kind="detailSection" />}><SocialPostsSection targetType="spot" targetId={String(spot.id)} targetName={name} user={user} /></Suspense></div>}</details>
         <p className="sf-new-detail-credit">Přidal(a) {creatorName}</p>
       </div>
     </div>

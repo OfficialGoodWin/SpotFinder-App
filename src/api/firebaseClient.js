@@ -622,17 +622,40 @@ export const getPublicSpotsNear = async (origin, maxDistance = Infinity, { maxCa
  
 export const getUserSpots = async (userEmail, maxCount = 50, userId = '') => {
   const { db } = getFirebaseServices();
-  const requests = [getDocs(query(collection(db, SPOTS_COLLECTION), where('created_by', '==', userEmail), orderBy('created_date', 'desc'), limit(maxCount)))];
-  if (userId) requests.push(getDocs(query(collection(db, SPOTS_COLLECTION), where('created_by_uid', '==', userId), limit(maxCount))));
+  const bases = [];
+  if (userEmail) bases.push(maxCount === Infinity ? [where('created_by', '==', userEmail)] : [where('created_by', '==', userEmail), orderBy('created_date', 'desc')]);
+  if (userId) bases.push([where('created_by_uid', '==', userId)]);
+  const requests = maxCount === Infinity
+    ? await Promise.all(bases.map(async clauses => {
+      const pages = [];
+      let cursor = null;
+      while (true) {
+        const snapshot = await getDocs(query(collection(db, SPOTS_COLLECTION), ...clauses, ...(cursor ? [startAfter(cursor)] : []), limit(100)));
+        pages.push(snapshot);
+        if (snapshot.docs.length < 100) break;
+        cursor = snapshot.docs.at(-1);
+      }
+      return pages;
+    }))
+    : (await Promise.all(bases.map(clauses => getDocs(query(collection(db, SPOTS_COLLECTION), ...clauses, limit(maxCount)))))).map(snapshot => [snapshot]);
   const unique = new Map();
-  (await Promise.all(requests)).forEach(snapshot => snapshot.docs.forEach(d => unique.set(d.id, spotFromSnapshot(d))));
+  requests.flat().forEach(snapshot => snapshot.docs.forEach(d => unique.set(d.id, spotFromSnapshot(d))));
   return [...unique.values()]
     .sort((a, b) => String(b.created_date || '').localeCompare(String(a.created_date || '')))
-    .slice(0, maxCount);
+    .slice(0, maxCount === Infinity ? undefined : maxCount);
 };
  
 export const createSpot = async (spotData) => {
   return callFn('submitSpot')(spotData);
+};
+
+// Older deployed submitSpot functions keep their three-photo limit. Only the
+// updated callable opts the redesigned form into five-photo submissions.
+export const getSpotPhotoLimit = async () => {
+  try {
+    const result = await callFn('submitSpot')({ _capability: 'spot-photo-limit' });
+    return result?.maxPhotoCount === 5 ? 5 : 3;
+  } catch { return 3; }
 };
 
 // Duplicate detection disabled for now (requires geohash utils)
@@ -857,16 +880,34 @@ export const toggleSpotSave = async (spotId, user, currentlySaved) => {
 async function getSpotsForRelations(collectionName, uid, maxCount = 100) {
   const { db } = getFirebaseServices();
   if (!uid) return [];
-  const relQ = query(collection(db, collectionName), where('user_id', '==', uid), limit(maxCount));
-  const rels = (await getDocs(relQ)).docs.map(d => d.data()).sort((a,b) => String(b.created_date || '').localeCompare(String(a.created_date || '')));
+  const relationDocs = [];
+  let cursor = null;
+  do {
+    const page = await getDocs(query(collection(db, collectionName), where('user_id', '==', uid), ...(cursor ? [startAfter(cursor)] : []), limit(maxCount === Infinity ? 100 : maxCount)));
+    relationDocs.push(...page.docs);
+    cursor = maxCount === Infinity && page.docs.length === 100 ? page.docs.at(-1) : null;
+  } while (cursor);
+  const rels = relationDocs.map(d => d.data()).sort((a,b) => String(b.created_date || '').localeCompare(String(a.created_date || '')));
   const ids = [...new Set(rels.map(r => r.spot_id).filter(Boolean))];
   const spotsById = new Map();
   // Firestore supports up to 30 values for an `in` query. Batching avoids the
   // previous burst of as many as 100 independent document requests.
   for (let offset = 0; offset < ids.length; offset += 30) {
     const batchIds = ids.slice(offset, offset + 30);
-    const batch = await getDocs(query(collection(db, SPOTS_COLLECTION), where(documentId(), 'in', batchIds)));
-    batch.docs.forEach(snap => spotsById.set(snap.id, spotFromSnapshot(snap)));
+    try {
+      const batch = await getDocs(query(collection(db, SPOTS_COLLECTION), where(documentId(), 'in', batchIds)));
+      batch.docs.forEach(snap => spotsById.set(snap.id, spotFromSnapshot(snap)));
+    } catch (error) {
+      if (maxCount !== Infinity || error?.code !== 'permission-denied') throw error;
+      // A saved or liked relation may outlive access to its spot. Keep the
+      // readable public spots rather than losing the whole collection page.
+      await Promise.all(batchIds.map(async id => {
+        try {
+          const snap = await getDoc(doc(db, SPOTS_COLLECTION, id));
+          if (snap.exists()) spotsById.set(id, spotFromSnapshot(snap));
+        } catch (readError) { if (readError?.code !== 'permission-denied') throw readError; }
+      }));
+    }
   }
   const relationDates = new Map(rels.map(relation => [relation.spot_id, relation.created_date || null]));
   return ids.map(id => {
