@@ -38,7 +38,7 @@ function Control({ label, detail, children }) {
   return <div className="sf-new-settings-control"><div><strong>{label}</strong>{detail && <small>{detail}</small>}</div>{children}</div>;
 }
 
-export default function NewSettings({ onSignIn, onSignOut, mapLayer, onMapLayer, terrain, onTerrain }) {
+export default function NewSettings({ onSignIn, onSignOut, mapLayer, onMapLayer, terrain, onTerrain, showZoomButtons, onZoomButtons }) {
   const { user } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const { language, setLanguage } = useLanguage();
@@ -59,7 +59,7 @@ export default function NewSettings({ onSignIn, onSignOut, mapLayer, onMapLayer,
     setNavigationProvider(id);
     try { localStorage.setItem(NAVIGATION_KEY, id); } catch { /* Choice applies for this view only when storage is unavailable. */ }
   };
-  const titles = { language: 'Jazyk', navigation: 'Navigační aplikace', appearance: 'Vzhled', accessibility: 'Přístupnost', account: 'Účet a zabezpečení', mfa: 'Dvoufázové ověření' };
+  const titles = { language: 'Jazyk', navigation: 'Navigační aplikace', appearance: 'Vzhled', accessibility: 'Možnosti přístupnosti', account: 'Účet a zabezpečení', mfa: 'Dvoufázové ověření' };
   const infoTitles = { faq: 'Časté dotazy', feedback: 'Zpětná vazba', report: 'Nahlásit problém', contact: 'Kontaktovat podporu', terms: 'Podmínky používání', privacy: 'Ochrana soukromí', cookies: 'Cookies', refunds: 'Vrácení peněz', preferences: 'Nastavení cookies', updates: 'Co je nového', app: 'O aplikaci' };
 
   return <section className="sf-new-settings-page" aria-labelledby="sf-new-settings-title">
@@ -79,8 +79,7 @@ export default function NewSettings({ onSignIn, onSignOut, mapLayer, onMapLayer,
             <SettingsRow icon={Moon} label="Vzhled" value={isDark ? 'Tmavý režim' : 'Světlý režim'} onClick={() => go('appearance')} />
           </SettingsGroup>
           <SettingsGroup title="Přístupnost">
-            <SettingsRow icon={Map} label="Ovládání mapy" onClick={() => go('accessibility')} />
-            <SettingsRow icon={Type} label="Velikost textu" value={`${textScale} %`} onClick={() => go('accessibility')} />
+            <SettingsRow icon={Accessibility} label="Možnosti přístupnosti" value="Ovládání mapy, velikost textu a další" onClick={() => go('accessibility')} />
           </SettingsGroup>
           <SettingsGroup title="Účet a zabezpečení">
             {accountAvailable ? <>
@@ -113,12 +112,15 @@ export default function NewSettings({ onSignIn, onSignOut, mapLayer, onMapLayer,
         {subsection === 'language' && <div className="sf-new-settings-panel"><p>Vyber jazyk aplikace.</p><Control label="Jazyk"><select aria-label="Jazyk aplikace" value={language} onChange={event => setLanguage(event.target.value)}>{[...LANGUAGES, ...LANGUAGE_VARIANTS].map(item => <option key={item.code} value={item.code}>{item.flag} {item.nativeName}</option>)}</select></Control></div>}
         {subsection === 'navigation' && <div className="sf-new-settings-panel"><p>Výběr se použije při otevírání navigace k místu.</p>{NAVIGATION_PROVIDERS.map(item => <label className="sf-new-settings-choice" key={item.id}><span>{item.label}</span><input type="radio" name="navigation-provider" value={item.id} checked={navigationProvider === item.id} onChange={() => chooseNavigation(item.id)} /></label>)}</div>}
         {subsection === 'appearance' && <div className="sf-new-settings-panel"><Control label="Tmavý režim" detail="Přepne vzhled aplikace a mapy."><input type="checkbox" role="switch" aria-label="Tmavý režim" checked={isDark} onChange={toggleTheme} /></Control></div>}
-        {subsection === 'accessibility' && <div className="sf-new-settings-panel">
-          <Control label="Velikost textu" detail={`${textScale} %`}><input type="range" min={TEXT_SCALE_MIN} max={TEXT_SCALE_MAX} step="5" value={textScale} onChange={event => setTextScale(saveTextScale(event.target.value))} aria-label="Velikost textu" /></Control>
-          <button type="button" className="sf-new-settings-reset" onClick={() => setTextScale(saveTextScale(TEXT_SCALE_DEFAULT))}>Obnovit výchozí velikost textu</button>
-          <h2><Accessibility size={17} /> Ovládání mapy</h2>
+        {subsection === 'accessibility' && <div className="sf-new-settings-panel sf-new-settings-accessibility">
+          <h2><Map size={17} /> Ovládání mapy</h2>
+          <Control label="Zobrazit tlačítka přiblížení" detail="Zobrazí na mapě tlačítka + a −."><input type="checkbox" role="switch" aria-label="Zobrazit tlačítka přiblížení" checked={showZoomButtons} onChange={event => onZoomButtons(event.target.checked)} /></Control>
           <Control label="Vzhled mapy"><select aria-label="Vzhled mapy" value={mapLayer} onChange={event => onMapLayer(event.target.value)}>{MAP_LAYERS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></Control>
           <Control label="3D mapa"><input type="checkbox" role="switch" aria-label="3D mapa" checked={terrain} onChange={event => onTerrain(event.target.checked)} /></Control>
+          <h2><Type size={17} /> Velikost textu</h2>
+          <Control label="Velikost textu" detail={`${textScale} %`}><input type="range" min={TEXT_SCALE_MIN} max={TEXT_SCALE_MAX} step="5" value={textScale} onChange={event => setTextScale(saveTextScale(event.target.value))} aria-label="Velikost textu" aria-valuetext={`${textScale} %`} /></Control>
+          <div className="sf-new-settings-scale-limits"><span>{TEXT_SCALE_MIN} %</span><span>{TEXT_SCALE_MAX} %</span></div>
+          <button type="button" className="sf-new-settings-reset" onClick={() => setTextScale(saveTextScale(TEXT_SCALE_DEFAULT))}>Obnovit výchozí velikost textu</button>
         </div>}
         {subsection === 'account' && (accountAvailable ? <div className="sf-new-settings-existing"><AccountSecuritySection /></div> : <div className="sf-new-settings-panel"><p>Přihlas se pro správu svého účtu.</p><button className="sf-new-settings-primary" type="button" onClick={onSignIn}>Přihlásit se</button></div>)}
         {subsection === 'mfa' && (accountAvailable ? <div className="sf-new-settings-existing"><MfaSection /></div> : <div className="sf-new-settings-panel"><p>Přihlas se pro správu dvoufázového ověření.</p><button className="sf-new-settings-primary" type="button" onClick={onSignIn}>Přihlásit se</button></div>)}

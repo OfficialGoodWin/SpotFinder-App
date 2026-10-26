@@ -23,7 +23,7 @@ function SaveButton({ spot, name, saved, busy, onSave }) {
   return <button type="button" className={`sf-new-save ${saved ? 'is-saved' : ''}`} disabled={busy || saved} aria-label={saved ? `Uloženo: ${name}` : `Uložit: ${name}`} onClick={() => onSave(spot)}><Bookmark size={20} fill={saved ? 'currentColor' : 'none'} /></button>;
 }
 
-export default function NewMapHome({ category, setCategory, spots, language, loading, error, onRetry, onSearch, onVoiceSearch, onGps, geoError, onDismissGeoError, map, mapLayer, onMapLayer, terrain, onTerrain, nearbySize, onNearbySize, onOpen, onSave, savedIds, savingSpotId }) {
+export default function NewMapHome({ category, setCategory, spots, language, loading, error, onRetry, onSearch, onVoiceSearch, onGps, geoError, onDismissGeoError, map, mapLayer, onMapLayer, terrain, onTerrain, showZoomButtons = false, nearbySize, onNearbySize, onOpen, onSave, savedIds, savingSpotId }) {
   const [layersOpen, setLayersOpen] = useState(false);
   const touchStart = useRef(null);
   const swiped = useRef(false);
@@ -62,7 +62,7 @@ export default function NewMapHome({ category, setCategory, spots, language, loa
       {layersOpen && <div className="sf-new-layer-menu" role="group" aria-label="Mapové vrstvy">{layers.map(([id, label]) => <button type="button" key={id} aria-pressed={mapLayer === id} onClick={() => { onMapLayer(id); setLayersOpen(false); }}>{label}</button>)}</div>}
       <button type="button" aria-label="Přepnout 3D mapu" aria-pressed={terrain} onClick={onTerrain}>3D</button>
       <button type="button" aria-label="Moje poloha" onClick={onGps}><Crosshair size={21} /></button>
-      <div className="sf-new-zoom"><button type="button" aria-label="Přiblížit mapu" onClick={() => map?.zoomIn()} disabled={!map}><Plus size={18} /></button><button type="button" aria-label="Oddálit mapu" onClick={() => map?.zoomOut()} disabled={!map}><Minus size={18} /></button></div>
+      {showZoomButtons && <div className="sf-new-zoom"><button type="button" aria-label="Přiblížit mapu" onClick={() => map?.zoomIn()} disabled={!map}><Plus size={18} /></button><button type="button" aria-label="Oddálit mapu" onClick={() => map?.zoomOut()} disabled={!map}><Minus size={18} /></button></div>}
     </div>
     {geoError && <div className="sf-new-geo-error" role="status">{geoError}<button type="button" onClick={onDismissGeoError}>Zavřít</button></div>}
     <section className={`sf-new-nearby sf-new-nearby--${nearbySize}`} aria-label="Poblíž">

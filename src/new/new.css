@@ -29,6 +29,7 @@
 .sf-new .sf-new-zoom button{height:39px;display:grid;place-items:center;border:0;background:transparent;color:var(--sf-forest)}
 .sf-new .sf-new-zoom button+button{border-left:1px solid #dfdacb}
 .sf-new .sf-new-zoom button:disabled{opacity:.45}
+.sf-new .mobile-v2:not(.sf-new-zoom-visible) .sf-new-position-controls>button:nth-child(-n+2){display:none}
 .sf-new .sf-new-nearby--partial{height:min(58dvh,530px)}
 .sf-new .sf-new-nearby--full{top:max(17px,env(safe-area-inset-top));bottom:0;height:auto;border-radius:23px 23px 0 0;padding-bottom:env(safe-area-inset-bottom)}
 .sf-new .mobile-v2.sf-new-sheet-full .v2-nav{display:none}
