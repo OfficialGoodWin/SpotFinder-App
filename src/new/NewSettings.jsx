@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { Accessibility, BadgeCheck, BookOpen, ChevronLeft, ChevronRight, CircleHelp, Cookie, FileText, Globe2, History, KeyRound, LogOut, Mail, Map, MessageSquare, Moon, Navigation2, ReceiptText, ShieldCheck, Smartphone, Type, UserRound } from 'lucide-react';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Accessibility, BadgeCheck, BookOpen, ChevronLeft, ChevronRight, CircleHelp, Cookie, FileText, Globe2, History, Mail, Map, MessageSquare, Moon, Navigation2, ReceiptText, Smartphone, Type, UserRound } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -8,8 +8,7 @@ import { LANGUAGES, LANGUAGE_VARIANTS } from '@/locales/translations';
 import { NAVIGATION_PROVIDERS } from '@/lib/externalNavigation';
 import { getTextScale, saveTextScale, TEXT_SCALE_DEFAULT, TEXT_SCALE_MIN, TEXT_SCALE_MAX } from '@/lib/textScale';
 import { APP_VERSION } from '@/config/appVersion';
-import AccountSecuritySection from '@/components/AccountSecuritySection';
-import MfaSection from '@/components/MfaSection';
+import NewAccount from './NewAccount';
 import NewSettingsInfo from './NewSettingsInfo';
 import './new-settings.css';
 
@@ -38,20 +37,20 @@ function Control({ label, detail, children }) {
   return <div className="sf-new-settings-control"><div><strong>{label}</strong>{detail && <small>{detail}</small>}</div>{children}</div>;
 }
 
-export default function NewSettings({ onSignIn, onSignOut, mapLayer, onMapLayer, terrain, onTerrain, showZoomButtons, onZoomButtons }) {
+export default function NewSettings({ onSignIn, mapLayer, onMapLayer, terrain, onTerrain, showZoomButtons, onZoomButtons }) {
   const { user } = useAuth();
   const { isDark, toggleTheme } = useTheme();
-  const { language, setLanguage } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const subsection = location.pathname.split('/')[3] || '';
   const detail = location.pathname.split('/')[4] || '';
   const [textScale, setTextScale] = useState(getTextScale);
   const [navigationProvider, setNavigationProvider] = useState(savedNavigationProvider);
-  const accountAvailable = Boolean(user);
   const go = part => navigate(`/new/settings/${part}`);
   const back = () => {
     if (!subsection) navigate('/new/profile');
+    else if (subsection === 'account' && detail) navigate('/new/settings/account');
     else if (location.key !== 'default') navigate(-1);
     else navigate('/new/settings');
   };
@@ -59,14 +58,16 @@ export default function NewSettings({ onSignIn, onSignOut, mapLayer, onMapLayer,
     setNavigationProvider(id);
     try { localStorage.setItem(NAVIGATION_KEY, id); } catch { /* Choice applies for this view only when storage is unavailable. */ }
   };
-  const titles = { language: 'Jazyk', navigation: 'Navigační aplikace', appearance: 'Vzhled', accessibility: 'Možnosti přístupnosti', account: 'Účet a zabezpečení', mfa: 'Dvoufázové ověření' };
+  const titles = { language: 'Jazyk', navigation: 'Navigační aplikace', appearance: 'Vzhled', accessibility: 'Možnosti přístupnosti', account: t('newAccount.management'), mfa: t('newAccount.mfa') };
   const infoTitles = { faq: 'Časté dotazy', feedback: 'Zpětná vazba', report: 'Nahlásit problém', contact: 'Kontaktovat podporu', terms: 'Podmínky používání', privacy: 'Ochrana soukromí', cookies: 'Cookies', refunds: 'Vrácení peněz', preferences: 'Nastavení cookies', updates: 'Co je nového', app: 'O aplikaci' };
 
+  const accountTitles = { name: t('newAccount.displayName'), methods: t('newAccount.signInMethods'), email: t('newAccount.changeEmail'), mfa: t('newAccount.mfa'), delete: t('newAccount.deleteAccount') };
+  if (subsection === 'mfa') return <Navigate to="/new/settings/account/mfa" replace />;
   return <section className="sf-new-settings-page" aria-labelledby="sf-new-settings-title">
     <div className="sf-new-settings-scroll">
       <div className="sf-new-settings-content">
-        <header className="sf-new-settings-header"><button type="button" className="sf-new-settings-back" aria-label={subsection ? 'Zpět na nastavení' : 'Zpět na profil'} onClick={back}><ChevronLeft size={22} /></button><div className="sf-new-settings-brand"><img src="/mobile-v2/official-logo.png" alt="" />SpotFinder</div><span /></header>
-        <h1 id="sf-new-settings-title">{infoTitles[detail] || titles[subsection] || 'Nastavení'}<span>.</span></h1>
+        <header className="sf-new-settings-header"><button type="button" className="sf-new-settings-back" aria-label={subsection === 'account' && detail ? t('newAccount.backToAccount') : subsection ? t('newAccount.backToSettings') : t('newAccount.backToProfile')} onClick={back}><ChevronLeft size={22} /></button><div className="sf-new-settings-brand"><img src="/mobile-v2/official-logo.png" alt="" />SpotFinder</div><span /></header>
+        <h1 id="sf-new-settings-title">{(subsection === 'account' && accountTitles[detail]) || infoTitles[detail] || titles[subsection] || 'Nastavení'}<span>.</span></h1>
 
         {!subsection && <>
           <div className="sf-new-settings-profile">
@@ -81,13 +82,8 @@ export default function NewSettings({ onSignIn, onSignOut, mapLayer, onMapLayer,
           <SettingsGroup title="Přístupnost">
             <SettingsRow icon={Accessibility} label="Možnosti přístupnosti" value="Ovládání mapy, velikost textu a další" onClick={() => go('accessibility')} />
           </SettingsGroup>
-          <SettingsGroup title="Účet a zabezpečení">
-            {accountAvailable ? <>
-              <SettingsRow icon={UserRound} label="Osobní údaje" onClick={() => go('account')} />
-              <SettingsRow icon={KeyRound} label="Změna hesla / správa přihlášení" onClick={() => go('account')} />
-              <SettingsRow icon={ShieldCheck} label="Dvoufázové ověření" onClick={() => go('mfa')} />
-              <SettingsRow icon={LogOut} label="Odhlášení" onClick={onSignOut} danger />
-            </> : <SettingsRow icon={UserRound} label="Přihlásit se / vytvořit účet" onClick={onSignIn} />}
+          <SettingsGroup title={t('newAccount.accountGroup')}>
+            <SettingsRow icon={UserRound} label={t('newAccount.management')} value={t('newAccount.managementSubtitle')} onClick={() => go('account')} />
           </SettingsGroup>
           <SettingsGroup title="Nápověda a podpora">
             <SettingsRow icon={CircleHelp} label="Časté dotazy" onClick={() => go('support/faq')} />
@@ -122,8 +118,7 @@ export default function NewSettings({ onSignIn, onSignOut, mapLayer, onMapLayer,
           <div className="sf-new-settings-scale-limits"><span>{TEXT_SCALE_MIN} %</span><span>{TEXT_SCALE_MAX} %</span></div>
           <button type="button" className="sf-new-settings-reset" onClick={() => setTextScale(saveTextScale(TEXT_SCALE_DEFAULT))}>Obnovit výchozí velikost textu</button>
         </div>}
-        {subsection === 'account' && (accountAvailable ? <div className="sf-new-settings-existing"><AccountSecuritySection /></div> : <div className="sf-new-settings-panel"><p>Přihlas se pro správu svého účtu.</p><button className="sf-new-settings-primary" type="button" onClick={onSignIn}>Přihlásit se</button></div>)}
-        {subsection === 'mfa' && (accountAvailable ? <div className="sf-new-settings-existing"><MfaSection /></div> : <div className="sf-new-settings-panel"><p>Přihlas se pro správu dvoufázového ověření.</p><button className="sf-new-settings-primary" type="button" onClick={onSignIn}>Přihlásit se</button></div>)}
+        {subsection === 'account' && <NewAccount detail={detail} onSignIn={onSignIn} />}
         {['support', 'legal', 'about'].includes(subsection) && <NewSettingsInfo area={subsection} page={detail} />}
       </div>
     </div>
