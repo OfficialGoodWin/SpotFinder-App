@@ -10,6 +10,7 @@ import { getTextScale, saveTextScale, TEXT_SCALE_DEFAULT, TEXT_SCALE_MIN, TEXT_S
 import { APP_VERSION } from '@/config/appVersion';
 import AccountSecuritySection from '@/components/AccountSecuritySection';
 import MfaSection from '@/components/MfaSection';
+import NewSettingsInfo from './NewSettingsInfo';
 import './new-settings.css';
 
 const NAVIGATION_KEY = 'spotfinder_navigation_provider'; // Used by the existing navigation chooser.
@@ -44,22 +45,28 @@ export default function NewSettings({ onSignIn, onSignOut, mapLayer, onMapLayer,
   const navigate = useNavigate();
   const location = useLocation();
   const subsection = location.pathname.split('/')[3] || '';
+  const detail = location.pathname.split('/')[4] || '';
   const [textScale, setTextScale] = useState(getTextScale);
   const [navigationProvider, setNavigationProvider] = useState(savedNavigationProvider);
   const accountAvailable = Boolean(user);
   const go = part => navigate(`/new/settings/${part}`);
-  const back = () => navigate(subsection ? '/new/settings' : '/new/profile');
+  const back = () => {
+    if (!subsection) navigate('/new/profile');
+    else if (location.key !== 'default') navigate(-1);
+    else navigate('/new/settings');
+  };
   const chooseNavigation = id => {
     setNavigationProvider(id);
     try { localStorage.setItem(NAVIGATION_KEY, id); } catch { /* Choice applies for this view only when storage is unavailable. */ }
   };
   const titles = { language: 'Jazyk', navigation: 'Navigační aplikace', appearance: 'Vzhled', accessibility: 'Přístupnost', account: 'Účet a zabezpečení', mfa: 'Dvoufázové ověření' };
+  const infoTitles = { faq: 'Časté dotazy', feedback: 'Zpětná vazba', report: 'Nahlásit problém', contact: 'Kontaktovat podporu', terms: 'Podmínky používání', privacy: 'Ochrana soukromí', cookies: 'Cookies', refunds: 'Vrácení peněz', preferences: 'Nastavení cookies', updates: 'Co je nového', app: 'O aplikaci' };
 
   return <section className="sf-new-settings-page" aria-labelledby="sf-new-settings-title">
     <div className="sf-new-settings-scroll">
       <div className="sf-new-settings-content">
         <header className="sf-new-settings-header"><button type="button" className="sf-new-settings-back" aria-label={subsection ? 'Zpět na nastavení' : 'Zpět na profil'} onClick={back}><ChevronLeft size={22} /></button><div className="sf-new-settings-brand"><img src="/mobile-v2/official-logo.png" alt="" />SpotFinder</div><span /></header>
-        <h1 id="sf-new-settings-title">{titles[subsection] || 'Nastavení'}<span>.</span></h1>
+        <h1 id="sf-new-settings-title">{infoTitles[detail] || titles[subsection] || 'Nastavení'}<span>.</span></h1>
 
         {!subsection && <>
           <div className="sf-new-settings-profile">
@@ -84,20 +91,22 @@ export default function NewSettings({ onSignIn, onSignOut, mapLayer, onMapLayer,
             </> : <SettingsRow icon={UserRound} label="Přihlásit se / vytvořit účet" onClick={onSignIn} />}
           </SettingsGroup>
           <SettingsGroup title="Nápověda a podpora">
-            <SettingsRow icon={CircleHelp} label="Časté dotazy" href="/FAQ" />
-            <SettingsRow icon={MessageSquare} label="Zpětná vazba" href="/FAQ#feedback-title" />
-            <SettingsRow icon={BookOpen} label="Nahlásit problém" href="/FAQ#feedback-title" />
-            <SettingsRow icon={Mail} label="Kontaktovat podporu" href="/FAQ#feedback-title" />
+            <SettingsRow icon={CircleHelp} label="Časté dotazy" onClick={() => go('support/faq')} />
+            <SettingsRow icon={MessageSquare} label="Zpětná vazba" onClick={() => go('support/feedback')} />
+            <SettingsRow icon={BookOpen} label="Nahlásit problém" onClick={() => go('support/report')} />
+            <SettingsRow icon={Mail} label="Kontaktovat podporu" onClick={() => go('support/contact')} />
           </SettingsGroup>
           <SettingsGroup title="Podmínky používání a právní informace">
-            <SettingsRow icon={FileText} label="Podmínky používání" href="/TermsAndConditions" />
-            <SettingsRow icon={BadgeCheck} label="Ochrana soukromí" href="/PrivacyPolicy" />
-            <SettingsRow icon={Cookie} label="Cookies" href="/CookiePolicy" />
-            <SettingsRow icon={ReceiptText} label="Vrácení peněz" href="/RefundPolicy" />
+            <SettingsRow icon={FileText} label="Podmínky používání" onClick={() => go('legal/terms')} />
+            <SettingsRow icon={BadgeCheck} label="Ochrana soukromí" onClick={() => go('legal/privacy')} />
+            <SettingsRow icon={Cookie} label="Cookies" onClick={() => go('legal/cookies')} />
+            <SettingsRow icon={Cookie} label="Nastavení cookies" onClick={() => go('legal/preferences')} />
+            <SettingsRow icon={ReceiptText} label="Vrácení peněz" onClick={() => go('legal/refunds')} />
           </SettingsGroup>
           <SettingsGroup title="O aplikaci">
-            <SettingsRow icon={History} label="Co je nového" href="/updates" />
-            <SettingsRow icon={Smartphone} label="Verze aplikace" value={APP_VERSION} onClick={() => navigate('/new/about')} />
+            <SettingsRow icon={History} label="Co je nového" onClick={() => go('about/updates')} />
+            <SettingsRow icon={Smartphone} label="Verze aplikace" value={APP_VERSION} onClick={() => go('about/app')} />
+            <SettingsRow icon={BookOpen} label="O aplikaci" onClick={() => go('about/app')} />
           </SettingsGroup>
         </>}
 
@@ -113,6 +122,7 @@ export default function NewSettings({ onSignIn, onSignOut, mapLayer, onMapLayer,
         </div>}
         {subsection === 'account' && (accountAvailable ? <div className="sf-new-settings-existing"><AccountSecuritySection /></div> : <div className="sf-new-settings-panel"><p>Přihlas se pro správu svého účtu.</p><button className="sf-new-settings-primary" type="button" onClick={onSignIn}>Přihlásit se</button></div>)}
         {subsection === 'mfa' && (accountAvailable ? <div className="sf-new-settings-existing"><MfaSection /></div> : <div className="sf-new-settings-panel"><p>Přihlas se pro správu dvoufázového ověření.</p><button className="sf-new-settings-primary" type="button" onClick={onSignIn}>Přihlásit se</button></div>)}
+        {['support', 'legal', 'about'].includes(subsection) && <NewSettingsInfo area={subsection} page={detail} />}
       </div>
     </div>
   </section>;
