@@ -1,11 +1,12 @@
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { Camera, ChevronLeft, Flag, Globe, Mail, MapPin, Navigation, Phone, Share2, Star, X } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
-import { normalizePoiPhotos, openingHoursLabel, safeWebsite } from '@/lib/poiPresentation';
+import { normalizePoiPhotos, safeWebsite } from '@/lib/poiPresentation';
 import { iconGlyphSVG } from '@/lib/mapIcons';
 import { recoverableLazy } from '@/components/ChunkLoadRecovery';
 import { toast } from 'sonner';
 import { newPoiText } from './newPoiPresentation';
+import NewPoiHours from './NewPoiHours';
 import './new-poi.css';
 
 const SocialPostsSection = recoverableLazy(() => import('@/components/social/SocialPostsSection'));
@@ -42,11 +43,11 @@ export default function NewPoiView({ poi, category, visibleText, sfRating, ratin
   const closeRef = useRef(null);
   useEffect(() => { if (expanded) closeRef.current?.focus(); }, [expanded]);
   const published = poi.enrichment || {};
-  const tags = { ...(poi.tags || {}), ...(published.attributes || {}), ...(published.phone ? { phone: published.phone } : {}), ...(published.website ? { website: published.website } : {}), ...(published.openingHours ? { opening_hours: published.openingHours } : {}) };
+  const tags = { ...(poi.tags || {}), ...(published.attributes || {}), ...(published.phone ? { phone: published.phone } : {}), ...(published.website ? { website: published.website } : {}), ...(Object.prototype.hasOwnProperty.call(published, 'openingHours') ? { opening_hours: published.openingHours } : {}) };
   const phone = tags.phone || tags['contact:phone'] || tags['contact:mobile'];
   const email = tags.email || tags['contact:email'];
   const website = safeWebsite(tags.website || tags['contact:website'] || tags.url);
-  const hours = openingHoursLabel(tags.opening_hours);
+  const hoursSource = Object.prototype.hasOwnProperty.call(published, 'openingHours') || Object.prototype.hasOwnProperty.call(published.attributes || {}, 'opening_hours') ? 'SpotFinder' : 'OpenStreetMap';
   const coordinate = Number.isFinite(poi.lat) && Number.isFinite(poi.lon) ? `${poi.lat.toFixed(6)}, ${poi.lon.toFixed(6)}` : '';
   const submitRating = async () => {
     if (!ratingVal || submitting) return;
@@ -67,7 +68,8 @@ export default function NewPoiView({ poi, category, visibleText, sfRating, ratin
     <header className="sf-new-poi-header"><button ref={closeRef} type="button" onClick={onClose} aria-label={t('poiDetailUi.closeDetails')}><ChevronLeft size={22} /></button><span>SpotFinder</span><button type="button" onClick={onShare} aria-label={t('poiDetail.share')}><Share2 size={19} /></button></header>
     <div className="sf-new-poi-scroll">
       {leadPhoto ? <div className="sf-new-poi-cover"><Photo photo={leadPhoto} title={title} category={category} onOpen={() => onOpenLightbox(0)} />{leadPhoto.credit && <p>{photoCredit(leadPhoto.credit, language)}{safeWebsite(leadPhoto.source) && <> · <a href={safeWebsite(leadPhoto.source)} target="_blank" rel="noopener noreferrer">{t('poiDetailUi.source')}</a></>}{safeWebsite(leadPhoto.license_url) && <> · <a href={safeWebsite(leadPhoto.license_url)} target="_blank" rel="noopener noreferrer">{t('poiDetailUi.license')}</a></>}</p>}</div> : <div className="sf-new-poi-fallback"><Photo title={title} category={category} /></div>}
-      <div className="sf-new-poi-content"><span className="sf-new-poi-category">{categoryLabel}</span><h1>{title}</h1>{address && <p className="sf-new-poi-address"><MapPin size={17} />{address}</p>}<div className="sf-new-poi-meta">{ratingsError ? <span className="sf-new-poi-unrated">{language?.startsWith('cs') ? 'Hodnocení není dostupné' : 'Ratings unavailable'}</span> : <Rating rating={sfRating} loading={ratingsLoading} language={language} t={t} />}{hours && <span>{hours === 'Open 24/7' ? t('poiDetail.open247') : hours}</span>}</div>
+      <div className="sf-new-poi-content"><span className="sf-new-poi-category">{categoryLabel}</span><h1>{title}</h1>{address && <p className="sf-new-poi-address"><MapPin size={17} />{address}</p>}<div className="sf-new-poi-meta">{ratingsError ? <span className="sf-new-poi-unrated">{language?.startsWith('cs') ? 'Hodnocení není dostupné' : 'Ratings unavailable'}</span> : <Rating rating={sfRating} loading={ratingsLoading} language={language} t={t} />}</div>
+      <NewPoiHours raw={tags.opening_hours} lat={poi.lat} lon={poi.lon} language={language} source={tags.opening_hours ? hoursSource : null} />
       <div className="sf-new-poi-actions"><button type="button" onClick={onShare}><Share2 size={17} />{t('poiDetail.share')}</button><button type="button" onClick={onAddPhoto} disabled={!user || !poiIdentity}><Camera size={17} />{t('poiDetail.addPhoto')}</button>{onEditOfficial && <button type="button" onClick={onEditOfficial}>{t('officialEditor.editThisPoi')}</button>}</div>
       {identityChecked && !poiIdentity && <p className="sf-new-poi-identity-note">{language?.startsWith('cs') ? 'K tomuto bodu chybí ověřený odkaz na OpenStreetMap; přidávání fotografií a propojení zatím není dostupné.' : 'This place has no verified OpenStreetMap reference; photo contributions and linking are unavailable.'}</p>}
       {poiIdentity && <section className="sf-new-poi-section sf-new-poi-link"><h2>{language?.startsWith('cs') ? 'Komunitní místo' : 'Community spot'}</h2>{linkedSpotId ? <p>{language?.startsWith('cs') ? 'Tento bod je propojený s komunitním místem.' : 'This POI is linked to a community spot.'}</p> : user ? <><p>{language?.startsWith('cs') ? 'Jde o stejné skutečné místo jako některé z tvých publikovaných míst? Propoj je pouze po osobním ověření.' : 'Is this the same real place as one of your published spots? Link only after checking.'}</p>{linkCandidates === null ? <button type="button" onClick={onLoadLinkCandidates} disabled={linkBusy}>{language?.startsWith('cs') ? 'Vybrat moje místo' : 'Choose my spot'}</button> : linkCandidates.length ? <div className="sf-new-poi-link-choice"><select aria-label={language?.startsWith('cs') ? 'Komunitní místo k propojení' : 'Community spot to link'} value={selectedLinkSpot} onChange={event => setSelectedLinkSpot(event.target.value)}><option value="">{language?.startsWith('cs') ? 'Vyber místo' : 'Choose a spot'}</option>{linkCandidates.map(spot => <option key={spot.id} value={spot.id}>{spot.title || spot.name}</option>)}</select><button type="button" disabled={!selectedLinkSpot || linkBusy} onClick={() => onLinkSpot(selectedLinkSpot)}>{language?.startsWith('cs') ? 'Potvrdit propojení' : 'Confirm link'}</button></div> : <p>{language?.startsWith('cs') ? 'Nemáš žádné dostupné publikované místo.' : 'No eligible published spot is available.'}</p>}</> : null}</section>}

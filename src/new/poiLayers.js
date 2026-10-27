@@ -1,12 +1,13 @@
 const STORAGE_KEY = 'spotfinder_new_poi_layers_v1';
 
-export const DEFAULT_NEW_POI_LAYERS = Object.freeze({ community: true, interesting: true, practical: false, food: false });
+export const DEFAULT_NEW_POI_LAYERS = Object.freeze({ community: true, interesting: true, parking: true, practical: false, food: false });
 
 const INTERESTING = new Set(['heritage', 'viewpoint', 'museum', 'camp_site', 'picnic_site']);
 const FOOD = new Set(['restaurant', 'cafe', 'bar', 'bakery']);
 
 export function poiGroupForCategory(key) {
   if (INTERESTING.has(key)) return 'interesting';
+  if (key === 'parking') return 'parking';
   if (FOOD.has(key)) return 'food';
   return 'practical';
 }

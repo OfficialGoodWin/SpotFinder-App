@@ -659,18 +659,37 @@ const AMBIENT_ZOOM_GROUPS = (() => {
 })();
 const AMBIENT_LAYER_IDS = AMBIENT_ZOOM_GROUPS.map(([z]) => `${AMBIENT_LAYER_PREFIX}${z}`);
 
-// /new draws only selected groups. The published tiles expose `cat`, but
-// their OSM identifiers may be numeric and cannot be used for grouping.
+// /new draws selected groups. Parking is sparse in the legacy named fallback,
+// so place it last to keep useful parking visible among dense heritage POIs.
 const NEW_AMBIENT_LAYERS = [
-  { id: 'ambient-poi-interesting-viewpoint', group: 'interesting', minzoom: 13, cats: ['viewpoint'] },
-  { id: 'ambient-poi-interesting-museum', group: 'interesting', minzoom: 14, cats: ['museum'] },
-  { id: 'ambient-poi-interesting-outdoor', group: 'interesting', minzoom: 15, cats: ['camp_site', 'picnic_site'] },
-  { id: 'ambient-poi-interesting-heritage', group: 'interesting', minzoom: 16, cats: ['heritage'], namedOnly: true },
   { id: 'ambient-poi-practical-landmark', group: 'practical', minzoom: 14, cats: ['train', 'fuel', 'charging', 'hotel', 'hospital'] },
-  { id: 'ambient-poi-practical-local', group: 'practical', minzoom: 16, cats: ['pharmacy', 'bank', 'supermarket', 'atm', 'parking', 'caravan_site', 'toilets', 'drinking_water'] },
+  { id: 'ambient-poi-practical-local', group: 'practical', minzoom: 16, cats: ['pharmacy', 'bank', 'supermarket', 'atm', 'caravan_site', 'toilets', 'drinking_water'] },
   { id: 'ambient-poi-food', group: 'food', minzoom: 16, cats: ['restaurant', 'cafe', 'bar', 'bakery'] },
+  { id: 'ambient-poi-interesting-outdoor', group: 'interesting', minzoom: 14, cats: ['camp_site', 'picnic_site'] },
+  { id: 'ambient-poi-interesting-heritage', group: 'interesting', minzoom: 15, cats: ['heritage'], namedOnly: true },
+  { id: 'ambient-poi-interesting-museum', group: 'interesting', minzoom: 14, cats: ['museum'] },
+  { id: 'ambient-poi-interesting-viewpoint', group: 'interesting', minzoom: 13, cats: ['viewpoint'] },
+  { id: 'ambient-poi-parking', group: 'parking', minzoom: 16, cats: ['parking'], parkingOnly: true },
 ];
 const NEW_AMBIENT_LAYER_IDS = NEW_AMBIENT_LAYERS.map(layer => layer.id);
+
+const PARKING_LOT_TYPES = ['surface', 'underground', 'multi-storey', 'rooftop'];
+const RESTRICTED_PARKING_ACCESS = ['private', 'customers', 'permit', 'no', 'delivery'];
+function newAmbientFilter(spec, linkedTileIds = []) {
+  const parts = [['in', ['get', 'cat'], ['literal', spec.cats]]];
+  if (spec.namedOnly) parts.push(['has', 'name']);
+  if (spec.parkingOnly) parts.push(['any',
+    // Newer tiles retain OSM access and parking type. Unknown access is not
+    // presented as public; explicitly restricted parking is excluded.
+    ['all', ['in', ['get', 'parking'], ['literal', PARKING_LOT_TYPES]],
+      ['!', ['in', ['get', 'access'], ['literal', RESTRICTED_PARKING_ACCESS]]]],
+    // Published tiles omit both fields. Only named parking is shown there,
+    // instead of every street-side parking feature.
+    ['all', ['!', ['has', 'parking']], ['!', ['has', 'access']], ['has', 'name']],
+  ]);
+  if (linkedTileIds.length) parts.push(['!', ['in', ['get', 'id'], ['literal', linkedTileIds]]]);
+  return parts.length === 1 ? parts[0] : ['all', ...parts];
+}
 
 const AMBIENT_ICON_CSS_PX = 44; // rasterized size; was 28 (icons rendered ~20px, too small to tap)
 const AMBIENT_ICON_RATIO = 2;
@@ -733,9 +752,7 @@ function addAmbientVectorLayer(map, getLanguage = () => 'en', getPoiLayers = () 
 
     const newLayers = getPoiLayers();
     const specs = newLayers
-      ? NEW_AMBIENT_LAYERS.map(layer => ({ ...layer, filter: layer.namedOnly
-        ? ['all', ['in', ['get', 'cat'], ['literal', layer.cats]], ['has', 'name']]
-        : ['in', ['get', 'cat'], ['literal', layer.cats]] }))
+      ? NEW_AMBIENT_LAYERS.map(layer => ({ ...layer, filter: newAmbientFilter(layer) }))
       : [...AMBIENT_ZOOM_GROUPS].reverse().map(([z, cats]) => ({ id: `${AMBIENT_LAYER_PREFIX}${z}`, minzoom: z, filter: ['in', ['get', 'cat'], ['literal', cats.map(c => c.key)]] }));
     const firstBaseSymbol = newLayers ? map.getStyle().layers.find(layer => layer.type === 'symbol')?.id : undefined;
     for (const spec of specs) {
@@ -749,11 +766,16 @@ function addAmbientVectorLayer(map, getLanguage = () => 'en', getPoiLayers = () 
         layout: {
           visibility: !newLayers || newLayers[spec.group] ? 'visible' : 'none',
           'icon-image': iconExpr,
-          'icon-size': newLayers ? ['interpolate', ['linear'], ['zoom'], 13, 0.75, 16, 0.86, 18, 0.98] : ['interpolate', ['linear'], ['zoom'], 12, 0.58, 15, 0.74, 18, 0.9],
+          'icon-size': newLayers ? spec.parkingOnly
+            ? ['interpolate', ['linear'], ['zoom'], 16, 0.62, 18, 0.72]
+            : ['interpolate', ['linear'], ['zoom'], 13, 0.75, 16, 0.87, 18, 0.95]
+            : ['interpolate', ['linear'], ['zoom'], 12, 0.58, 15, 0.74, 18, 0.9],
           'icon-allow-overlap': false,
           'icon-ignore-placement': false,
-          'icon-padding': newLayers ? 11 : 7,
-          'symbol-sort-key': sortExpr,
+          'icon-padding': newLayers ? spec.parkingOnly ? 10 : 5 : 7,
+          'symbol-sort-key': newLayers && spec.parkingOnly
+            ? ['case', ['in', ['get', 'access'], ['literal', ['yes', 'permissive', 'public']]], 0, 10]
+            : sortExpr,
           // Names only once zoomed in; `text-optional` drops the label (not the icon) if it collides.
           // Name sits directly below the icon (Mapy.cz style), from z14 up.
           'text-field': newLayers ? '' : ambientPoiNameExpression(getLanguage()),
@@ -767,12 +789,13 @@ function addAmbientVectorLayer(map, getLanguage = () => 'en', getPoiLayers = () 
         paint: {
           // Ambient geography remains available but visually secondary to the
           // larger, full-opacity community discovery markers.
-          'icon-opacity': newLayers ? ['interpolate', ['linear'], ['zoom'], 13, 0.62, 16, 0.72, 18, 0.82] : ['interpolate', ['linear'], ['zoom'], 12, 0.72, 16, 0.84, 18, 0.92],
+          'icon-opacity': newLayers ? spec.parkingOnly ? 0.85 : 0.94
+            : ['interpolate', ['linear'], ['zoom'], 12, 0.72, 16, 0.84, 18, 0.92],
           'text-color': '#1f2937',
           'text-halo-color': '#ffffff',
           'text-halo-width': 1.6,
         },
-      }, firstBaseSymbol);
+      }, newLayers ? undefined : firstBaseSymbol);
     }
     onReady?.();
   } catch (e) {
@@ -949,10 +972,7 @@ export default function MapLibreMap({
     const apply = () => {
       for (const spec of NEW_AMBIENT_LAYERS) {
         if (!map.getLayer(spec.id)) continue;
-        const categoryFilter = ['in', ['get', 'cat'], ['literal', spec.cats]];
-        const base = spec.namedOnly ? ['all', categoryFilter, ['has', 'name']] : categoryFilter;
-        map.setFilter(spec.id, linkedPoiTileIds.length
-          ? ['all', base, ['!', ['in', ['get', 'id'], ['literal', linkedPoiTileIds]]]] : base);
+        map.setFilter(spec.id, newAmbientFilter(spec, linkedPoiTileIds));
       }
     };
     apply();
@@ -1306,7 +1326,7 @@ export default function MapLibreMap({
       const b = map.getBounds();
       const s = b.getSouth(), n = b.getNorth(), w = b.getWest(), e = b.getEast();
       const cLat = (s + n) / 2, cLon = (w + e) / 2;
-      const key = `${s.toFixed(2)}_${w.toFixed(2)}_${zoom.toFixed(0)}_${poiLayers ? `${Number(poiLayers.interesting)}${Number(poiLayers.practical)}${Number(poiLayers.food)}` : 'legacy'}`;
+      const key = `${s.toFixed(2)}_${w.toFixed(2)}_${zoom.toFixed(0)}_${poiLayers ? `${Number(poiLayers.interesting)}${Number(poiLayers.parking)}${Number(poiLayers.practical)}${Number(poiLayers.food)}` : 'legacy'}`;
 
       poiAbort.current?.abort();
       poiAbort.current = new AbortController();
@@ -1328,6 +1348,12 @@ export default function MapLibreMap({
               if (!cat) return null;
               const p = feat.properties || {};
               if (poiLayers && (!poiLayers[poiGroupForCategory(cat.key)] || cat.key === 'heritage' && !p.name)) return null;
+              if (poiLayers && cat.key === 'parking') {
+                const raw = p.datasource?.raw || {};
+                if (RESTRICTED_PARKING_ACCESS.includes(raw.access) ||
+                    raw.parking && !PARKING_LOT_TYPES.includes(raw.parking) ||
+                    !raw.parking && !raw.access && !p.name) return null;
+              }
               return { id: p.place_id || `${lat}-${lon}`, lat, lon, name: p.name || '', address: p.address_line2 || '', tags: { phone: p.contact?.phone, website: p.website }, _cat: cat };
             }).filter(Boolean);
             poiCache.set(key, { data: pois, ts: Date.now() });

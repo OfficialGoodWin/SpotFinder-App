@@ -28,6 +28,7 @@ function LayerMenu({ mapLayer, onMapLayer, poiLayers, onPoiLayers, onClose }) {
   const groups = [
     ['community', 'Komunitní místa'],
     ['interesting', 'Zajímavá místa OSM'],
+    ['parking', 'Parkoviště a garáže OSM'],
     ['practical', 'Praktická místa OSM'],
     ['food', 'Jídlo a kavárny OSM'],
   ];
