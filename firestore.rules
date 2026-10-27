@@ -53,7 +53,10 @@ service cloud.firestore {
                         'beauty_rating', 'beauty_rating_count', 'privacy_rating',
                         'privacy_rating_count', 'access_rating', 'access_rating_count',
                         'condition_rating', 'condition_rating_count', 'safety_rating', 'safety_rating_count',
-                        'crowdedness_rating', 'crowdedness_rating_count', 'rating_schema', 'flag_count', 'status', 'created_by',
+                        'crowdedness_rating', 'crowdedness_rating_count',
+                        'crowdedness_report_count', 'crowdedness_quiet_count',
+                        'crowdedness_moderate_count', 'crowdedness_crowded_count',
+                        'rating_schema', 'flag_count', 'status', 'created_by',
                         'created_by_uid', 'upvote_count', 'downvote_count', 'quality_score',
                         'likes_count', 'saves_count', 'has_social', 'discovery_state', 'osm_poi_link']))
         || isSuperAdmin()
@@ -102,7 +105,14 @@ service cloud.firestore {
     // recomputed server-side by a Cloud Function trigger — never trust a
     // client-submitted average).
     match /spot_ratings/{ratingId} {
-      allow read: if isAuth() && (resource.data.user_id == request.auth.uid || isSuperAdmin());
+      // A preflight get for the signed-in user's own (possibly missing) rating
+      // must return an empty document instead of permission-denied. Existing
+      // documents remain restricted to their author/super-admin.
+      allow get: if isAuth() && (
+        !exists(/databases/$(database)/documents/spot_ratings/$(ratingId))
+        || resource.data.user_id == request.auth.uid
+        || isSuperAdmin());
+      allow list: if isAuth() && (resource.data.user_id == request.auth.uid || isSuperAdmin());
       // ratingId MUST be `${spotId}_${uid}` so a user can only ever create
       // or overwrite *their own* rating for a given spot (built-in de-dupe).
       allow create, update: if isAuth()
@@ -112,13 +122,22 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/spots/$(request.resource.data.spot_id)).data.get('created_by', '') != authEmail()
         && ratingId == request.resource.data.spot_id + '_' + request.auth.uid
         && request.resource.data.user_id == request.auth.uid
-        && request.resource.data.keys().hasOnly(['spot_id', 'user_id', 'overall', 'access', 'condition', 'safety', 'crowdedness', 'schema', 'updated_date'])
+        && request.resource.data.keys().hasOnly(['spot_id', 'user_id', 'overall', 'access', 'condition', 'safety', 'crowdedness', 'crowdedness_report', 'schema', 'updated_date'])
         && request.resource.data.schema == 2
-        && request.resource.data.overall is number && request.resource.data.overall >= 1 && request.resource.data.overall <= 5
-        && request.resource.data.access is number && request.resource.data.access >= 0 && request.resource.data.access <= 5
-        && request.resource.data.condition is number && request.resource.data.condition >= 0 && request.resource.data.condition <= 5
-        && request.resource.data.safety is number && request.resource.data.safety >= 0 && request.resource.data.safety <= 5
-        && request.resource.data.crowdedness is number && request.resource.data.crowdedness >= 0 && request.resource.data.crowdedness <= 5;
+        // A document may contain star ratings, an independent crowdedness
+        // report, or both (merge writes preserve the other half).
+        && (
+          (!request.resource.data.keys().hasAny(['overall', 'access', 'condition', 'safety', 'crowdedness'])
+            && request.resource.data.crowdedness_report in ['quiet', 'moderate', 'crowded'])
+          || (request.resource.data.overall is number && request.resource.data.overall >= 1 && request.resource.data.overall <= 5
+            && request.resource.data.access is number && request.resource.data.access >= 0 && request.resource.data.access <= 5
+            && request.resource.data.condition is number && request.resource.data.condition >= 0 && request.resource.data.condition <= 5
+            && request.resource.data.safety is number && request.resource.data.safety >= 0 && request.resource.data.safety <= 5
+            && (!('crowdedness' in request.resource.data)
+              || (request.resource.data.crowdedness is number && request.resource.data.crowdedness >= 0 && request.resource.data.crowdedness <= 5)))
+        )
+        && (!('crowdedness_report' in request.resource.data)
+          || request.resource.data.crowdedness_report in ['quiet', 'moderate', 'crowded']);
       allow delete: if isSuperAdmin();
     }
 

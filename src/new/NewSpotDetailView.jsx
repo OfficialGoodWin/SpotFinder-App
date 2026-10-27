@@ -5,7 +5,10 @@ import StarRating from '@/components/spots/StarRating';
 import LabeledRatingScale from '@/components/spots/LabeledRatingScale';
 import { recoverableLazy } from '@/components/ChunkLoadRecovery';
 import { getSpotLocationLabel, getVerifiedSpotCategory } from '@/lib/spotPresentation';
+import { categoryLabel, spotPrimaryCategory } from '@/lib/spotCategories';
+import { normalizeBestTimeValues } from '@/lib/visitTime';
 import { safeWebsite } from '@/lib/poiPresentation';
+import NewCrowdednessReport from './NewCrowdednessReport';
 import NewSkeleton from './NewSkeleton';
 
 const SocialPostsSection = recoverableLazy(() => import('@/components/social/SocialPostsSection'));
@@ -14,15 +17,18 @@ export default function NewSpotDetailView({ spot, photos, name, creatorName, use
   const [descriptionOpen, setDescriptionOpen] = useState(false);
   const [ratingsOpen, setRatingsOpen] = useState(false);
   const [socialOpen, setSocialOpen] = useState(false);
-  const category = spot.tags?.[0] ? t(`spotTags.${spot.tags[0]}`, getVerifiedSpotCategory(spot) || 'Místo') : getVerifiedSpotCategory(spot) || 'Místo';
+  const categoryKey = spotPrimaryCategory(spot);
+  const legacyCategory = !categoryKey && spot.tags?.[0] ? (spot.tags[0] === 'Other' ? 'Jiné' : t(`spotTags.${spot.tags[0]}`, getVerifiedSpotCategory(spot) || 'Místo')) : '';
+  const category = categoryKey ? categoryLabel(categoryKey, language) : legacyCategory || getVerifiedSpotCategory(spot) || 'Místo';
   const poi = spot.poi_match?.name ? spot.poi_match : null;
   const website = safeWebsite(poi?.tags?.website || poi?.tags?.['contact:website']);
-  const ratedRows = [...catRows, ...legacyRows].filter(row => row.count > 0 && Number.isFinite(row.val) && row.val >= 1 && row.val <= 5);
+  const visibleCatRows = catRows.filter(row => row.key !== 'crowdedness');
+  const ratedRows = [...visibleCatRows, ...legacyRows].filter(row => row.count > 0 && Number.isFinite(row.val) && row.val >= 1 && row.val <= 5);
   const practical = [
     spot.cost && t(`addSpot.cost${spot.cost[0].toUpperCase()}${spot.cost.slice(1)}`),
     spot.access_difficulty && t(`addSpot.access${spot.access_difficulty[0].toUpperCase()}${spot.access_difficulty.slice(1)}`),
     spot.parking && t(`addSpot.parking${spot.parking[0].toUpperCase()}${spot.parking.slice(1)}`),
-    ...(spot.best_time || []).map(value => t(`addSpot.bestTime${value.split('_').map(word => word[0].toUpperCase() + word.slice(1)).join('')}`)),
+    ...normalizeBestTimeValues(spot.best_time || []).map(value => t(`addSpot.bestTime${value.split('_').map(word => word[0].toUpperCase() + word.slice(1)).join('')}`)),
   ].filter(Boolean);
 
   const location = getSpotLocationLabel(spot, 5);
@@ -56,9 +62,10 @@ export default function NewSpotDetailView({ spot, photos, name, creatorName, use
         <details className="sf-new-detail-section" open={ratingsOpen} onToggle={event => setRatingsOpen(event.currentTarget.open)}><summary>Hodnocení a zkušenosti</summary><div className="sf-new-detail-section-content">
           <p>{ratingCount ? `Celkové hodnocení ${rating.toFixed(1).replace('.', ',')} z 5 · ${ratingCount} hodnocení` : 'Zatím bez hodnocení.'}</p>
           {ratedRows.length > 0 && <div className="sf-new-detail-ratings-list"><strong>Podrobná hodnocení</strong>{ratedRows.map(row => <div key={row.key}><span>{row.label}</span><b>{row.val.toFixed(1).replace('.', ',')} <small>({row.count})</small></b></div>)}</div>}
+          {ratingsOpen && <NewCrowdednessReport spot={spot} user={user} isOwner={isOwner} onShowAuth={onShowAuth} language={language} />}
           {!ratingSubmitted && !isOwner && !user && <button className="sf-new-detail-action" type="button" onClick={onShowAuth}>Přihlásit se a ohodnotit</button>}
           {!ratingSubmitted && !isOwner && user && !user.emailVerified && <p>Pro hodnocení nejprve ověř svůj e-mail.</p>}
-          {!ratingSubmitted && !isOwner && user?.emailVerified && <div className="sf-new-detail-rate-form"><strong>Ohodnoť místo</strong><label>Celkový dojem *</label><StarRating value={pending.overall} onChange={onPending.overall} size="lg" />{catRows.map(row => <div key={row.key}><label>{row.label}</label><LabeledRatingScale value={pending[row.key]} onChange={onPending[row.key]} labels={row.labels} /></div>)}<button type="button" className="sf-new-detail-action" disabled={!pending.overall || submitting} onClick={onSubmit}>{submitting ? 'Ukládám…' : 'Odeslat hodnocení'}</button></div>}
+          {!ratingSubmitted && !isOwner && user?.emailVerified && <div className="sf-new-detail-rate-form"><strong>Ohodnoť místo</strong><label>Celkový dojem *</label><StarRating value={pending.overall} onChange={onPending.overall} size="lg" />{visibleCatRows.map(row => <div key={row.key}><label>{row.label}</label><LabeledRatingScale value={pending[row.key]} onChange={onPending[row.key]} labels={row.labels} /></div>)}<button type="button" className="sf-new-detail-action" disabled={!pending.overall || submitting} onClick={onSubmit}>{submitting ? 'Ukládám…' : 'Odeslat hodnocení'}</button></div>}
           {ratingSubmitted && <p>Děkujeme za hodnocení.</p>}
         </div></details>
         {(practical.length > 3 || spot.directions || poi || spot.tags?.length > 1) && <details className="sf-new-detail-section"><summary>Další informace</summary><div className="sf-new-detail-section-content">{practical.length > 0 && <div className="sf-new-detail-chips">{practical.map((label, index) => <span key={`${label}-${index}`}>{label}</span>)}</div>}{spot.directions && <p>{spot.directions}</p>}{spot.tags?.length > 1 && <p>{spot.tags.slice(1).map(tag => t(`spotTags.${tag}`, tag)).join(' · ')}</p>}{poi && <p>{t('spotDetailUi.alsoKnownAs', { name: poi.name })}{poi.address ? ` · ${poi.address}` : ''}</p>}{website && <a href={website} target="_blank" rel="noopener noreferrer">Web místa</a>}</div></details>}

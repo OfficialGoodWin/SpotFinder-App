@@ -4,10 +4,11 @@ import { getSpotRating } from '@/lib/spotDiscovery';
 import { isDiscoverEligible } from '@/mobile-v2/discoverSpots';
 import DiscoverCard from '@/mobile-v2/DiscoverCard';
 import NewSkeleton from './NewSkeleton';
-import { appendUniqueDiscoverSpots, discoverCategoryOf, matchesDiscoverCategory } from './discoverCategory';
+import { DISCOVER_ALL, appendUniqueDiscoverSpots, discoverCategoryLabel, matchesDiscoverCategory } from './discoverCategory';
+import { SPOT_CATEGORY_KEYS, categoryLabel } from '@/lib/spotCategories';
 import './new-discover.css';
 
-const CATEGORIES = ['Vše', 'Vyhlídky', 'Hrady', 'Zříceniny', 'Příroda', 'Kavárny'];
+const CATEGORIES = [DISCOVER_ALL, ...SPOT_CATEGORY_KEYS];
 const QUERY_SIZE = 24;
 const TARGET_MATCHES = 12;
 
@@ -19,7 +20,7 @@ function ratingLabel(spot) {
 }
 
 export default function NewDiscover({ language, titleOf, locationOf, savedIds, savingSpotId, onSave, onOpen, onMap }) {
-  const [category, setCategory] = useState('Vše');
+  const [category, setCategory] = useState(DISCOVER_ALL);
   const [pageState, setPageState] = useState({ spots: [], cursor: null, hasMore: true, loading: true, error: false, initialized: false });
   const generation = useRef(0);
   const inFlight = useRef(false);
@@ -74,10 +75,10 @@ export default function NewDiscover({ language, titleOf, locationOf, savedIds, s
 
   return <section className="v2-page sf-new-discover-page">
     <header className="v2-page-header"><h1>Objevit</h1><p>Místa sdílená komunitou</p></header>
-    <div className="v2-chips" role="group" aria-label="Kategorie míst">{CATEGORIES.map(name => <button type="button" key={name} className={category === name ? 'active' : ''} aria-pressed={category === name} onClick={() => setCategory(name)}>{name}</button>)}</div>
+    <div className="v2-chips" role="group" aria-label="Kategorie míst">{CATEGORIES.map(name => <button type="button" key={name} className={category === name ? 'active' : ''} aria-pressed={category === name} onClick={() => setCategory(name)}>{name === DISCOVER_ALL ? (String(language || '').startsWith('cs') ? 'Vše' : 'All') : categoryLabel(name, language, { short: true })}</button>)}</div>
     <div className="v2-scroll sf-new-discover-scroll">
       <div className="sf-new-discover-grid">
-        {pageState.spots.map(spot => <DiscoverCard key={String(spot.id)} spot={spot} title={titleOf(spot, language)} location={locationOf(spot)} categoryLabel={discoverCategoryOf(spot)} ratingLabel={ratingLabel(spot)} landscape compact savingSpotId={savingSpotId} savedIds={savedIds} onSave={onSave} onOpen={onOpen} onMap={onMap} />)}
+        {pageState.spots.map(spot => <DiscoverCard key={String(spot.id)} spot={spot} title={titleOf(spot, language)} location={locationOf(spot)} categoryLabel={discoverCategoryLabel(spot, language)} ratingLabel={ratingLabel(spot)} landscape compact savingSpotId={savingSpotId} savedIds={savedIds} onSave={onSave} onOpen={onOpen} onMap={onMap} />)}
         {pageState.loading && <NewSkeleton kind="discoverCards" />}
       </div>
       {!pageState.loading && !pageState.spots.length && !pageState.error && <p className="sf-new-discover-state">V této kategorii zatím nejsou dostupná místa.</p>}

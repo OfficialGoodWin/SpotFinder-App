@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Camera, ChevronLeft, ChevronRight, ImagePlus, MapPin, X } from 'lucide-react';
+import { Camera, Check, ChevronLeft, ChevronRight, ImagePlus, MapPin, Search, X } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import { addSocialPost, createSpot, deleteCloudSpotDraft, getFirebaseServices, getPublicSpotsNear, getSpotPhotoLimit, loadDraftImageFile, saveCloudSpotDraft, uploadDraftImage, uploadSpotImage } from '@/api/firebaseClient';
 import { createDraftId, deleteGuestDraft, getGuestDraftOwnerKey, normalizeSpotDraft, saveGuestDraft } from '@/lib/spotDrafts';
@@ -14,18 +14,18 @@ import { NewLegalLink } from './legalRoutes';
 import NewVoiceButton, { NewVoiceStatus } from './NewVoiceButton';
 import { appendSpeechText, useVoiceInput } from './useVoiceInput';
 import DraftConfirmationDialog from '@/components/ui/DraftConfirmationDialog';
+import { SPOT_CATEGORIES, POPULAR_SPOT_CATEGORY_KEYS, categoryByKey, categoryDescription, categoryKeyForValue, categoryLabel } from '@/lib/spotCategories';
+import { normalizeBestTimeValues, VISIT_TIME_SUNRISE_SUNSET } from '@/lib/visitTime';
+import { SPOT_CATEGORY_ICONS } from './spotCategoryIcons';
 
-const CATEGORIES = [
-  { label: 'Vyhlídka', tag: 'Viewpoint', type: 'viewpoint' },
-  { label: 'Výlet', tag: 'Hike', type: 'general' },
-  { label: 'U vody', tag: 'SwimSpot', type: 'general' },
-  { label: 'Jídlo', tag: 'SecretCafe', type: 'general' },
-  { label: 'Jiné', tag: 'Other', type: 'general' },
-];
 const COST = [['free', 'Zdarma'], ['paid', 'Placené'], ['donation', 'Dobrovolné']];
 const EFFORT = [['easy', 'Snadná procházka'], ['moderate', 'Kousek pěšky'], ['hard', 'Výprava']];
 const PARKING = [['yes', 'K dispozici'], ['street', 'Na ulici'], ['paid', 'Placené'], ['no', 'Žádné']];
-const TIMES = [['sunrise', 'Východ slunce'], ['sunset', 'Západ slunce'], ['golden_hour', 'Zlatá hodinka'], ['night', 'Po setmění'], ['anytime', 'Kdykoli']];
+const TIMES = [[VISIT_TIME_SUNRISE_SUNSET, 'Východ a západ slunce'], ['golden_hour', 'Zlatá hodinka'], ['night', 'Po setmění'], ['anytime', 'Kdykoli']];
+const canonicalCategoryValue = value => categoryKeyForValue(value) || value || '';
+// The legacy submitSpot contract only knows these three values. The canonical
+// category is stored in tags[0]; spot_type stays compatible for older clients.
+const spotTypeForCategory = key => key === 'viewpoint' ? 'viewpoint' : key === 'heritage' ? 'historic' : 'general';
 const VIBE_TAGS = ['Viewpoint', 'SecretCafe', 'Sunset', 'Sunrise', 'PhotoSpot', 'Waterfall', 'Hike', 'SwimSpot', 'Ruin', 'UrbanExplore'];
 const MAX_QUICK_PHOTOS = 5;
 const optionSuffix = value => value.split('_').map(part => part[0].toUpperCase() + part.slice(1)).join('');
@@ -57,12 +57,12 @@ export default function QuickAddFlow({ coords, draft, hidden, user, onMove, onCl
   const draftId = initial.current?.id;
   const [form, setForm] = useState(() => ({
     title: editing ? spot.title || '' : initial.current.title,
-    category: editing ? spot.tags?.[0] || '' : initial.current.tags[0] || '',
+    category: editing ? canonicalCategoryValue(spot.tags?.[0]) : canonicalCategoryValue(initial.current.tags[0]),
     description: editing ? spot.description || '' : initial.current.description,
     cost: editing ? spot.cost || '' : initial.current.cost,
     difficulty: editing ? spot.access_difficulty || '' : initial.current.accessDifficulty,
     parking: editing ? spot.parking || '' : initial.current.parking,
-    bestTime: (editing ? spot.best_time || [] : initial.current.bestTime).map(value => value === 'after_dark' ? 'night' : value),
+    bestTime: normalizeBestTimeValues(editing ? spot.best_time || [] : initial.current.bestTime),
     socialUrl: editing ? '' : initial.current.socialUrl,
   }));
   const existingPhotoUrls = useRef(editing ? (Array.isArray(spot.image_urls) && spot.image_urls.length ? spot.image_urls : [spot.image_url].filter(Boolean)) : []);
@@ -84,6 +84,8 @@ export default function QuickAddFlow({ coords, draft, hidden, user, onMove, onCl
   const [socialWarning, setSocialWarning] = useState('');
   const [activePhoto, setActivePhoto] = useState(0);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [categorySheet, setCategorySheet] = useState(false);
+  const [categoryQuery, setCategoryQuery] = useState('');
   const [directions, setDirections] = useState(editing ? spot.directions || '' : '');
   const [extraTags, setExtraTags] = useState(editing ? (spot.tags || []).slice(1) : []);
   const photosRef = useRef([]);
@@ -103,6 +105,13 @@ export default function QuickAddFlow({ coords, draft, hidden, user, onMove, onCl
   useEffect(() => { photosRef.current = photos; }, [photos]);
   useEffect(() => { let active = true; getSpotPhotoLimit().then(limit => { if (active) setPhotoLimit(Math.max(limit, existingPhotoUrls.current.length)); }); return () => { active = false; }; }, []);
   useEffect(() => { voice.stop(); }, [hidden, goodToKnow, voice.stop]);
+  useEffect(() => { if (hidden) setCategorySheet(false); }, [hidden]);
+  useEffect(() => {
+    if (!categorySheet) return undefined;
+    const onKey = event => { if (event.key === 'Escape') setCategorySheet(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [categorySheet]);
   useEffect(() => () => { photosRef.current.forEach(photo => { if (!photo.existing) URL.revokeObjectURL(photo.url); }); }, []);
   useEffect(() => {
     if (editing || !draft?.photo_refs?.length) return undefined;
@@ -123,6 +132,17 @@ export default function QuickAddFlow({ coords, draft, hidden, user, onMove, onCl
   }, [cloud, draft, photoReload, editing]);
 
   const update = (key, value) => { setForm(current => ({ ...current, [key]: value })); setDuplicateCheck(null); setError(''); };
+  const toggleBestTime = value => {
+    setForm(current => {
+      const next = value === 'anytime'
+        ? (current.bestTime.includes(value) ? [] : [value])
+        : current.bestTime.includes(value)
+          ? current.bestTime.filter(item => item !== value)
+          : [...current.bestTime.filter(item => item !== 'anytime'), value];
+      return { ...current, bestTime: normalizeBestTimeValues(next) };
+    });
+    setDuplicateCheck(null); setError('');
+  };
   latestRef.current = { form, coords, photos, pendingPhotos };
   const saveDraft = () => {
     const snapshot = latestRef.current;
@@ -238,10 +258,12 @@ export default function QuickAddFlow({ coords, draft, hidden, user, onMove, onCl
   const removePhoto = index => setPhotos(current => { const next = current.filter((_, i) => i !== index); if (!current[index].existing) URL.revokeObjectURL(current[index].url); photosRef.current = next; setActivePhoto(value => Math.min(value, Math.max(0, next.length - 1))); return next; });
   const movePhoto = (from, to) => setPhotos(current => { if (to < 0 || to >= current.length) return current; const next = [...current]; next.splice(to, 0, next.splice(from, 1)[0]); photosRef.current = next; setActivePhoto(to); return next; });
   const photoDirty = editing && JSON.stringify(photos.map(photo => photo.existing ? photo.url : photo.id)) !== JSON.stringify(existingPhotoUrls.current);
+  const initialCategory = canonicalCategoryValue(editing ? spot.tags?.[0] : '');
+  const initialBestTime = normalizeBestTimeValues(editing ? spot.best_time || [] : []);
   const editDirty = editing && (form.title !== (spot.title || '') || form.description !== (spot.description || '') ||
-    form.category !== (spot.tags?.[0] || '') || form.cost !== (spot.cost || '') ||
+    form.category !== initialCategory || form.cost !== (spot.cost || '') ||
     form.difficulty !== (spot.access_difficulty || '') || form.parking !== (spot.parking || '') ||
-    JSON.stringify(form.bestTime) !== JSON.stringify((spot.best_time || []).map(value => value === 'after_dark' ? 'night' : value)) ||
+    JSON.stringify(form.bestTime) !== JSON.stringify(initialBestTime) ||
     directions !== (spot.directions || '') || JSON.stringify(extraTags) !== JSON.stringify((spot.tags || []).slice(1)) || photoDirty || pendingPhotos.length > 0);
   const saveEdit = async () => {
     if (!editing || lockRef.current || preparing || busy) return;
@@ -260,11 +282,11 @@ export default function QuickAddFlow({ coords, draft, hidden, user, onMove, onCl
       const patch = {};
       if (form.title !== (spot.title || '')) patch.title = form.title;
       if (form.description !== (spot.description || '')) patch.description = form.description;
-      if (form.category !== (spot.tags?.[0] || '') || JSON.stringify(extraTags) !== JSON.stringify((spot.tags || []).slice(1))) patch.tags = [form.category, ...extraTags.filter(tag => tag !== form.category)];
+      if (form.category !== initialCategory || JSON.stringify(extraTags) !== JSON.stringify((spot.tags || []).slice(1))) patch.tags = [form.category, ...extraTags.filter(tag => tag !== form.category)];
       if (form.cost !== (spot.cost || '')) patch.cost = form.cost;
       if (form.difficulty !== (spot.access_difficulty || '')) patch.access_difficulty = form.difficulty;
       if (form.parking !== (spot.parking || '')) patch.parking = form.parking;
-      if (JSON.stringify(form.bestTime) !== JSON.stringify((spot.best_time || []).map(value => value === 'after_dark' ? 'night' : value))) patch.best_time = form.bestTime;
+      if (JSON.stringify(form.bestTime) !== JSON.stringify(initialBestTime)) patch.best_time = form.bestTime;
       if (directions !== (spot.directions || '')) patch.directions = directions;
       if (photoDirty) {
         const urls = [];
@@ -335,7 +357,7 @@ export default function QuickAddFlow({ coords, draft, hidden, user, onMove, onCl
     lockRef.current = true;
     setBusy('publishing'); setError('');
     try {
-      const description = form.description.trim() || `${form.title.trim()} – ${CATEGORIES.find(item => item.tag === form.category)?.label || 'zajímavé místo'}.`;
+      const description = form.description.trim() || `${form.title.trim()} – ${categoryLabel(form.category, language) || L('zajímavé místo', 'an interesting place')}.`;
       const moderation = moderateSubmission({ text: description, rateLimitKey: `rate:add_spot:${user?.email || 'anon'}`, maxPerWindow: 5, windowMs: 10 * 60 * 1000 });
       if (!moderation.allowed) throw new Error(moderation.reasonKey === 'moderation.tooManySubmissions' ? 'Příliš mnoho odeslání. Zkus to prosím později.' : 'Text není možné odeslat. Uprav popis místa.');
       await saveDraft();
@@ -351,9 +373,8 @@ export default function QuickAddFlow({ coords, draft, hidden, user, onMove, onCl
           catch (cause) { photoLog('public-upload', index, photo, cause); throw new Error(photoError(index, cause), { cause }); }
         }
       }
-      const category = CATEGORIES.find(item => item.tag === form.category);
       const created = await createSpot({
-        lat: coords.lat, lng: coords.lng, title: form.title.trim(), description, spot_type: category?.type || 'general',
+        lat: coords.lat, lng: coords.lng, title: form.title.trim(), description, spot_type: spotTypeForCategory(form.category),
         tags: [form.category], image_url: imageUrls[0] || null, image_urls: imageUrls, is_public: true,
         created_by: user?.email || 'anonymous', created_by_name: user?.displayName || user?.email?.split('@')[0] || 'Anonymous',
         created_by_uid: getFirebaseServices().auth.currentUser?.uid || null,
@@ -378,8 +399,16 @@ export default function QuickAddFlow({ coords, draft, hidden, user, onMove, onCl
     finally { lockRef.current = false; setBusy(''); }
   };
 
-  const categoryChoices = editing && form.category && !CATEGORIES.some(item => item.tag === form.category)
-    ? [...CATEGORIES, { tag: form.category, label: t(`spotTags.${form.category}`, form.category) }] : CATEGORIES;
+  const selectedCategory = categoryByKey(form.category);
+  const selectedCategoryIsPopular = POPULAR_SPOT_CATEGORY_KEYS.includes(form.category);
+  const SelectedCategoryIcon = selectedCategory ? SPOT_CATEGORY_ICONS[selectedCategory.key] : null;
+  const legacyCategoryName = !selectedCategory && form.category ? (form.category === 'Other' ? L('Jiné', 'Other') : t(`spotTags.${form.category}`, form.category)) : '';
+  const normalizedQuery = String(categoryQuery || '').trim().toLocaleLowerCase('cs').normalize('NFKD').replace(/\p{M}/gu, '');
+  const filteredCategories = SPOT_CATEGORIES.filter(item => {
+    if (!normalizedQuery) return true;
+    return [item.label.cs, item.label.en, item.shortLabel.cs, item.shortLabel.en, item.description.cs, item.description.en]
+      .join(' ').toLocaleLowerCase('cs').normalize('NFKD').replace(/\p{M}/gu, '').includes(normalizedQuery);
+  });
   if (hidden) return null;
   if (result) return <NewPublishConfirmation spot={result} socialWarning={socialWarning} onBack={onClose} onView={onViewSpot} onUpdated={updated => { setResult(updated); onCreated(updated); }} />;
   return <section className="sf-new-quick-add" aria-label={editing ? L('Upravit místo', 'Edit spot') : L('Nové místo', 'New spot')} data-unsaved-work={editing && editDirty ? 'true' : undefined}>
@@ -387,7 +416,7 @@ export default function QuickAddFlow({ coords, draft, hidden, user, onMove, onCl
     {goodToKnow ? <div className="sf-new-quick-body sf-new-quick-good">
       <h2>{L('Co pomůže ostatním?', 'What helps others?')}</h2><p>{L('Volitelné detaily usnadní plánování návštěvy.', 'Optional details make a visit easier to plan.')}</p>
       {[[COST, L('Cena', 'Cost'), 'cost', 'cost'], [EFFORT, L('Náročnost', 'Getting there'), 'difficulty', 'access'], [PARKING, L('Parkování', 'Parking'), 'parking', 'parking']].map(([options, label, key, translation]) => <div className="sf-new-quick-field" key={key}><strong>{label}</strong><div className="sf-new-quick-chips">{options.map(([value, text]) => <button type="button" className={form[key] === value ? 'selected' : ''} key={value} onClick={() => update(key, form[key] === value ? '' : value)}>{cs ? text : t(`addSpot.${translation}${optionSuffix(value)}`)}</button>)}</div></div>)}
-      <div className="sf-new-quick-field"><strong>{L('Nejlepší čas', 'Best time to visit')}</strong><div className="sf-new-quick-chips">{TIMES.map(([value, text]) => <button type="button" className={form.bestTime.includes(value) ? 'selected' : ''} key={value} onClick={() => update('bestTime', value === 'anytime' ? (form.bestTime.includes(value) ? [] : [value]) : form.bestTime.includes(value) ? form.bestTime.filter(item => item !== value) : [...form.bestTime.filter(item => item !== 'anytime'), value])}>{cs ? text : t(`addSpot.bestTime${optionSuffix(value)}`)}</button>)}</div></div>
+      <div className="sf-new-quick-field"><strong>{L('Nejlepší čas', 'Best time to visit')}</strong><div className="sf-new-quick-chips">{TIMES.map(([value, text]) => <button type="button" className={form.bestTime.includes(value) ? 'selected' : ''} key={value} onClick={() => toggleBestTime(value)}>{cs ? text : t(`addSpot.bestTime${optionSuffix(value)}`)}</button>)}</div></div>
       {editing && <div className="sf-new-quick-field"><strong>{L('Vibe a další štítky', 'Vibe and additional tags')}</strong><div className="sf-new-quick-chips">{[...new Set([...VIBE_TAGS, ...extraTags])].filter(tag => tag !== form.category).map(tag => <button type="button" key={tag} className={extraTags.includes(tag) ? 'selected' : ''} aria-pressed={extraTags.includes(tag)} onClick={() => setExtraTags(current => current.includes(tag) ? current.filter(item => item !== tag) : [...current, tag])}>{tag === 'Other' ? L('Jiné', 'Other') : t(`spotTags.${tag}`, tag)}</button>)}</div></div>}
       <label className="sf-new-quick-field"><strong>{L('Krátký popis', 'Description')}</strong><span className="sf-new-quick-textarea"><textarea maxLength={2000} value={form.description} onChange={event => update('description', event.target.value)} placeholder={L('Co je na místě zajímavé?', 'What makes this place worth visiting?')} /><NewVoiceButton voice={voice} field="description" label={L('Nadiktovat popis', 'Dictate description')} /></span><NewVoiceStatus voice={voice} field="description" /></label>
       {editing && <label className="sf-new-quick-field"><strong>{L('Jak se tam dostat', 'Getting there')}</strong><span className="sf-new-quick-textarea"><textarea maxLength={1000} value={directions} onChange={event => setDirections(event.target.value)} placeholder={L('Popiš cestu k místu.', 'Describe how to reach the spot.')} /></span></label>}
@@ -399,7 +428,12 @@ export default function QuickAddFlow({ coords, draft, hidden, user, onMove, onCl
       {pendingPhotos.map(pending => <div className="sf-new-quick-pending" key={pending.id}><span>{pending.file.name || L('Nepřipravená fotografie', 'Unprepared photo')}</span><button type="button" onClick={() => retryPendingPhoto(pending)} disabled={preparing || !!busy}>{L('Zkusit znovu', 'Retry')}</button><button type="button" onClick={() => setPendingPhotos(current => current.filter(item => item.id !== pending.id))}>{L('Odebrat', 'Remove')}</button></div>)}
       {photos.some(photo => !editing || !photo.existing) && <label className="sf-new-quick-check"><input type="checkbox" checked={rights} onChange={event => setRights(event.target.checked)} /> {L('Mám právo tyto fotografie sdílet.', 'I have the right to share these photos.')}</label>}
       <label className="sf-new-quick-field"><strong>{L('Název místa *', 'Spot name *')}</strong><span className="sf-new-quick-input"><input maxLength={100} value={form.title} onChange={event => update('title', event.target.value)} placeholder={L('Jak se místo jmenuje?', 'What is this place called?')} /><NewVoiceButton voice={voice} field="title" label={L('Nadiktovat název', 'Dictate name')} /></span><NewVoiceStatus voice={voice} field="title" /></label>
-      <div className="sf-new-quick-field"><strong>{L('O jaké místo jde? *', 'What kind of place is it? *')}</strong><div className="sf-new-quick-chips">{categoryChoices.map(item => <button type="button" className={form.category === item.tag ? 'selected' : ''} key={item.tag} onClick={() => update('category', item.tag)}>{cs ? item.label : item.tag === 'Other' ? 'Other' : t(`spotTags.${item.tag}`, item.label)}</button>)}</div></div>
+      <div className="sf-new-quick-field sf-new-quick-category-field"><strong>{L('O jaké místo jde? *', 'What kind of place is it? *')}</strong>
+        <div className="sf-new-quick-category-grid">{POPULAR_SPOT_CATEGORY_KEYS.map(key => { const Icon = SPOT_CATEGORY_ICONS[key]; return <button type="button" className={`sf-new-quick-category-option${form.category === key ? ' selected' : ''}`} aria-pressed={form.category === key} key={key} onClick={() => update('category', key)}><Icon size={18} aria-hidden="true" /><span>{categoryLabel(key, language, { short: true })}</span></button>; })}</div>
+        <button type="button" className="sf-new-quick-category-more" aria-expanded={categorySheet} onClick={() => { setCategoryQuery(''); setCategorySheet(true); }}><span><strong>{L('Další typy', 'More types')}</strong><small>{L('Příroda, město a kuriozity', 'Nature, urban landmarks and curiosities')}</small></span><ChevronRight size={18} aria-hidden="true" /></button>
+        {selectedCategory && !selectedCategoryIsPopular && <div className="sf-new-quick-category-selected"><span className="sf-new-quick-category-selected-icon"><SelectedCategoryIcon size={19} aria-hidden="true" /></span><span><strong>{categoryLabel(selectedCategory.key, language)}</strong><small>{categoryDescription(selectedCategory.key, language)}</small></span></div>}
+        {!selectedCategory && form.category && <div className="sf-new-quick-category-selected"><span><strong>{legacyCategoryName}</strong><small>{L('Původní kategorie', 'Original category')}</small></span></div>}
+      </div>
       <div className="sf-new-quick-location"><MapPin size={21} /><div><strong>{L('Poloha', 'Location')}</strong><small>{validCoords(coords) ? `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}` : L('Poloha není dostupná', 'Location unavailable')}</small></div>{!editing && <button type="button" onClick={onMove}>{L('Upravit', 'Change')}</button>}</div>
       <button type="button" className="sf-new-quick-more" onClick={() => setGoodToKnow(true)}><span><strong>{L('Dobré vědět', 'Good to know')}</strong><small>{L('Cena, cesta, parkování a krátký popis · volitelné', 'Cost, access, parking and description · optional')}</small></span><ChevronRight size={20} /></button>
       {!editing && <><label className="sf-new-quick-field"><strong>{L('Instagram nebo TikTok · volitelné', 'Instagram or TikTok · optional')}</strong><input type="url" value={form.socialUrl} onChange={event => update('socialUrl', event.target.value)} placeholder="https://www.instagram.com/p/…" autoCapitalize="off" /></label>
@@ -409,6 +443,13 @@ export default function QuickAddFlow({ coords, draft, hidden, user, onMove, onCl
       {error && <p className="sf-new-quick-error" role="alert">{error} <button type="button" onClick={() => { setError(''); if (!ready) setPhotoReload(value => value + 1); }}>{!ready ? L('Zkusit znovu', 'Retry') : L('Zavřít', 'Dismiss')}</button></p>}
     </div>}
     <footer className="sf-new-quick-footer">{goodToKnow ? <button className="sf-new-quick-primary" type="button" onClick={() => setGoodToKnow(false)}>{L('Hotovo', 'Done')}</button> : editing ? <><p className="sf-new-quick-save-status" role="status">{preparing ? L('Připravuji fotografie…', 'Preparing photos…') : busy === 'saving' ? L('Ukládám změny…', 'Saving changes…') : editDirty ? L('Neuložené změny', 'Unsaved changes') : ''}</p><div className="sf-new-quick-buttons"><button type="button" onClick={close} disabled={!!busy || preparing}>{L('Zrušit', 'Cancel')}</button><button type="button" className="sf-new-quick-primary" onClick={saveEdit} disabled={!!busy || preparing || !!pendingPhotos.length || !form.title.trim() || !form.category}>{L('Uložit změny', 'Save changes')}</button></div></> : <><p className="sf-new-quick-save-status" role="status">{preparing ? 'Připravuji fotografie…' : busy === 'publishing' ? `Odesílám místo… ${progress ? `${progress} %` : ''}` : busy === 'checking' ? 'Hledám podobná místa…' : busy === 'draft' ? `Ukládám… ${progress ? `${progress} %` : ''}` : saveState}</p><div className="sf-new-quick-buttons"><button type="button" onClick={close} disabled={!!busy || preparing || !ready}>Uložit návrh</button><button type="button" className="sf-new-quick-primary" onClick={beginPublish} disabled={!!busy || preparing || !ready || !!pendingPhotos.length || !form.title.trim() || !form.category || !validCoords(coords)}>Odeslat místo</button></div></>}</footer>
+    {categorySheet && <div className="sf-new-category-overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setCategorySheet(false); }}>
+      <div className="sf-new-category-sheet" role="dialog" aria-modal="true" aria-labelledby="sf-new-category-title">
+        <header><div><strong id="sf-new-category-title">{L('Vyber typ místa', 'Choose a place type')}</strong><small>{L('Jedna kategorie popisuje místo nejlépe.', 'Pick the single category that fits best.')}</small></div><button type="button" onClick={() => setCategorySheet(false)} aria-label={L('Zavřít', 'Close')}><X size={19} /></button></header>
+        <label className="sf-new-category-search"><Search size={17} aria-hidden="true" /><input type="search" value={categoryQuery} onChange={event => setCategoryQuery(event.target.value)} placeholder={L('Hledat typ místa', 'Search place types')} autoFocus /></label>
+        <div className="sf-new-category-list">{filteredCategories.map(item => { const Icon = SPOT_CATEGORY_ICONS[item.key]; const selected = form.category === item.key; return <button type="button" key={item.key} className={selected ? 'selected' : ''} aria-pressed={selected} onClick={() => { update('category', item.key); setCategorySheet(false); }}><span className="sf-new-category-list-icon"><Icon size={19} aria-hidden="true" /></span><span><strong>{categoryLabel(item.key, language)}</strong><small>{categoryDescription(item.key, language)}</small></span>{selected && <Check size={18} aria-hidden="true" />}</button>; })}{!filteredCategories.length && <p className="sf-new-category-empty">{L('Tomuto hledání nic neodpovídá.', 'No place type matches that search.')}</p>}</div>
+      </div>
+    </div>}
     {editing && <DraftConfirmationDialog open={confirmDiscard} onOpenChange={setConfirmDiscard} title={L('Zahodit neuložené změny?', 'Discard unsaved changes?')} description={L('Úpravy tohoto místa nebyly uloženy.', 'Your edits to this spot have not been saved.')} cancelLabel={L('Pokračovat v úpravách', 'Keep editing')} confirmLabel={L('Zahodit změny', 'Discard changes')} onConfirm={onClose} destructive />}
   </section>;
 }

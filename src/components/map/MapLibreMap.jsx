@@ -23,7 +23,7 @@ import { Minus, Plus } from 'lucide-react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { getBaseStyle } from '../../lib/mapStyle.js';
 import { AMBIENT_CATEGORIES } from '../../lib/ambientCategories.js';
-import { badgeSVG, iconGlyphSVG } from '../../lib/mapIcons.js';
+import { badgeSVG, iconGlyphSVG, spotMapIconKey } from '../../lib/mapIcons.js';
 import { createAdminPoiPopupContent, createTrafficPopupContent } from '../../lib/mapPopupContent.js';
 import { useLanguage } from '@/lib/LanguageContext';
 import SpotMarkerIcon from '@/components/spots/SpotMarkerIcon';
@@ -574,8 +574,7 @@ function compactSpotPhoto(spot) {
 }
 
 function compactSpotIcon(spot) {
-  const keys = { Viewpoint: 'viewpoint', SecretCafe: 'cafe', Sunset: 'sunset', Sunrise: 'sunrise', PhotoSpot: 'viewpoint', Waterfall: 'waterfall', Hike: 'hike', SwimSpot: 'swim', Ruin: 'heritage', UrbanExplore: 'urbanexplore', Mountain: 'mountain' };
-  return iconGlyphSVG(keys[spot.tags?.[0]] || 'custom', 25, '#194b30');
+  return iconGlyphSVG(spotMapIconKey(spot), 25, '#194b30');
 }
 
 function makeCompactSpotMarker(spot, selected, zoom, language, onClick) {

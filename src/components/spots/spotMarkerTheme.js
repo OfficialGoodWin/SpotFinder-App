@@ -107,5 +107,3 @@ export function getSpotRating(spot) {
   const rating = getCommunitySpotRating(spot);
   return rating === null ? 'New' : rating.toFixed(1);
 }
-
-

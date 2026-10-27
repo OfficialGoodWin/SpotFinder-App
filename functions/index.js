@@ -791,6 +791,8 @@ exports.submitSpot = functions.runWith({ secrets: ['ANTI_SPAM_IP_SALT'] }).https
     // A contributor cannot create a community rating for their own spot.
     // Never accept aggregate counts or scores from the callable input.
     rating: 0, rating_count: 0, rating_schema: 2,
+    crowdedness_report_count: 0, crowdedness_quiet_count: 0,
+    crowdedness_moderate_count: 0, crowdedness_crowded_count: 0,
     geohash: encodeGeohash(lat, lng), created_date: new Date().toISOString(),
   };
   for (const field of ['access', 'condition', 'safety', 'crowdedness']) {
@@ -887,6 +889,12 @@ exports.onSpotRatingWritten = functions.firestore
     const condition = avg('condition');
     const safety = avg('safety');
     const crowdedness = avg('crowdedness');
+    const reportCounts = { quiet: 0, moderate: 0, crowded: 0 };
+    for (const row of rows) {
+      const report = row.crowdedness_report;
+      if (report === 'quiet' || report === 'moderate' || report === 'crowded') reportCounts[report] += 1;
+    }
+    const reportCount = reportCounts.quiet + reportCounts.moderate + reportCounts.crowded;
 
     await db.collection('spots').doc(spotId).update({
       rating: overall.avg, rating_count: overall.count,
@@ -894,6 +902,10 @@ exports.onSpotRatingWritten = functions.firestore
       condition_rating: condition.avg, condition_rating_count: condition.count,
       safety_rating: safety.avg, safety_rating_count: safety.count,
       crowdedness_rating: crowdedness.avg, crowdedness_rating_count: crowdedness.count,
+      crowdedness_report_count: reportCount,
+      crowdedness_quiet_count: reportCounts.quiet,
+      crowdedness_moderate_count: reportCounts.moderate,
+      crowdedness_crowded_count: reportCounts.crowded,
       rating_schema: 2,
     });
   });

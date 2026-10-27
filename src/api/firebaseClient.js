@@ -711,6 +711,9 @@ export const updateSpotDetailRating = async (spotId, field, newVal, count) => {
  * shape directly, and a Cloud Function (onSpotRatingWritten) recomputes the
  * trusted averages on spots/{id} server-side after every write.
  *
+ * The merge write keeps an independently saved crowdedness report intact when
+ * only the star ratings change (and vice versa).
+ *
  * @param {{overall:number, access:number, condition:number, safety:number, crowdedness:number}} ratings - schema v2
  */
 export const submitCategoryRatings = async (spotId, currentSpot, ratings, userId) => {
@@ -718,22 +721,56 @@ export const submitCategoryRatings = async (spotId, currentSpot, ratings, userId
   if (!userId) throw new Error('Must be signed in to rate a spot');
 
   const ratingId = `${spotId}_${userId}`;
-  await setDoc(doc(db, 'spot_ratings', ratingId), {
+  const payload = {
     spot_id: spotId,
     user_id: userId,
     overall: ratings.overall || 0,
     access: ratings.access || 0,
     condition: ratings.condition || 0,
     safety: ratings.safety || 0,
-    crowdedness: ratings.crowdedness || 0,
     schema: 2,
     updated_date: new Date().toISOString(),
-  });
+  };
+  // Zero means "not rated"; omit it rather than storing a meaningful-looking
+  // value. Legacy aggregates are still recomputed from the remaining docs.
+  if (ratings.crowdedness) payload.crowdedness = ratings.crowdedness;
+  await setDoc(doc(db, 'spot_ratings', ratingId), payload, { merge: true });
 
   // The Cloud Function trigger updates spots/{id} asynchronously (usually
   // within a second or two); return the current spot so the UI can proceed
   // without claiming these are the final server-computed numbers.
   return currentSpot;
+};
+
+const CROWDEDNESS_REPORTS = ['quiet', 'moderate', 'crowded'];
+
+export const getMyCrowdednessReport = async (spotId, userId) => {
+  const { db } = getFirebaseServices();
+  if (!userId) return null;
+  const snapshot = await getDoc(doc(db, 'spot_ratings', `${spotId}_${userId}`));
+  if (!snapshot.exists()) return null;
+  const value = snapshot.data()?.crowdedness_report;
+  return CROWDEDNESS_REPORTS.includes(value) ? value : null;
+};
+
+/**
+ * Save the signed-in visitor's current crowdedness report. One report per user
+ * per spot (same de-duplicated document as the star rating); repeated calls
+ * update the existing value. The aggregate fields on the spot are recomputed
+ * by onSpotRatingWritten, never by the client.
+ */
+export const submitCrowdednessReport = async (spotId, report, userId) => {
+  const { db } = getFirebaseServices();
+  if (!userId) throw new Error('Must be signed in to report crowdedness');
+  if (!CROWDEDNESS_REPORTS.includes(report)) throw new Error('Invalid crowdedness report');
+  await setDoc(doc(db, 'spot_ratings', `${spotId}_${userId}`), {
+    spot_id: spotId,
+    user_id: userId,
+    crowdedness_report: report,
+    schema: 2,
+    updated_date: new Date().toISOString(),
+  }, { merge: true });
+  return report;
 };
 
 // ─── Flags (community moderation) ─────────────────────────────────────────────

@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { ArrowRight, Check, Clock3, MapPin, Pencil, X } from 'lucide-react';
 import { getFirebaseServices, updateSpot } from '@/api/firebaseClient';
 import { getSpotDisplayName, getVerifiedSpotCategory } from '@/lib/spotPresentation';
+import { categoryLabel, spotPrimaryCategory } from '@/lib/spotCategories';
+import { normalizeBestTimeValues, VISIT_TIME_SUNRISE_SUNSET } from '@/lib/visitTime';
 import { checkContent } from '@/lib/moderation';
 import SpotImage from '@/components/spots/SpotImage';
 
 const PARKING = [['', 'Nevyplněno'], ['yes', 'K dispozici'], ['street', 'Na ulici'], ['paid', 'Placené'], ['no', 'Není']];
-const TIMES = [['sunrise', 'Východ slunce'], ['sunset', 'Západ slunce'], ['golden_hour', 'Zlatá hodinka'], ['night', 'Po setmění'], ['anytime', 'Kdykoli']];
+const TIMES = [[VISIT_TIME_SUNRISE_SUNSET, 'Východ a západ slunce'], ['golden_hour', 'Zlatá hodinka'], ['night', 'Po setmění'], ['anytime', 'Kdykoli']];
 const CATEGORY = {
   viewpoint: 'Vyhlídka', 'hiking spot': 'Výlet', 'swimming spot': 'U vody',
   waterfall: 'Vodopád', 'café': 'Jídlo', castle: 'Hrad', mountain: 'Hora',
@@ -14,6 +16,8 @@ const CATEGORY = {
 };
 
 export function newSpotCategoryLabel(spot) {
+  const key = spotPrimaryCategory(spot);
+  if (key) return categoryLabel(key, 'cs');
   if (spot?.tags?.includes('Other')) return 'Jiné';
   const raw = getVerifiedSpotCategory(spot) || '';
   return CATEGORY[raw] || (raw ? raw.replace(/^./, letter => letter.toLocaleUpperCase('cs')) : 'Místo');
@@ -23,7 +27,7 @@ export default function NewPublishConfirmation({ spot, onBack, onView, onUpdated
   const [current, setCurrent] = useState(spot);
   const [editing, setEditing] = useState(false);
   const [parking, setParking] = useState(spot.parking || '');
-  const [bestTime, setBestTime] = useState(Array.isArray(spot.best_time) ? spot.best_time : []);
+  const [bestTime, setBestTime] = useState(normalizeBestTimeValues(spot.best_time));
   const [description, setDescription] = useState(spot.description || '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -34,9 +38,9 @@ export default function NewPublishConfirmation({ spot, onBack, onView, onUpdated
   const ownerUid = getFirebaseServices().auth.currentUser?.uid;
   const canImprove = Boolean(ownerUid && current.created_by_uid === ownerUid);
   const name = getSpotDisplayName(current, 'cs');
-  const toggleTime = value => setBestTime(existing => value === 'anytime'
+  const toggleTime = value => setBestTime(existing => normalizeBestTimeValues(value === 'anytime'
     ? existing.includes('anytime') ? [] : ['anytime']
-    : existing.includes(value) ? existing.filter(item => item !== value) : [...existing.filter(item => item !== 'anytime'), value]);
+    : existing.includes(value) ? existing.filter(item => item !== value) : [...existing.filter(item => item !== 'anytime'), value]));
   const saveImprovements = async () => {
     if (busy || !canImprove) return;
     if (!checkContent(description).ok) { setError('Popis nelze uložit. Uprav text a zkus to znovu.'); return; }

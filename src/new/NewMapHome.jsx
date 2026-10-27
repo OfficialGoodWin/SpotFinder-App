@@ -1,21 +1,25 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Bookmark, Crosshair, Droplets, Layers, MapPin, Mic, Minus, Mountain, Plus, Route, UtensilsCrossed } from 'lucide-react';
+import { Bookmark, Crosshair, Layers, MapPin, Mic, Minus, Plus } from 'lucide-react';
 import { getSpotDisplayName } from '@/lib/spotPresentation';
 import { getSpotRating } from '@/lib/spotDiscovery';
+import { categoryLabel } from '@/lib/spotCategories';
 import { SpotPhoto } from '@/mobile-v2/spotDisplay';
-import { MAP_HOME_CATEGORIES, mapHomeCategoryOf } from './mapHomeData';
+import { MAP_HOME_ALL, MAP_HOME_CATEGORIES, mapHomeCategoryOf } from './mapHomeData';
+import { SPOT_CATEGORY_ICONS } from './spotCategoryIcons';
 import NewSkeleton from './NewSkeleton';
 
-const icons = { Výhledy: Mountain, Túry: Route, Voda: Droplets, Jídlo: UtensilsCrossed };
 const layers = [['basic', 'Základní'], ['outdoor', 'Turistická'], ['aerial', 'Letecká'], ['winter', 'Zimní'], ['traffic', 'Doprava']];
 const nextSize = { collapsed: 'expanded', expanded: 'fullscreen', fullscreen: 'collapsed' };
 const previousSize = { collapsed: 'collapsed', expanded: 'collapsed', fullscreen: 'expanded' };
 
-function CategoryChips({ category, setCategory, className = '' }) {
+function CategoryChips({ category, setCategory, language, className = '' }) {
+  const cs = String(language || '').startsWith('cs');
   return <div className={`sf-new-categories ${className}`} role="group" aria-label="Kategorie míst">
     {MAP_HOME_CATEGORIES.map(name => {
-      const Icon = icons[name];
-      return <button type="button" key={name} className={category === name ? 'is-active' : ''} aria-pressed={category === name} onClick={() => setCategory(name)}>{Icon && <Icon size={18} aria-hidden="true" />}{name}</button>;
+      const isAll = name === MAP_HOME_ALL;
+      const Icon = isAll ? null : SPOT_CATEGORY_ICONS[name];
+      const label = isAll ? (cs ? 'Vše' : 'All') : categoryLabel(name, language, { short: true });
+      return <button type="button" key={name} className={category === name ? 'is-active' : ''} aria-pressed={category === name} onClick={() => setCategory(name)}>{Icon && <Icon size={18} aria-hidden="true" />}{label}</button>;
     })}
   </div>;
 }
@@ -65,12 +69,13 @@ export default function NewMapHome({ category, setCategory, spots, language, loa
     const name = getSpotDisplayName(spot, language);
     const rating = getSpotRating(spot);
     const spotCategory = mapHomeCategoryOf(spot);
-    const Icon = icons[spotCategory];
+    const Icon = spotCategory ? SPOT_CATEGORY_ICONS[spotCategory] : null;
+    const categoryName = spotCategory ? categoryLabel(spotCategory, language, { short: true }) : (String(language || '').startsWith('cs') ? 'Místo' : 'Spot');
     const saved = savedIds.has(spot.id);
     return <article className={vertical ? `sf-new-row ${sheetSize === 'fullscreen' && index === 0 ? 'sf-new-row--hero' : ''}` : 'sf-new-card'} key={spot.id}>
       <button type="button" className={vertical ? 'sf-new-row-open' : 'sf-new-card-open'} onClick={() => onOpen(spot)}>
-        <span className={vertical ? 'sf-new-row-image' : 'sf-new-card-image'}><SpotPhoto spot={spot} />{(!vertical || sheetSize === 'fullscreen' && index === 0) && <span className="sf-new-card-category">{Icon && <Icon size={15} />}{spotCategory}</span>}</span>
-        <span className="sf-new-card-copy">{vertical && sheetSize !== 'fullscreen' && <span className="sf-new-row-category">{Icon && <Icon size={15} />}{spotCategory}</span>}<strong>{name}</strong><small>{rating === null ? 'Bez hodnocení' : `★ ${rating.toFixed(1).replace('.', ',')}`}</small></span>
+        <span className={vertical ? 'sf-new-row-image' : 'sf-new-card-image'}><SpotPhoto spot={spot} />{(!vertical || sheetSize === 'fullscreen' && index === 0) && <span className="sf-new-card-category">{Icon && <Icon size={15} />}{categoryName}</span>}</span>
+        <span className="sf-new-card-copy">{vertical && sheetSize !== 'fullscreen' && <span className="sf-new-row-category">{Icon && <Icon size={15} />}{categoryName}</span>}<strong>{name}</strong><small>{rating === null ? 'Bez hodnocení' : `★ ${rating.toFixed(1).replace('.', ',')}`}</small></span>
       </button>
       <SaveButton spot={spot} name={name} saved={saved} busy={savingSpotId === spot.id} onSave={onSave} />
     </article>;
@@ -79,7 +84,7 @@ export default function NewMapHome({ category, setCategory, spots, language, loa
   return <>
     {sheetSize !== 'fullscreen' && <div className="sf-new-top">
       <div className="sf-new-search"><img src="/mobile-v2/official-logo.png" alt="SpotFinder" /><button type="button" onClick={onSearch}>Hledat místa…</button><button className="sf-new-microphone" type="button" onClick={onVoiceSearch} aria-label="Hledat místa hlasem"><Mic size={21} /></button></div>
-      {!collectionMode && sheetSize === 'collapsed' && <CategoryChips category={category} setCategory={setCategory} />}
+      {!collectionMode && sheetSize === 'collapsed' && <CategoryChips category={category} setCategory={setCategory} language={language} />}
     </div>}
     {sheetSize === 'collapsed' && <div className="sf-new-controls">
       <button type="button" aria-label="Mapové vrstvy" aria-expanded={layersOpen} onClick={() => setLayersOpen(value => !value)}><Layers size={21} /></button>
@@ -92,8 +97,8 @@ export default function NewMapHome({ category, setCategory, spots, language, loa
     <section className={`sf-new-nearby sf-new-nearby--${sheetSize}${!hasResults ? ' is-empty' : ''}`} aria-label="Poblíž">
       <button className="sf-new-handle" type="button" aria-label={expanded ? 'Změnit velikost seznamu míst' : 'Rozbalit místa poblíž'} onPointerDown={event => { dragStart.current = event.clientY; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerUp={handlePointerUp} onPointerCancel={() => { dragStart.current = null; }} onClick={() => { if (swiped.current) { swiped.current = false; return; } changeSize('up'); }}><span /></button>
       <div className="sf-new-nearby-heading"><div><h2>{collectionMode ? 'Moje místa' : 'Poblíž'}</h2><p>{loading ? 'Načítám místa…' : `${spots.length} míst na mapě`}</p></div>{collectionMode ? <button type="button" onClick={onExitCollection}>Komunitní mapa</button> : <button type="button" onClick={onGps}><Crosshair size={18} /> Zapnout polohu</button>}</div>
-      {expanded && !collectionMode && <CategoryChips category={category} setCategory={setCategory} className="sf-new-categories--sheet" />}
-      {error && !hasResults ? <p className="sf-new-state">Místa se nepodařilo načíst. <button type="button" onClick={onRetry}>Zkusit znovu</button></p> : loading && !hasResults ? <NewSkeleton kind={expanded ? 'nearbyRows' : 'nearbyCards'} /> : !hasResults ? <div className="sf-new-nearby-empty"><MapPin size={23} aria-hidden="true" /><p>{collectionMode ? 'Zatím tu nemáš žádná veřejná místa s polohou.' : category !== 'Vše' ? 'V této kategorii tu zatím nejsou místa.' : 'V zobrazené oblasti zatím nejsou místa.'}</p>{collectionMode ? <button type="button" onClick={onExitCollection}>Zobrazit komunitní mapu</button> : category !== 'Vše' ? <button type="button" onClick={() => setCategory('Vše')}>Zobrazit vše</button> : <button type="button" onClick={onSearch}>Hledat jiné místo</button>}</div> : expanded ? <div className="sf-new-vertical-list">{spots.map((spot, index) => renderSpot(spot, index, true))}</div> : <div className="sf-new-card-list">{spots.slice(0, 20).map((spot, index) => renderSpot(spot, index))}</div>}
+      {expanded && !collectionMode && <CategoryChips category={category} setCategory={setCategory} language={language} className="sf-new-categories--sheet" />}
+      {error && !hasResults ? <p className="sf-new-state">Místa se nepodařilo načíst. <button type="button" onClick={onRetry}>Zkusit znovu</button></p> : loading && !hasResults ? <NewSkeleton kind={expanded ? 'nearbyRows' : 'nearbyCards'} /> : !hasResults ? <div className="sf-new-nearby-empty"><MapPin size={23} aria-hidden="true" /><p>{collectionMode ? 'Zatím tu nemáš žádná veřejná místa s polohou.' : category !== MAP_HOME_ALL ? 'V této kategorii tu zatím nejsou místa.' : 'V zobrazené oblasti zatím nejsou místa.'}</p>{collectionMode ? <button type="button" onClick={onExitCollection}>Zobrazit komunitní mapu</button> : category !== MAP_HOME_ALL ? <button type="button" onClick={() => setCategory(MAP_HOME_ALL)}>Zobrazit vše</button> : <button type="button" onClick={onSearch}>Hledat jiné místo</button>}</div> : expanded ? <div className="sf-new-vertical-list">{spots.map((spot, index) => renderSpot(spot, index, true))}</div> : <div className="sf-new-card-list">{spots.slice(0, 20).map((spot, index) => renderSpot(spot, index))}</div>}
     </section>
   </>;
 }

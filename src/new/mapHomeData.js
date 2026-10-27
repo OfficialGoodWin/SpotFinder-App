@@ -1,12 +1,12 @@
-import { getVerifiedSpotCategory } from '@/lib/spotPresentation';
+import { SPOT_CATEGORY_KEYS, spotPrimaryCategory } from '@/lib/spotCategories';
 
-export const MAP_HOME_CATEGORIES = ['Vše', 'Výhledy', 'Túry', 'Voda', 'Jídlo'];
+// `Vše` is the existing sentinel used by the redesigned map filter. Category
+// values are canonical keys; legacy primary values resolve through the shared
+// category module, so no Firestore migration is needed.
+export const MAP_HOME_ALL = 'Vše';
+export const MAP_HOME_CATEGORY_KEYS = SPOT_CATEGORY_KEYS;
+export const MAP_HOME_CATEGORIES = [MAP_HOME_ALL, ...SPOT_CATEGORY_KEYS];
 
 export function mapHomeCategoryOf(spot) {
-  const category = String(getVerifiedSpotCategory(spot) || '').toLowerCase();
-  if (/waterfall|swim|water|lake|river|beach/.test(category)) return 'Voda';
-  if (/cafe|caf|food|restaurant/.test(category)) return 'Jídlo';
-  if (/hike|trail|mountain|walking/.test(category)) return 'Túry';
-  if (/viewpoint|sunset|sunrise|photo/.test(category)) return 'Výhledy';
-  return 'Ostatní';
+  return spotPrimaryCategory(spot);
 }
