@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import * as maplibregl from 'maplibre-gl';
-import { getSpotDisplayName, getSpotImageInfo } from '@/lib/spotPresentation';
+import { getSpotDisplayName, getSpotImageInfo, isUsableSpotImageUrl } from '@/lib/spotPresentation';
 import { clampMapZoom, getSpotCameraOptions, MAP_MAX_ZOOM } from '@/lib/mapSpotFocus';
 import { registerSingleMapListener } from '@/lib/mapLifecycle';
 import { attachMarkerAt, validMarkerLngLat } from '@/lib/mapMarkerCoordinates';
@@ -23,7 +23,7 @@ import { Minus, Plus } from 'lucide-react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { getBaseStyle } from '../../lib/mapStyle.js';
 import { AMBIENT_CATEGORIES } from '../../lib/ambientCategories.js';
-import { badgeSVG } from '../../lib/mapIcons.js';
+import { badgeSVG, iconGlyphSVG } from '../../lib/mapIcons.js';
 import { createAdminPoiPopupContent, createTrafficPopupContent } from '../../lib/mapPopupContent.js';
 import { useLanguage } from '@/lib/LanguageContext';
 import SpotMarkerIcon from '@/components/spots/SpotMarkerIcon';
@@ -566,23 +566,39 @@ function removeSpotMarker(marker) {
 
 // Compact discovery markers for /new. The shared map's original markers remain
 // the default for every other route.
+function compactSpotPhoto(spot) {
+  const image = getSpotImageInfo(spot);
+  if (!image) return '';
+  const thumbnail = spot.photo_metadata?.find?.(item => item?.url === image.url)?.thumbnail_url || spot.thumbnail_url;
+  return isUsableSpotImageUrl(thumbnail) ? thumbnail : image.url;
+}
+
+function compactSpotIcon(spot) {
+  const keys = { Viewpoint: 'viewpoint', SecretCafe: 'cafe', Sunset: 'sunset', Sunrise: 'sunrise', PhotoSpot: 'viewpoint', Waterfall: 'waterfall', Hike: 'hike', SwimSpot: 'swim', Ruin: 'heritage', UrbanExplore: 'urbanexplore', Mountain: 'mountain' };
+  return iconGlyphSVG(keys[spot.tags?.[0]] || 'custom', 25, '#194b30');
+}
+
 function makeCompactSpotMarker(spot, selected, zoom, language, onClick) {
   const el = document.createElement('button');
   el.type = 'button';
-  const photoUrl = getSpotImageInfo(spot)?.url;
+  el.__spot = spot;
+  const photoUrl = compactSpotPhoto(spot);
   el.className = `sf-new-map-marker${selected ? ' is-selected' : photoUrl && zoom >= 15.5 ? ' has-photo' : ''}${photoUrl ? '' : ' no-photo'}`;
   el.setAttribute('aria-label', `${selected ? 'Otevřít' : 'Vybrat'}: ${getSpotDisplayName(spot, language)}`);
   el.setAttribute('aria-pressed', selected ? 'true' : 'false');
   if (photoUrl && (selected || zoom >= 15.5)) {
     const image = document.createElement('img');
     const fallback = document.createElement('span');
-    fallback.className = 'sf-new-map-marker-dot';
-    fallback.textContent = '•';
+    fallback.className = 'sf-new-map-marker-icon';
+    fallback.innerHTML = compactSpotIcon(spot);
     fallback.hidden = true;
-    image.src = photoUrl;
     image.alt = '';
-    image.loading = 'lazy';
-    image.onerror = () => { image.remove(); fallback.hidden = false; el.classList.add('no-photo'); };
+    image.loading = selected ? 'eager' : 'lazy';
+    image.decoding = 'async';
+    if (selected) el.classList.add('is-image-loading');
+    image.onload = () => el.classList.remove('is-image-loading');
+    image.onerror = () => { image.remove(); fallback.hidden = false; el.classList.remove('is-image-loading'); el.classList.add('no-photo'); };
+    image.src = photoUrl;
     el.appendChild(image);
     el.appendChild(fallback);
   }
@@ -593,11 +609,11 @@ function makeCompactSpotMarker(spot, selected, zoom, language, onClick) {
     el.appendChild(title);
   } else if (!photoUrl || zoom < 15.5) {
     const dot = document.createElement('span');
-    dot.className = 'sf-new-map-marker-dot';
-    dot.textContent = '•';
+    dot.className = 'sf-new-map-marker-icon';
+    dot.innerHTML = compactSpotIcon(spot);
     el.appendChild(dot);
   }
-  el.addEventListener('click', event => { event.stopPropagation(); onClick?.(spot); });
+  el.addEventListener('click', event => { event.stopPropagation(); onClick?.(el.__spot); });
   return el;
 }
 
@@ -607,8 +623,21 @@ function makeCompactClusterMarker(count, onClick) {
   el.className = 'sf-new-map-cluster';
   el.textContent = count > 99 ? '99+' : String(count);
   el.setAttribute('aria-label', `${count} míst poblíž. Přiblížit mapu.`);
-  el.addEventListener('click', event => { event.stopPropagation(); onClick(); });
+  el.addEventListener('click', event => { event.stopPropagation(); onClick(el.__clusterGroup); });
   return el;
+}
+
+function compactClusterExpansionZoom(map, group) {
+  const points = group.map(spot => maplibregl.MercatorCoordinate.fromLngLat([Number(spot.lng), Number(spot.lat)]));
+  const spanX = Math.max(...points.map(point => point.x)) - Math.min(...points.map(point => point.x));
+  const spanY = Math.max(...points.map(point => point.y)) - Math.min(...points.map(point => point.y));
+  const span = Math.max(spanX, spanY);
+  if (!span) return 18;
+  for (let zoom = Math.ceil(map.getZoom() * 2 + 1) / 2; zoom <= 18; zoom += 0.5) {
+    const cell = zoom < 12 ? 84 : zoom < 15.5 ? 66 : 58;
+    if (span * 512 * 2 ** zoom >= cell * 1.1) return zoom;
+  }
+  return 18;
 }
 
 // ── Pre-baked ambient POI tiles ───────────────────────────────────────────────
@@ -940,14 +969,23 @@ export default function MapLibreMap({
     terrainRef.current = terrainEnabled;
     const map = mapRef.current;
     if (!map) return;
-    if (map.isStyleLoaded()) { applyTerrain(map, terrainEnabled); apply3DBuildings(map, terrainEnabled); }
-    else map.once('idle', () => { applyTerrain(map, terrainEnabled); apply3DBuildings(map, terrainEnabled); });
+    const apply = () => { applyTerrain(map, terrainEnabled); apply3DBuildings(map, terrainEnabled); };
+    if (map.isStyleLoaded()) apply();
+    else map.once('idle', apply);
+    return () => map.off('idle', apply);
   }, [terrainEnabled]);
   const markers = useRef({ spots: new Map(), ambient: new Map(), pois: new Map(), user: null });
   const onSelectSpotRef = useRef(onSelectSpot);
   onSelectSpotRef.current = onSelectSpot;
+  const onSelectPOIRef = useRef(onSelectPOI);
+  onSelectPOIRef.current = onSelectPOI;
+  const ambientSelectionRef = useRef(0);
   const selectedSpotIdRef = useRef(selectedSpotId);
   selectedSpotIdRef.current = selectedSpotId;
+  const compactSpotsRef = useRef(spots);
+  compactSpotsRef.current = spots;
+  const compactLanguageRef = useRef(language);
+  compactLanguageRef.current = language;
   const drawCompactSpotsRef = useRef(null);
   const officialEditorRef = useRef({ active: officialEditorActive, select: onSelectOfficialPoi });
   officialEditorRef.current = { active: officialEditorActive, select: onSelectOfficialPoi };
@@ -1054,6 +1092,7 @@ export default function MapLibreMap({
         return map.queryRenderedFeatures([[point.x - r, point.y - r], [point.x + r, point.y + r]], { layers });
       };
       map.on('click', async (e) => {
+        const selection = ++ambientSelectionRef.current;
         if (adminPickRef.current) return;
         const hits = ambientHits(e.point);
         const feat = hits[0];
@@ -1080,10 +1119,11 @@ export default function MapLibreMap({
           const items = await readPoiDetailShard(lon, lat, detailsBase);
           details = items?.find(item => String(item.id) === String(p.id)) || null;
         } catch (error) { console.warn('POI detail shard unavailable:', error); }
+        if (selection !== ambientSelectionRef.current) return;
 
         const baseTags = { phone: p.phone, website: p.website, opening_hours: p.opening_hours, description: p.description, wikidata: p.wikidata, wikimedia_commons: p.wikimedia_commons, image: p.image };
         const enrichedTags = details?.wikipedia ? { ...baseTags, wikipedia: details.wikipedia } : baseTags;
-        onSelectPOI?.(
+        onSelectPOIRef.current?.(
           // Keep the existing public/social POI key when typed candidate tiles
           // replace numeric tiles. Official editing uses _ambientHit instead.
           { id: p.osm_id || p.id || `${lat}-${lon}`, lat, lon, name: p.name || '', address: p.address || '',
@@ -1201,17 +1241,18 @@ export default function MapLibreMap({
   // ── Spot markers ───────────────────────────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !compactSpotMarkers) return;
     const m = markers.current.spots;
     if (!showSpots) { m.forEach(removeSpotMarker); m.clear(); return; }
-    if (compactSpotMarkers) {
       const draw = () => {
-        m.forEach(removeSpotMarker); m.clear();
+        const nextKeys = new Set();
         const zoom = map.getZoom();
         const cell = zoom < 12 ? 84 : zoom < 15.5 ? 66 : 58;
-        const selected = spots.find(spot => String(spot.id) === String(selectedSpotIdRef.current) && validMarkerLngLat(spot.lng, spot.lat));
+        const currentSpots = compactSpotsRef.current || [];
+        const currentLanguage = compactLanguageRef.current;
+        const selected = currentSpots.find(spot => String(spot.id) === String(selectedSpotIdRef.current) && validMarkerLngLat(spot.lng, spot.lat));
         const buckets = new Map();
-        for (const spot of spots) {
+        for (const spot of currentSpots) {
           const position = validMarkerLngLat(spot.lng, spot.lat);
           if (!spot.id || !position || String(spot.id) === String(selected?.id)) continue;
           const point = map.project(position);
@@ -1220,25 +1261,66 @@ export default function MapLibreMap({
           if (!buckets.has(key)) buckets.set(key, []);
           buckets.get(key).push(spot);
         }
-        for (const [key, group] of buckets) {
+        const place = (key, signature, position, anchor, create, spotOrGroup, offset) => {
+          nextKeys.add(key);
+          const existing = m.get(key);
+          if (existing?.__compactSignature === signature) {
+            existing.setLngLat(position);
+            if (Array.isArray(spotOrGroup)) existing.getElement().__clusterGroup = spotOrGroup;
+            else existing.getElement().__spot = spotOrGroup;
+            return;
+          }
+          if (existing) removeSpotMarker(existing);
+          const marker = attachMarkerAt(new maplibregl.Marker({ element: create(), anchor, offset }), map, position);
+          marker.__compactSignature = signature;
+          m.set(key, marker);
+        };
+        for (const group of buckets.values()) {
           const lng = group.reduce((sum, spot) => sum + Number(spot.lng), 0) / group.length;
           const lat = group.reduce((sum, spot) => sum + Number(spot.lat), 0) / group.length;
-          const clustered = group.length > 1 || zoom < 14;
-          const el = clustered
-            ? makeCompactClusterMarker(group.length, () => zoom < 18 ? map.easeTo({ center: [lng, lat], zoom: Math.min(18, zoom + 2) }) : onSelectSpotRef.current?.(group[0]))
-            : makeCompactSpotMarker(group[0], false, zoom, language, spot => onSelectSpotRef.current?.(spot));
-          m.set(`new:${key}`, attachMarkerAt(new maplibregl.Marker({ element: el, anchor: clustered ? 'center' : 'bottom' }), map, [lng, lat]));
+          if (zoom >= 18 && group.length > 1) {
+            const ordered = [...group].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+            const radius = Math.min(60, 30 + ordered.length * 4);
+            ordered.forEach((spot, index) => {
+              const angle = index * 2 * Math.PI / ordered.length - Math.PI / 2;
+              const offset = [Math.round(Math.cos(angle) * radius), Math.round(Math.sin(angle) * radius)];
+              const signature = `spider:${spot.id}:${getSpotDisplayName(spot, currentLanguage)}:${compactSpotPhoto(spot)}:${offset.join(',')}`;
+              place(`new:spider:${spot.id}`, signature, [Number(spot.lng), Number(spot.lat)], 'bottom', () => makeCompactSpotMarker(spot, false, zoom, currentLanguage, value => { ambientSelectionRef.current += 1; onSelectSpotRef.current?.(value); }), spot, offset);
+            });
+            continue;
+          }
+          const ids = group.map(spot => String(spot.id)).sort().join('|');
+          const clustered = group.length > 1;
+          const signature = clustered ? `cluster:${ids}` : `spot:${ids}:${getSpotDisplayName(group[0], currentLanguage)}:${compactSpotPhoto(group[0])}:${zoom >= 15.5}`;
+          place(`new:${ids}`, signature, [lng, lat], clustered ? 'center' : 'bottom', () => {
+            if (!clustered) return makeCompactSpotMarker(group[0], false, zoom, currentLanguage, spot => { ambientSelectionRef.current += 1; onSelectSpotRef.current?.(spot); });
+            const el = makeCompactClusterMarker(group.length, members => {
+              const target = members || group;
+              const centerLng = target.reduce((sum, spot) => sum + Number(spot.lng), 0) / target.length;
+              const centerLat = target.reduce((sum, spot) => sum + Number(spot.lat), 0) / target.length;
+              map.easeTo({ center: [centerLng, centerLat], zoom: compactClusterExpansionZoom(map, target), duration: mapMotionDuration(420) });
+            });
+            el.__clusterGroup = group;
+            return el;
+          }, clustered ? group : group[0]);
         }
         if (selected) {
-          const el = makeCompactSpotMarker(selected, true, zoom, language, spot => onSelectSpotRef.current?.(spot));
-          m.set(`new:selected:${selected.id}`, attachMarkerAt(new maplibregl.Marker({ element: el, anchor: 'bottom' }), map, [Number(selected.lng), Number(selected.lat)]));
+          const key = `new:selected:${selected.id}`;
+          place(key, `selected:${selected.id}:${getSpotDisplayName(selected, currentLanguage)}:${compactSpotPhoto(selected)}`, [Number(selected.lng), Number(selected.lat)], 'bottom', () => makeCompactSpotMarker(selected, true, zoom, currentLanguage, spot => { ambientSelectionRef.current += 1; onSelectSpotRef.current?.(spot); }), selected);
         }
+        m.forEach((marker, key) => { if (!nextKeys.has(key)) { removeSpotMarker(marker); m.delete(key); } });
       };
       drawCompactSpotsRef.current = draw;
       map.on('moveend', draw);
       draw();
       return () => { map.off('moveend', draw); if (drawCompactSpotsRef.current === draw) drawCompactSpotsRef.current = null; m.forEach(removeSpotMarker); m.clear(); };
-    }
+  }, [showSpots, compactSpotMarkers]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || compactSpotMarkers) return;
+    const m = markers.current.spots;
+    if (!showSpots) { m.forEach(removeSpotMarker); m.clear(); return; }
     const ids = new Set(spots.filter(s => s.id && validMarkerLngLat(s.lng, s.lat)).map(s => String(s.id)));
     m.forEach((x, id) => { if (!ids.has(id)) { removeSpotMarker(x); m.delete(id); } });
     for (const spot of spots) {
@@ -1260,6 +1342,8 @@ export default function MapLibreMap({
       m.set(spotId, mk);
     }
   }, [language, spots, showSpots, compactSpotMarkers]);
+
+  useEffect(() => { if (compactSpotMarkers) drawCompactSpotsRef.current?.(); }, [spots, language, compactSpotMarkers]);
 
   useEffect(() => {
     if (compactSpotMarkers) { drawCompactSpotsRef.current?.(); return; }
@@ -1444,6 +1528,8 @@ export default function MapLibreMap({
 
     const incidentMarkers = [];
     let abortCtrl = new AbortController();
+    let moveTimer = null;
+    let disposed = false;
 
     const ICON_SVG = {
       closure: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="24" height="24"><circle cx="50" cy="50" r="48" fill="white"/><circle cx="50" cy="50" r="43" fill="#CC1111"/><rect x="14" y="38" width="72" height="24" rx="5" fill="white"/></svg>`,
@@ -1467,15 +1553,17 @@ export default function MapLibreMap({
     const isLane = c => [7].includes(c);
 
     const load = async () => {
-      if (!map.isStyleLoaded()) return;
+      if (disposed || !map.isStyleLoaded()) return;
+      const signal = abortCtrl.signal;
       const bounds = map.getBounds();
       const sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
       const bbox = [sw.lng, sw.lat, ne.lng, ne.lat].map(n => n.toFixed(6)).join(',');
       const fields = encodeURIComponent('{incidents{type,geometry{type,coordinates},properties{iconCategory,from,to,roadNumbers,events{description,iconCategory}}}}');
       try {
-        const res = await fetch(`https://api.tomtom.com/traffic/services/5/incidentDetails?bbox=${bbox}&fields=${fields}&language=en-GB&timeValidityFilter=present&key=${TOMTOM_KEY}`, { signal: abortCtrl.signal });
+        const res = await fetch(`https://api.tomtom.com/traffic/services/5/incidentDetails?bbox=${bbox}&fields=${fields}&language=en-GB&timeValidityFilter=present&key=${TOMTOM_KEY}`, { signal });
         if (!res.ok) return;
         const data = await res.json();
+        if (disposed || signal.aborted) return;
         // Remove old markers
         incidentMarkers.forEach(m => m.remove());
         incidentMarkers.length = 0;
@@ -1496,10 +1584,13 @@ export default function MapLibreMap({
       } catch (e) { if (e.name !== 'AbortError') console.warn('Incident fetch:', e.message); }
     };
 
-    const onMove = () => { abortCtrl.abort(); abortCtrl = new AbortController(); setTimeout(load, 600); };
+    const onMove = () => { if (moveTimer) clearTimeout(moveTimer); abortCtrl.abort(); abortCtrl = new AbortController(); moveTimer = setTimeout(() => { moveTimer = null; load(); }, 600); };
     if (map.isStyleLoaded()) load(); else map.once('idle', load);
     map.on('moveend', onMove);
     return () => {
+      disposed = true;
+      if (moveTimer) clearTimeout(moveTimer);
+      map.off('idle', load);
       map.off('moveend', onMove);
       abortCtrl.abort();
       incidentMarkers.forEach(m => m.remove());

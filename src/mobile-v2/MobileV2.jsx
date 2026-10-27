@@ -159,6 +159,7 @@ export default function MobileV2({ redesigned = false }) {
   const [flyTo, setFlyTo] = useState(null);
   const [selectedSpot, setSelectedSpot] = useState(null);
   const [selectedMapSpotId, setSelectedMapSpotId] = useState(null);
+  const [previewSpot, setPreviewSpot] = useState(null);
   const [editingSpot, setEditingSpot] = useState(null);
   const [selectedPoi, setSelectedPoi] = useState(null);
   const [navigationDestination, setNavigationDestination] = useState(null);
@@ -237,6 +238,7 @@ export default function MobileV2({ redesigned = false }) {
   const zoomDraggingRef = useRef(false);
   const requestRef = useRef(0);
   const cacheRef = useRef(null);
+  const pendingBoundsRef = useRef(null);
   useEffect(() => {
     if (!redesigned) return undefined;
     const linked = event => {
@@ -304,11 +306,14 @@ export default function MobileV2({ redesigned = false }) {
       setSpots(cacheRef.current.rows); setSpotsLoading(false); setSpotsError(false); return;
     }
     setSpotsLoading(true); setSpotsError(false);
+    const pending = pendingBoundsRef.current;
+    const queryPromise = pending?.key === key ? pending.promise : getPublicSpotsInBounds(view, 300);
+    if (pending?.key !== key) pendingBoundsRef.current = { key, promise: queryPromise };
     try {
-      const rows = await getPublicSpotsInBounds(view, 300);
+      const rows = await queryPromise;
       if (request === requestRef.current) { setSpots(rows); cacheRef.current = { key, rows, at: Date.now() }; }
     } catch { if (request === requestRef.current) setSpotsError(true); }
-    finally { if (request === requestRef.current) setSpotsLoading(false); }
+    finally { if (pendingBoundsRef.current?.promise === queryPromise) pendingBoundsRef.current = null; if (request === requestRef.current) setSpotsLoading(false); }
   }, []);
   const handleZoomDragStart = useCallback(() => {
     zoomDraggingRef.current = true;
@@ -336,11 +341,11 @@ export default function MobileV2({ redesigned = false }) {
     let alive = true;
     getPublicSpotById(id).then(spot => {
       if (!alive) return;
-      if (spot) { selectedSpotRef.current = spot; setSelectedSpot(spot); setSelectedMapSpotId(spot.id); const coords = normalizeLatLng(spot); if (coords) setFlyTo(coords); }
+      if (spot) { selectedSpotRef.current = spot; setSelectedSpot(spot); setSelectedMapSpotId(spot.id); if (redesigned) setPreviewSpot(spot); const coords = normalizeLatLng(spot); if (coords) setFlyTo(coords); }
       else { toast.error('Místo nebylo nalezeno.'); navigate('/new', { replace: true }); }
     }).catch(() => { if (alive) toast.error('Místo se nepodařilo načíst.'); });
     return () => { alive = false; };
-  }, [location.pathname, navigate]);
+  }, [location.pathname, navigate, redesigned]);
 
   const loadDiscover = useCallback(async (more = false) => {
     if (discoverLoading) return;
@@ -425,10 +430,24 @@ export default function MobileV2({ redesigned = false }) {
     minRating: nearbyResults ? nearbyFilters.minRating : 0,
     sort: nearbyResults ? nearbySort : 'newest',
   }).filter(spot => redesigned ? mapCategory === 'Vše' || mapHomeCategoryOf(spot) === mapCategory : category === 'Vše' || categoryOf(spot) === category), [sourceSpots, category, mapCategory, redesigned, nearbyResults, nearbyOrigin, nearbyFilters, nearbySort, myMapSpots]);
+  const mapSpots = useMemo(() => redesigned && previewSpot && String(previewSpot.id) === String(selectedMapSpotId) && !visibleSpots.some(spot => String(spot.id) === String(previewSpot.id))
+    ? [...visibleSpots, previewSpot] : visibleSpots, [redesigned, previewSpot, selectedMapSpotId, visibleSpots]);
   useEffect(() => setNearbyCount(20), [category, nearbyResults, nearbySort]);
   const featuredVisible = useMemo(() => (featured || []).filter(spot => category === 'Vše' || categoryOf(spot) === category), [featured, category]);
-  const openSpot = spot => { setNearbySize('collapsed'); setSelectedPoi(null); setSelectedMapSpotId(spot.id); selectedSpotRef.current = spot; setSelectedSpot(spot); const coords = normalizeLatLng(spot); if (coords) setFlyTo(coords); navigate(`/new/spot/${encodeURIComponent(spot.id)}`); };
-  const openOnMap = spot => { if (redesigned) setMyMapSpots(null); setSelectedSpot(null); selectedSpotRef.current = null; setSelectedMapSpotId(spot.id); setNearbySize('collapsed'); navigate('/new/map'); const coords = normalizeLatLng(spot); if (coords) setFlyTo(coords); };
+  const openSpot = spot => { setNearbySize('collapsed'); setSelectedPoi(null); setSelectedMapSpotId(spot.id); if (redesigned) setPreviewSpot(spot); selectedSpotRef.current = spot; setSelectedSpot(spot); const coords = normalizeLatLng(spot); if (coords) setFlyTo(coords); navigate(`/new/spot/${encodeURIComponent(spot.id)}`); };
+  const selectMapSpot = spot => {
+    if (!redesigned || String(selectedMapSpotId) === String(spot.id)) { openSpot(spot); return; }
+    setNearbySize('collapsed'); setSelectedPoi(null); setSelectedMapSpotId(spot.id); setPreviewSpot(spot);
+    const coords = normalizeLatLng(spot);
+    const map = mapRef.current;
+    if (!coords || !map) return;
+    const point = map.project([coords[1], coords[0]]);
+    const height = map.getContainer().clientHeight;
+    if (map.getZoom() >= 15.5 && point.x > 80 && point.x < map.getContainer().clientWidth - 80 && point.y > 110 && point.y < height - 190) return;
+    map.stop();
+    map.easeTo({ center: [coords[1], coords[0]], zoom: Math.max(16.2, map.getZoom()), offset: [0, -Math.min(105, height * 0.15)], duration: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 380 });
+  };
+  const openOnMap = spot => { if (redesigned) { setMyMapSpots(null); setPreviewSpot(spot); } setSelectedSpot(null); selectedSpotRef.current = null; setSelectedMapSpotId(spot.id); setNearbySize('collapsed'); navigate('/new/map'); const coords = normalizeLatLng(spot); if (coords) setFlyTo(coords); };
   const showMySpotsOnMap = async () => {
     if (!redesigned || !user?.id || myMapBusy) return;
     const request = ++myMapRequestRef.current;
@@ -482,7 +501,7 @@ export default function MobileV2({ redesigned = false }) {
     } catch { toast.error('Místo se nepodařilo odebrat.'); }
     finally { setUnsaveBusy(false); }
   };
-  const closeSpot = () => { setSelectedSpot(null); selectedSpotRef.current = null; if (location.pathname.startsWith('/new/spot/')) navigate(location.key === 'default' ? '/new' : -1); };
+  const closeSpot = () => { setSelectedSpot(null); selectedSpotRef.current = null; setNavigationDestination(null); if (location.pathname.startsWith('/new/spot/')) navigate(location.key === 'default' ? '/new' : -1); };
   const runNearby = async (filters, mode) => {
     const request = ++nearbyRequestRef.current;
     setFilterLocationError('');
@@ -563,9 +582,9 @@ export default function MobileV2({ redesigned = false }) {
     finally { setSignOutBusy(false); }
   };
 
-  return <div className={`mobile-v2 ${isDark ? 'v2-dark' : ''} ${redesigned && myMapSpots !== null && activeTab === 'map' ? 'sf-new-my-map' : ''} ${redesigned && (quickAdd || choosingQuickPosition) ? 'sf-new-adding' : ''} ${redesigned && settingsPage ? 'sf-new-settings-open' : ''} ${redesigned && showNewZoomButtons ? 'sf-new-zoom-visible' : ''}`}>
+  return <div className={`mobile-v2 ${isDark ? 'v2-dark' : ''} ${redesigned && myMapSpots !== null && activeTab === 'map' ? 'sf-new-my-map' : ''} ${redesigned && (quickAdd || choosingQuickPosition || editingSpot) ? 'sf-new-adding' : ''} ${redesigned && settingsPage ? 'sf-new-settings-open' : ''} ${redesigned && showNewZoomButtons ? 'sf-new-zoom-visible' : ''}`}>
     <div className={`v2-map-layer ${activeTab === 'map' ? '' : 'v2-map-hidden'}`} aria-hidden={activeTab !== 'map'}>
-      {mapActivated && <Suspense fallback={redesigned ? <NewSkeleton kind="map" /> : <div className="v2-map-loading" role="status">Načítám mapu…</div>}><MapLibreMap center={START} flyTo={flyTo} selectedSpotId={selectedSpot?.id || selectedMapSpotId} setMapRef={handleMapReady} addMode={addMode} onMapClick={point => { setAddMode(false); setAddAt(point); }} spots={redesigned ? visibleSpots : spots} showSpots={!redesigned || !choosingQuickPosition && newPoiLayers.community} compactSpotMarkers={redesigned} poiLayers={redesigned ? newPoiLayers : null} onSelectSpot={spot => { if (!redesigned || String(selectedMapSpotId) === String(spot.id)) openSpot(spot); else setSelectedMapSpotId(spot.id); }} userPos={userPos} selectedPOICategory={null} onSelectPOI={(poi, cat) => { setNearbySize('collapsed'); setSelectedSpot(null); setSelectedPoi({ poi, cat }); }} isDark={isDark} mapLayer={mapLayer} terrainEnabled={terrain} showZoomControls={false} /></Suspense>}
+      {mapActivated && <Suspense fallback={redesigned ? <NewSkeleton kind="map" /> : <div className="v2-map-loading" role="status">Načítám mapu…</div>}><MapLibreMap center={START} flyTo={flyTo} selectedSpotId={selectedSpot?.id || selectedMapSpotId} setMapRef={handleMapReady} addMode={addMode} onMapClick={point => { setAddMode(false); setAddAt(point); }} spots={redesigned ? mapSpots : spots} showSpots={!redesigned || !choosingQuickPosition && newPoiLayers.community} compactSpotMarkers={redesigned} poiLayers={redesigned ? newPoiLayers : null} onSelectSpot={selectMapSpot} userPos={userPos} selectedPOICategory={null} onSelectPOI={(poi, cat) => { if (redesigned && activeTab !== 'map') return; setNearbySize('collapsed'); setSelectedSpot(null); setSelectedMapSpotId(null); setPreviewSpot(null); setSelectedPoi({ poi, cat }); }} isDark={isDark} mapLayer={mapLayer} terrainEnabled={terrain} showZoomControls={false} /></Suspense>}
     </div>
     {activeTab === 'map' && (redesigned ? <>
       {!choosingQuickPosition && !quickAdd && !selectedPoi && <NewMapHome category={mapCategory} setCategory={setMapCategory} spots={visibleSpots} language={language} loading={myMapSpots === null && (spotsLoading || nearbyLoading)} error={myMapSpots === null && (spotsError || Boolean(nearbyError))} onRetry={() => nearbyResults ? runNearby(nearbyFilters, nearbyMode) : refreshMap()} onSearch={() => { searchVoice.stop(); setSearchQuery(''); navigate('/new/search'); }} onVoiceSearch={startVoiceSearch} onGps={requestGps} geoError={geoError} onDismissGeoError={() => setGeoError('')} map={mapInstance} mapLayer={mapLayer} onMapLayer={setMapLayer} poiLayers={newPoiLayers} onPoiLayers={changeNewPoiLayers} terrain={terrain} onTerrain={() => setTerrain(value => !value)} showZoomButtons={showNewZoomButtons} nearbySize={nearbySize} onNearbySize={setNearbySize} onOpen={openSpot} onSave={saveDiscoverSpot} savedIds={savedIds} savingSpotId={savingSpotId} collectionMode={myMapSpots !== null} onExitCollection={() => setMyMapSpots(null)} />}
@@ -611,9 +630,9 @@ export default function MobileV2({ redesigned = false }) {
     {unsaveSpot && <div className="v2-dialog-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setUnsaveSpot(null); }}><section className="v2-confirm" role="alertdialog" aria-modal="true" aria-labelledby="v2-unsave-title" onKeyDown={event => { if (event.key === 'Escape') setUnsaveSpot(null); }}><h2 id="v2-unsave-title">Odebrat uložené místo?</h2><p>„{getSpotDisplayName(unsaveSpot, language)}“ zmizí ze seznamu uložených míst.</p><div><button autoFocus className="v2-secondary" onClick={() => setUnsaveSpot(null)}>Ponechat</button><button className="v2-secondary" disabled={unsaveBusy} onClick={confirmUnsave}>{unsaveBusy ? 'Odebírám…' : 'Odebrat'}</button></div></section></div>}
     <Suspense fallback={redesigned && selectedPoi ? <NewSkeleton kind="poiPreview" /> : redesigned && selectedSpot ? <NewSkeleton kind="detail" /> : null}>
       {selectedSpot && !editingSpot && <SpotDetailModal spot={selectedSpot} user={user} redesigned={redesigned} onClose={closeSpot} onNavigate={setNavigationDestination} onShowAuth={() => setShowAuth(true)} onEdit={() => { setEditingSpot(selectedSpot); setSelectedSpot(null); }} onDelete={async () => { await deleteSpot(selectedSpot.id); setSpots(rows => rows.filter(row => row.id !== selectedSpot.id)); setCollection({}); cacheRef.current = null; window.dispatchEvent(new CustomEvent('spotfinder:collection-changed')); closeSpot(); }} onSpotUpdate={updated => { selectedSpotRef.current = updated; setSelectedSpot(updated); setSpots(rows => rows.map(row => row.id === updated.id ? updated : row)); }} />}
-      {editingSpot && <EditSpotModal spot={editingSpot} user={user} redesigned={redesigned} onClose={() => { setEditingSpot(null); closeSpot(); }} onSave={async updated => { await updateSpot(updated.id, updated); setSpots(rows => rows.map(row => row.id === updated.id ? updated : row)); setCollection({}); cacheRef.current = null; window.dispatchEvent(new CustomEvent('spotfinder:collection-changed')); setEditingSpot(null); closeSpot(); }} />}
+      {editingSpot && (redesigned ? <QuickAddFlow key={`edit-${editingSpot.id}`} mode="edit" spot={editingSpot} coords={(() => { const pair = normalizeLatLng(editingSpot); return pair ? { lat: pair[0], lng: pair[1] } : null; })()} user={user} onClose={() => { setSelectedSpot(editingSpot); setEditingSpot(null); }} onUpdate={async patch => { await updateSpot(editingSpot.id, patch); const updated = { ...editingSpot, ...patch }; setSpots(rows => rows.map(row => row.id === updated.id ? updated : row)); setSelectedSpot(updated); selectedSpotRef.current = updated; setCollection({}); cacheRef.current = null; window.dispatchEvent(new CustomEvent('spotfinder:collection-changed')); setEditingSpot(null); }} /> : <EditSpotModal spot={editingSpot} user={user} onClose={() => { setEditingSpot(null); closeSpot(); }} onSave={async updated => { await updateSpot(updated.id, updated); setSpots(rows => rows.map(row => row.id === updated.id ? updated : row)); setCollection({}); cacheRef.current = null; window.dispatchEvent(new CustomEvent('spotfinder:collection-changed')); setEditingSpot(null); closeSpot(); }} />)}
       {selectedPoi && <POIDetailPanel poi={selectedPoi.poi} category={selectedPoi.cat} user={user} redesigned={redesigned} onClose={() => setSelectedPoi(null)} onNavigate={setNavigationDestination} />}
-      {navigationDestination && <NavigationProviderSheet destination={navigationDestination} onClose={() => setNavigationDestination(null)} />}
+      {navigationDestination && <NavigationProviderSheet destination={navigationDestination} redesigned={redesigned} onClose={() => setNavigationDestination(null)} />}
       {addAt && <AddSpotModal mobileV2 redesigned={redesigned} latlng={addAt} draft={draft} user={user} onClose={() => { setAddAt(null); setDraft(null); }} onSave={async (data, socialUrl = '') => { let created = await createSpot(data); if (socialUrl) { try { await addSocialPost({ url: socialUrl, targetType: 'spot', targetId: String(created.id), targetName: getSpotDisplayName(created, language) }); created = { ...created, has_social: true }; } catch { toast.error('Místo bylo uloženo, ale mediální příspěvek se nepodařilo připojit.'); } } setSpots(rows => [created, ...rows]); cacheRef.current = null; window.dispatchEvent(new CustomEvent('spotfinder:collection-changed')); return created; }} />}
       {showNearbyFilter && <NearbySpotsFilterModal isOpen onClose={() => { setShowNearbyFilter(false); setFilterLocationError(''); }} onApply={runNearby} currentFilters={nearbyFilters} currentMode={nearbyMode} locationError={filterLocationError} busy={nearbyLoading} />}
       {redesigned && (showAuth || authPage) ? <NewAuth initialScreen={location.pathname.endsWith('/register') ? 'register' : 'login'} onClose={closeNewAuth} /> : showAuth && <AuthModal mobileV2 onClose={() => setShowAuth(false)} />}

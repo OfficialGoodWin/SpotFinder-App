@@ -26,6 +26,16 @@ export default function NewSpotDetailView({ spot, photos, name, creatorName, use
   ].filter(Boolean);
 
   const location = getSpotLocationLabel(spot, 5);
+  // The shared chooser can only label community spots through `title`/`label`,
+  // so hand it the same display name the sheet uses instead of the raw record.
+  const navigationLabel = t('poiDetail.navigate');
+  const openNavigation = event => {
+    event?.preventDefault();
+    event?.stopPropagation();
+    if (!spot || typeof onNavigate !== 'function') return;
+    const destinationName = name || spot.name || spot.title;
+    onNavigate({ ...spot, ...(destinationName ? { name: destinationName, title: destinationName } : {}) });
+  };
   return <div className="sf-new-detail-view">
     <div className="sf-new-detail-scroll">
       <div className="sf-new-detail-cover">
@@ -56,6 +66,6 @@ export default function NewSpotDetailView({ spot, photos, name, creatorName, use
         <p className="sf-new-detail-credit">Přidal(a) {creatorName}</p>
       </div>
     </div>
-    <footer className="sf-new-detail-bottom">{(isOwner || isAdmin) && <>{isOwner && <button type="button" onClick={onEdit} aria-label="Upravit místo"><Edit2 size={19} /></button>}<button type="button" onClick={onDelete} aria-label="Smazat místo"><Trash2 size={19} /></button></>}{!isOwner && <button type="button" onClick={onReport} aria-label="Nahlásit místo"><Flag size={19} /></button>}<button type="button" className="sf-new-detail-go" onClick={() => onNavigate?.(spot)}><Navigation size={19} /> Navigovat</button></footer>
+    <footer className="sf-new-detail-bottom">{(isOwner || isAdmin) && <>{isOwner && <button type="button" onClick={onEdit} aria-label="Upravit místo"><Edit2 size={19} aria-hidden="true" /></button>}<button type="button" onClick={onDelete} aria-label="Smazat místo"><Trash2 size={19} aria-hidden="true" /></button></>}{!isOwner && <button type="button" onClick={onReport} aria-label="Nahlásit místo"><Flag size={19} aria-hidden="true" /></button>}<button type="button" className="sf-new-detail-go" onClick={openNavigation} aria-label={navigationLabel}><Navigation size={19} aria-hidden="true" /><span>{navigationLabel}</span></button></footer>
   </div>;
 }
