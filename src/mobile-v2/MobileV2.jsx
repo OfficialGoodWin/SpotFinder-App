@@ -480,7 +480,7 @@ export default function MobileV2({ redesigned = false }) {
     }
     if (request !== nearbyRequestRef.current) return;
     setShowNearbyFilter(false);
-    setNearbySize('full');
+    setNearbySize(redesigned ? 'expanded' : 'full');
     setNearbyFilters(filters);
     setNearbyMode(mode);
     setNearbyOrigin(origin);
@@ -544,7 +544,7 @@ export default function MobileV2({ redesigned = false }) {
     finally { setSignOutBusy(false); }
   };
 
-  return <div className={`mobile-v2 ${isDark ? 'v2-dark' : ''} ${redesigned && nearbySize === 'full' && activeTab === 'map' ? 'sf-new-sheet-full' : ''} ${redesigned && myMapSpots !== null && activeTab === 'map' ? 'sf-new-my-map' : ''} ${redesigned && (quickAdd || choosingQuickPosition) ? 'sf-new-adding' : ''} ${redesigned && settingsPage ? 'sf-new-settings-open' : ''} ${redesigned && showNewZoomButtons ? 'sf-new-zoom-visible' : ''}`}>
+  return <div className={`mobile-v2 ${isDark ? 'v2-dark' : ''} ${redesigned && myMapSpots !== null && activeTab === 'map' ? 'sf-new-my-map' : ''} ${redesigned && (quickAdd || choosingQuickPosition) ? 'sf-new-adding' : ''} ${redesigned && settingsPage ? 'sf-new-settings-open' : ''} ${redesigned && showNewZoomButtons ? 'sf-new-zoom-visible' : ''}`}>
     <div className={`v2-map-layer ${activeTab === 'map' ? '' : 'v2-map-hidden'}`} aria-hidden={activeTab !== 'map'}>
       {mapActivated && <Suspense fallback={redesigned ? <NewSkeleton kind="map" /> : <div className="v2-map-loading" role="status">Načítám mapu…</div>}><MapLibreMap center={START} flyTo={flyTo} selectedSpotId={selectedSpot?.id || selectedMapSpotId} setMapRef={handleMapReady} addMode={addMode} onMapClick={point => { setAddMode(false); setAddAt(point); }} spots={redesigned ? visibleSpots : spots} showSpots={!redesigned || !choosingQuickPosition} compactSpotMarkers={redesigned} onSelectSpot={spot => { if (!redesigned || String(selectedMapSpotId) === String(spot.id)) openSpot(spot); else setSelectedMapSpotId(spot.id); }} userPos={userPos} selectedPOICategory={null} onSelectPOI={(poi, cat) => { setNearbySize('collapsed'); setSelectedPoi({ poi, cat }); }} isDark={isDark} mapLayer={mapLayer} terrainEnabled={terrain} showZoomControls={false} /></Suspense>}
     </div>
