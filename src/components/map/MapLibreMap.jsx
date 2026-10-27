@@ -7,7 +7,7 @@
  * OpenFreeMap vector tiles — styled to match Mapy.cz
  * Dark: full dark variant, switches instantly via setStyle()
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import * as maplibregl from 'maplibre-gl';
 import { getSpotDisplayName, getSpotImageInfo } from '@/lib/spotPresentation';
@@ -16,6 +16,7 @@ import { registerSingleMapListener } from '@/lib/mapLifecycle';
 import { attachMarkerAt, validMarkerLngLat } from '@/lib/mapMarkerCoordinates';
 import { readPoiDetailShard } from '@/lib/poiDetailShard';
 import { ambientPoiNameExpression } from '@/lib/poiLocalization';
+import { poiGroupForCategory } from '@/new/poiLayers';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { Protocol } from 'pmtiles';
 import { Minus, Plus } from 'lucide-react';
@@ -658,6 +659,19 @@ const AMBIENT_ZOOM_GROUPS = (() => {
 })();
 const AMBIENT_LAYER_IDS = AMBIENT_ZOOM_GROUPS.map(([z]) => `${AMBIENT_LAYER_PREFIX}${z}`);
 
+// /new draws only selected groups. The published tiles expose `cat`, but
+// their OSM identifiers may be numeric and cannot be used for grouping.
+const NEW_AMBIENT_LAYERS = [
+  { id: 'ambient-poi-interesting-viewpoint', group: 'interesting', minzoom: 13, cats: ['viewpoint'] },
+  { id: 'ambient-poi-interesting-museum', group: 'interesting', minzoom: 14, cats: ['museum'] },
+  { id: 'ambient-poi-interesting-outdoor', group: 'interesting', minzoom: 15, cats: ['camp_site', 'picnic_site'] },
+  { id: 'ambient-poi-interesting-heritage', group: 'interesting', minzoom: 16, cats: ['heritage'], namedOnly: true },
+  { id: 'ambient-poi-practical-landmark', group: 'practical', minzoom: 14, cats: ['train', 'fuel', 'charging', 'hotel', 'hospital'] },
+  { id: 'ambient-poi-practical-local', group: 'practical', minzoom: 16, cats: ['pharmacy', 'bank', 'supermarket', 'atm', 'parking', 'caravan_site', 'toilets', 'drinking_water'] },
+  { id: 'ambient-poi-food', group: 'food', minzoom: 16, cats: ['restaurant', 'cafe', 'bar', 'bakery'] },
+];
+const NEW_AMBIENT_LAYER_IDS = NEW_AMBIENT_LAYERS.map(layer => layer.id);
+
 const AMBIENT_ICON_CSS_PX = 44; // rasterized size; was 28 (icons rendered ~20px, too small to tap)
 const AMBIENT_ICON_RATIO = 2;
 let ambientIconData = null;      // Map<imageId, ImageData>, filled once, reused after every setStyle()
@@ -692,13 +706,13 @@ function loadAmbientIcons() {
   return ambientIconPromise;
 }
 
-function addAmbientVectorLayer(map, getLanguage = () => 'en') {
+function addAmbientVectorLayer(map, getLanguage = () => 'en', getPoiLayers = () => null, onReady) {
   if (!AMBIENT_TILES_URL || map.getSource(AMBIENT_SOURCE_ID)) return;
   // First call: rasterize icons (async), then come back. After a setStyle() the
   // cached ImageData is reused, so re-adding is synchronous.
   if (!ambientIconData) {
     loadAmbientIcons()
-      .then(() => addAmbientVectorLayer(map, getLanguage))
+      .then(() => addAmbientVectorLayer(map, getLanguage, getPoiLayers, onReady))
       .catch(e => console.warn('Ambient POI icons failed to render:', e?.message || e));
     return;
   }
@@ -717,25 +731,32 @@ function addAmbientVectorLayer(map, getLanguage = () => 'en') {
     iconExpr.push(ambientIconId('custom'));
     sortExpr.push(99);
 
-    // Highest minZoom first -> lowest minZoom ends up on top / placed first.
-    for (const [z, cats] of [...AMBIENT_ZOOM_GROUPS].reverse()) {
+    const newLayers = getPoiLayers();
+    const specs = newLayers
+      ? NEW_AMBIENT_LAYERS.map(layer => ({ ...layer, filter: layer.namedOnly
+        ? ['all', ['in', ['get', 'cat'], ['literal', layer.cats]], ['has', 'name']]
+        : ['in', ['get', 'cat'], ['literal', layer.cats]] }))
+      : [...AMBIENT_ZOOM_GROUPS].reverse().map(([z, cats]) => ({ id: `${AMBIENT_LAYER_PREFIX}${z}`, minzoom: z, filter: ['in', ['get', 'cat'], ['literal', cats.map(c => c.key)]] }));
+    const firstBaseSymbol = newLayers ? map.getStyle().layers.find(layer => layer.type === 'symbol')?.id : undefined;
+    for (const spec of specs) {
       map.addLayer({
-        id: `${AMBIENT_LAYER_PREFIX}${z}`,
+        id: spec.id,
         type: 'symbol',
         source: AMBIENT_SOURCE_ID,
         'source-layer': AMBIENT_SOURCE_LAYER,
-        minzoom: z,
-        filter: ['in', ['get', 'cat'], ['literal', cats.map(c => c.key)]],
+        minzoom: spec.minzoom,
+        filter: spec.filter,
         layout: {
+          visibility: !newLayers || newLayers[spec.group] ? 'visible' : 'none',
           'icon-image': iconExpr,
-          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.58, 15, 0.74, 18, 0.9],
+          'icon-size': newLayers ? ['interpolate', ['linear'], ['zoom'], 13, 0.75, 16, 0.86, 18, 0.98] : ['interpolate', ['linear'], ['zoom'], 12, 0.58, 15, 0.74, 18, 0.9],
           'icon-allow-overlap': false,
           'icon-ignore-placement': false,
-          'icon-padding': 7,
+          'icon-padding': newLayers ? 11 : 7,
           'symbol-sort-key': sortExpr,
           // Names only once zoomed in; `text-optional` drops the label (not the icon) if it collides.
           // Name sits directly below the icon (Mapy.cz style), from z14 up.
-          'text-field': ambientPoiNameExpression(getLanguage()),
+          'text-field': newLayers ? '' : ambientPoiNameExpression(getLanguage()),
           'text-font': ['Noto Sans Regular'],
           'text-size': ['interpolate', ['linear'], ['zoom'], 14, 11, 17, 13],
           'text-anchor': 'top',
@@ -746,13 +767,14 @@ function addAmbientVectorLayer(map, getLanguage = () => 'en') {
         paint: {
           // Ambient geography remains available but visually secondary to the
           // larger, full-opacity community discovery markers.
-          'icon-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.72, 16, 0.84, 18, 0.92],
+          'icon-opacity': newLayers ? ['interpolate', ['linear'], ['zoom'], 13, 0.62, 16, 0.72, 18, 0.82] : ['interpolate', ['linear'], ['zoom'], 12, 0.72, 16, 0.84, 18, 0.92],
           'text-color': '#1f2937',
           'text-halo-color': '#ffffff',
           'text-halo-width': 1.6,
         },
-      });
+      }, firstBaseSymbol);
     }
+    onReady?.();
   } catch (e) {
     console.warn('Ambient POI tile layer failed to load, falling back to live fetch:', e.message);
   }
@@ -762,8 +784,12 @@ function addAmbientVectorLayer(map, getLanguage = () => 'en') {
 const poiCache = new Map();
 const POI_TTL = 10 * 60 * 1000;
 
-async function fetchAmbientPOIs(south, west, north, east, zoom, signal) {
-  const visible = AMBIENT_CATS.filter(c => zoom >= c.minZoom);
+async function fetchAmbientPOIs(south, west, north, east, zoom, signal, poiLayers = null) {
+  const visible = AMBIENT_CATS.filter(c => {
+    if (!poiLayers) return zoom >= c.minZoom;
+    const spec = NEW_AMBIENT_LAYERS.find(layer => layer.cats.includes(c.key));
+    return spec && poiLayers[poiGroupForCategory(c.key)] && zoom >= spec.minzoom;
+  });
   if (!visible.length || !GEOAPIFY_KEY) return [];
   const tiers = [{ z: 13, lim: 30 }, { z: 15, lim: 60 }, { z: 16, lim: 100 }];
   const feats = [];
@@ -831,7 +857,7 @@ function registerMissingImageResolver(map) {
   });
 }
 
-function registerStyleRestoration(map, getTerrainEnabled, getLanguage, onStyleLoad) {
+function registerStyleRestoration(map, getTerrainEnabled, getLanguage, getPoiLayers, onStyleLoad) {
   // The missing-image resolver survives setStyle in MapLibre — no need to re-add
   // BUT we need to clear the image cache so shields get redrawn after style reload
   // (setStyle wipes all images including our shields)
@@ -842,7 +868,7 @@ function registerStyleRestoration(map, getTerrainEnabled, getLanguage, onStyleLo
     applyTerrain(map, getTerrainEnabled());
     apply3DBuildings(map, getTerrainEnabled());
     addOnewayArrow(map);
-    addAmbientVectorLayer(map, getLanguage);
+    addAmbientVectorLayer(map, getLanguage, getPoiLayers, onStyleLoad);
     onStyleLoad?.();
     map.triggerRepaint();
   };
@@ -854,6 +880,7 @@ export default function MapLibreMap({
   center, flyTo, spotFocus, selectedSpotId, fitBoundsData, zoomToArea, setMapRef,
   addMode, onMapClick,
   spots, showSpots, onSelectSpot, compactSpotMarkers = false,
+  poiLayers = null,
   userPos, userAccuracy,
   selectedPOICategory, onSelectPOI, onPOIsLoaded, onLoadingChange,
   isDark, mapLayer, showZoomControls = true,
@@ -864,14 +891,21 @@ export default function MapLibreMap({
   const { language, t } = useLanguage();
   const languageRef = useRef(language);
   languageRef.current = language;
+  const poiLayersRef = useRef(poiLayers);
+  poiLayersRef.current = poiLayers;
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     const expression = ambientPoiNameExpression(language);
-    for (const id of AMBIENT_LAYER_IDS) if (map.getLayer(id)) map.setLayoutProperty(id, 'text-field', expression);
-  }, [language]);
+    for (const id of [...AMBIENT_LAYER_IDS, ...NEW_AMBIENT_LAYER_IDS]) if (map.getLayer(id)) map.setLayoutProperty(id, 'text-field', poiLayers ? '' : expression);
+  }, [language, poiLayers]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !poiLayers) return;
+    for (const layer of NEW_AMBIENT_LAYERS) if (map.getLayer(layer.id)) map.setLayoutProperty(layer.id, 'visibility', poiLayers[layer.group] ? 'visible' : 'none');
+  }, [poiLayers]);
   const appliedStyleRef = useRef(null);
   // Ref so the map's click handler (registered once on mount) always reads
   // the current addMode value instead of the stale value from init time.
@@ -905,6 +939,26 @@ export default function MapLibreMap({
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [mapZoom, setMapZoom] = useState(13);
   const [styleRevision, setStyleRevision] = useState(0);
+  const linkedPoiTileIds = useMemo(() => poiLayers && showSpots
+    ? [...new Set((spots || []).map(spot => Number(spot.osm_poi_link?.tile_id))
+      .filter(id => Number.isSafeInteger(id) && id > 0))]
+    : [], [poiLayers, showSpots, spots]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !poiLayers) return;
+    const apply = () => {
+      for (const spec of NEW_AMBIENT_LAYERS) {
+        if (!map.getLayer(spec.id)) continue;
+        const categoryFilter = ['in', ['get', 'cat'], ['literal', spec.cats]];
+        const base = spec.namedOnly ? ['all', categoryFilter, ['has', 'name']] : categoryFilter;
+        map.setFilter(spec.id, linkedPoiTileIds.length
+          ? ['all', base, ['!', ['in', ['get', 'id'], ['literal', linkedPoiTileIds]]]] : base);
+      }
+    };
+    apply();
+    map.once('idle', apply);
+    return () => map.off('idle', apply);
+  }, [linkedPoiTileIds, poiLayers, styleRevision]);
   if (!selectedPOICategory) categoryOriginRef.current = { key: null, position: null };
   else if (categoryOriginRef.current.key !== selectedPOICategory.key) {
     categoryOriginRef.current = { key: selectedPOICategory.key, position: userPos };
@@ -965,7 +1019,7 @@ export default function MapLibreMap({
     // both). Previously this listener was defined but never registered, so 3D
     // silently broke — visually stuck tilted with no terrain/buildings — the
     // moment the user switched map layer or dark/light mode while 3D was on.
-    const removeStyleRestoration = registerStyleRestoration(map, () => terrainRef.current, () => languageRef.current, () => {
+    const removeStyleRestoration = registerStyleRestoration(map, () => terrainRef.current, () => languageRef.current, () => poiLayersRef.current, () => {
       setStyleRevision(revision => revision + 1);
     });
     // Add the one-way arrow image on first style load, and re-add after style reloads
@@ -974,7 +1028,7 @@ export default function MapLibreMap({
     if (AMBIENT_TILES_URL) {
       // Query a small box around the tap so icons are easy to hit on touch screens.
       const ambientHits = (point) => {
-        const layers = AMBIENT_LAYER_IDS.filter(id => map.getLayer(id));
+        const layers = [...AMBIENT_LAYER_IDS, ...NEW_AMBIENT_LAYER_IDS].filter(id => map.getLayer(id));
         if (!layers.length) return [];
         const r = 14;
         return map.queryRenderedFeatures([[point.x - r, point.y - r], [point.x + r, point.y + r]], { layers });
@@ -1244,6 +1298,7 @@ export default function MapLibreMap({
     const clear = () => { m.forEach(x => x.remove()); m.clear(); };
 
     if (selectedPOICategory) { clear(); return; }
+    if (poiLayers) clear();
 
     const load = async () => {
       const zoom = map.getZoom();
@@ -1251,7 +1306,7 @@ export default function MapLibreMap({
       const b = map.getBounds();
       const s = b.getSouth(), n = b.getNorth(), w = b.getWest(), e = b.getEast();
       const cLat = (s + n) / 2, cLon = (w + e) / 2;
-      const key = `${s.toFixed(2)}_${w.toFixed(2)}_${zoom.toFixed(0)}`;
+      const key = `${s.toFixed(2)}_${w.toFixed(2)}_${zoom.toFixed(0)}_${poiLayers ? `${Number(poiLayers.interesting)}${Number(poiLayers.practical)}${Number(poiLayers.food)}` : 'legacy'}`;
 
       poiAbort.current?.abort();
       poiAbort.current = new AbortController();
@@ -1265,13 +1320,14 @@ export default function MapLibreMap({
           pois = cached.data;
         } else {
           try {
-            const feats = await fetchAmbientPOIs(s, w, n, e, zoom, poiAbort.current.signal);
+            const feats = await fetchAmbientPOIs(s, w, n, e, zoom, poiAbort.current.signal, poiLayers);
             pois = feats.map(feat => {
               const [lon, lat] = feat.geometry?.coordinates || [];
               if (!validMarkerLngLat(lon, lat)) return null;
               const cat = detectCat(feat);
               if (!cat) return null;
               const p = feat.properties || {};
+              if (poiLayers && (!poiLayers[poiGroupForCategory(cat.key)] || cat.key === 'heritage' && !p.name)) return null;
               return { id: p.place_id || `${lat}-${lon}`, lat, lon, name: p.name || '', address: p.address_line2 || '', tags: { phone: p.contact?.phone, website: p.website }, _cat: cat };
             }).filter(Boolean);
             poiCache.set(key, { data: pois, ts: Date.now() });
@@ -1283,8 +1339,8 @@ export default function MapLibreMap({
       for (const poi of pois) {
         const lngLat = validMarkerLngLat(poi.lon, poi.lat);
         if (!lngLat) continue;
-        const size = zoom >= 16 ? 44 : zoom >= 14 ? 40 : 34;
-        const el = makeDot(poi._cat.key, poi._cat.color, size, zoom >= 14 ? poi.name : '');
+        const size = poiLayers ? zoom >= 16 ? 29 : 25 : zoom >= 16 ? 44 : zoom >= 14 ? 40 : 34;
+        const el = makeDot(poi._cat.key, poi._cat.color, size, poiLayers ? '' : zoom >= 14 ? poi.name : '');
         const mk = attachMarkerAt(new maplibregl.Marker({ element: el, anchor: 'bottom' }), map, lngLat);
         el.addEventListener('click', e => { e.stopPropagation(); onSelectPOI?.(poi, poi._cat); });
         m.set(poi.id, mk);
@@ -1297,7 +1353,7 @@ export default function MapLibreMap({
     map.on('moveend', onMove); map.on('zoomend', onMove);
     return () => { map.off('moveend', onMove); map.off('zoomend', onMove); clearTimeout(poiTimer.current); poiAbort.current?.abort(); };
      
-  }, [selectedPOICategory]);
+  }, [selectedPOICategory, poiLayers]);
 
   // ── Category POIs ──────────────────────────────────────────────────────────
   useEffect(() => {

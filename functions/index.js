@@ -27,6 +27,7 @@ const { validateSocialPostUrl, INVALID_SOCIAL_URL_MESSAGE } = require('./socialU
 const { saveOfficialPoi, PoiEditError } = require('./officialPoiService');
 const { readOfficialPoi } = require('./officialPoiReader');
 const { MAX_UPLOAD_BYTES, isJpegBytes } = require('./imageFilePolicy');
+const { poiReference, ownedPhotoPath, verifyUploadedPhoto, submissionId } = require('./poiEnrichment');
 initializeApp();
 const db = getFirestore();
 const adminAuth = getAuth();
@@ -112,6 +113,7 @@ async function cleanupAccountData(uid, email) {
     deleteWhere('spot_likes', 'user_id', uid),
     deleteWhere('spot_saves', 'user_id', uid),
     deleteWhere('feedback', 'account_uid', uid),
+    deleteWhere('poi_enrichment_submissions', 'owner_uid', uid),
     anonymizeOwnedSpots('created_by_uid', uid),
     anonymizeWhere('social_posts', 'added_by', uid, {
       added_by: FieldValue.delete(), added_by_email: FieldValue.delete(), account_deleted: true,
@@ -124,6 +126,9 @@ async function cleanupAccountData(uid, email) {
     }),
     anonymizeWhere('poi_photos', 'created_by_uid', uid, {
       created_by_uid: FieldValue.delete(), created_by: 'Former contributor', account_deleted: true,
+    }),
+    anonymizeWhere('poi_enrichments', 'linked_by_uid', uid, {
+      linked_by_uid: FieldValue.delete(), account_deleted: true,
     }),
   ]);
 
@@ -147,7 +152,7 @@ async function cleanupAccountData(uid, email) {
   }
 
   await db.collection('users').doc(uid).delete();
-  await Promise.all(['add_spot', 'feedback', 'social_post', 'content_report', 'account_deletion']
+  await Promise.all(['add_spot', 'feedback', 'social_post', 'content_report', 'account_deletion', 'poi_enrichment_photo']
     .map(action => db.collection('rate_limits').doc(`${uid}_${action}`).delete().catch(() => {})));
   await getStorage().bucket().deleteFiles({ prefix: `drafts/${uid}/` });
 }
@@ -497,6 +502,141 @@ exports.validateCommunityPhoto = functions.https.onCall(async (data, context) =>
     throw new functions.https.HttpsError('failed-precondition', 'The uploaded photo was not a valid JPEG. Try another copy.');
   }
   return { size };
+});
+
+// /new enrichment is opt-in. Numeric tile IDs are resolved against the
+// original PBF identity index; an unresolved feature cannot be persisted.
+exports.resolvePoiEnrichment = functions.https.onCall(async (data) => {
+  try {
+    const identity = poiReference(data);
+    const link = await db.collection('poi_enrichments').doc(identity.canonicalId).get();
+    return { identity, linkedSpotId: link.data()?.linked_spot_id || null };
+  } catch (error) {
+    if (error instanceof PoiEditError) throw new functions.https.HttpsError(error.code, error.message);
+    throw new functions.https.HttpsError('invalid-argument', error.message);
+  }
+});
+
+exports.submitPoiEnrichmentPhoto = functions.https.onCall(async (data, context) => {
+  const uid = context.auth?.uid;
+  if (!uid || context.auth.token.email_verified !== true)
+    throw new functions.https.HttpsError('permission-denied', 'A verified account is required.');
+  if (data?.rightsConfirmed !== true)
+    throw new functions.https.HttpsError('failed-precondition', 'Confirm that you may publish this photo.');
+  let identity, path;
+  try {
+    identity = poiReference(data);
+    path = ownedPhotoPath(data?.imageUrl, uid, getStorage().bucket().name);
+    await verifyUploadedPhoto(getStorage(), path);
+  } catch (error) {
+    if (error instanceof PoiEditError) throw new functions.https.HttpsError(error.code, error.message);
+    throw new functions.https.HttpsError('invalid-argument', error.message);
+  }
+  const ref = db.collection('poi_enrichment_submissions').doc(submissionId(path));
+  if ((await db.collection('poi_photos').doc(ref.id).get()).exists)
+    throw new functions.https.HttpsError('already-exists', 'This photo is already attached to a place.');
+  const existing = await ref.get();
+  if (existing.exists) {
+    if (existing.data().owner_uid !== uid || existing.data().osm_ref !== identity.canonicalId)
+      throw new functions.https.HttpsError('already-exists', 'This upload is already attached to another place.');
+    return { id: ref.id, status: existing.data().status };
+  }
+  if (!await checkServerRateLimit(uid, 'poi_enrichment_photo', 5, 24 * 60 * 60 * 1000))
+    throw new functions.https.HttpsError('resource-exhausted', 'Too many photo submissions. Try again later.');
+  await ref.create({ osm_ref: identity.canonicalId, tile_id: identity.tileId,
+    category: identity.category, image_path: path, image_url: data.imageUrl,
+    owner_uid: uid, attribution: String(data.attribution || '').trim().slice(0, 120) || 'SpotFinder contributor',
+    rights_basis: 'uploader-attestation',
+    status: 'pending_review', created_at: new Date().toISOString() });
+  return { id: ref.id, status: 'pending_review' };
+});
+
+exports.adminReviewPoiEnrichmentPhoto = functions.https.onCall(async (data, context) => {
+  assertIsAdmin(context);
+  const id = String(data?.submissionId || '');
+  const decision = data?.decision;
+  if (!/^photo_[0-9a-f]{64}$/.test(id) || !['approve', 'reject'].includes(decision))
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid review decision.');
+  const ref = db.collection('poi_enrichment_submissions').doc(id);
+  const initial = await ref.get();
+  if (!initial.exists || initial.data().status !== 'pending_review')
+    throw new functions.https.HttpsError('failed-precondition', 'Submission is missing or already reviewed.');
+  let publishedUrl = null;
+  let publishedPath = null;
+  if (decision === 'approve') {
+    try {
+      await verifyUploadedPhoto(getStorage(), initial.data().image_path);
+      const bucket = getStorage().bucket();
+      publishedPath = `poi-enrichment/${id}.jpg`;
+      const token = crypto.randomUUID();
+      const copy = bucket.file(publishedPath);
+      await bucket.file(initial.data().image_path).copy(copy);
+      await verifyUploadedPhoto(getStorage(), publishedPath);
+      await copy.setMetadata({ contentType: 'image/jpeg', cacheControl: 'public,max-age=31536000,immutable',
+        metadata: { firebaseStorageDownloadTokens: token } });
+      publishedUrl = `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(bucket.name)}/o/${encodeURIComponent(publishedPath)}?alt=media&token=${token}`;
+    } catch {
+      throw new functions.https.HttpsError('failed-precondition', 'The photo is missing or no longer valid.');
+    }
+  }
+  await db.runTransaction(async tx => {
+    const snapshot = await tx.get(ref);
+    if (!snapshot.exists) throw new functions.https.HttpsError('not-found', 'Submission not found.');
+    const row = snapshot.data();
+    if (row.status !== 'pending_review') throw new functions.https.HttpsError('failed-precondition', 'Already reviewed.');
+    tx.update(ref, { status: decision === 'approve' ? 'approved' : 'rejected',
+      reviewed_at: new Date().toISOString(), reviewed_by_uid: context.auth.uid });
+    if (decision === 'approve') tx.create(db.collection('poi_photos').doc(id), {
+      poi_id: row.osm_ref, osm_ref: row.osm_ref, source: 'community', image: publishedUrl,
+      image_path: publishedPath, created_by: 'registered-account', created_by_uid: row.owner_uid,
+      attribution: row.attribution, rights_basis: row.rights_basis, created_date: row.created_at,
+    });
+  });
+  return { status: decision === 'approve' ? 'approved' : 'rejected' };
+});
+
+exports.linkPoiCommunitySpot = functions.https.onCall(async (data, context) => {
+  const uid = context.auth?.uid;
+  if (!uid || context.auth.token.email_verified !== true)
+    throw new functions.https.HttpsError('permission-denied', 'A verified account is required.');
+  let identity;
+  try { identity = poiReference(data); }
+  catch (error) {
+    if (error instanceof PoiEditError) throw new functions.https.HttpsError(error.code, error.message);
+    throw new functions.https.HttpsError('invalid-argument', error.message);
+  }
+  const spotId = String(data?.spotId || '');
+  if (!/^[A-Za-z0-9_-]{1,120}$/.test(spotId))
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid spot ID.');
+  const spotRef = db.collection('spots').doc(spotId);
+  const linkRef = db.collection('poi_enrichments').doc(identity.canonicalId);
+  await db.runTransaction(async tx => {
+    const [spot, link] = await Promise.all([tx.get(spotRef), tx.get(linkRef)]);
+    if (!spot.exists || spot.data().created_by_uid !== uid || spot.data().is_public !== true || spot.data().status !== 'published')
+      throw new functions.https.HttpsError('permission-denied', 'Choose one of your published public spots.');
+    if (spot.data().osm_poi_link && spot.data().osm_poi_link.canonical_id !== identity.canonicalId)
+      throw new functions.https.HttpsError('already-exists', 'The community spot is linked elsewhere.');
+    if (link.exists && link.data().linked_spot_id !== spotId)
+      throw new functions.https.HttpsError('already-exists', 'This POI is linked to another spot.');
+    if (link.exists) return;
+    const now = new Date().toISOString();
+    tx.create(linkRef, { osm_ref: identity.canonicalId, tile_id: identity.tileId,
+      category: identity.category, identity_provenance: identity.provenance,
+      linked_spot_id: spotId, linked_by_uid: uid, linked_at: now, source: 'community-link' });
+    tx.update(spotRef, { osm_poi_link: { canonical_id: identity.canonicalId,
+      tile_id: identity.tileId, category: identity.category, linked_at: now } });
+  });
+  return { identity, linkedSpotId: spotId };
+});
+
+exports.onLinkedCommunitySpotDeleted = functions.firestore.document('spots/{spotId}').onDelete(async (snapshot, context) => {
+  const canonicalId = snapshot.data()?.osm_poi_link?.canonical_id;
+  if (!/^osm:(node|way|relation):[1-9]\d*$/.test(canonicalId || '')) return;
+  const ref = db.collection('poi_enrichments').doc(canonicalId);
+  await db.runTransaction(async tx => {
+    const link = await tx.get(ref);
+    if (link.exists && link.data().linked_spot_id === context.params.spotId) tx.delete(ref);
+  });
 });
 
 function sanitizePoiMatch(value) {

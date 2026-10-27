@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Navigation, Share2, Camera, Star, Phone, Mail, Globe, MapPin, ChevronUp, ChevronLeft, ChevronRight, Flag, Pencil, Clock } from 'lucide-react';
-import { getPOIPhotos, getPOIRatings, addPOIPhoto, addPOIRating, uploadSpotImage, makePOIId } from '@/api/firebaseClient';
+import { getPOIPhotos, getPOIRatings, addPOIPhoto, addPOIRating, uploadSpotImage, makePOIId, resolvePoiEnrichment, submitPoiEnrichmentPhoto, linkPoiCommunitySpot, getUserSpots } from '@/api/firebaseClient';
 import { moderateSubmission } from '@/lib/moderation';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -12,6 +12,8 @@ import ImagePreparationDialog from './ImagePreparationDialog';
 import { normalizePoiPhotos, openingHoursLabel, safeWebsite } from '@/lib/poiPresentation';
 import { resolveVisiblePoiText } from '@/lib/poiLocalization';
 import { recoverableLazy } from '@/components/ChunkLoadRecovery';
+import NewPoiView from '@/new/NewPoiView';
+import { newPoiText } from '@/new/newPoiPresentation';
 
 const SocialPostsSection = recoverableLazy(() => import('@/components/social/SocialPostsSection'));
 
@@ -550,22 +552,30 @@ function FullSheet({ poi, displayName, originalName, displayDescription, shortSu
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
-export default function POIDetailPanel({ poi, category, onClose, onNavigate, onEditOfficial, isSuperAdmin, user }) {
+export default function POIDetailPanel({ poi, category, onClose, onNavigate, onEditOfficial, isSuperAdmin, user, redesigned = false }) {
   const { t, language } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   const [sfPhotos, setSfPhotos] = useState([]);
   const [sfRating, setSfRating] = useState({ ratings: [], avg: 0, count: 0 });
+  const [ratingsLoading, setRatingsLoading] = useState(true);
+  const [ratingsError, setRatingsError] = useState(false);
   const [photos, setPhotos] = useState([]);
   const [lightboxIndex, setLightboxIndex] = useState(null); // null = closed
   const [resolvedAddress, setResolvedAddress] = useState('');
   const [reportTarget, setReportTarget] = useState(null);
   const [pendingPhoto, setPendingPhoto] = useState(null);
+  const [poiIdentity, setPoiIdentity] = useState(null);
+  const [identityChecked, setIdentityChecked] = useState(false);
+  const [linkedSpotId, setLinkedSpotId] = useState(null);
+  const [linkCandidates, setLinkCandidates] = useState(null);
+  const [linkBusy, setLinkBusy] = useState(false);
   const photoUploadLockRef = useRef(false);
   const uploadedPhotoUrlRef = useRef(new Map());
   const photoAbortRef = useRef(new AbortController());
   useEffect(() => () => photoAbortRef.current.abort(), []);
   const fileInputRef = useRef(null);
   const visibleText = resolveVisiblePoiText(poi, language);
+  const newText = redesigned ? newPoiText({ ...poi, address: poi?.address || resolvedAddress }, category, language, visibleText) : null;
   useEffect(() => {
     if (!expanded) return undefined;
     const previous = document.body.style.overflow;
@@ -584,31 +594,52 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, onE
 
   useEffect(() => {
     if (!poi) return;
+    let active = true;
     setExpanded(false);
+    setSfPhotos([]);
+    setSfRating({ ratings: [], avg: 0, count: 0 });
     setPhotos([]);
     setLightboxIndex(null);
+    setRatingsLoading(true);
+    setRatingsError(false);
+    setPoiIdentity(null);
+    setIdentityChecked(false);
+    setLinkedSpotId(null);
+    setLinkCandidates(null);
 
     const poiId = makePOIId(poi.lat, poi.lon, poi.name);
-    getPOIPhotos(poiId).then(setSfPhotos);
-    getPOIRatings(poiId).then(r => setSfRating(
+    getPOIPhotos(poiId).then(rows => { if (active) setSfPhotos(previous => [...rows, ...previous.filter(row => !rows.some(old => old.id === row.id))]); }).catch(() => {});
+    const props = poi._ambientHit?.properties;
+    if (redesigned && props?.id != null && typeof props.cat === 'string') {
+      resolvePoiEnrichment({ tileId: String(props.id), category: props.cat }).then(async result => {
+        if (!active) return;
+        setPoiIdentity(result.identity);
+        setIdentityChecked(true);
+        setLinkedSpotId(result.linkedSpotId);
+        const rows = await getPOIPhotos(result.identity.canonicalId);
+        if (active) setSfPhotos(previous => [...previous, ...rows.filter(row => !previous.some(old => old.id === row.id))]);
+      }).catch(() => { if (active) setIdentityChecked(true); });
+    } else if (redesigned) setIdentityChecked(true);
+    getPOIRatings(poiId).then(r => { if (active) setSfRating(
       Array.isArray(r)
         ? { ratings: r, avg: r.length ? Math.round(r.reduce((s, x) => s + x.rating, 0) / r.length * 10) / 10 : 0, count: r.length }
         : (r || { ratings: [], avg: 0, count: 0 })
-    ));
+    ); }).catch(() => { if (active) { setSfRating({ ratings: [], avg: 0, count: 0 }); setRatingsError(true); } }).finally(() => { if (active) setRatingsLoading(false); });
 
     // Ambient vector-tile clicks may carry static build-time enrichment.
     // Only fall back to live photo lookups when no enrichment was baked in.
     // Baked-in enrichment photos win; otherwise (including when enrichment exists
     // but found no photo) fall back to the live subject-verified lookup.
     if (poi.enrichment?.photos?.length) setPhotos(poi.enrichment.photos);
-    else tryFetchPhotos(poi.tags || {}).then(res => { if (res.length) setPhotos(res); });
-  }, [poi?.id]);
+    else tryFetchPhotos(poi.tags || {}).then(res => { if (active && res.length) setPhotos(res); });
+    return () => { active = false; };
+  }, [poi?.id, redesigned]);
 
   const handleShare = async () => {
     const url = `https://maps.google.com/?q=${poi.lat},${poi.lon}`;
     try {
-      if (navigator.share) await navigator.share({ title: visibleText.name, text: poi.address || resolvedAddress || visibleText.name, url });
-      else if (navigator.clipboard) { await navigator.clipboard.writeText(`${visibleText.name}\n${url}`); toast.success(t('poiDetail.linkCopied')); }
+      if (navigator.share) await navigator.share({ title: newText?.title || visibleText.name, text: poi.address || resolvedAddress || newText?.title || visibleText.name, url });
+      else if (navigator.clipboard) { await navigator.clipboard.writeText(`${newText?.title || visibleText.name}\n${url}`); toast.success(t('poiDetail.linkCopied')); }
       else window.open(url, '_blank');
     } catch (e) { if (e.name !== 'AbortError') window.open(url, '_blank'); }
   };
@@ -624,7 +655,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, onE
     e.target.value = '';
   };
 
-  const handlePreparedPhoto = async file => {
+  const handlePreparedPhoto = async (file, attribution) => {
     if (photoUploadLockRef.current) return;
     photoUploadLockRef.current = true;
     const poiId = makePOIId(poi.lat, poi.lon, poi.name);
@@ -635,11 +666,15 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, onE
         uploadedPhotoUrlRef.current.set(file, dataUrl);
       }
       if (photoAbortRef.current.signal.aborted) throw new Error('Upload interrupted. Open the place and try again.');
-      await addPOIPhoto(poiId, dataUrl, user.email);
+      if (redesigned) {
+        if (!poiIdentity) throw new Error(language?.startsWith('cs') ? 'Identitu místa se nepodařilo ověřit.' : 'Place identity could not be verified.');
+        await submitPoiEnrichmentPhoto({ tileId: poiIdentity.tileId, category: poiIdentity.category,
+          imageUrl: dataUrl, rightsConfirmed: true, attribution });
+      } else await addPOIPhoto(poiId, dataUrl, user.email);
       uploadedPhotoUrlRef.current.delete(file);
-      setSfPhotos(prev => [{ id: Date.now(), image: dataUrl, created_by: user.email }, ...prev]);
+      if (!redesigned) setSfPhotos(prev => [{ id: Date.now(), image: dataUrl, created_by: user.email }, ...prev]);
       setPendingPhoto(null);
-      toast.success(t('imagePrep.uploaded'));
+      toast.success(redesigned ? language?.startsWith('cs') ? 'Fotografie čeká na schválení.' : 'Photo is awaiting review.' : t('imagePrep.uploaded'));
     } finally { photoUploadLockRef.current = false; }
   };
 
@@ -654,12 +689,10 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, onE
       windowMs: 10 * 60 * 1000,
     });
     if (!modCheck.allowed) {
-      toast.error(
-        modCheck.reasonKey === 'moderation.tooManySubmissions'
-          ? 'You are submitting reviews too quickly. Please wait a few minutes.'
-          : 'This review looks like spam. Please rewrite it and try again.'
-      );
-      return;
+      toast.error(redesigned && language?.startsWith('cs')
+        ? modCheck.reasonKey === 'moderation.tooManySubmissions' ? 'Hodnocení odesíláte příliš rychle. Počkejte prosím několik minut.' : 'Hodnocení připomíná spam. Upravte ho a zkuste to znovu.'
+        : modCheck.reasonKey === 'moderation.tooManySubmissions' ? 'You are submitting reviews too quickly. Please wait a few minutes.' : 'This review looks like spam. Please rewrite it and try again.');
+      return false;
     }
 
     const poiId = makePOIId(poi.lat, poi.lon, poi.name);
@@ -671,7 +704,30 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, onE
     ));
   };
 
-  const handleNavigate = () => { onNavigate?.({ lat: poi.lat, lng: poi.lon, label: visibleText.name }); onClose(); };
+  const handleNavigate = () => { onNavigate?.({ lat: poi.lat, lng: poi.lon, label: newText?.title || visibleText.name }); onClose(); };
+
+  const loadLinkCandidates = async () => {
+    if (!user || linkCandidates || linkBusy) return;
+    setLinkBusy(true);
+    try {
+      const rows = await getUserSpots(user.email, 100, user.uid || user.id);
+      setLinkCandidates(rows.filter(row => row.created_by_uid === (user.uid || user.id) && row.status === 'published' && row.is_public && !row.osm_poi_link));
+    } catch (error) { toast.error(error.message); }
+    finally { setLinkBusy(false); }
+  };
+  const handleLinkSpot = async spotId => {
+    if (!poiIdentity || linkBusy) return;
+    setLinkBusy(true);
+    try {
+      await linkPoiCommunitySpot({ tileId: poiIdentity.tileId, category: poiIdentity.category, spotId });
+      setLinkedSpotId(spotId);
+      window.dispatchEvent(new CustomEvent('spotfinder:poi-linked', { detail: {
+        spotId, link: { canonical_id: poiIdentity.canonicalId, tile_id: poiIdentity.tileId, category: poiIdentity.category }
+      } }));
+      toast.success(language?.startsWith('cs') ? 'Místa byla propojena.' : 'Places linked.');
+    } catch (error) { toast.error(error.message); }
+    finally { setLinkBusy(false); }
+  };
 
   // All photos merged for lightbox — { url, credit } shape throughout;
   // SpotFinder-hosted photos have no third-party attribution requirement.
@@ -687,19 +743,22 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, onE
     socialTargetId: makePOIId(poi.lat, poi.lon, poi.name),
     onClose, onNavigate: handleNavigate, onShare: handleShare,
     onAddPhoto: handleAddPhoto, user,
+    poiIdentity, identityChecked, linkedSpotId, linkCandidates, linkBusy, onLoadLinkCandidates: loadLinkCandidates, onLinkSpot: handleLinkSpot,
     onEditOfficial: isSuperAdmin && poi._ambientHit ? () => { onClose(); onEditOfficial?.(poi._ambientHit); } : null,
     onOpenLightbox: (i) => setLightboxIndex(i),
-    onReportPOI: () => setReportTarget({ type: 'poi', id: makePOIId(poi.lat, poi.lon, poi.name), label: visibleText.name, snapshot: { name: poi.name, lat: poi.lat, lon: poi.lon } }),
-    onReportPhoto: (p) => setReportTarget({ type: 'poi_photo', id: String(p.photoId), label: `photo at ${poi.name}`, snapshot: { name: poi.name, lat: poi.lat, lon: poi.lon, image: p.url } }),
+    onReportPOI: () => setReportTarget({ type: 'poi', id: makePOIId(poi.lat, poi.lon, poi.name), label: newText?.title || visibleText.name, snapshot: { name: poi.name, lat: poi.lat, lon: poi.lon } }),
+    onReportPhoto: (p) => setReportTarget({ type: 'poi_photo', id: String(p.photoId), label: redesigned && language?.startsWith('cs') ? `fotografie místa ${newText.title}` : `photo at ${newText?.title || poi.name}`, snapshot: { name: poi.name, lat: poi.lat, lon: poi.lon, image: p.url } }),
   };
 
   return (
     <>
       <input ref={fileInputRef} type="file" accept={IMAGE_ACCEPT} className="hidden" onChange={handleFileChange} />
 
-      {expanded
-        ? <FullSheet {...sharedProps} onSubmitRating={handleSubmitRating} />
-        : <MiniBar {...sharedProps} photoUrl={photos[0]?.url || null} onExpand={() => setExpanded(true)} />}
+      {redesigned
+        ? <NewPoiView key={poi.id} {...sharedProps} visibleText={visibleText} ratingsLoading={ratingsLoading} ratingsError={ratingsError} expanded={expanded} onExpand={() => setExpanded(true)} onSubmitRating={handleSubmitRating} />
+        : expanded
+          ? <FullSheet {...sharedProps} onSubmitRating={handleSubmitRating} />
+          : <MiniBar {...sharedProps} photoUrl={photos[0]?.url || null} onExpand={() => setExpanded(true)} />}
 
       {lightboxIndex !== null && allPhotoUrls.length > 0 && (
         <Lightbox
@@ -709,7 +768,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, onE
         />
       )}
       <ReportDialog open={!!reportTarget} onClose={() => setReportTarget(null)} user={user} targetType={reportTarget?.type} targetId={reportTarget?.id || ''} targetLabel={reportTarget?.label} targetSnapshot={reportTarget?.snapshot || {}} />
-      {pendingPhoto && <ImagePreparationDialog file={pendingPhoto} onConfirm={handlePreparedPhoto} onCancel={() => setPendingPhoto(null)} />}
+      {pendingPhoto && <ImagePreparationDialog file={pendingPhoto} onConfirm={handlePreparedPhoto} onCancel={() => setPendingPhoto(null)} requireRights={redesigned} />}
     </>
   );
 }

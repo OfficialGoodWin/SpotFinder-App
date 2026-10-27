@@ -55,7 +55,7 @@ service cloud.firestore {
                         'condition_rating', 'condition_rating_count', 'safety_rating', 'safety_rating_count',
                         'crowdedness_rating', 'crowdedness_rating_count', 'rating_schema', 'flag_count', 'status', 'created_by',
                         'created_by_uid', 'upvote_count', 'downvote_count', 'quality_score',
-                        'likes_count', 'saves_count', 'has_social', 'discovery_state']))
+                        'likes_count', 'saves_count', 'has_social', 'discovery_state', 'osm_poi_link']))
         || isSuperAdmin()
       );
 
@@ -137,6 +137,17 @@ service cloud.firestore {
         && request.resource.data.created_by_uid == request.auth.uid
         && request.resource.data.keys().hasOnly(['poi_id', 'image', 'created_by', 'created_by_uid', 'created_date']);
       allow delete: if isSuperAdmin() || (isAuth() && resource.data.created_by_uid == request.auth.uid);
+    }
+
+    // Server-reviewed /new submissions and deliberate links. Clients cannot
+    // publish, approve, or alter either record directly.
+    match /poi_enrichment_submissions/{docId} {
+      allow read: if isSuperAdmin() || (isAuth() && resource.data.owner_uid == request.auth.uid);
+      allow write: if false;
+    }
+    match /poi_enrichments/{osmRef} {
+      allow read: if true;
+      allow write: if false;
     }
 
     match /poi_ratings/{docId} {

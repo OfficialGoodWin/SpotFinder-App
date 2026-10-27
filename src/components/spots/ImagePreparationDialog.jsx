@@ -5,8 +5,10 @@ import { useLanguage } from '@/lib/LanguageContext';
 
 const mb = bytes => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
-export default function ImagePreparationDialog({ file, onConfirm, onCancel }) {
-  const { t } = useLanguage();
+export default function ImagePreparationDialog({ file, onConfirm, onCancel, requireRights = false }) {
+  const { t, language } = useLanguage();
+  const [rightsConfirmed, setRightsConfirmed] = useState(false);
+  const [attribution, setAttribution] = useState('');
   const [info, setInfo] = useState(null);
   const [sourceUrl, setSourceUrl] = useState('');
   const [result, setResult] = useState(null);
@@ -67,10 +69,10 @@ export default function ImagePreparationDialog({ file, onConfirm, onCancel }) {
     } finally { setBusy(false); }
   };
   const confirm = async () => {
-    if (!result || busy) return;
+    if (!result || busy || requireRights && !rightsConfirmed) return;
     setBusy(true);
     setError('');
-    try { await onConfirm(result.file); }
+    try { await onConfirm(result.file, attribution.trim()); }
     catch (cause) { setError(cause.message || t('imagePrep.uploadInterrupted')); toast.error(cause.message || t('imagePrep.uploadInterrupted')); }
     finally { setBusy(false); }
   };
@@ -116,11 +118,13 @@ export default function ImagePreparationDialog({ file, onConfirm, onCancel }) {
           </div>}
           {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950/30 dark:text-red-200">{error}</p>}
           <p className="text-xs text-muted-foreground">{t('imagePrep.privacy')}</p>
+          {requireRights && <label className="flex items-start gap-2 text-sm text-foreground"><input type="checkbox" checked={rightsConfirmed} onChange={event => setRightsConfirmed(event.target.checked)} />{language?.startsWith('cs') ? 'Potvrzuji, že fotografii vlastním nebo mám svolení ji zveřejnit ve SpotFinderu.' : 'I own this photo or have permission to publish it on SpotFinder.'}</label>}
+          {requireRights && <label className="block text-sm text-foreground">{language?.startsWith('cs') ? 'Jméno autora fotografie (volitelné)' : 'Photo credit (optional)'}<input type="text" maxLength={120} value={attribution} onChange={event => setAttribution(event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2" /></label>}
         </div>
         <div className="flex flex-wrap gap-2 border-t border-border px-5 pt-3" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
           <button type="button" onClick={reset} disabled={busy} className="min-h-11 rounded-xl border border-border px-4 text-sm">{t('imagePrep.reset')}</button>
           <button type="button" onClick={makePreview} disabled={busy || !info} className="min-h-11 rounded-xl border border-border px-4 text-sm">{busy ? t('imagePrep.preparing') : t('imagePrep.preview')}</button>
-          <button type="button" onClick={confirm} disabled={busy || !result} className="min-h-11 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground">{t('imagePrep.usePhoto')}</button>
+          <button type="button" onClick={confirm} disabled={busy || !result || requireRights && !rightsConfirmed} className="min-h-11 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground">{t('imagePrep.usePhoto')}</button>
         </div>
       </div>
     </div>

@@ -15,7 +15,8 @@ export function normalizePoiPhotos(remote = [], community = []) {
   const seen = new Set();
   return [
     ...remote.map(photo => ({ ...photo, kind: 'remote' })),
-    ...community.map(photo => ({ url: photo.image || photo.photo, thumbnail_url: photo.thumbnail_url, kind: 'sf', photoId: photo.id })),
+    ...community.map(photo => ({ url: photo.image || photo.photo, thumbnail_url: photo.thumbnail_url,
+      kind: 'sf', photoId: photo.id, credit: photo.attribution || null })),
   ].filter(photo => {
     if (typeof photo.url !== 'string') return false;
     try {

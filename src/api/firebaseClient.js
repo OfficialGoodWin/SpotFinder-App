@@ -978,6 +978,12 @@ export const getPOIPhotos = async (poiId) => {
   return (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
 };
 
+// Verified OSM references and contribution writes are server-owned. The
+// legacy coordinate/name POI key remains in use for existing social content.
+export const resolvePoiEnrichment = callFn('resolvePoiEnrichment');
+export const submitPoiEnrichmentPhoto = callFn('submitPoiEnrichmentPhoto');
+export const linkPoiCommunitySpot = callFn('linkPoiCommunitySpot');
+
 export const addPOIPhoto = async (poiId, imageUrl, userEmail) => {
   const { auth, db } = getFirebaseServices();
   const uid = auth.currentUser?.uid;

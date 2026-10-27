@@ -21,6 +21,7 @@ export default function NewSkeleton({ kind = 'settings' }) {
   else if (kind === 'nearbyCards') content = <div className="sf-new-skeleton-cards">{[0, 1, 2].map(index => <div className="sf-new-skeleton-card" key={index}><Bar className="is-photo" /><Bar width="78%" /><Bar width="46%" /></div>)}</div>;
   else if (kind === 'discoverCards') content = <div className="sf-new-skeleton-discover">{[0, 1, 2, 3].map(index => <div className="sf-new-skeleton-card" key={index}><Bar className="is-photo" /><Bar width="78%" /><Bar width="46%" /></div>)}</div>;
   else if (kind === 'nearbyRows') content = <div className="sf-new-skeleton-nearby-rows">{[0, 1, 2, 3].map(index => <Row image key={index} />)}</div>;
+  else if (kind === 'poiPreview') content = <div className="sf-new-skeleton-poi"><Row image /><div><Bar width="46%" className="is-action" /><Bar width="46%" className="is-action" /></div></div>;
   else if (kind === 'detail') content = <div className="sf-new-skeleton-detail"><Bar className="is-cover" /><div><Bar width="28%" /><Bar width="78%" className="is-title" /><Bar width="54%" /><div className="sf-new-skeleton-paragraph"><Bar width="31%" /><Bar /><Bar width="90%" /><Bar width="71%" /></div><div className="sf-new-skeleton-paragraph"><Bar width="36%" /><Bar width="80%" /><Bar width="64%" /></div></div></div>;
   else if (kind === 'map') content = <div className="sf-new-skeleton-map" />;
   else content = <div className="sf-new-skeleton-paragraph"><Bar width="42%" /><Bar /><Bar width="70%" /></div>;

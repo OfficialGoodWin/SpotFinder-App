@@ -24,7 +24,21 @@ function SaveButton({ spot, name, saved, busy, onSave }) {
   return <button type="button" className={`sf-new-save ${saved ? 'is-saved' : ''}`} disabled={busy || saved} aria-label={saved ? `Uloženo: ${name}` : `Uložit: ${name}`} onClick={() => onSave(spot)}><Bookmark size={20} fill={saved ? 'currentColor' : 'none'} /></button>;
 }
 
-export default function NewMapHome({ category, setCategory, spots, language, loading, error, onRetry, onSearch, onVoiceSearch, onGps, geoError, onDismissGeoError, map, mapLayer, onMapLayer, terrain, onTerrain, showZoomButtons = false, nearbySize, onNearbySize, onOpen, onSave, savedIds, savingSpotId, collectionMode = false, onExitCollection }) {
+function LayerMenu({ mapLayer, onMapLayer, poiLayers, onPoiLayers, onClose }) {
+  const groups = [
+    ['community', 'Komunitní místa'],
+    ['interesting', 'Zajímavá místa OSM'],
+    ['practical', 'Praktická místa OSM'],
+    ['food', 'Jídlo a kavárny OSM'],
+  ];
+  return <div className="sf-new-layer-menu" role="group" aria-label="Mapové vrstvy">
+    <strong>Podklad mapy</strong>
+    {layers.map(([id, label]) => <button type="button" key={id} aria-pressed={mapLayer === id} onClick={() => { onMapLayer(id); onClose(); }}>{label}</button>)}
+    <fieldset><legend>Místa na mapě</legend>{groups.map(([id, label]) => <label key={id}><input type="checkbox" checked={poiLayers[id]} onChange={event => onPoiLayers({ ...poiLayers, [id]: event.target.checked })} />{label}</label>)}</fieldset>
+  </div>;
+}
+
+export default function NewMapHome({ category, setCategory, spots, language, loading, error, onRetry, onSearch, onVoiceSearch, onGps, geoError, onDismissGeoError, map, mapLayer, onMapLayer, poiLayers, onPoiLayers, terrain, onTerrain, showZoomButtons = false, nearbySize, onNearbySize, onOpen, onSave, savedIds, savingSpotId, collectionMode = false, onExitCollection }) {
   const [layersOpen, setLayersOpen] = useState(false);
   const dragStart = useRef(null);
   const swiped = useRef(false);
@@ -68,7 +82,7 @@ export default function NewMapHome({ category, setCategory, spots, language, loa
     </div>}
     {sheetSize === 'collapsed' && <div className="sf-new-controls">
       <button type="button" aria-label="Mapové vrstvy" aria-expanded={layersOpen} onClick={() => setLayersOpen(value => !value)}><Layers size={21} /></button>
-      {layersOpen && <div className="sf-new-layer-menu" role="group" aria-label="Mapové vrstvy">{layers.map(([id, label]) => <button type="button" key={id} aria-pressed={mapLayer === id} onClick={() => { onMapLayer(id); setLayersOpen(false); }}>{label}</button>)}</div>}
+      {layersOpen && <LayerMenu mapLayer={mapLayer} onMapLayer={onMapLayer} poiLayers={poiLayers} onPoiLayers={onPoiLayers} onClose={() => setLayersOpen(false)} />}
       <button type="button" aria-label="Přepnout 3D mapu" aria-pressed={terrain} onClick={onTerrain}>3D</button>
       <button type="button" aria-label="Moje poloha" onClick={onGps}><Crosshair size={21} /></button>
       {showZoomButtons && <div className="sf-new-zoom"><button type="button" aria-label="Přiblížit mapu" onClick={() => map?.zoomIn()} disabled={!map}><Plus size={18} /></button><button type="button" aria-label="Oddálit mapu" onClick={() => map?.zoomOut()} disabled={!map}><Minus size={18} /></button></div>}
