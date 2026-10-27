@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Camera, MapPin } from 'lucide-react';
+import { X, Camera, MapPin, Star, Mountain, Coffee, Sunrise, Sunset, Image, Waves, Footprints, Landmark, Building2, Droplets } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 import LiquidSegmentedControl from '../ui/LiquidSegmentedControl';
 import StarRating from './StarRating';
@@ -10,6 +10,7 @@ import { IMAGE_ACCEPT, validateImageFileMetadata } from '@/lib/imageUploadValida
 import ImagePreparationDialog from './ImagePreparationDialog';
 import { getSpotDisplayName, isMeaningfulSpotTitle } from '@/lib/spotPresentation';
 import DraftConfirmationDialog from '../ui/DraftConfirmationDialog';
+import '@/new/new-edit-spot.css';
 
 const AVAILABLE_TAGS = [
   { id: 'Viewpoint', emoji: '🏞️' },
@@ -28,9 +29,14 @@ const ACCESS_OPTIONS = ['easy', 'moderate', 'hard'];
 const PARKING_OPTIONS = ['yes', 'no', 'street', 'paid'];
 const BEST_TIME_OPTIONS = ['sunrise', 'sunset', 'golden_hour', 'night', 'anytime'];
 const toKeySuffix = (opt) => opt.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join('');
+const TAG_ICONS = { Viewpoint: Mountain, SecretCafe: Coffee, Sunset, Sunrise, PhotoSpot: Image, Waterfall: Droplets, Hike: Footprints, SwimSpot: Waves, Ruin: Landmark, UrbanExplore: Building2, Mountain };
 
-export default function EditSpotModal({ spot, user, onClose, onSave }) {
-  const { t } = useLanguage();
+function ChoiceField({ legend, options, value, onChange, multiple = false }) {
+  return <fieldset className="sf-new-edit-choice"><legend>{legend}</legend><div>{options.map(({ id, label, Icon }) => <button key={id} type="button" aria-pressed={multiple ? value.includes(id) : value === id} className={(multiple ? value.includes(id) : value === id) ? 'is-selected' : ''} onClick={() => onChange(id)}>{Icon && <Icon size={16} aria-hidden="true" />}{label}</button>)}</div></fieldset>;
+}
+
+export default function EditSpotModal({ spot, user, onClose, onSave, redesigned = false }) {
+  const { t, language } = useLanguage();
   const [title, setTitle] = useState(isMeaningfulSpotTitle(spot.title) ? spot.title : (
     isMeaningfulSpotTitle(getSpotDisplayName(spot)) ? getSpotDisplayName(spot) : ''
   ));
@@ -46,6 +52,7 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
   const photoAbortRef = useRef(new AbortController());
 
   const [tags, setTags] = useState(spot.tags || []);
+  const tagChoices = [...AVAILABLE_TAGS.map(({ id }) => id), ...tags.filter(id => !AVAILABLE_TAGS.some(option => option.id === id))];
   const [cost, setCost] = useState(spot.cost || 'free');
   const [accessDifficulty, setAccessDifficulty] = useState(spot.access_difficulty || 'easy');
   const [parking, setParking] = useState(spot.parking || 'yes');
@@ -56,11 +63,12 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
     (Boolean(spot.created_by_uid) && spot.created_by_uid === (user.id || user.uid)) ||
     (Boolean(spot.created_by) && spot.created_by === user.email)
   );
-  const isDirty = title !== (isMeaningfulSpotTitle(spot.title) ? spot.title : (isMeaningfulSpotTitle(getSpotDisplayName(spot)) ? getSpotDisplayName(spot) : '')) ||
+  const detailsDirty = title !== (isMeaningfulSpotTitle(spot.title) ? spot.title : (isMeaningfulSpotTitle(getSpotDisplayName(spot)) ? getSpotDisplayName(spot) : '')) ||
     description !== (spot.description || '') || Boolean(imageFile) || imagePreview !== (existingImageUrls[0] || null) ||
     JSON.stringify(tags) !== JSON.stringify(spot.tags || []) || cost !== (spot.cost || 'free') ||
     accessDifficulty !== (spot.access_difficulty || 'easy') || parking !== (spot.parking || 'yes') ||
-    JSON.stringify(bestTime) !== JSON.stringify(spot.best_time || []) || directions !== (spot.directions || '') || rating.overall > 0;
+    JSON.stringify(bestTime) !== JSON.stringify(spot.best_time || []) || directions !== (spot.directions || '');
+  const isDirty = detailsDirty || rating.overall > 0;
   const requestClose = () => { if (!loading) isDirty ? setConfirmDiscard(true) : onClose(); };
   useEffect(() => () => { photoAbortRef.current.abort(); if (imageUrlRef.current) URL.revokeObjectURL(imageUrlRef.current); }, []);
 
@@ -80,6 +88,15 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
   };
 
   const handleSave = async () => {
+    if (redesigned && !isDirty) { onClose(); return; }
+    if (redesigned && !detailsDirty && rating.overall > 0) {
+      if (!user?.emailVerified || isOwner) return;
+      setLoading(true);
+      try { await submitCategoryRatings(spot.id, spot, rating, user.id || user.uid); onClose(); }
+      catch (error) { console.error('Spot rating failed:', error); toast.error(t('editSpotUi.ratingFailed')); }
+      finally { setLoading(false); }
+      return;
+    }
     if (!isMeaningfulSpotTitle(title)) {
       toast.error(t('addSpotUi.validationTitle'));
       return;
@@ -110,7 +127,7 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
     if (photoAbortRef.current.signal.aborted) throw new Error('Upload interrupted. Reopen this spot and try again.');
     await onSave({
       ...spot,
-      title: title.trim(),
+      title: redesigned ? title : title.trim(),
       description,
       image_url,
       image_urls,
@@ -135,6 +152,27 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
     setLoading(false);
     }
   };
+
+  if (redesigned) return <div className="sf-new-edit-backdrop" data-unsaved-work={isDirty ? 'true' : undefined}>
+    <form className="sf-new-edit-screen" role="dialog" aria-modal="true" aria-labelledby="sf-new-edit-title" onSubmit={event => { event.preventDefault(); handleSave(); }} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); requestClose(); } }}>
+      <header className="sf-new-edit-header"><button type="button" className="sf-new-edit-close" onClick={requestClose} aria-label={t('common.close')} disabled={loading}><X size={21} /></button><div><span>SpotFinder</span><h2 id="sf-new-edit-title">{t('editSpotUi.title')}</h2></div><span className="sf-new-edit-header-spacer" aria-hidden="true" /></header>
+      <div className="sf-new-edit-scroll">
+        <section className="sf-new-edit-section"><h3>{t('addSpotUi.essential')}</h3><label htmlFor="sf-new-edit-name">{t('addSpotUi.spotName')}</label><input id="sf-new-edit-name" value={title} maxLength={100} onChange={event => setTitle(event.target.value)} placeholder={t('addSpotUi.namePlaceholder')} required /><label htmlFor="sf-new-edit-description">{t('addSpot.description')}</label><textarea id="sf-new-edit-description" value={description} onChange={event => setDescription(event.target.value)} placeholder={t('addSpot.descPlaceholder')} rows={5} /></section>
+        <section className="sf-new-edit-section"><ChoiceField legend={t('addSpot.tags')} multiple options={tagChoices.map(id => ({ id, label: id === 'Other' ? language?.startsWith('cs') ? 'Jiné' : 'Other' : t(`spotTags.${id}`, id), Icon: TAG_ICONS[id] }))} value={tags} onChange={toggleTag} /></section>
+        <section className="sf-new-edit-section"><h3>{t('addSpotUi.optional')}</h3><ChoiceField legend={t('addSpot.cost')} options={COST_OPTIONS.map(id => ({ id, label: t(`addSpot.cost${toKeySuffix(id)}`) }))} value={cost} onChange={setCost} /><ChoiceField legend={t('addSpot.accessDifficulty')} options={ACCESS_OPTIONS.map(id => ({ id, label: t(`addSpot.access${toKeySuffix(id)}`) }))} value={accessDifficulty} onChange={setAccessDifficulty} /><ChoiceField legend={t('addSpot.parkingAvailability')} options={PARKING_OPTIONS.map(id => ({ id, label: t(`addSpot.parking${toKeySuffix(id)}`) }))} value={parking} onChange={setParking} /><ChoiceField legend={t('addSpot.bestTime')} multiple options={BEST_TIME_OPTIONS.map(id => ({ id, label: t(`addSpot.bestTime${toKeySuffix(id)}`) }))} value={bestTime} onChange={toggleBestTime} /><label htmlFor="sf-new-edit-directions">{t('addSpot.directions')}</label><textarea id="sf-new-edit-directions" value={directions} onChange={event => setDirections(event.target.value)} placeholder={t('addSpot.directionsPlaceholder')} rows={3} /></section>
+        <section className="sf-new-edit-section"><h3>{t('addSpot.photo')}</h3>{imagePreview ? <div className="sf-new-edit-photo"><img src={imagePreview} alt={t('addSpotUi.photoPreview', { number: 1 })} /><button type="button" onClick={() => { setImageFile(null); setImagePreview(null); }} aria-label={t('addSpotUi.removePhoto', { number: 1 })}><X size={19} /></button></div> : <label className="sf-new-edit-upload"><Camera size={22} aria-hidden="true" /><span>{t('addSpot.photoHint')}</span><input type="file" accept={IMAGE_ACCEPT} onChange={handleImageChange} /></label>}</section>
+        {!isOwner && <section className="sf-new-edit-section"><h3>{t('editSpotUi.yourRating')}</h3><p className="sf-new-edit-hint">{t('editSpotUi.ratingHint')}</p>{user?.emailVerified ? <><div className="sf-new-edit-stars" role="group" aria-label={t('editSpotUi.yourRating')}>{[1, 2, 3, 4, 5].map(value => <button key={value} type="button" aria-label={`${value} / 5`} aria-pressed={rating.overall === value} onClick={() => setRating(current => ({ ...current, overall: value }))}><Star size={25} fill={rating.overall >= value ? 'currentColor' : 'none'} /></button>)}</div>{[
+          ['access', t('spotDetailUi.access'), [t('spotDetailUi.access1'), '', '', '', t('spotDetailUi.access5')]],
+          ['condition', t('spotDetailUi.condition'), [t('spotDetailUi.condition1'), '', '', '', t('spotDetailUi.condition5')]],
+          ['safety', t('spotDetailUi.safety'), [t('spotDetailUi.safety2'), '', '', '', t('spotDetailUi.safety5')]],
+          ['crowdedness', t('spotDetailUi.crowding'), [t('spotDetailUi.crowding1'), '', '', '', t('spotDetailUi.crowding5')]],
+        ].map(([key, label, labels]) => <div className="sf-new-edit-scale" key={key}><strong>{label}</strong><div role="group" aria-label={label}>{[1, 2, 3, 4, 5].map(value => <button key={value} type="button" aria-label={`${value} / 5`} aria-pressed={rating[key] === value} className={rating[key] === value ? 'is-selected' : ''} onClick={() => setRating(current => ({ ...current, [key]: value }))}>{value}</button>)}</div><small>{labels[0]} · {labels[4]}</small></div>)}</> : <p className="sf-new-edit-hint">{t('editSpotUi.ratingVerify')}</p>}</section>}
+      </div>
+      <footer className="sf-new-edit-footer"><button type="button" onClick={requestClose} disabled={loading}>{t('common.cancel')}</button><button type="submit" disabled={loading}>{loading ? t('addSpot.saving') : t('common.save')}</button></footer>
+    </form>
+    <DraftConfirmationDialog open={confirmDiscard} onOpenChange={setConfirmDiscard} title={t('editSpotUi.discardTitle')} description={t('editSpotUi.discardHint')} cancelLabel={t('editSpotUi.keepEditing')} confirmLabel={t('editSpotUi.discardChanges')} onConfirm={onClose} destructive />
+    {pendingImage && <ImagePreparationDialog file={pendingImage} onConfirm={file => { uploadedImageUrlRef.current.clear(); setImageFile(file); if (imageUrlRef.current) URL.revokeObjectURL(imageUrlRef.current); imageUrlRef.current = URL.createObjectURL(file); setImagePreview(imageUrlRef.current); setPendingImage(null); }} onCancel={() => setPendingImage(null)} />}
+  </div>;
 
   return (
     <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/50 backdrop-blur-sm" data-unsaved-work={isDirty ? 'true' : undefined}>
