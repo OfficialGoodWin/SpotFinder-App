@@ -196,7 +196,10 @@ export default function MobileV2({ redesigned = false }) {
   const [showAuth, setShowAuth] = useState(false);
   const closeNewAuth = () => {
     setShowAuth(false);
-    if (authPage) navigate(location.state?.from?.startsWith('/new') ? location.state.from : '/new', { replace: true });
+    if (authPage) {
+      const from = location.state?.from;
+      navigate(typeof from === 'string' && from.startsWith('/new') ? from : '/new', { replace: true });
+    }
   };
   const [showSettings, setShowSettings] = useState(false);
   const [textScale, setTextScale] = useState(() => getTextScale());

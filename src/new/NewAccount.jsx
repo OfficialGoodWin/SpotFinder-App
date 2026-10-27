@@ -114,7 +114,10 @@ export default function NewAccount({ detail = '', onSignIn }) {
     finally { setBusy(''); }
   };
   const refreshProviders = async () => { try { await firebaseUser.reload(); } catch { /* The preceding Firebase change already succeeded; refresh on focus can retry. */ } setRevision(value => value + 1); await refreshUser(); };
-  const open = path => navigate(`/new/settings/account/${path}`, { state: { settingsParent: '/new/settings/account' } });
+  const open = path => {
+    if (typeof path !== 'string' || !path) throw new TypeError('Account settings route must be a non-empty string');
+    navigate(`/new/settings/account/${path}`, { state: { settingsParent: '/new/settings/account' } });
+  };
   const availableMethod = hasGoogle && hasPassword ? reauthMethod || 'password' : hasGoogle ? 'google' : 'password';
   const methodSelector = hasGoogle && hasPassword ? <div className="sf-new-account-method-choice" role="group" aria-label={L('verifyWith')}><label><input type="radio" name="account-reauth" checked={availableMethod === 'password'} onChange={() => setReauthMethod('password')} />{L('passwordMethod')}</label><label><input type="radio" name="account-reauth" checked={availableMethod === 'google'} onChange={() => setReauthMethod('google')} />Google</label></div> : null;
   const passwordForReauth = availableMethod === 'password' ? <AccountField id="sf-new-account-current" label={L('currentPassword')}><input id="sf-new-account-current" type="password" autoComplete="current-password" value={currentPassword} onChange={event => setCurrentPassword(event.target.value)} required /></AccountField> : null;

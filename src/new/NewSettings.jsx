@@ -16,6 +16,23 @@ import './new-settings.css';
 const NAVIGATION_KEY = 'spotfinder_navigation_provider'; // Used by the existing navigation chooser.
 const MAP_LAYERS = [['basic', 'Základní'], ['outdoor', 'Turistická'], ['aerial', 'Letecká'], ['winter', 'Zimní'], ['traffic', 'Doprava']];
 
+function isSettingsRoute(value) {
+  return typeof value === 'string' && value.startsWith('/new/settings/');
+}
+
+function settingsBackRoute(pathname, state) {
+  const [, , , subsection, detail] = pathname.split('/');
+  if (!subsection) return '/new/profile';
+  if (subsection === 'account') return detail ? '/new/settings/account' : '/new/settings';
+
+  const legalReturn = state?.legalReturnTo;
+  if (subsection === 'legal' && typeof legalReturn === 'string' && legalReturn.startsWith('/new/') && legalReturn !== pathname) return legalReturn;
+
+  const settingsParent = state?.settingsParent;
+  if (detail && isSettingsRoute(settingsParent) && settingsParent !== pathname) return settingsParent;
+  return '/new/settings';
+}
+
 function savedNavigationProvider() {
   try {
     const id = localStorage.getItem(NAVIGATION_KEY);
@@ -48,14 +65,13 @@ export default function NewSettings({ onSignIn, mapLayer, onMapLayer, terrain, o
   const detail = location.pathname.split('/')[4] || '';
   const [textScale, setTextScale] = useState(getTextScale);
   const [navigationProvider, setNavigationProvider] = useState(savedNavigationProvider);
-  const go = part => navigate(`/new/settings/${part}`, { state: { settingsParent: '/new/settings' } });
+  const go = part => {
+    if (typeof part !== 'string' || !part) throw new TypeError('Settings route must be a non-empty string');
+    navigate(`/new/settings/${part}`, { state: { settingsParent: '/new/settings' } });
+  };
+  const parentRoute = settingsBackRoute(location.pathname, location.state);
   const back = () => {
-    const legalReturn = subsection === 'legal' && location.state?.legalReturnTo;
-    const parent = legalReturn?.startsWith('/new/') && legalReturn !== location.pathname ? legalReturn
-      : !subsection ? '/new/profile' : subsection === 'account' && detail ? '/new/settings/account'
-      : detail && location.state?.settingsParent?.startsWith('/new/settings/') && location.state.settingsParent !== location.pathname
-        ? location.state.settingsParent : '/new/settings';
-    navigate(parent, { replace: true });
+    if (parentRoute !== location.pathname) navigate(parentRoute, { replace: true });
   };
   const chooseNavigation = id => {
     setNavigationProvider(id);
@@ -69,7 +85,7 @@ export default function NewSettings({ onSignIn, mapLayer, onMapLayer, terrain, o
   return <section className="sf-new-settings-page" aria-labelledby="sf-new-settings-title">
     <div className="sf-new-settings-scroll">
       <div className="sf-new-settings-content">
-        <header className="sf-new-settings-header"><button type="button" className="sf-new-settings-back" aria-label={subsection === 'account' && detail ? t('newAccount.backToAccount') : location.state?.settingsParent?.startsWith('/new/settings/') ? t('newAccount.back') : subsection ? t('newAccount.backToSettings') : t('newAccount.backToProfile')} onClick={back}><ChevronLeft size={22} /></button><div className="sf-new-settings-brand"><img src="/mobile-v2/official-logo.png" alt="" />SpotFinder</div><span /></header>
+        <header className="sf-new-settings-header"><button type="button" className="sf-new-settings-back" aria-label={subsection === 'account' && detail ? t('newAccount.backToAccount') : isSettingsRoute(parentRoute) ? t('newAccount.back') : subsection ? t('newAccount.backToSettings') : t('newAccount.backToProfile')} onClick={back}><ChevronLeft size={22} /></button><div className="sf-new-settings-brand"><img src="/mobile-v2/official-logo.png" alt="" />SpotFinder</div><span /></header>
         <h1 id="sf-new-settings-title">{(subsection === 'account' && accountTitles[detail]) || infoTitles[detail] || titles[subsection] || 'Nastavení'}<span>.</span></h1>
 
         {!subsection && (isLoadingAuth ? <NewSkeleton kind="settings" /> : <>
