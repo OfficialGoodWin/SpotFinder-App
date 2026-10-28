@@ -5,7 +5,7 @@ import { NewLegalLink } from './legalRoutes';
 export default function NewWelcome({ onExplore, onGps, onSignIn }) {
   return <div className="sf-new-welcome-backdrop" role="presentation">
     <section className="sf-new-welcome" role="dialog" aria-modal="true" aria-labelledby="sf-new-welcome-title">
-      <img src="/mobile-v2/official-logo.png" alt="SpotFinder" />
+      <img src="/app-icon-v2-192.png?v=3" alt="SpotFinder" />
       <h1 id="sf-new-welcome-title">Najdi místa, která stojí za cestu.</h1>
       <p>Výhledy, túry, voda a dobré jídlo od lidí, kteří tam opravdu byli.</p>
       <div className="sf-new-welcome-categories"><span><Mountain />Výhledy</span><span><Route />Túry</span><span><Droplets />Voda</span><span><UtensilsCrossed />Jídlo</span></div>

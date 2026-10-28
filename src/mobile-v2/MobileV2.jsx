@@ -49,7 +49,7 @@ const NearbySpotsFilterModal = recoverableLazy(() => import('@/components/spots/
 const EditSpotModal = recoverableLazy(() => import('@/components/spots/EditSpotModal'));
 const NavigationProviderSheet = recoverableLazy(() => import('@/components/navigation/NavigationProviderSheet'));
 
-const LOGO = '/mobile-v2/official-logo.png';
+const LOGO = '/app-icon-v2-192.png?v=3';
 const START = { lat: 50.0755, lng: 14.4378 };
 const TABS = [
   ['map', 'Mapa', MapIcon], ['discover', 'Objevit', Compass], ['add', 'Přidat', Plus],

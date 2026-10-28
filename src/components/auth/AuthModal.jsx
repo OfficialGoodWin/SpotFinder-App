@@ -188,7 +188,7 @@ export default function AuthModal({ onClose, onSuccess = () => {}, mobileV2 = fa
 
         <div className="text-center mb-8">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
-            {mobileV2 ? <img src="/mobile-v2/official-logo.png" alt="SpotFinder" className="h-14 w-14 rounded-2xl object-cover" /> : <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {mobileV2 ? <img src="/app-icon-v2-192.png?v=3" alt="SpotFinder" className="h-14 w-14 rounded-2xl object-cover" /> : <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>}

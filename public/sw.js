@@ -1,7 +1,7 @@
-const SHELL_CACHE = 'spotfinder-shell-v5';
-const STATIC_CACHE = 'spotfinder-static-v5';
-const PREVIOUS_STATIC_CACHE = 'spotfinder-static-v4';
-const SHELL = ['/', '/manifest.json', '/app-icon-v2-192.png', '/app-icon-v2-512.png', '/app-icon-v2-180.png', '/app-icon-maskable-192.png', '/app-icon-maskable-512.png', '/favicon.svg'];
+const SHELL_CACHE = 'spotfinder-shell-v6';
+const STATIC_CACHE = 'spotfinder-static-v6';
+const PREVIOUS_STATIC_CACHE = 'spotfinder-static-v5';
+const SHELL = ['/', '/manifest.json?v=3', '/app-icon-v2-192.png?v=3', '/app-icon-v2-512.png?v=3', '/app-icon-v2-180.png?v=3', '/app-icon-maskable-192.png?v=3', '/app-icon-maskable-512.png?v=3', '/favicon.svg?v=3'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(SHELL_CACHE).then(cache => cache.addAll(SHELL)));

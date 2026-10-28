@@ -85,7 +85,7 @@ export default function NewSettings({ onSignIn, mapLayer, onMapLayer, terrain, o
   return <section className="sf-new-settings-page" aria-labelledby="sf-new-settings-title">
     <div className="sf-new-settings-scroll">
       <div className="sf-new-settings-content">
-        <header className="sf-new-settings-header"><button type="button" className="sf-new-settings-back" aria-label={subsection === 'account' && detail ? t('newAccount.backToAccount') : isSettingsRoute(parentRoute) ? t('newAccount.back') : subsection ? t('newAccount.backToSettings') : t('newAccount.backToProfile')} onClick={back}><ChevronLeft size={22} /></button><div className="sf-new-settings-brand"><img src="/mobile-v2/official-logo.png" alt="" />SpotFinder</div><span /></header>
+        <header className="sf-new-settings-header"><button type="button" className="sf-new-settings-back" aria-label={subsection === 'account' && detail ? t('newAccount.backToAccount') : isSettingsRoute(parentRoute) ? t('newAccount.back') : subsection ? t('newAccount.backToSettings') : t('newAccount.backToProfile')} onClick={back}><ChevronLeft size={22} /></button><div className="sf-new-settings-brand"><img src="/app-icon-v2-192.png?v=3" alt="" />SpotFinder</div><span /></header>
         <h1 id="sf-new-settings-title">{(subsection === 'account' && accountTitles[detail]) || infoTitles[detail] || titles[subsection] || 'Nastavení'}<span>.</span></h1>
 
         {!subsection && (isLoadingAuth ? <NewSkeleton kind="settings" /> : <>

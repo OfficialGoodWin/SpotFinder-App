@@ -83,7 +83,7 @@ export default function NewMapHome({ category, setCategory, spots, language, loa
 
   return <>
     {sheetSize !== 'fullscreen' && <div className="sf-new-top">
-      <div className="sf-new-search"><img src="/mobile-v2/official-logo.png" alt="SpotFinder" /><button type="button" onClick={onSearch}>Hledat místa…</button><button className="sf-new-microphone" type="button" onClick={onVoiceSearch} aria-label="Hledat místa hlasem"><Mic size={21} /></button></div>
+      <div className="sf-new-search"><img src="/app-icon-v2-192.png?v=3" alt="SpotFinder" /><button type="button" onClick={onSearch}>Hledat místa…</button><button className="sf-new-microphone" type="button" onClick={onVoiceSearch} aria-label="Hledat místa hlasem"><Mic size={21} /></button></div>
       {!collectionMode && sheetSize === 'collapsed' && <CategoryChips category={category} setCategory={setCategory} language={language} />}
     </div>}
     {sheetSize === 'collapsed' && <div className="sf-new-controls">
