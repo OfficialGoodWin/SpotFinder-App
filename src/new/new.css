@@ -272,3 +272,13 @@ html[data-sf-text-scale='large'] .sf-new .sf-new-controls{top:calc(max(11px,env(
 .sf-new .v2-search>.v2-scroll{animation:sf-new-fade-in .18s ease-out both}
 .sf-new :is(.sf-new-detail-scroll,.sf-new-poi-scroll,.sf-new-quick-body,.sf-new-settings-content){min-height:0;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch}
 @media(prefers-reduced-motion:reduce){.sf-new .v2-search>.v2-scroll{animation:none}}
+/* Route surfaces move; the MapLibre layer remains mounted and stationary. */
+.sf-new .sf-new-route-surface{position:absolute;inset:0;z-index:38;overflow:hidden;background:var(--sf-cream)}
+.sf-new .sf-new-route-surface :is(.sf-new-discover-page,.sf-new-settings-page,.v2-search){animation:none}
+.sf-new .sf-new-motion-nav{isolation:isolate;overflow:visible}
+.sf-new .sf-new-motion-nav>button:not(.v2-add-tab){z-index:0}
+.sf-new .sf-new-motion-nav>.v2-add-tab{position:relative;z-index:2;isolation:isolate;overflow:visible;pointer-events:auto}
+.sf-new .sf-new-motion-nav>.v2-add-tab span{position:relative;z-index:1}
+.sf-new .sf-new-quick-header button{display:grid;place-items:center;align-self:center;padding:0;line-height:0}
+.sf-new .sf-new-quick-header button svg{display:block;width:20px;height:20px;flex:none;stroke-width:2}
+.sf-new .sf-new-route-surface.is-settings{z-index:42}

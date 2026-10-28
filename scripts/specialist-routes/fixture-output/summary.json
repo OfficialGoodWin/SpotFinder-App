@@ -1,0 +1,10 @@
+{
+  "source": "scripts/specialist-routes/fixture.json",
+  "counts": {
+    "hiking": 2,
+    "cycling": 1,
+    "pistes": 3,
+    "lifts": 1
+  },
+  "missingGeometry": []
+}

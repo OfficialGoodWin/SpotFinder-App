@@ -1,6 +1,6 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { motion, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Bookmark, ChevronDown, ChevronLeft, ChevronRight, Compass, Crosshair, Heart, Layers, List, Map as MapIcon, MapPin, Mic, Minus, Plus, Search, Settings, SlidersHorizontal, UserRound, X } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
@@ -23,10 +23,11 @@ import SignOutDialog from './SignOutDialog';
 import NewMapHome from '@/new/NewMapHome';
 import NewWelcome from '@/new/NewWelcome';
 import NewAuth from '@/new/NewAuth';
-import NewSettings from '@/new/NewSettings';
+import NewSettings, { settingsBackRoute } from '@/new/NewSettings';
 import NewSkeleton from '@/new/NewSkeleton';
 import NewDiscover from '@/new/NewDiscover';
 import { newMotion, reducedTransition } from '@/new/motion';
+import { useNewSwipeNavigation } from '@/new/useNewSwipeNavigation';
 import NewVoiceButton, { NewVoiceStatus } from '@/new/NewVoiceButton';
 import { appendSpeechText, useVoiceInput } from '@/new/useVoiceInput';
 import { fitMySpotsOnMap, publicMySpots } from '@/new/myMapCollection';
@@ -146,7 +147,20 @@ function NewBottomNav({ selectedNav, language, chooseTab }) {
     : <button key={id} type="button" className={selectedNav === id ? 'active' : ''} aria-current={selectedNav === id ? 'page' : undefined} onClick={() => chooseTab(id)}>{selectedNav === id && <motion.span className="sf-new-nav-highlight" layoutId="sf-new-nav-highlight" transition={reduced ? reducedTransition : newMotion.selection} />}<span><Icon size={19} strokeWidth={1.8} /></span><small>{label}</small></button>)}</nav>;
 }
 
+const MAIN_DESTINATIONS = ['map', 'discover', 'collection', 'profile'];
+const routeSection = path => {
+  const section = path.split('/')[2] || 'map';
+  return ['settings', 'drafts', 'about'].includes(section) ? 'profile' : section;
+};
+const routeDepth = path => path.split('/').filter(Boolean).length + (path === '/new/profile' ? 0 : path.startsWith('/new/settings') ? 1 : 0);
+const pageVariants = {
+  enter: direction => ({ x: direction > 0 ? '100%' : '-28%', opacity: 0.96 }),
+  center: { x: 0, opacity: 1 },
+  exit: direction => ({ x: direction > 0 ? '-28%' : '100%', opacity: 0.96 }),
+};
+
 export default function MobileV2({ redesigned = false }) {
+  const reducedMotion = useReducedMotion();
   const { user, logout, isLoadingAuth } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const { language, setLanguage } = useLanguage();
@@ -571,6 +585,25 @@ export default function MobileV2({ redesigned = false }) {
   };
   const selectSearchPlace = place => { const point = place.position || place.regionalStructure?.[0]; const coords = normalizeLatLng(point); if (coords) { setFlyTo(coords); navigate('/new'); } else toast.error('Toto místo nemá platnou polohu.'); };
   const selectedNav = addMode || addAt || choosingQuickPosition || quickAdd ? 'add' : activeTab;
+  const previousRoute = useRef(location.pathname);
+  const previousDirection = useRef(1);
+  if (previousRoute.current !== location.pathname) {
+    const oldSection = routeSection(previousRoute.current);
+    const newSection = routeSection(location.pathname);
+    previousDirection.current = oldSection !== newSection
+      ? Math.sign(MAIN_DESTINATIONS.indexOf(newSection) - MAIN_DESTINATIONS.indexOf(oldSection)) || 1
+      : routeDepth(location.pathname) >= routeDepth(previousRoute.current) ? 1 : -1;
+    previousRoute.current = location.pathname;
+  }
+  const swipeBackPath = settingsPage ? settingsBackRoute(location.pathname, location.state) : draftsPage || aboutPage ? '/new/profile' : null;
+  const swipeHandlers = useNewSwipeNavigation({
+    enabled: redesigned && !searchOpen,
+    tab: activeTab,
+    backPath: swipeBackPath,
+    blocked: Boolean(selectedSpot || selectedPoi || editingSpot || quickAdd || choosingQuickPosition || addMode || showAuth || authPage || showSignOut || draftToDelete || unsaveSpot || navigationDestination || showNearbyFilter || showWelcome || !consent),
+    onTab: chooseTab,
+    onBack: path => navigate(path, { replace: true }),
+  });
 
   useEffect(() => {
     if (!layerMenu) return undefined;
@@ -591,7 +624,7 @@ export default function MobileV2({ redesigned = false }) {
     finally { setSignOutBusy(false); }
   };
 
-  return <div className={`mobile-v2 ${isDark ? 'v2-dark' : ''} ${redesigned && myMapSpots !== null && activeTab === 'map' ? 'sf-new-my-map' : ''} ${redesigned && (quickAdd || choosingQuickPosition || editingSpot) ? 'sf-new-adding' : ''} ${redesigned && settingsPage ? 'sf-new-settings-open' : ''} ${redesigned && showNewZoomButtons ? 'sf-new-zoom-visible' : ''}`}>
+  return <div className={`mobile-v2 ${isDark ? 'v2-dark' : ''} ${redesigned && myMapSpots !== null && activeTab === 'map' ? 'sf-new-my-map' : ''} ${redesigned && (quickAdd || choosingQuickPosition || editingSpot) ? 'sf-new-adding' : ''} ${redesigned && settingsPage ? 'sf-new-settings-open' : ''} ${redesigned && showNewZoomButtons ? 'sf-new-zoom-visible' : ''}`} {...swipeHandlers}>
     <div className={`v2-map-layer ${activeTab === 'map' ? '' : 'v2-map-hidden'}`} aria-hidden={activeTab !== 'map'}>
       {mapActivated && <Suspense fallback={redesigned ? <NewSkeleton kind="map" /> : <div className="v2-map-loading" role="status">Načítám mapu…</div>}><MapLibreMap center={START} flyTo={flyTo} selectedSpotId={selectedSpot?.id || selectedMapSpotId} setMapRef={handleMapReady} addMode={addMode} onMapClick={point => { setAddMode(false); setAddAt(point); }} spots={redesigned ? mapSpots : spots} showSpots={!redesigned || !choosingQuickPosition && newPoiLayers.community} compactSpotMarkers={redesigned} poiLayers={redesigned ? newPoiLayers : null} onSelectSpot={selectMapSpot} userPos={userPos} selectedPOICategory={null} onSelectPOI={(poi, cat) => { if (redesigned && activeTab !== 'map') return; setNearbySize('collapsed'); setSelectedSpot(null); setSelectedMapSpotId(null); setPreviewSpot(null); setSelectedPoi({ poi, cat }); }} isDark={isDark} mapLayer={mapLayer} terrainEnabled={terrain} showZoomControls={false} /></Suspense>}
     </div>
@@ -622,6 +655,8 @@ export default function MobileV2({ redesigned = false }) {
         {nearbySize !== 'collapsed' && <><div className="v2-chips" role="group" aria-label="Kategorie">{CATEGORIES.map(name => <button key={name} className={category === name ? 'active' : ''} onClick={() => setCategory(name)}>{name}</button>)}</div>{nearbyResults && <div className="v2-nearby-context"><span>Komunitní místa · {nearbyFilters.maxDistance === Infinity ? 'širší oblast' : `do ${nearbyFilters.maxDistance} km`}{nearbyFilters.minRating ? ` · ${nearbyFilters.minRating}★+` : ''}</span><select aria-label="Řadit místa" value={nearbySort} onChange={event => setNearbySort(event.target.value)}><option value="distance">Nejbližší</option><option value="rating">Hodnocení</option><option value="newest">Nejnovější</option></select></div>}<div className="v2-nearby-list">{nearbyError ? <StateMessage retry={() => runNearby(nearbyFilters, nearbyMode)}>{nearbyError}</StateMessage> : nearbyLoading || spotsLoading && !nearbyResults ? <StateMessage>Načítám místa…</StateMessage> : spotsError && !nearbyResults ? <StateMessage retry={refreshMap}>Místa se nepodařilo načíst.</StateMessage> : visibleSpots.length ? <>{visibleSpots.slice(0, nearbyCount).map(spot => <SpotRow key={spot.id} spot={spot} onOpen={openSpot} onMap={openOnMap} />)}{visibleSpots.length > nearbyCount && <button className="v2-load-more" onClick={() => setNearbyCount(value => value + 20)}>Načíst další místa</button>}</> : <StateMessage>{nearbyResults ? nearbyComplete ? 'V této vzdálenosti nejsou místa podle vybraných filtrů.' : 'V načtené oblasti nejsou odpovídající místa.' : 'V zobrazené oblasti nejsou místa v této kategorii. Posuňte mapu nebo změňte filtr.'}</StateMessage>}</div><button className="v2-expand-control" onClick={() => setNearbySize(value => value === 'full' ? 'partial' : 'full')}>{nearbySize === 'full' ? 'Zmenšit seznam' : 'Zobrazit více'}</button></>}
       </section>
     </>)}
+    <AnimatePresence initial={false} custom={previousDirection.current}>
+      {(activeTab !== 'map' || searchOpen || unknownPage) && <motion.div key={location.pathname} className={`sf-new-route-surface${settingsPage ? ' is-settings' : ''}`} custom={previousDirection.current} variants={pageVariants} initial={redesigned && !reducedMotion ? 'enter' : false} animate="center" exit={redesigned && !reducedMotion ? 'exit' : 'center'} transition={redesigned && !reducedMotion ? newMotion.page : reducedTransition}>
     {activeTab === 'discover' && (redesigned
       ? <NewDiscover language={language} titleOf={spotTitle} locationOf={spotLocation} savedIds={savedIds} savingSpotId={savingSpotId} onSave={saveDiscoverSpot} onOpen={openSpot} onMap={openOnMap} />
       : <section className="v2-page"><header className="v2-page-header"><h1>Objevit</h1><p>Místa sdílená komunitou</p></header><div className="v2-chips" role="group" aria-label="Kategorie">{CATEGORIES.map(name => <button key={name} className={category === name ? 'active' : ''} onClick={() => setCategory(name)}>{name}</button>)}</div><div className="v2-scroll v2-discover-list">{featuredError && featured === null ? <StateMessage retry={() => loadDiscover()}>Místa se nepodařilo načíst.</StateMessage> : featured === null ? <StateMessage>Načítám místa…</StateMessage> : <>{featuredVisible.length ? featuredVisible.map(spot => <DiscoverCard key={spot.id} spot={spot} title={spotTitle(spot, language)} location={spotLocation(spot)} savingSpotId={savingSpotId} savedIds={savedIds} onSave={saveDiscoverSpot} onOpen={openSpot} onMap={openOnMap} />) : <StateMessage>V načtených místech tato kategorie zatím není.</StateMessage>}{featuredError && <StateMessage retry={() => loadDiscover(true)}>Další místa se nepodařilo načíst.</StateMessage>}{discoverMore && !featuredError && <button className="v2-load-more" disabled={discoverLoading} onClick={() => loadDiscover(true)}>{discoverLoading ? 'Načítám…' : 'Načíst další místa'}</button>}</>}</div></section>)}
@@ -632,6 +667,8 @@ export default function MobileV2({ redesigned = false }) {
     {draftsPage && <section className="v2-page"><header className="v2-page-header v2-subpage-header"><button onClick={() => navigate('/new/profile')} aria-label="Zpět na profil"><ChevronLeft /></button><h1>Rozpracovaná místa</h1></header><div className="v2-scroll v2-drafts-list">{draftsError ? <StateMessage retry={loadDrafts}>Rozpracovaná místa se nepodařilo načíst.</StateMessage> : draftRows === null ? (redesigned ? <NewSkeleton kind="nearbyRows" /> : <StateMessage>Načítám rozpracovaná místa…</StateMessage>) : draftRows.length ? draftRows.map(item => <article className="v2-draft-row" key={item.id}><div className="v2-draft-icon"><MapPin size={23} /></div><div className="v2-draft-copy"><strong>{draftTitle(item)}</strong><small>{draftDate(item.updated_at || item.created_at)}</small></div><button className="v2-draft-resume" onClick={() => { const coords = normalizeLatLng(item); if (!coords) { toast.error('Návrh nemá platnou polohu.'); return; } if (redesigned) setQuickAdd({ coords: { lat: coords[0], lng: coords[1] }, draft: item }); else { setDraft(item); setAddAt({ lat: coords[0], lng: coords[1] }); } navigate('/new/map'); }}>Pokračovat</button><button className="v2-draft-delete" aria-label={`Smazat ${draftTitle(item)}`} onClick={() => setDraftToDelete(item)}><X size={18} /></button></article>) : <StateMessage>Nemáš žádná rozpracovaná místa.</StateMessage>}</div></section>}
     {unknownPage && <section className="v2-page v2-not-found"><MapPin size={34} /><h1>Stránka nebyla nalezena</h1><p>Požadovaná stránka není dostupná.</p><button className="v2-primary" onClick={() => navigate('/new')}>Zpět na mapu</button></section>}
     {searchOpen && <SearchPanel spots={spots} center={center} voiceQuery={voiceQuery} redesigned={redesigned} searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} voiceInput={searchVoice} onClose={() => { searchVoice.stop(); setSearchQuery(''); setVoiceQuery(''); navigate(location.key === 'default' ? '/new' : -1); }} onSpot={openSpot} onPlace={selectSearchPlace} />}
+      </motion.div>}
+    </AnimatePresence>
     {!online && <div className="v2-offline" role="status">Jsi offline. Některá místa a mapové podklady nemusí být dostupné.</div>}
     {redesigned ? <NewBottomNav selectedNav={selectedNav} language={language} chooseTab={chooseTab} /> : <nav className="v2-nav" aria-label="Hlavní navigace">{TABS.map(([id,label,Icon]) => <button key={id} type="button" className={`${selectedNav === id ? 'active' : ''} ${id === 'add' ? 'v2-add-tab' : ''}`} aria-current={selectedNav === id ? 'page' : undefined} onClick={() => chooseTab(id)}><span><Icon size={id === 'add' ? 21 : 19} strokeWidth={1.8} /></span><small>{label}</small></button>)}</nav>}
     {showSignOut && <SignOutDialog busy={signOutBusy} onCancel={() => setShowSignOut(false)} onConfirm={confirmSignOut} />}

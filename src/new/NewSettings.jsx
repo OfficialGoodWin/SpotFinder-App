@@ -20,7 +20,8 @@ function isSettingsRoute(value) {
   return typeof value === 'string' && value.startsWith('/new/settings/');
 }
 
-function settingsBackRoute(pathname, state) {
+export function settingsBackRoute(pathname, state) {
+  if (typeof pathname !== 'string') return '/new/profile';
   const [, , , subsection, detail] = pathname.split('/');
   if (!subsection) return '/new/profile';
   if (subsection === 'account') return detail ? '/new/settings/account' : '/new/settings';
