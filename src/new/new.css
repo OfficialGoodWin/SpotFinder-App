@@ -4,7 +4,7 @@
 .sf-new-top{position:absolute;z-index:35;top:max(16px,env(safe-area-inset-top));left:16px;right:16px;pointer-events:none}
 .sf-new-search{pointer-events:auto;width:100%;min-height:56px;display:flex;align-items:center;gap:12px;padding:6px 13px;border:1px solid #e5dfd0;border-radius:999px;background:var(--sf-cream);box-shadow:0 3px 15px #18352624;color:#59675b;text-align:left}
 .sf-new-search img{width:42px;height:42px;border-radius:13px;object-fit:cover}.sf-new-search span{flex:1;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sf-new-search svg:first-of-type{display:none}
-.sf-new-categories{pointer-events:auto;width:100%;min-width:0;display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-inline:contain;touch-action:pan-x;scrollbar-width:none;margin-top:12px;padding-bottom:5px}.sf-new-categories::-webkit-scrollbar,.sf-new-card-list::-webkit-scrollbar{display:none}
+.sf-new-categories{pointer-events:auto;width:100%;min-width:0;display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-inline:contain;touch-action:auto;scrollbar-width:none;margin-top:12px;padding-bottom:5px}.sf-new-categories::-webkit-scrollbar,.sf-new-card-list::-webkit-scrollbar{display:none}
 .sf-new-categories button{flex:none;min-height:42px;display:flex;align-items:center;gap:7px;padding:8px 15px;border:1px solid #d8d1bf;border-radius:999px;background:var(--sf-cream);color:var(--sf-forest);font-size:.88rem;font-weight:var(--sf-weight-control);box-shadow:0 2px 8px #1b362012}.sf-new-categories button.is-active{background:var(--sf-forest);border-color:var(--sf-forest);color:white}
 .sf-new-controls{position:absolute;z-index:33;right:15px;top:30%;display:flex;flex-direction:column;border:1px solid #d8d1bf;border-radius:18px;background:var(--sf-cream);box-shadow:0 3px 14px #17381e24}.sf-new-controls>button{width:51px;height:51px;display:grid;place-items:center;border:0;border-bottom:1px solid #dfdacb;background:transparent;color:var(--sf-forest);font-weight:var(--sf-weight-strong);font-size:1rem}.sf-new-controls>button:last-child{border-bottom:0}.sf-new-controls>button[aria-pressed=true]{background:#e1e9d8}.sf-new-controls>button:first-child{border-radius:18px 18px 0 0}.sf-new-controls>button:last-child{border-radius:0 0 18px 18px}
 .sf-new-layer-menu{position:absolute;right:60px;top:0;width:145px;padding:6px;border:1px solid #d8d1bf;border-radius:14px;background:var(--sf-cream);box-shadow:0 8px 20px #17381e29}.sf-new-layer-menu button{width:100%;min-height:40px;border:0;border-radius:9px;background:transparent;color:var(--sf-forest);text-align:left;padding:8px}.sf-new-layer-menu button[aria-pressed=true]{background:#dce7d7;font-weight:var(--sf-weight-control)}
@@ -252,3 +252,23 @@ html[data-sf-text-scale='large'] .sf-new .sf-new-controls{top:calc(max(11px,env(
 .sf-new .sf-new-quick-replace:focus-within{outline:2px solid var(--sf-forest);outline-offset:2px}
 .sf-new .sf-new-layer-menu{max-height:min(calc(70dvh - var(--sf-nav-occupied) - 10px),510px)}
 .sf-new .sf-new-map-marker-icon{display:grid;place-items:center;width:100%;height:100%;background:#dfe9d9}.sf-new .sf-new-map-marker-icon[hidden]{display:none}.sf-new .sf-new-map-marker.is-selected .sf-new-map-marker-icon{height:76px;flex:none}.sf-new .sf-new-map-marker.is-image-loading:before{content:"";position:absolute;z-index:1;inset:0 0 auto;height:76px;background:#dfe9d9;animation:sf-new-marker-loading 1.2s ease-in-out infinite}@keyframes sf-new-marker-loading{50%{background:#edf2e8}}@media(prefers-reduced-motion:reduce){.sf-new .sf-new-map-marker.is-image-loading:before{animation:none}}
+/* Shared, low-cost interaction motion for the redesigned route. */
+.sf-new .sf-new-categories button,.sf-new .sf-new-discover-page .v2-chips button,.sf-new .sf-new-motion-nav>button{position:relative;isolation:isolate}
+.sf-new .sf-new-chip-highlight,.sf-new .sf-new-nav-highlight{position:absolute;inset:0;z-index:-1;pointer-events:none;border-radius:inherit;background:var(--sf-forest)}
+.sf-new .sf-new-categories button.is-active,.sf-new .sf-new-discover-page .v2-chips button.active{background:transparent;border-color:var(--sf-forest);color:#fff}
+.sf-new .sf-new-motion-nav>button.active{background:transparent}
+.sf-new .sf-new-nav-highlight{inset:3px 7px;border-radius:13px;background:var(--sf-chip)}
+.sf-new :is(button:not(:disabled),a):active{transition:scale .12s ease-out;scale:.97}
+.sf-new :is(.sf-new-detail-scroll,.sf-new-poi-scroll,.sf-new-discover-scroll,.sf-new-vertical-list,.sf-new-category-list){overflow-anchor:auto;-webkit-overflow-scrolling:touch}
+.sf-new :is(.sf-new-categories,.sf-new-discover-page .v2-chips){-webkit-overflow-scrolling:touch;overscroll-behavior-inline:contain}
+@media(prefers-reduced-motion:reduce){.sf-new :is(button,a):active{transition:none;scale:1}}
+@keyframes sf-new-surface-enter{from{opacity:.65;translate:0 12px}to{opacity:1;translate:0 0}}
+@keyframes sf-new-page-enter{from{opacity:.7;translate:0 6px}to{opacity:1;translate:0 0}}
+.sf-new :is(.sf-new-quick-add,.sf-new-poi-preview,.sf-new-detail-view,.sf-new-welcome,.sf-new-category-sheet){animation:sf-new-surface-enter .27s cubic-bezier(.2,0,0,1) both}
+.sf-new :is(.sf-new-discover-page,.sf-new-settings-page,.v2-search){animation:sf-new-page-enter .22s cubic-bezier(.2,0,0,1) both}
+.sf-new :is(.sf-new-poi-backdrop,.sf-new-welcome-backdrop,.v2-dialog-backdrop){animation:sf-new-fade-in .22s ease-out both}
+@keyframes sf-new-fade-in{from{opacity:0}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){.sf-new :is(.sf-new-quick-add,.sf-new-poi-preview,.sf-new-detail-view,.sf-new-welcome,.sf-new-category-sheet,.sf-new-discover-page,.sf-new-settings-page,.v2-search,.sf-new-poi-backdrop,.sf-new-welcome-backdrop,.v2-dialog-backdrop){animation:none}}
+.sf-new .v2-search>.v2-scroll{animation:sf-new-fade-in .18s ease-out both}
+.sf-new :is(.sf-new-detail-scroll,.sf-new-poi-scroll,.sf-new-quick-body,.sf-new-settings-content){min-height:0;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch}
+@media(prefers-reduced-motion:reduce){.sf-new .v2-search>.v2-scroll{animation:none}}

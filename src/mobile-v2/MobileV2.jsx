@@ -1,5 +1,6 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Bookmark, ChevronDown, ChevronLeft, ChevronRight, Compass, Crosshair, Heart, Layers, List, Map as MapIcon, MapPin, Mic, Minus, Plus, Search, Settings, SlidersHorizontal, UserRound, X } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
@@ -25,6 +26,7 @@ import NewAuth from '@/new/NewAuth';
 import NewSettings from '@/new/NewSettings';
 import NewSkeleton from '@/new/NewSkeleton';
 import NewDiscover from '@/new/NewDiscover';
+import { newMotion, reducedTransition } from '@/new/motion';
 import NewVoiceButton, { NewVoiceStatus } from '@/new/NewVoiceButton';
 import { appendSpeechText, useVoiceInput } from '@/new/useVoiceInput';
 import { fitMySpotsOnMap, publicMySpots } from '@/new/myMapCollection';
@@ -135,6 +137,13 @@ function SearchPanel({ spots, center, voiceQuery, onClose, onSpot, onPlace, rede
       {status === 'done' && !matches.length && !results.length && <StateMessage>Pro „{query}“ jsme nic nenašli.</StateMessage>}
     </div>}
   </section>;
+}
+
+function NewBottomNav({ selectedNav, language, chooseTab }) {
+  const reduced = useReducedMotion();
+  return <nav className="v2-nav sf-new-motion-nav" aria-label="Hlavní navigace">{TABS.map(([id, label, Icon]) => id === 'add'
+    ? <button key={id} type="button" className="v2-add-tab" aria-label={language?.startsWith('cs') ? 'Přidat místo' : 'Add spot'} onClick={() => chooseTab(id)}><span aria-hidden="true"><Icon size={27} strokeWidth={2.2} /></span></button>
+    : <button key={id} type="button" className={selectedNav === id ? 'active' : ''} aria-current={selectedNav === id ? 'page' : undefined} onClick={() => chooseTab(id)}>{selectedNav === id && <motion.span className="sf-new-nav-highlight" layoutId="sf-new-nav-highlight" transition={reduced ? reducedTransition : newMotion.selection} />}<span><Icon size={19} strokeWidth={1.8} /></span><small>{label}</small></button>)}</nav>;
 }
 
 export default function MobileV2({ redesigned = false }) {
@@ -624,7 +633,7 @@ export default function MobileV2({ redesigned = false }) {
     {unknownPage && <section className="v2-page v2-not-found"><MapPin size={34} /><h1>Stránka nebyla nalezena</h1><p>Požadovaná stránka není dostupná.</p><button className="v2-primary" onClick={() => navigate('/new')}>Zpět na mapu</button></section>}
     {searchOpen && <SearchPanel spots={spots} center={center} voiceQuery={voiceQuery} redesigned={redesigned} searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} voiceInput={searchVoice} onClose={() => { searchVoice.stop(); setSearchQuery(''); setVoiceQuery(''); navigate(location.key === 'default' ? '/new' : -1); }} onSpot={openSpot} onPlace={selectSearchPlace} />}
     {!online && <div className="v2-offline" role="status">Jsi offline. Některá místa a mapové podklady nemusí být dostupné.</div>}
-    <nav className="v2-nav" aria-label="Hlavní navigace">{TABS.map(([id,label,Icon]) => redesigned && id === 'add' ? <button key={id} type="button" className="v2-add-tab" aria-label={language?.startsWith('cs') ? 'Přidat místo' : 'Add spot'} onClick={() => chooseTab(id)}><span aria-hidden="true"><Icon size={27} strokeWidth={2.2} /></span></button> : <button key={id} type="button" className={`${selectedNav === id ? 'active' : ''} ${id === 'add' ? 'v2-add-tab' : ''}`} aria-current={selectedNav === id ? 'page' : undefined} onClick={() => chooseTab(id)}><span><Icon size={id === 'add' ? 21 : 19} strokeWidth={1.8} /></span><small>{label}</small></button>)}</nav>
+    {redesigned ? <NewBottomNav selectedNav={selectedNav} language={language} chooseTab={chooseTab} /> : <nav className="v2-nav" aria-label="Hlavní navigace">{TABS.map(([id,label,Icon]) => <button key={id} type="button" className={`${selectedNav === id ? 'active' : ''} ${id === 'add' ? 'v2-add-tab' : ''}`} aria-current={selectedNav === id ? 'page' : undefined} onClick={() => chooseTab(id)}><span><Icon size={id === 'add' ? 21 : 19} strokeWidth={1.8} /></span><small>{label}</small></button>)}</nav>}
     {showSignOut && <SignOutDialog busy={signOutBusy} onCancel={() => setShowSignOut(false)} onConfirm={confirmSignOut} />}
     {draftToDelete && <div className="v2-dialog-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setDraftToDelete(null); }}><section className="v2-confirm" role="alertdialog" aria-modal="true" aria-labelledby="v2-delete-draft-title" onKeyDown={event => { if (event.key === 'Escape') setDraftToDelete(null); }}><h2 id="v2-delete-draft-title">Smazat rozpracované místo?</h2><p>„{draftTitle(draftToDelete)}“ a jeho soukromé fotografie budou odstraněny.</p><div><button autoFocus className="v2-secondary" onClick={() => setDraftToDelete(null)}>Ponechat</button><button className="v2-danger" disabled={draftDeleteBusy} onClick={confirmDeleteDraft}>{draftDeleteBusy ? 'Mažu…' : 'Smazat'}</button></div></section></div>}
     {unsaveSpot && <div className="v2-dialog-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setUnsaveSpot(null); }}><section className="v2-confirm" role="alertdialog" aria-modal="true" aria-labelledby="v2-unsave-title" onKeyDown={event => { if (event.key === 'Escape') setUnsaveSpot(null); }}><h2 id="v2-unsave-title">Odebrat uložené místo?</h2><p>„{getSpotDisplayName(unsaveSpot, language)}“ zmizí ze seznamu uložených míst.</p><div><button autoFocus className="v2-secondary" onClick={() => setUnsaveSpot(null)}>Ponechat</button><button className="v2-secondary" disabled={unsaveBusy} onClick={confirmUnsave}>{unsaveBusy ? 'Odebírám…' : 'Odebrat'}</button></div></section></div>}

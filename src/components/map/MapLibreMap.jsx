@@ -431,7 +431,7 @@ function applyTerrain(map, enabled) {
           maxzoom: 14,
         });
       }
-      if (!map.getLayer('terrain-hillshade')) {
+      if (!map.getLayer('terrain-hillshade') && !map.getLayer('specialist-hillshade')) {
         const firstSymbol = map.getStyle().layers.find(layer => layer.type === 'symbol')?.id;
         map.addLayer({
           id: 'terrain-hillshade',
@@ -450,9 +450,10 @@ function applyTerrain(map, enabled) {
       map.setTerrain({ source: 'terrain-dem', exaggeration: 1.8 });
       map.easeTo({ pitch: Math.max(map.getPitch(), 58), bearing: map.getBearing() || -12, duration: mapMotionDuration(700) });
     } else {
+      const hadTerrain = Boolean(map.getTerrain?.());
       map.setTerrain(null);
       if (map.getLayer('terrain-hillshade')) map.setLayoutProperty('terrain-hillshade', 'visibility', 'none');
-      if (map.getPitch() > 0 || map.getBearing() !== 0) map.easeTo({ pitch: 0, bearing: 0, duration: mapMotionDuration(500) });
+      if (hadTerrain && (map.getPitch() > 0 || map.getBearing() !== 0)) map.easeTo({ pitch: 0, bearing: 0, duration: mapMotionDuration(500) });
     }
   } catch (e) {
     console.warn('Terrain toggle failed:', e);
@@ -1793,7 +1794,7 @@ const addAdminMarkers = () => {
           tiles: [`https://a.api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?key=${TOMTOM_KEY}`],
           tileSize: 256,
         });
-        map.addLayer({ id: 'traffic', type: 'raster', source: 'traffic', paint: { 'raster-opacity': 0.65 } });
+        map.addLayer({ id: 'traffic', type: 'raster', source: 'traffic', paint: { 'raster-opacity': 0.52, 'raster-saturation': -0.2 } });
       } catch (_) { }
     };
 

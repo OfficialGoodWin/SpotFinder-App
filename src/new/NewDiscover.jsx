@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { getDiscoverSpotsPage } from '@/api/firebaseClient';
 import { getSpotRating } from '@/lib/spotDiscovery';
 import { isDiscoverEligible } from '@/mobile-v2/discoverSpots';
@@ -7,6 +8,7 @@ import NewSkeleton from './NewSkeleton';
 import { DISCOVER_ALL, appendUniqueDiscoverSpots, discoverCategoryLabel, matchesDiscoverCategory } from './discoverCategory';
 import { SPOT_CATEGORY_KEYS, categoryLabel } from '@/lib/spotCategories';
 import './new-discover.css';
+import { newMotion, reducedTransition } from './motion';
 
 const CATEGORIES = [DISCOVER_ALL, ...SPOT_CATEGORY_KEYS];
 const QUERY_SIZE = 24;
@@ -20,6 +22,7 @@ function ratingLabel(spot) {
 }
 
 export default function NewDiscover({ language, titleOf, locationOf, savedIds, savingSpotId, onSave, onOpen, onMap }) {
+  const reduced = useReducedMotion();
   const [category, setCategory] = useState(DISCOVER_ALL);
   const [pageState, setPageState] = useState({ spots: [], cursor: null, hasMore: true, loading: true, error: false, initialized: false });
   const generation = useRef(0);
@@ -75,7 +78,7 @@ export default function NewDiscover({ language, titleOf, locationOf, savedIds, s
 
   return <section className="v2-page sf-new-discover-page">
     <header className="v2-page-header"><h1>Objevit</h1><p>Místa sdílená komunitou</p></header>
-    <div className="v2-chips" role="group" aria-label="Kategorie míst">{CATEGORIES.map(name => <button type="button" key={name} className={category === name ? 'active' : ''} aria-pressed={category === name} onClick={() => setCategory(name)}>{name === DISCOVER_ALL ? (String(language || '').startsWith('cs') ? 'Vše' : 'All') : categoryLabel(name, language, { short: true })}</button>)}</div>
+    <div className="v2-chips" role="group" aria-label="Kategorie míst">{CATEGORIES.map(name => <button type="button" key={name} className={category === name ? 'active' : ''} aria-pressed={category === name} onClick={() => setCategory(name)}>{category === name && <motion.span className="sf-new-chip-highlight" layoutId="sf-new-discover-category-highlight" transition={reduced ? reducedTransition : newMotion.selection} />}{name === DISCOVER_ALL ? (String(language || '').startsWith('cs') ? 'Vše' : 'All') : categoryLabel(name, language, { short: true })}</button>)}</div>
     <div className="v2-scroll sf-new-discover-scroll">
       <div className="sf-new-discover-grid">
         {pageState.spots.map(spot => <DiscoverCard key={String(spot.id)} spot={spot} title={titleOf(spot, language)} location={locationOf(spot)} categoryLabel={discoverCategoryLabel(spot, language)} ratingLabel={ratingLabel(spot)} landscape compact savingSpotId={savingSpotId} savedIds={savedIds} onSave={onSave} onOpen={onOpen} onMap={onMap} />)}

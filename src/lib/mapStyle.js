@@ -34,15 +34,15 @@ const LIGHT = {
   building:     '#d4c4a8',
   buildingLine: '#b8a888',
   // Roads
-  motorway:     '#609e3f',
-  motorwayLine: '#3d7a20',
+  motorway:     '#829b70',
+  motorwayLine: '#657e59',
   motorwayStripe: '#f5d800',
-  trunk:        '#3a81fc',
-  trunkLine:    '#1a5ad0',
-  primary:      '#e07b00',
-  primaryLine:  '#b85a00',
-  secondary:    '#d4a000',
-  secondaryLine:'#a87800',
+  trunk:        '#8daac2',
+  trunkLine:    '#6b879f',
+  primary:      '#c9a779',
+  primaryLine:  '#a98b68',
+  secondary:    '#d6c197',
+  secondaryLine:'#ad9d7b',
   tertiary:     '#c0b090',
   tertiaryLine: '#a09070',
   road:         '#f8f4ee',
@@ -86,12 +86,12 @@ const DARK = {
   motorway:     '#3d7020',
   motorwayLine: '#2a5010',
   motorwayStripe: '#f5d800',
-  trunk:        '#1a5ad0',
-  trunkLine:    '#0e3490',
-  primary:      '#c06000',
-  primaryLine:  '#803000',
-  secondary:    '#b08000',
-  secondaryLine:'#705000',
+  trunk:        '#6885a3',
+  trunkLine:    '#4d6886',
+  primary:      '#a88460',
+  primaryLine:  '#806849',
+  secondary:    '#927f61',
+  secondaryLine:'#695e49',
   tertiary:     '#4a4030',
   tertiaryLine: '#3a3020',
   road:         '#3a3a3a',
@@ -1053,6 +1053,45 @@ export const winterStyle = {
   ],
 };
 
+// These layers use fields present in the OpenMapTiles schema. Route relations,
+// piste difficulty and lift geometry need a separate, verified OSM tile source.
+function refineSpecialistStyle(mapStyle, winter) {
+  mapStyle.sources['terrain-dem'] = {
+    type: 'raster-dem',
+    tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+    encoding: 'terrarium', tileSize: 256, maxzoom: 14,
+    attribution: 'Terrain: Mapzen elevation tiles',
+  };
+  const roadColors = winter
+    ? { motorway: '#aab9c1', trunk: '#b1c1ca', primary: '#c4c9c7', secondary: '#d3d6d2' }
+    : { motorway: '#7d9e71', trunk: '#88a9b5', primary: '#c8ad86', secondary: '#d6c29a' };
+  for (const layer of mapStyle.layers) {
+    const road = /^(?:r|rc)-(motorway|trunk|primary|secondary)(?:-local)?$/.exec(layer.id);
+    if (road && typeof layer.paint?.['line-color'] === 'string') {
+      layer.paint['line-color'] = roadColors[road[1]];
+    }
+  }
+  const roads = mapStyle.layers.findIndex(layer => layer.id === 'rc-motorway');
+  mapStyle.layers.splice(roads, 0, {
+    id: 'specialist-hillshade', type: 'hillshade', source: 'terrain-dem',
+    paint: {
+      'hillshade-exaggeration': winter ? 0.48 : 0.55,
+      'hillshade-shadow-color': winter ? '#9eafbd' : '#657b62',
+      'hillshade-highlight-color': winter ? '#ffffff' : '#f6f0dc',
+      'hillshade-accent-color': winter ? '#b9c8d1' : '#8c9b76',
+    },
+  });
+  mapStyle.layers.push({
+    id: 'specialist-peaks', type: 'symbol', source: 'v', 'source-layer': 'mountain_peak', minzoom: 10,
+    filter: ['in', 'class', 'peak', 'volcano'],
+    layout: { 'text-field': ['concat', ['get', 'name'], ['case', ['has', 'ele'], ['concat', ' · ', ['to-string', ['get', 'ele']], ' m'], '']], 'text-font': ['Noto Sans Bold'], 'text-size': 11, 'text-max-width': 9 },
+    paint: { 'text-color': winter ? '#415768' : '#405b37', 'text-halo-color': winter ? '#f6f9fb' : '#e8f0e0', 'text-halo-width': 1.7 },
+  });
+}
+
+refineSpecialistStyle(outdoorStyle, false);
+refineSpecialistStyle(winterStyle, true);
+
 export const lightStyle = style(false);
 export const darkStyle  = style(true);
 // Satellite stands alone so unavailable tiles reveal only a neutral background.
@@ -1071,7 +1110,7 @@ export const satelliteStyle = {
   },
   layers: [
     { id: 'satellite-background', type: 'background', paint: { 'background-color': '#30353a' } },
-    { id: 'aerial', type: 'raster', source: 'aerial', paint: { 'raster-opacity': 1 } },
+    { id: 'aerial', type: 'raster', source: 'aerial', paint: { 'raster-opacity': 1, 'raster-saturation': -0.12 } },
   ],
 };
 

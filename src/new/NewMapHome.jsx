@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Bookmark, Crosshair, Layers, MapPin, Mic, Minus, Plus } from 'lucide-react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { getSpotDisplayName } from '@/lib/spotPresentation';
 import { getSpotRating } from '@/lib/spotDiscovery';
 import { categoryLabel } from '@/lib/spotCategories';
@@ -7,6 +8,7 @@ import { SpotPhoto } from '@/mobile-v2/spotDisplay';
 import { MAP_HOME_ALL, MAP_HOME_CATEGORIES, mapHomeCategoryOf } from './mapHomeData';
 import { SPOT_CATEGORY_ICONS } from './spotCategoryIcons';
 import NewSkeleton from './NewSkeleton';
+import { newMotion, reducedTransition } from './motion';
 
 const layers = [['basic', 'Základní'], ['outdoor', 'Turistická'], ['aerial', 'Letecká'], ['winter', 'Zimní'], ['traffic', 'Doprava']];
 const nextSize = { collapsed: 'expanded', expanded: 'fullscreen', fullscreen: 'collapsed' };
@@ -14,12 +16,13 @@ const previousSize = { collapsed: 'collapsed', expanded: 'collapsed', fullscreen
 
 function CategoryChips({ category, setCategory, language, className = '' }) {
   const cs = String(language || '').startsWith('cs');
+  const reduced = useReducedMotion();
   return <div className={`sf-new-categories ${className}`} role="group" aria-label="Kategorie míst">
     {MAP_HOME_CATEGORIES.map(name => {
       const isAll = name === MAP_HOME_ALL;
       const Icon = isAll ? null : SPOT_CATEGORY_ICONS[name];
       const label = isAll ? (cs ? 'Vše' : 'All') : categoryLabel(name, language, { short: true });
-      return <button type="button" key={name} className={category === name ? 'is-active' : ''} aria-pressed={category === name} onClick={() => setCategory(name)}>{Icon && <Icon size={18} aria-hidden="true" />}{label}</button>;
+      return <button type="button" key={name} className={category === name ? 'is-active' : ''} aria-pressed={category === name} onClick={() => setCategory(name)}>{category === name && <motion.span className="sf-new-chip-highlight" layoutId="sf-new-map-category-highlight" transition={reduced ? reducedTransition : newMotion.selection} />}{Icon && <Icon size={18} aria-hidden="true" />}{label}</button>;
     })}
   </div>;
 }
