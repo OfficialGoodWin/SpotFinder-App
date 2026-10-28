@@ -686,12 +686,12 @@ export const outdoorStyle = {
       filter:['in','class','unclassified','minor'],
       layout:{ 'line-join':'round', 'line-cap':'round' },
       paint:{ 'line-color':'#b8b0a0',
-        'line-width':['interpolate',['linear'],['zoom'],12,0.5,10,2,14,5,18,12] } },
+        'line-width':['interpolate',['linear'],['zoom'],10,2,12,0.5,14,5,18,12] } },
     { id:'rc-street', type:'line', source:'v', 'source-layer':'transportation',
       filter:['in','class','street','street_limited','service','residential','living_street','unclassified','minor'],
       layout:{ 'line-join':'round', 'line-cap':'round' },
       paint:{ 'line-color':'#b8b0a0',
-        'line-width':['interpolate',['linear'],['zoom'],13,0.5,10,2,14,5,18,12] } },
+        'line-width':['interpolate',['linear'],['zoom'],10,2,13,0.5,14,5,18,12] } },
 
     // ── Roads — fills ─────────────────────────────────────────────────────
     { id: 'r-track', type: 'line', source: 'v', 'source-layer': 'transportation',
@@ -901,12 +901,12 @@ export const winterStyle = {
       filter:['in','class','unclassified','minor'],
       layout:{ 'line-join':'round', 'line-cap':'round' },
       paint:{ 'line-color':'#b8b0a0',
-        'line-width':['interpolate',['linear'],['zoom'],12,0.5,10,2,14,5,18,12] } },
+        'line-width':['interpolate',['linear'],['zoom'],10,2,12,0.5,14,5,18,12] } },
     { id:'rc-street', type:'line', source:'v', 'source-layer':'transportation',
       filter:['in','class','street','street_limited','service','residential','living_street','unclassified','minor'],
       layout:{ 'line-join':'round', 'line-cap':'round' },
       paint:{ 'line-color':'#b8b0a0',
-        'line-width':['interpolate',['linear'],['zoom'],13,0.5,10,2,14,5,18,12] } },
+        'line-width':['interpolate',['linear'],['zoom'],10,2,13,0.5,14,5,18,12] } },
 
     // ── Roads — fills ─────────────────────────────────────────────────────
     { id: 'r-track', type: 'line', source: 'v', 'source-layer': 'transportation',

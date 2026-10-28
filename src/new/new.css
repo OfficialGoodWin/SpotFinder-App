@@ -254,10 +254,10 @@ html[data-sf-text-scale='large'] .sf-new .sf-new-controls{top:calc(max(11px,env(
 .sf-new .sf-new-map-marker-icon{display:grid;place-items:center;width:100%;height:100%;background:#dfe9d9}.sf-new .sf-new-map-marker-icon[hidden]{display:none}.sf-new .sf-new-map-marker.is-selected .sf-new-map-marker-icon{height:76px;flex:none}.sf-new .sf-new-map-marker.is-image-loading:before{content:"";position:absolute;z-index:1;inset:0 0 auto;height:76px;background:#dfe9d9;animation:sf-new-marker-loading 1.2s ease-in-out infinite}@keyframes sf-new-marker-loading{50%{background:#edf2e8}}@media(prefers-reduced-motion:reduce){.sf-new .sf-new-map-marker.is-image-loading:before{animation:none}}
 /* Shared, low-cost interaction motion for the redesigned route. */
 .sf-new .sf-new-categories button,.sf-new .sf-new-discover-page .v2-chips button,.sf-new .sf-new-motion-nav>button{position:relative;isolation:isolate}
-.sf-new .sf-new-chip-highlight,.sf-new .sf-new-nav-highlight{position:absolute;inset:0;z-index:-1;pointer-events:none;border-radius:inherit;background:var(--sf-forest)}
+.sf-new .sf-new-chip-highlight{position:absolute;inset:0;z-index:-1;pointer-events:none;border-radius:inherit;background:var(--sf-forest)}
 .sf-new .sf-new-categories button.is-active,.sf-new .sf-new-discover-page .v2-chips button.active{background:transparent;border-color:var(--sf-forest);color:#fff}
 .sf-new .sf-new-motion-nav>button.active{background:transparent}
-.sf-new .sf-new-nav-highlight{inset:3px 7px;border-radius:13px;background:var(--sf-chip)}
+.sf-new .sf-new-nav-highlight{position:absolute;top:0;left:0;z-index:0;pointer-events:none;border-radius:13px;background:var(--sf-chip)}
 .sf-new :is(button:not(:disabled),a):active{transition:scale .12s ease-out;scale:.97}
 .sf-new :is(.sf-new-detail-scroll,.sf-new-poi-scroll,.sf-new-discover-scroll,.sf-new-vertical-list,.sf-new-category-list){overflow-anchor:auto;-webkit-overflow-scrolling:touch}
 .sf-new :is(.sf-new-categories,.sf-new-discover-page .v2-chips){-webkit-overflow-scrolling:touch;overscroll-behavior-inline:contain}
@@ -276,7 +276,7 @@ html[data-sf-text-scale='large'] .sf-new .sf-new-controls{top:calc(max(11px,env(
 .sf-new .sf-new-route-surface{position:absolute;inset:0;z-index:38;overflow:hidden;background:var(--sf-cream)}
 .sf-new .sf-new-route-surface :is(.sf-new-discover-page,.sf-new-settings-page,.v2-search){animation:none}
 .sf-new .sf-new-motion-nav{isolation:isolate;overflow:visible}
-.sf-new .sf-new-motion-nav>button:not(.v2-add-tab){z-index:0}
+.sf-new .sf-new-motion-nav>button:not(.v2-add-tab){z-index:1}
 .sf-new .sf-new-motion-nav>.v2-add-tab{position:relative;z-index:2;isolation:isolate;overflow:visible;pointer-events:auto}
 .sf-new .sf-new-motion-nav>.v2-add-tab span{position:relative;z-index:1}
 .sf-new .sf-new-quick-header button{display:grid;place-items:center;align-self:center;padding:0;line-height:0}

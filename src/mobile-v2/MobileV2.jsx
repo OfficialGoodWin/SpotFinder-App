@@ -1,4 +1,4 @@
-import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Bookmark, ChevronDown, ChevronLeft, ChevronRight, Compass, Crosshair, Heart, Layers, List, Map as MapIcon, MapPin, Mic, Minus, Plus, Search, Settings, SlidersHorizontal, UserRound, X } from 'lucide-react';
@@ -142,9 +142,32 @@ function SearchPanel({ spots, center, voiceQuery, onClose, onSpot, onPlace, rede
 
 function NewBottomNav({ selectedNav, language, chooseTab }) {
   const reduced = useReducedMotion();
-  return <nav className="v2-nav sf-new-motion-nav" aria-label="Hlavní navigace">{TABS.map(([id, label, Icon]) => id === 'add'
+  const navRef = useRef(null);
+  const tabRefs = useRef({});
+  const [indicator, setIndicator] = useState(null);
+  useLayoutEffect(() => {
+    const nav = navRef.current;
+    const active = tabRefs.current[selectedNav];
+    if (!nav || !active) { setIndicator(null); return undefined; }
+    const measure = () => {
+      const navRect = nav.getBoundingClientRect();
+      const tabRect = active.getBoundingClientRect();
+      if (!navRect.width || !tabRect.width) return;
+      const width = Math.max(0, tabRect.width - 14);
+      setIndicator({ x: tabRect.left - navRect.left + nav.scrollLeft + (tabRect.width - width) / 2, y: tabRect.top - navRect.top + 3, width, height: Math.max(0, tabRect.height - 6) });
+    };
+    measure();
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    observer?.observe(nav);
+    observer?.observe(active);
+    window.addEventListener('resize', measure);
+    return () => { observer?.disconnect(); window.removeEventListener('resize', measure); };
+  }, [selectedNav]);
+  return <nav ref={navRef} className="v2-nav sf-new-motion-nav" aria-label="Hlavní navigace">
+    {indicator && <motion.span aria-hidden="true" className="sf-new-nav-highlight" initial={false} animate={indicator} transition={reduced ? reducedTransition : newMotion.selection} />}
+    {TABS.map(([id, label, Icon]) => id === 'add'
     ? <button key={id} type="button" className="v2-add-tab" aria-label={language?.startsWith('cs') ? 'Přidat místo' : 'Add spot'} onClick={() => chooseTab(id)}><span aria-hidden="true"><Icon size={27} strokeWidth={2.2} /></span></button>
-    : <button key={id} type="button" className={selectedNav === id ? 'active' : ''} aria-current={selectedNav === id ? 'page' : undefined} onClick={() => chooseTab(id)}>{selectedNav === id && <motion.span className="sf-new-nav-highlight" layoutId="sf-new-nav-highlight" transition={reduced ? reducedTransition : newMotion.selection} />}<span><Icon size={19} strokeWidth={1.8} /></span><small>{label}</small></button>)}</nav>;
+    : <button ref={node => { tabRefs.current[id] = node; }} key={id} type="button" className={selectedNav === id ? 'active' : ''} aria-current={selectedNav === id ? 'page' : undefined} onClick={() => chooseTab(id)}><span><Icon size={19} strokeWidth={1.8} /></span><small>{label}</small></button>)}</nav>;
 }
 
 const MAIN_DESTINATIONS = ['map', 'discover', 'collection', 'profile'];
