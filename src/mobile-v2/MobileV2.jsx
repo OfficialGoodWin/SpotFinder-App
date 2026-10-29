@@ -186,7 +186,7 @@ export default function MobileV2({ redesigned = false }) {
   const reducedMotion = useReducedMotion();
   const { user, logout, isLoadingAuth } = useAuth();
   const { isDark, toggleTheme } = useTheme();
-  const { language, setLanguage } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const tab = location.pathname.split('/')[2] || 'map';
@@ -643,7 +643,7 @@ export default function MobileV2({ redesigned = false }) {
     if (signOutBusy) return;
     setSignOutBusy(true);
     try { await logout(); setShowSignOut(false); }
-    catch { toast.error('Odhlášení se nezdařilo.'); setShowSignOut(false); }
+    catch { toast.error(t('signOutFailed')); }
     finally { setSignOutBusy(false); }
   };
 

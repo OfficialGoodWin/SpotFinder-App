@@ -486,8 +486,13 @@ export default function Home() {
   };
  
   const handleSignOut = async () => {
-    stopLiveLocation();
-    await logout();
+    try {
+      await logout(false);
+      stopLiveLocation();
+      window.location.reload();
+    } catch {
+      toast.error(t('signOutFailed'));
+    }
   };
  
   const handleDeleteAccount = async () => {

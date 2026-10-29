@@ -1,4 +1,5 @@
 import { adminDb, verifyRequestAuth } from './_firebaseAdmin.js';
+import { hasPaidAccess } from './stripeWebhookPolicy.js';
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'private, no-store');
@@ -13,10 +14,11 @@ export default async function handler(req, res) {
   try {
     const userDoc = await adminDb.collection('users').doc(userId).get();
     const subscription = userDoc.exists ? userDoc.data()?.subscription || null : null;
+    const entitled = hasPaidAccess(subscription);
     return res.status(200).json({
       subscription,
-      isElite: subscription?.status === 'active' && subscription?.plan === 'elite',
-      isUltra: subscription?.status === 'active' && subscription?.plan === 'ultra',
+      isElite: entitled && subscription.plan === 'elite',
+      isUltra: entitled && subscription.plan === 'ultra',
     });
   } catch (error) {
     console.error('Subscription status error', { code: error?.code || 'unknown' });

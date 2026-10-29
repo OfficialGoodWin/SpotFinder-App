@@ -1,4 +1,5 @@
 export default {
+  signOutFailed: 'Odhlášení se nezdařilo. Stále jste přihlášeni. Zkuste to znovu.',
   newSkeleton: { loading: 'Načítám obsah…' },
   newSupport: {
     feedbackIntro: 'Pomoz nám zlepšovat SpotFinder. Napiš, co se ti líbí, co chybí nebo co by šlo udělat lépe.',

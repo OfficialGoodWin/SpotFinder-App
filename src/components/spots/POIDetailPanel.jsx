@@ -314,6 +314,13 @@ function FullSheet({ poi, displayName, originalName, displayDescription, shortSu
   const [ratingComment, setRatingComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [ratingDone, setRatingDone] = useState(false);
+  useEffect(() => setRatingDone(false), [poi?.id, user?.uid, user?.id]);
+  const ownRating = sfRating?.ratings?.find(row => row.created_by_uid === (user?.uid || user?.id));
+  useEffect(() => {
+    if (ratingDone) return;
+    setRatingVal(ownRating?.rating || 0);
+    setRatingComment(ownRating?.comment || '');
+  }, [poi?.id, ownRating?.id, ratingDone]);
 
   const published = poi.enrichment || {};
   const tags = { ...(poi.tags || {}),
@@ -332,7 +339,7 @@ function FullSheet({ poi, displayName, originalName, displayDescription, shortSu
   const handleRateSubmit = async () => {
     if (!ratingVal || submitting) return;
     setSubmitting(true);
-    try { await onSubmitRating(ratingVal, ratingComment); setRatingDone(true); }
+    try { if (await onSubmitRating(ratingVal, ratingComment) !== false) setRatingDone(true); }
     catch (error) { toast.error(error?.message || 'Could not submit rating.'); }
     finally { setSubmitting(false); }
   };
@@ -419,7 +426,7 @@ function FullSheet({ poi, displayName, originalName, displayDescription, shortSu
                       <Stars value={ratingVal} size={28} interactive onRate={setRatingVal} />
                       {ratingVal > 0 && (
                         <>
-                          <textarea value={ratingComment} onChange={e => setRatingComment(e.target.value)}
+                          <textarea value={ratingComment} onChange={e => setRatingComment(e.target.value)} maxLength={1000}
                             placeholder={t('poiDetail.addComment')}
                             className="mt-3 w-full text-sm px-3 py-2 rounded-xl border border-gray-200 dark:border-border bg-white dark:bg-background text-foreground resize-none outline-none focus:ring-2 focus:ring-blue-300"
                             rows={2} />
@@ -670,18 +677,16 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, onE
         if (!poiIdentity) throw new Error(language?.startsWith('cs') ? 'Identitu místa se nepodařilo ověřit.' : 'Place identity could not be verified.');
         await submitPoiEnrichmentPhoto({ tileId: poiIdentity.tileId, category: poiIdentity.category,
           imageUrl: dataUrl, rightsConfirmed: true, attribution });
-      } else await addPOIPhoto(poiId, dataUrl, user.email);
+      } else await addPOIPhoto(poiId, dataUrl, attribution);
       uploadedPhotoUrlRef.current.delete(file);
-      if (!redesigned) setSfPhotos(prev => [{ id: Date.now(), image: dataUrl, created_by: user.email }, ...prev]);
       setPendingPhoto(null);
-      toast.success(redesigned ? language?.startsWith('cs') ? 'Fotografie čeká na schválení.' : 'Photo is awaiting review.' : t('imagePrep.uploaded'));
+      toast.success(language?.startsWith('cs') ? 'Fotografie čeká na schválení.' : 'Photo is awaiting review.');
     } finally { photoUploadLockRef.current = false; }
   };
 
   const handleSubmitRating = async (rating, comment) => {
-    // Anti-spam / moderation pre-check (client-side UX only — the
-    // authoritative check runs server-side in the Cloud Functions trigger
-    // on `poi_ratings` creation; see functions/index.js).
+    // Anti-spam / moderation pre-check for UX. The callable enforces the
+    // server rate limit and scores the review before storing it.
     const modCheck = moderateSubmission({
       text: comment,
       rateLimitKey: `rate:poi_rating:${user?.email || 'anon'}`,
@@ -696,7 +701,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, onE
     }
 
     const poiId = makePOIId(poi.lat, poi.lon, poi.name);
-    await addPOIRating(poiId, rating, comment, user?.email);
+    await addPOIRating(poiId, rating, comment);
     getPOIRatings(poiId).then(r => setSfRating(
       Array.isArray(r)
         ? { ratings: r, avg: r.length ? Math.round(r.reduce((s, x) => s + x.rating, 0) / r.length * 10) / 10 : 0, count: r.length }
@@ -768,7 +773,7 @@ export default function POIDetailPanel({ poi, category, onClose, onNavigate, onE
         />
       )}
       <ReportDialog open={!!reportTarget} onClose={() => setReportTarget(null)} user={user} targetType={reportTarget?.type} targetId={reportTarget?.id || ''} targetLabel={reportTarget?.label} targetSnapshot={reportTarget?.snapshot || {}} />
-      {pendingPhoto && <ImagePreparationDialog file={pendingPhoto} onConfirm={handlePreparedPhoto} onCancel={() => setPendingPhoto(null)} requireRights={redesigned} />}
+      {pendingPhoto && <ImagePreparationDialog file={pendingPhoto} onConfirm={handlePreparedPhoto} onCancel={() => setPendingPhoto(null)} requireRights />}
     </>
   );
 }

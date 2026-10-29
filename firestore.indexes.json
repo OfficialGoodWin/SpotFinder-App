@@ -60,6 +60,14 @@
       ]
     },
     {
+      "collectionGroup": "poi_ratings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "poi_id", "order": "ASCENDING" },
+        { "fieldPath": "created_by_uid", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "status_incidents",
       "queryScope": "COLLECTION",
       "fields": [

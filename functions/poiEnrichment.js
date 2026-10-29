@@ -16,9 +16,10 @@ function ownedPhotoPath(url, uid, bucketName) {
   let parsed;
   try { parsed = new URL(url); } catch { throw new TypeError('Invalid photo URL'); }
   const prefix = `/v0/b/${encodeURIComponent(bucketName)}/o/`;
-  if (parsed.origin !== 'https://firebasestorage.googleapis.com' ||
+  if (parsed.origin !== 'https://firebasestorage.googleapis.com' || parsed.username || parsed.password || parsed.hash ||
       !parsed.pathname.startsWith(prefix) || parsed.searchParams.get('alt') !== 'media' ||
-      !parsed.searchParams.get('token')) throw new TypeError('Photo must be an owned Firebase Storage upload');
+      !parsed.searchParams.get('token') || [...parsed.searchParams].length !== 2)
+    throw new TypeError('Photo must be an owned Firebase Storage upload');
   const encodedPath = parsed.pathname.slice(prefix.length);
   const path = decodeURIComponent(encodedPath);
   if (encodeURIComponent(path) !== encodedPath ||
@@ -36,10 +37,31 @@ async function verifyUploadedPhoto(storage, path) {
     throw new TypeError('Photo must be a validated JPEG under 5 MB');
   const [bytes] = await object.download();
   if (!isJpegBytes(bytes)) throw new TypeError('Photo content is not JPEG');
+  return metadata;
+}
+
+async function validatedCommunityPhoto(storage, url, uid) {
+  const bucket = storage.bucket();
+  const path = ownedPhotoPath(url, uid, bucket.name);
+  const metadata = await verifyUploadedPhoto(storage, path);
+  const requestedToken = new URL(url).searchParams.get('token');
+  const issuedTokens = String(metadata.metadata?.firebaseStorageDownloadTokens || '')
+    .split(',').map(token => token.trim()).filter(Boolean);
+  if (!issuedTokens.includes(requestedToken)) throw new TypeError('Photo token does not belong to the uploaded object');
+  return {
+    path,
+    url: `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(bucket.name)}/o/${encodeURIComponent(path)}?alt=media&token=${encodeURIComponent(requestedToken)}`,
+  };
+}
+
+function validLegacyPoiId(value) {
+  if (typeof value !== 'string') return false;
+  const match = /^(-?\d{1,3}\.\d{4})_(-?\d{1,3}\.\d{4})_([a-z0-9]{0,20})$/.exec(value);
+  return Boolean(match && Math.abs(Number(match[1])) <= 90 && Math.abs(Number(match[2])) <= 180);
 }
 
 function submissionId(path) {
   return `photo_${crypto.createHash('sha256').update(path).digest('hex')}`;
 }
 
-module.exports = { poiReference, ownedPhotoPath, verifyUploadedPhoto, submissionId };
+module.exports = { poiReference, ownedPhotoPath, verifyUploadedPhoto, validatedCommunityPhoto, validLegacyPoiId, submissionId };

@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app';
+import { getApps, initializeApp } from 'firebase/app';
 import { 
   getAuth, 
   signInWithEmailAndPassword, 
@@ -49,33 +49,35 @@ import { validateImageFile } from '@/lib/imageUploadValidation';
 import { isPreparedImage, MAX_UPLOAD_BYTES, prepareImageFile, uploadImageError } from '@/lib/imagePreparation';
 import { waitForUploadTask } from '@/lib/uploadTask';
 import { firebaseConfig } from './firebaseConfig';
+import { signOutOnce } from '@/lib/signOutGate';
+import { initializeSpotFinderAppCheck } from './firebaseAppCheck';
 import { getRecaptchaToken } from '@/lib/recaptcha';
 import { filterAndSortNearbySpots, nearbyBounds, normalizeLatLng } from '@/lib/spotDiscovery';
 import { applyReviewedLegacyIdentity } from '@/lib/reviewedLegacySpots';
 import { normalizeSpotDraft } from '@/lib/spotDrafts';
 import { isEligibleBirthDate } from '@/lib/ageEligibility';
 import { createPrivateDraftPhotoLoader, draftPhotoLoadMessage } from '@/lib/privateDraftPhotoLoader';
+import { visiblePoiRatings } from '@/lib/poiRatings';
 
 let app, auth, db, functionsInstance, storage;
-try {
-  app = initializeApp(firebaseConfig);
+const initializeServices = () => {
+  // The Firebase app and App Check must exist before any protected service
+  // starts its first operation. Reuse the default app during hot reload.
+  app = getApps().find(candidate => candidate.name === '[DEFAULT]') || initializeApp(firebaseConfig);
+  initializeSpotFinderAppCheck(app);
   auth = getAuth(app);
   db = getFirestore(app);
   functionsInstance = getFunctions(app);
   storage = getStorage(app);
-} catch (error) {
-  console.error("Firebase initialization error:", error);
-}
+};
+try { initializeServices(); }
+catch (error) { console.error('Firebase initialization error:', error); }
 
 export const getFirebaseServices = () => {
   if (!app || !auth || !db) {
     try {
-      app = initializeApp(firebaseConfig);
-      auth = getAuth(app);
-      db = getFirestore(app);
-      functionsInstance = getFunctions(app);
-      storage = getStorage(app);
-        } catch (error) {
+      initializeServices();
+    } catch (error) {
       console.error("Firebase re-initialization error:", error);
       return null;
     }
@@ -315,7 +317,7 @@ export const handleGoogleRedirectResult = async () => {
  
 export const logout = async () => {
   const { auth } = getFirebaseServices();
-  await firebaseSignOut(auth);
+  await signOutOnce(auth, firebaseSignOut);
 };
  
 export const onAuthChange = (callback) => {
@@ -450,18 +452,11 @@ export const deleteCloudSpotDraft = async (draftId, { deletePhotos = true } = {}
 };
 
  
-const IP_BANS_COLLECTION = 'ip_bans';
-// These now call the audited Cloud Function callables (functions/index.js)
-// instead of writing Firestore directly — every ban/unban/delete/resolve is
-// guaranteed to leave an admin_audit_log entry, since the logging happens
-// server-side as part of the same call rather than as a separate write the
-// client could skip or fail to make.
+// Legacy IP-ban records are not enforced; new bans must target a signed-in UID.
 export const banIP = callFn('adminBanIP');
 export const unbanIP = (ipAddress) => callFn('adminUnbanIP')({ ip: ipAddress });
-export const isIPBanned = async (ipAddress) => {
-  const { db } = getFirebaseServices();
-  return (await getDoc(doc(db, IP_BANS_COLLECTION, ipAddress))).exists();
-};
+export const blockAccountSubmissions = callFn('adminBlockAccountSubmissions');
+export const unblockAccountSubmissions = (uid) => callFn('adminUnblockAccountSubmissions')({ uid });
  
 const SPOTS_COLLECTION = 'spots';
 const RATINGS_COLLECTION = 'ratings';
@@ -664,12 +659,25 @@ export const getSpotPhotoLimit = async () => {
 export const updateSpot = async (spotId, data) => {
   const { db } = getFirebaseServices();
   const editableFields = [
-    'title', 'description', 'image_url', 'image_urls', 'photo_metadata', 'tags',
-    'cost', 'access_difficulty', 'parking', 'best_time', 'directions', 'poi_match',
+    'title', 'description', 'tags', 'cost', 'access_difficulty', 'parking', 'best_time', 'directions',
   ];
   const patch = Object.fromEntries(editableFields
-    .filter(field => Object.prototype.hasOwnProperty.call(data, field))
+    .filter(field => Object.prototype.hasOwnProperty.call(data, field) && data[field] !== undefined)
     .map(field => [field, data[field]]));
+  if (Object.prototype.hasOwnProperty.call(data, 'image_urls') || Object.prototype.hasOwnProperty.call(data, 'image_url')) {
+    const imageUrls = Array.isArray(data.image_urls) ? data.image_urls : [data.image_url].filter(Boolean);
+    const current = await getDoc(doc(db, SPOTS_COLLECTION, spotId));
+    if (!current.exists()) throw new Error('Spot not found.');
+    const currentUrls = Array.isArray(current.data().image_urls) && current.data().image_urls.length
+      ? current.data().image_urls : [current.data().image_url].filter(Boolean);
+    if (JSON.stringify(imageUrls) !== JSON.stringify(currentUrls)) {
+      const changedDetails = Object.fromEntries(Object.entries(patch)
+        .filter(([key, value]) => JSON.stringify(current.data()[key]) !== JSON.stringify(value)));
+      await callFn('updateSpotPhotos')({ spotId, patch: { ...changedDetails, image_urls: imageUrls, image_url: imageUrls[0] || null } });
+      return;
+    }
+  }
+  if (!Object.keys(patch).length) return;
   await updateDoc(doc(db, SPOTS_COLLECTION, spotId), patch);
 };
  
@@ -1019,32 +1027,11 @@ export const getPOIPhotos = async (poiId) => {
 // legacy coordinate/name POI key remains in use for existing social content.
 export const resolvePoiEnrichment = callFn('resolvePoiEnrichment');
 export const submitPoiEnrichmentPhoto = callFn('submitPoiEnrichmentPhoto');
+export const submitLegacyPoiPhoto = callFn('submitLegacyPoiPhoto');
 export const linkPoiCommunitySpot = callFn('linkPoiCommunitySpot');
 
-export const addPOIPhoto = async (poiId, imageUrl, userEmail) => {
-  const { auth, db } = getFirebaseServices();
-  const uid = auth.currentUser?.uid;
-  if (!uid) throw new Error('Sign in to add a photo');
-  let path;
-  try { path = decodeURIComponent(new URL(imageUrl).pathname.split('/o/')[1] || ''); }
-  catch { throw new Error('The uploaded photo URL could not be verified. Try again.'); }
-  const prefix = `community/${uid}/`;
-  const filename = path.startsWith(prefix) ? path.slice(prefix.length) : '';
-  if (!/^[A-Za-z0-9-]+\.jpg$/.test(filename)) throw new Error('This uploaded photo does not belong to your account.');
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(path));
-  const docRef = doc(db, POI_PHOTOS_COLLECTION, `photo_${Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')}`);
-  if ((await getDoc(docRef)).exists()) return { id: docRef.id, poi_id: poiId, image: imageUrl };
-  try { await setDoc(docRef, {
-    poi_id: poiId,
-    image: imageUrl,
-    created_by: 'registered-account',
-    created_by_uid: uid,
-    created_date: new Date().toISOString(),
-  }); } catch (error) {
-    if (!(await getDoc(docRef)).exists()) throw error;
-  }
-  return { id: docRef.id, poi_id: poiId, image: imageUrl };
-};
+export const addPOIPhoto = (poiId, imageUrl, attribution) =>
+  submitLegacyPoiPhoto({ poiId, imageUrl, attribution, rightsConfirmed: true });
 
 // Ratings
 export const getPOIRatings = async (poiId) => {
@@ -1055,22 +1042,13 @@ export const getPOIRatings = async (poiId) => {
     orderBy('created_date', 'desc'),
     limit(100)
   );
-  return (await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
+  return visiblePoiRatings((await getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() })));
 };
 
-export const addPOIRating = async (poiId, rating, reviewText, userEmail) => {
-  const { auth, db } = getFirebaseServices();
-  const uid = auth.currentUser?.uid;
-  if (!uid) throw new Error('Sign in to add a review');
-  const docRef = await addDoc(collection(db, POI_RATINGS_COLLECTION), {
-    poi_id: poiId,
-    rating,
-    review: reviewText || '',
-    created_by: 'registered-account',
-    created_by_uid: uid,
-    created_date: new Date().toISOString(),
-  });
-  return { id: docRef.id };
+export const addPOIRating = async (poiId, rating, reviewText) => {
+  const { auth } = getFirebaseServices();
+  if (!auth.currentUser?.uid) throw new Error('Sign in to add a review');
+  return callFn('submitPoiRating')({ poiId, rating, review: reviewText || '' });
 };
 
 // ─── Superadmin map editor ────────────────────────────────────────────────────

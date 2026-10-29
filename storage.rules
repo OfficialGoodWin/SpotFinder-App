@@ -3,7 +3,9 @@ service firebase.storage {
   match /b/{bucket}/o {
     match /community/{userId}/{fileName} {
       allow read: if true;
-      allow create, update: if request.auth != null
+      // Uploads use random object names. Replacing a validated object would
+      // change photos already referenced by a spot or pending POI review.
+      allow create: if request.auth != null
                    && request.auth.uid == userId
                    && fileName.matches('^[A-Za-z0-9-]+\\.jpg$')
                    && request.resource.size > 0

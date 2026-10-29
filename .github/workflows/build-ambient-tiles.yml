@@ -1,42 +1,71 @@
-name: Rebuild ambient POI tiles
+name: Build ambient POI candidate
 
-# Ambient POIs (cafes, museums, viewpoints...) don't change hourly — monthly
-# is plenty. See scripts/ambient-tiles/README.md for background. Before this
-# does anything useful you need to set two things:
-#   1. Repo secret BLOB_READ_WRITE_TOKEN (Vercel dashboard → Storage → your
-#      Blob store → ".env.local" tab).
-#   2. Repo variable AMBIENT_TILES_BBOX (south,west,north,east) — or just
-#      edit the fallback value below.
+# Candidate builds require a reviewed checksum for the changing Geofabrik
+# extract. Publishing to Vercel Blob remains a separate owner-approved step.
 on:
-  schedule:
-    - cron: '0 3 1 * *' # 03:00 UTC on the 1st of each month
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      pbf_sha256:
+        description: SHA-256 of the Czech Republic PBF snapshot to build
+        required: true
+        type: string
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+          cache: npm
 
-      - name: Install tippecanoe
+      - name: Install locked validation dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Install native build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libsqlite3-dev zlib1g-dev
-          git clone --depth 1 https://github.com/felt/tippecanoe.git
-          cd tippecanoe && make -j"$(nproc)" && sudo make install
+          sudo apt-get install -y --no-install-recommends build-essential libsqlite3-dev zlib1g-dev osmium-tool
 
-      - name: Install build deps
-        working-directory: scripts/ambient-tiles
-        run: npm install
-
-      - name: Build and upload tiles
-        working-directory: scripts/ambient-tiles
+      - name: Build pinned Tippecanoe 2.78.0
         env:
-          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
-        # TODO: set your coverage area (south,west,north,east) as a repo
-        # variable AMBIENT_TILES_BBOX, or edit the fallback below directly.
-        run: ./build.sh "${{ vars.AMBIENT_TILES_BBOX || '48.5,12.0,51.1,18.9' }}"
+          TIPPECANOE_SHA: 2d548bed0623005ab1ae619595ef4cfe1c745d3e
+        run: |
+          git clone --depth 1 --branch 2.78.0 https://github.com/felt/tippecanoe.git tippecanoe
+          test "$(git -C tippecanoe rev-parse HEAD)" = "$TIPPECANOE_SHA"
+          make -C tippecanoe -j2
+          echo "$PWD/tippecanoe" >> "$GITHUB_PATH"
+
+      - name: Download reviewed PBF snapshot
+        env:
+          EXPECTED_PBF_SHA256: ${{ inputs.pbf_sha256 }}
+        run: |
+          [[ "$EXPECTED_PBF_SHA256" =~ ^[0-9a-fA-F]{64}$ ]]
+          curl --fail --location --proto '=https' --tlsv1.2 --retry 3 \
+            --output "$RUNNER_TEMP/czech-republic.osm.pbf" \
+            https://download.geofabrik.de/europe/czech-republic-latest.osm.pbf
+          echo "$EXPECTED_PBF_SHA256  $RUNNER_TEMP/czech-republic.osm.pbf" | sha256sum --check
+
+      - name: Build and validate unpublished PMTiles candidate
+        working-directory: scripts/ambient-tiles
+        run: |
+          ./build.sh "$RUNNER_TEMP/czech-republic.osm.pbf"
+          sha256sum ambient-poi.candidate.pmtiles > ambient-poi.candidate.pmtiles.sha256
+
+      - name: Retain candidate for owner review
+        uses: actions/upload-artifact@v4
+        with:
+          name: ambient-poi-candidate
+          path: |
+            scripts/ambient-tiles/ambient-poi.candidate.pmtiles
+            scripts/ambient-tiles/ambient-poi.candidate.pmtiles.sha256
+          if-no-files-found: error
+          retention-days: 7

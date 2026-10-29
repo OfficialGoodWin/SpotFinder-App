@@ -14,6 +14,7 @@ import {
   getAdminRoadOverrides, addAdminRoadOverride, deleteAdminRoadOverride,
   getAdminERouteOverrides, addAdminERouteOverride, deleteAdminERouteOverride,
   getOpenFlagsForAdmin, resolveFlag, deleteSpotAsSuperAdmin,
+  blockAccountSubmissions, unblockAccountSubmissions,
   getMaintenanceStatus, setMaintenanceStatus,
 } from '@/api/firebaseClient';
 // Category options for the POI dropdown — keys match AMBIENT_CATEGORIES keys in ambientCategories.js
@@ -835,6 +836,11 @@ function ModerationTab({ user }) {
   const [loading, setLoading] = useState(true);
   const [statusForm, setStatusForm] = useState({ status: 'ok', message: '', showBanner: true });
   const [savingStatus, setSavingStatus] = useState(false);
+  const [moderationNotice, setModerationNotice] = useState('');
+  const [blockUid, setBlockUid] = useState('');
+  const [blockHours, setBlockHours] = useState(24);
+  const [blockReason, setBlockReason] = useState('');
+  const [blockBusy, setBlockBusy] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -856,8 +862,9 @@ function ModerationTab({ user }) {
 
   const handleResolve = async (flagId, resolution) => {
     try {
-      await resolveFlag(flagId, resolution);
-      setFlags((prev) => prev.filter((f) => f.id !== flagId));
+      const result = await resolveFlag(flagId, resolution);
+      setModerationNotice(`Flag ${resolution}. Spot: ${result.spotStatus || 'deleted'}; ${result.openCount} open reports.`);
+      await load();
     } catch (err) {
       console.error('Failed to resolve flag:', err);
       alert('Could not resolve flag: ' + (err?.message || 'unknown error'));
@@ -869,11 +876,26 @@ function ModerationTab({ user }) {
     try {
       await deleteSpotAsSuperAdmin(spotId);
       await resolveFlag(flagId, 'upheld');
-      setFlags((prev) => prev.filter((f) => f.id !== flagId));
+      setModerationNotice('Spot deleted and flag resolved.');
+      await load();
     } catch (err) {
       console.error('Failed to delete spot:', err);
       alert('Could not delete spot: ' + (err?.message || 'unknown error'));
     }
+  };
+
+  const changeAccountBlock = async (blocked) => {
+    setBlockBusy(true);
+    try {
+      const result = blocked
+        ? await blockAccountSubmissions({ uid: blockUid.trim(), hours: Number(blockHours), reason: blockReason })
+        : await unblockAccountSubmissions(blockUid.trim());
+      setModerationNotice(blocked
+        ? `Account ${result.uid} cannot submit until ${result.expires_at}.`
+        : `Account ${result.uid} can submit again.`);
+    } catch (error) {
+      setModerationNotice(`Account block change failed: ${error?.message || 'unknown error'}`);
+    } finally { setBlockBusy(false); }
   };
 
   const saveStatus = async () => {
@@ -893,6 +915,23 @@ function ModerationTab({ user }) {
 
   return (
     <div className="space-y-5">
+      {moderationNotice && <p role="status" className="text-xs text-muted-foreground">{moderationNotice}</p>}
+      <div className="bg-gray-50 dark:bg-accent/30 rounded-xl p-3 border border-gray-100 dark:border-border">
+        <p className="text-xs font-semibold mb-2">Account submission block</p>
+        <p className="text-[11px] text-muted-foreground mb-2">IP bans are not enforced. Use a known account UID; enforcement ends when the block expires.</p>
+        <input value={blockUid} onChange={(event) => setBlockUid(event.target.value)} placeholder="Account UID"
+          className="w-full mb-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-border bg-white dark:bg-background text-sm" />
+        <input type="number" min="1" max="720" value={blockHours} onChange={(event) => setBlockHours(event.target.value)}
+          aria-label="Block duration in hours" className="w-full mb-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-border bg-white dark:bg-background text-sm" />
+        <input value={blockReason} onChange={(event) => setBlockReason(event.target.value)} placeholder="Reason (admin only)"
+          maxLength={200} className="w-full mb-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-border bg-white dark:bg-background text-sm" />
+        <div className="flex gap-2">
+          <button type="button" disabled={blockBusy || !blockUid.trim()} onClick={() => changeAccountBlock(true)}
+            className="flex-1 py-2 rounded-lg bg-red-600 text-white text-xs font-semibold disabled:opacity-50">Block submissions</button>
+          <button type="button" disabled={blockBusy || !blockUid.trim()} onClick={() => changeAccountBlock(false)}
+            className="flex-1 py-2 rounded-lg bg-gray-200 dark:bg-accent text-xs font-semibold disabled:opacity-50">Unblock</button>
+        </div>
+      </div>
       {/* Site status banner control */}
       <div className="bg-gray-50 dark:bg-accent/30 rounded-xl p-3 border border-gray-100 dark:border-border">
         <p className="text-xs font-semibold mb-2">Site status banner</p>

@@ -27,7 +27,10 @@ const { validateSocialPostUrl, INVALID_SOCIAL_URL_MESSAGE } = require('./socialU
 const { saveOfficialPoi, PoiEditError } = require('./officialPoiService');
 const { readOfficialPoi } = require('./officialPoiReader');
 const { MAX_UPLOAD_BYTES, isJpegBytes } = require('./imageFilePolicy');
-const { poiReference, ownedPhotoPath, verifyUploadedPhoto, submissionId } = require('./poiEnrichment');
+const { poiReference, verifyUploadedPhoto, validatedCommunityPhoto, validLegacyPoiId, submissionId } = require('./poiEnrichment');
+const { validatePoiRatingInput, moderationForRating, upsertPoiRating } = require('./poiRatingPolicy');
+const { reconcileSpotFlags, FlagModerationError } = require('./flagModeration');
+const { isSubmissionBlocked } = require('./submissionBlock');
 initializeApp();
 const db = getFirestore();
 const adminAuth = getAuth();
@@ -312,6 +315,12 @@ function hashIp(ip) {
   return crypto.createHash('sha256').update(`${salt}:${ip}`).digest('hex');
 }
 
+async function assertAccountCanSubmit(uid) {
+  // Public feedback without Auth still uses reCAPTCHA and existing limits.
+  if (await isSubmissionBlocked(db, uid))
+    throw new functions.https.HttpsError('permission-denied', 'Submissions are temporarily blocked for this account.');
+}
+
 function isAllowedRecaptchaHostname(hostname) {
   const configured = (process.env.RECAPTCHA_ALLOWED_HOSTNAMES || 'spotfinder.cz,www.spotfinder.cz,spot-finder-app.vercel.app,localhost,127.0.0.1')
     .split(',').map((v) => v.trim().toLowerCase()).filter(Boolean);
@@ -422,15 +431,27 @@ function cleanString(value, maxLength) {
   return String(value || '').replace(/[\u0000-\u001F\u007F]/g, ' ').trim().slice(0, maxLength);
 }
 
-function isManagedImageUrl(value, uid) {
-  try {
-    const url = new URL(value);
-    return url.protocol === 'https:'
-      && url.hostname === 'firebasestorage.googleapis.com'
-      && decodeURIComponent(url.pathname).includes(`/community/${uid}/`);
-  } catch {
-    return false;
-  }
+const OWNER_SPOT_DETAIL_FIELDS = ['title', 'description', 'tags', 'cost',
+  'access_difficulty', 'parking', 'best_time', 'directions'];
+function validOwnerSpotDetail(key, value) {
+  const stringList = (items, maxItems, maxLength) => Array.isArray(items)
+    && items.length <= maxItems && items.every(item => typeof item === 'string' && item.length <= maxLength);
+  if (key === 'title') return typeof value === 'string' && value.length > 0 && value.length <= 100;
+  if (key === 'description') return typeof value === 'string' && value.length <= 2000;
+  if (key === 'tags') return stringList(value, 10, 40);
+  if (key === 'best_time') return stringList(value, 5, 30);
+  if (key === 'directions') return typeof value === 'string' && value.length <= 1000;
+  const options = {
+    cost: ['free', 'paid', 'donation'],
+    access_difficulty: ['easy', 'moderate', 'hard'],
+    parking: ['yes', 'no', 'street', 'paid'],
+  };
+  return value == null || value === '' || options[key]?.includes(value) === true;
+}
+function ownsSpotRecord(spot, auth) {
+  return spot.created_by_uid === auth.uid
+    || (spot.created_by_uid == null && typeof auth.token?.email === 'string'
+      && auth.token.email.length > 0 && spot.created_by === auth.token.email);
 }
 
 async function promoteDraftPhotos(uid, draftId, draftData) {
@@ -482,6 +503,7 @@ exports.validateCommunityPhoto = functions.https.onCall(async (data, context) =>
   if (!uid) {
     throw new functions.https.HttpsError('unauthenticated', 'Sign in to upload a photo.');
   }
+  await assertAccountCanSubmit(uid);
   const path = String(data?.path || '');
   const prefix = `community/${uid}/`;
   if (!path.startsWith(prefix) || !/^[A-Za-z0-9-]+\.jpg$/.test(path.slice(prefix.length))) {
@@ -504,6 +526,62 @@ exports.validateCommunityPhoto = functions.https.onCall(async (data, context) =>
   return { size };
 });
 
+// Photo references cannot be trusted in a direct Firestore owner update.
+// This callable verifies new objects in this project's bucket and commits the
+// content/photo edit atomically without accepting publication or location keys.
+exports.updateSpotPhotos = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in to edit a spot.');
+  await assertAccountCanSubmit(context.auth.uid);
+  const spotId = String(data?.spotId || '');
+  const patch = data?.patch;
+  if (!/^[A-Za-z0-9_-]{1,120}$/.test(spotId) || !patch || typeof patch !== 'object' || Array.isArray(patch))
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid spot edit.');
+  const keys = Object.keys(patch);
+  if (!keys.length || keys.some(key => !OWNER_SPOT_DETAIL_FIELDS.includes(key) && !['image_urls', 'image_url'].includes(key))
+      || !Object.prototype.hasOwnProperty.call(patch, 'image_urls'))
+    throw new functions.https.HttpsError('invalid-argument', 'Only editable content and photos are accepted.');
+  const urls = patch.image_urls;
+  if (!Array.isArray(urls) || urls.length > 5 || new Set(urls).size !== urls.length
+      || urls.some(url => typeof url !== 'string' || url.length > 2048)
+      || (Object.prototype.hasOwnProperty.call(patch, 'image_url') && patch.image_url !== (urls[0] || null)))
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid spot photos.');
+  const details = Object.fromEntries(keys.filter(key => OWNER_SPOT_DETAIL_FIELDS.includes(key)).map(key => [key, patch[key]]));
+  if (Object.entries(details).some(([key, value]) => !validOwnerSpotDetail(key, value)))
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid spot details.');
+
+  const ref = db.collection('spots').doc(spotId);
+  const initial = await ref.get();
+  if (!initial.exists) throw new functions.https.HttpsError('not-found', 'Spot not found.');
+  if (!ownsSpotRecord(initial.data(), context.auth))
+    throw new functions.https.HttpsError('permission-denied', 'Only the owner can edit this spot.');
+  const previous = Array.isArray(initial.data().image_urls) && initial.data().image_urls.length
+    ? initial.data().image_urls : [initial.data().image_url].filter(Boolean);
+  for (const url of urls) {
+    if (previous.includes(url)) continue; // Existing legacy references may be retained or reordered.
+    try {
+      await validatedCommunityPhoto(getStorage(), url, context.auth.uid);
+    } catch {
+      throw new functions.https.HttpsError('invalid-argument', 'A new photo must be a validated upload from this account.');
+    }
+  }
+  await db.runTransaction(async transaction => {
+    const current = await transaction.get(ref);
+    if (!current.exists || !ownsSpotRecord(current.data(), context.auth))
+      throw new functions.https.HttpsError('permission-denied', 'Only the owner can edit this spot.');
+    // The photos and edit state used for validation must still be current.
+    if (!current.updateTime.isEqual(initial.updateTime))
+      throw new functions.https.HttpsError('aborted', 'Spot photos changed. Reload and try again.');
+    const oldMetadata = Array.isArray(current.data().photo_metadata) ? current.data().photo_metadata : [];
+    const photoMetadata = urls.map(url => oldMetadata.find(item => item?.url === url) || ({
+      url, source: 'user_upload', creator: current.data().created_by_name || 'SpotFinder contributor',
+      permission_basis: 'legacy_upload_unverified', source_url: null, modified: false,
+      location_match_confidence: 'user_placed',
+    }));
+    transaction.update(ref, { ...details, image_urls: urls, image_url: urls[0] || null, photo_metadata: photoMetadata });
+  });
+  return { success: true };
+});
+
 // /new enrichment is opt-in. Numeric tile IDs are resolved against the
 // original PBF identity index; an unresolved feature cannot be persisted.
 exports.resolvePoiEnrichment = functions.https.onCall(async (data) => {
@@ -521,18 +599,18 @@ exports.submitPoiEnrichmentPhoto = functions.https.onCall(async (data, context) 
   const uid = context.auth?.uid;
   if (!uid || context.auth.token.email_verified !== true)
     throw new functions.https.HttpsError('permission-denied', 'A verified account is required.');
+  await assertAccountCanSubmit(uid);
   if (data?.rightsConfirmed !== true)
     throw new functions.https.HttpsError('failed-precondition', 'Confirm that you may publish this photo.');
-  let identity, path;
+  let identity, photo;
   try {
     identity = poiReference(data);
-    path = ownedPhotoPath(data?.imageUrl, uid, getStorage().bucket().name);
-    await verifyUploadedPhoto(getStorage(), path);
+    photo = await validatedCommunityPhoto(getStorage(), data?.imageUrl, uid);
   } catch (error) {
     if (error instanceof PoiEditError) throw new functions.https.HttpsError(error.code, error.message);
     throw new functions.https.HttpsError('invalid-argument', error.message);
   }
-  const ref = db.collection('poi_enrichment_submissions').doc(submissionId(path));
+  const ref = db.collection('poi_enrichment_submissions').doc(submissionId(photo.path));
   if ((await db.collection('poi_photos').doc(ref.id).get()).exists)
     throw new functions.https.HttpsError('already-exists', 'This photo is already attached to a place.');
   const existing = await ref.get();
@@ -543,11 +621,60 @@ exports.submitPoiEnrichmentPhoto = functions.https.onCall(async (data, context) 
   }
   if (!await checkServerRateLimit(uid, 'poi_enrichment_photo', 5, 24 * 60 * 60 * 1000))
     throw new functions.https.HttpsError('resource-exhausted', 'Too many photo submissions. Try again later.');
-  await ref.create({ osm_ref: identity.canonicalId, tile_id: identity.tileId,
-    category: identity.category, image_path: path, image_url: data.imageUrl,
-    owner_uid: uid, attribution: String(data.attribution || '').trim().slice(0, 120) || 'SpotFinder contributor',
-    rights_basis: 'uploader-attestation',
-    status: 'pending_review', created_at: new Date().toISOString() });
+  try {
+    await ref.create({ osm_ref: identity.canonicalId, tile_id: identity.tileId,
+      category: identity.category, image_path: photo.path, image_url: photo.url,
+      owner_uid: uid, attribution: String(data.attribution || '').trim().slice(0, 120) || 'SpotFinder contributor',
+      rights_basis: 'uploader-attestation',
+      status: 'pending_review', created_at: new Date().toISOString() });
+  } catch (error) {
+    if (error?.code !== 6 && error?.code !== 'already-exists') throw error;
+    const concurrent = await ref.get();
+    if (!concurrent.exists || concurrent.data().owner_uid !== uid || concurrent.data().osm_ref !== identity.canonicalId)
+      throw new functions.https.HttpsError('already-exists', 'This upload is already attached to another place.');
+    return { id: ref.id, status: concurrent.data().status };
+  }
+  return { id: ref.id, status: 'pending_review' };
+});
+
+// Legacy coordinate/name POIs use the same upload and review boundary as /new.
+// Their key cannot establish OSM provenance, so an admin must review before
+// publishing the photo to the public collection.
+exports.submitLegacyPoiPhoto = functions.https.onCall(async (data, context) => {
+  const uid = context.auth?.uid;
+  if (!uid || context.auth.token.email_verified !== true)
+    throw new functions.https.HttpsError('permission-denied', 'A verified account is required.');
+  await assertAccountCanSubmit(uid);
+  if (data?.rightsConfirmed !== true)
+    throw new functions.https.HttpsError('failed-precondition', 'Confirm that you may publish this photo.');
+  const poiId = data?.poiId;
+  if (!validLegacyPoiId(poiId))
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid place identity.');
+  let photo;
+  try { photo = await validatedCommunityPhoto(getStorage(), data?.imageUrl, uid); }
+  catch { throw new functions.https.HttpsError('invalid-argument', 'A photo must be a validated upload from this account.'); }
+  const ref = db.collection('poi_enrichment_submissions').doc(submissionId(photo.path));
+  if ((await db.collection('poi_photos').doc(ref.id).get()).exists)
+    throw new functions.https.HttpsError('already-exists', 'This photo is already attached to a place.');
+  const existing = await ref.get();
+  if (existing.exists) {
+    if (existing.data().owner_uid !== uid || existing.data().poi_id !== poiId)
+      throw new functions.https.HttpsError('already-exists', 'This upload is already attached to another place.');
+    return { id: ref.id, status: existing.data().status };
+  }
+  if (!await checkServerRateLimit(uid, 'poi_enrichment_photo', 5, 24 * 60 * 60 * 1000))
+    throw new functions.https.HttpsError('resource-exhausted', 'Too many photo submissions. Try again later.');
+  try {
+    await ref.create({ poi_id: poiId, source_type: 'legacy_poi', image_path: photo.path, image_url: photo.url,
+      owner_uid: uid, attribution: String(data.attribution || '').trim().slice(0, 120) || 'SpotFinder contributor',
+      rights_basis: 'uploader-attestation', status: 'pending_review', created_at: new Date().toISOString() });
+  } catch (error) {
+    if (error?.code !== 6 && error?.code !== 'already-exists') throw error;
+    const concurrent = await ref.get();
+    if (!concurrent.exists || concurrent.data().owner_uid !== uid || concurrent.data().poi_id !== poiId)
+      throw new functions.https.HttpsError('already-exists', 'This upload is already attached to another place.');
+    return { id: ref.id, status: concurrent.data().status };
+  }
   return { id: ref.id, status: 'pending_review' };
 });
 
@@ -587,7 +714,8 @@ exports.adminReviewPoiEnrichmentPhoto = functions.https.onCall(async (data, cont
     tx.update(ref, { status: decision === 'approve' ? 'approved' : 'rejected',
       reviewed_at: new Date().toISOString(), reviewed_by_uid: context.auth.uid });
     if (decision === 'approve') tx.create(db.collection('poi_photos').doc(id), {
-      poi_id: row.osm_ref, osm_ref: row.osm_ref, source: 'community', image: publishedUrl,
+      poi_id: row.poi_id || row.osm_ref, ...(row.osm_ref ? { osm_ref: row.osm_ref } : {}),
+      source: 'community', image: publishedUrl,
       image_path: publishedPath, created_by: 'registered-account', created_by_uid: row.owner_uid,
       attribution: row.attribution, rights_basis: row.rights_basis, created_date: row.created_at,
     });
@@ -599,6 +727,7 @@ exports.linkPoiCommunitySpot = functions.https.onCall(async (data, context) => {
   const uid = context.auth?.uid;
   if (!uid || context.auth.token.email_verified !== true)
     throw new functions.https.HttpsError('permission-denied', 'A verified account is required.');
+  await assertAccountCanSubmit(uid);
   let identity;
   try { identity = poiReference(data); }
   catch (error) {
@@ -695,6 +824,7 @@ exports.submitSpot = functions.runWith({ secrets: ['ANTI_SPAM_IP_SALT'] }).https
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in to add a spot.');
   const input = data || {};
   const uid = context.auth.uid;
+  await assertAccountCanSubmit(uid);
   const rawDraftId = cleanString(input._draft_id, 100);
   const draftId = /^[A-Za-z0-9_-]{1,100}$/.test(rawDraftId) ? rawDraftId : '';
   const publicationRef = draftId ? db.collection('spot_publications').doc(`${uid}_${draftId}`) : null;
@@ -748,11 +878,23 @@ exports.submitSpot = functions.runWith({ secrets: ['ANTI_SPAM_IP_SALT'] }).https
       throw new functions.https.HttpsError('permission-denied', 'This draft belongs to another account.');
     }
   }
+  const suppliedUrls = Array.isArray(input.image_urls) ? input.image_urls : [];
+  const draftPhotoCount = Array.isArray(draftSnapshotForPhotos?.data()?.photo_refs)
+    ? draftSnapshotForPhotos.data().photo_refs.length : 0;
+  if (suppliedUrls.length + draftPhotoCount > 5 || new Set(suppliedUrls).size !== suppliedUrls.length)
+    throw new functions.https.HttpsError('invalid-argument', 'A spot can contain at most five distinct photos.');
+  const submittedImageUrls = [];
+  for (const value of suppliedUrls) {
+    try {
+      if (typeof value !== 'string' || value.length > 2048) throw new TypeError('Invalid photo URL');
+      submittedImageUrls.push((await validatedCommunityPhoto(getStorage(), value, uid)).url);
+    } catch {
+      throw new functions.https.HttpsError('invalid-argument', 'A photo must be a validated upload from this account.');
+    }
+  }
   const promotedDraftUrls = draftSnapshotForPhotos?.exists
     ? await promoteDraftPhotos(uid, draftId, draftSnapshotForPhotos.data())
     : [];
-  const submittedImageUrls = (Array.isArray(input.image_urls) ? input.image_urls : [])
-    .filter(value => typeof value === 'string' && isManagedImageUrl(value, uid));
   const imageUrls = [...promotedDraftUrls, ...submittedImageUrls];
   if (imageUrls.length > 5) throw new functions.https.HttpsError('invalid-argument', 'A spot can contain at most five photos.');
   const allowedOption = (value, allowed) => allowed.includes(value) ? value : null;
@@ -824,13 +966,9 @@ exports.submitSpot = functions.runWith({ secrets: ['ANTI_SPAM_IP_SALT'] }).https
   return { id: spotRef.id, ...spot };
 });
 
-// Best-effort caller identity: Firestore triggers don't carry the writer's
-// source IP, so IP-based bans (ip_bans collection) can only be enforced on
-// requests that pass through an HTTPS callable/endpoint (e.g. put the
-// create-spot / create-rating calls behind a callable function instead of
-// direct client SDK writes) or via a Cloud Armor / App Check rule at the
-// edge. This trigger enforces what it *can* see: per-account rate limits
-// and content heuristics.
+// Firestore triggers do not carry a trustworthy requester IP. Legacy ip_bans
+// records are not enforced; trusted callables and direct-write rules use UID
+// submission blocks instead. This trigger retains content heuristics.
 
 // ─── Spots: rate-limit + spam scan on create ───────────────────────────────
 exports.onSpotCreated = functions.firestore
@@ -910,49 +1048,56 @@ exports.onSpotRatingWritten = functions.firestore
     });
   });
 
-// ─── Flags: recompute flag_count / auto-hide server-side ───────────────────
-const FLAG_AUTO_HIDE_THRESHOLD = 3;
-
-exports.onFlagCreated = functions.firestore
+// Reconcile creation, resolution, account deletion and trigger retries from
+// current open reports. The transaction writes only when state actually differs.
+exports.onFlagWritten = functions.firestore
   .document('flags/{flagId}')
-  .onCreate(async (snap) => {
-    const flag = snap.data();
-    const spotId = flag.spot_id;
+  .onWrite(async (change) => {
+    const spotId = change.after.exists ? change.after.data()?.spot_id : change.before.data()?.spot_id;
     if (!spotId) return;
-
-    const openFlags = await db.collection('flags')
-      .where('spot_id', '==', spotId)
-      .where('status', '==', 'open')
-      .get();
-
-    const updates = { flag_count: openFlags.size };
-    if (openFlags.size >= FLAG_AUTO_HIDE_THRESHOLD) {
-      updates.status = 'flagged';
-    }
-    await db.collection('spots').doc(spotId).update(updates);
+    await reconcileSpotFlags({ db, spotId, deleteField: () => FieldValue.delete() });
   });
 
-// ─── POI ratings / reviews: spam scan on create ────────────────────────────
+// One trusted write path covers both new canonical IDs and legacy arbitrary IDs.
+// A bounded transaction prevents concurrent submissions from adding a second
+// active rating for the same verified account and POI.
+exports.submitPoiRating = functions.https.onCall(async (data, context) => {
+  const uid = context.auth?.uid;
+  if (!uid || context.auth.token.email_verified !== true)
+    throw new functions.https.HttpsError('permission-denied', 'A verified account is required.');
+  await assertAccountCanSubmit(uid);
+  let input;
+  try { input = validatePoiRatingInput(data); }
+  catch { throw new functions.https.HttpsError('invalid-argument', 'Invalid POI rating or review.'); }
+  if (!await checkServerRateLimit(uid, 'poi_rating', 20, 60 * 60 * 1000))
+    throw new functions.https.HttpsError('resource-exhausted', 'Too many rating changes. Try again later.');
+
+  try { return await upsertPoiRating({ db, uid, input, spamScore }); }
+  catch (error) {
+    if (error.message === 'legacy-duplicate-limit')
+      throw new functions.https.HttpsError('failed-precondition', 'Legacy duplicate ratings need owner review before another edit.');
+    throw error;
+  }
+});
+
+// Old create events may be delivered more than once. The callable already
+// scores new writes synchronously; this trigger only fills missing moderation
+// on older direct-client records, using their rules-validated stored UID.
 exports.onPoiRatingCreated = functions.firestore
   .document('poi_ratings/{docId}')
-  .onCreate(async (snap, context) => {
+  .onCreate(async (snap) => {
     const rating = snap.data();
-    const uid = context.auth?.uid;
-
-    if (uid) {
-      const allowed = await checkServerRateLimit(uid, 'poi_rating', 20, 60 * 60 * 1000); // 20/hour
-      if (!allowed) {
-        await snap.ref.update({ hidden: true, moderation_note: 'auto_hidden:rate_limit_exceeded' });
-        return;
-      }
-    }
-
-    const { score, reasons } = spamScore(rating.comment);
-    if (score >= 5) {
-      await snap.ref.update({ hidden: true, moderation_note: `auto_hidden:${reasons.join(',')}` });
-    } else if (score > 0) {
-      await snap.ref.update({ needs_review: true, moderation_note: `low_confidence:${reasons.join(',')}` });
-    }
+    const uid = rating.created_by_uid;
+    if (typeof uid !== 'string' || !uid) return;
+    const moderation = moderationForRating(rating, spamScore);
+    if (!moderation.hidden && !moderation.needs_review) return;
+    const current = await snap.ref.get();
+    if (!current.exists || current.data().review !== rating.review) return;
+    const patch = {};
+    if (moderation.hidden && current.data().hidden !== true) patch.hidden = true;
+    if (moderation.needs_review && current.data().needs_review !== true) patch.needs_review = true;
+    if (!current.data().moderation_note) patch.moderation_note = moderation.moderation_note;
+    if (Object.keys(patch).length) await snap.ref.update(patch);
   });
 
 // ─── Feedback: protected public submit endpoint ─────────────────────────────
@@ -982,6 +1127,7 @@ exports.submitFeedback = functions.runWith({
 
   const ipHash = hashIp(getRequestIp(context));
   const uid = context.auth?.uid || 'no-auth';
+  await assertAccountCanSubmit(context.auth?.uid);
   const sessionAllowed = await checkServerRateLimit(uid, 'feedback', 5, 60 * 60 * 1000);
   const ipAllowed = await checkIpRateLimit(ipHash, 'feedback', 10, 60 * 60 * 1000);
 
@@ -1088,15 +1234,35 @@ function assertIsAdmin(context) {
 
 // ─── Admin actions as callables (so every admin action is logged server-side,
 // instead of trusting the client to also write an audit entry) ─────────────
+exports.adminBlockAccountSubmissions = functions.https.onCall(async (data, context) => {
+  assertIsAdmin(context);
+  const uid = String(data?.uid || '').trim();
+  const hours = Number(data?.hours ?? 24);
+  if (!/^[A-Za-z0-9:_-]{1,128}$/.test(uid) || !Number.isInteger(hours) || hours < 1 || hours > 720)
+    throw new functions.https.HttpsError('invalid-argument', 'Provide an account UID and a duration of 1 to 720 hours.');
+  if (uid === context.auth.uid)
+    throw new functions.https.HttpsError('failed-precondition', 'An admin cannot block their own account.');
+  const reason = String(data?.reason || 'Submission abuse').trim().slice(0, 200);
+  const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000);
+  await db.collection('submission_blocks').doc(uid).set({ uid, reason,
+    expires_at: expiresAt, blocked_at: new Date().toISOString(), blocked_by_uid: context.auth.uid });
+  await logAdminAction('block_account_submissions', context.auth.uid, { uid, hours, reason, expires_at: expiresAt.toISOString() });
+  return { success: true, uid, expires_at: expiresAt.toISOString() };
+});
+
+exports.adminUnblockAccountSubmissions = functions.https.onCall(async (data, context) => {
+  assertIsAdmin(context);
+  const uid = String(data?.uid || '').trim();
+  if (!/^[A-Za-z0-9:_-]{1,128}$/.test(uid))
+    throw new functions.https.HttpsError('invalid-argument', 'Provide an account UID.');
+  await db.collection('submission_blocks').doc(uid).delete();
+  await logAdminAction('unblock_account_submissions', context.auth.uid, { uid });
+  return { success: true, uid };
+});
+
 exports.adminBanIP = functions.https.onCall(async (data, context) => {
   assertIsAdmin(context);
-  const { ip, reason } = data || {};
-  if (!ip) throw new functions.https.HttpsError('invalid-argument', 'ip is required.');
-  await db.collection('ip_bans').doc(ip).set({
-    ip, reason: reason || 'Violation of terms', banned_by: context.auth.token.email, banned_at: new Date().toISOString(),
-  });
-  await logAdminAction('ban_ip', context.auth.token.email, { ip, reason });
-  return { success: true };
+  throw new functions.https.HttpsError('failed-precondition', 'IP bans are not enforced. Block an account UID instead.');
 });
 
 exports.adminUnbanIP = functions.https.onCall(async (data, context) => {
@@ -1114,11 +1280,19 @@ exports.adminResolveFlag = functions.https.onCall(async (data, context) => {
   if (!flagId || !['upheld', 'dismissed'].includes(resolution)) {
     throw new functions.https.HttpsError('invalid-argument', 'flagId and a valid resolution are required.');
   }
-  await db.collection('flags').doc(flagId).update({
-    status: 'resolved', resolution, resolved_date: new Date().toISOString(),
-  });
-  await logAdminAction('resolve_flag', context.auth.token.email, { flagId, resolution });
-  return { success: true };
+  const snapshot = await db.collection('flags').doc(flagId).get();
+  if (!snapshot.exists) throw new functions.https.HttpsError('not-found', 'Flag not found.');
+  let result;
+  try {
+    result = await reconcileSpotFlags({ db, spotId: snapshot.data().spot_id, flagId,
+      resolution, deleteField: () => FieldValue.delete() });
+  } catch (error) {
+    if (error instanceof FlagModerationError) throw new functions.https.HttpsError(error.code, error.message);
+    throw error;
+  }
+  if (!result.alreadyResolved) await logAdminAction('resolve_flag', context.auth.token.email,
+    { flagId, resolution, spotId: result.spotId, openCount: result.openCount, spotStatus: result.spotStatus });
+  return { success: true, ...result };
 });
 
 exports.adminDeleteSpot = functions.https.onCall(async (data, context) => {
@@ -1139,9 +1313,6 @@ exports.adminDeleteSpot = functions.https.onCall(async (data, context) => {
 });
 
 exports.setAdminClaim = require('./setAdminClaim').setAdminClaim;
-// Keep the already-deployed migration callable in the manifest so routine
-// deployments do not attempt to delete it implicitly.
-exports.updateSuperadminEmail = require('./updateSuperadminEmail').updateSuperadminEmail;
 // ─── Unified content reports (spots, dataset POIs, community POI photos) ───
 const REPORT_REASONS = {
   spot: new Set(['wrong_info','wrong_location','closed_or_missing','duplicate','inappropriate','spam_scam','other_safety']),
@@ -1180,6 +1351,7 @@ exports.addSocialPost = functions.runWith({
   secrets: ['ANTI_SPAM_IP_SALT'],
 }).https.onCall(async (data, context) => {
   assertVerifiedUser(context);
+  await assertAccountCanSubmit(context.auth.uid);
   const validated = validateSocialPostUrl(data?.url);
   if (!validated.ok) throw new functions.https.HttpsError('invalid-argument', INVALID_SOCIAL_URL_MESSAGE);
   const target = normalizeSocialTarget(data);
@@ -1267,6 +1439,7 @@ exports.submitReport = functions.runWith({
   secrets: ['ANTI_SPAM_IP_SALT'],
 }).https.onCall(async (data, context) => {
   assertVerifiedUser(context);
+  await assertAccountCanSubmit(context.auth.uid);
   const p=data||{}, targetType=String(p.targetType||''), targetId=String(p.targetId||'').slice(0,500), reason=String(p.category||'');
   if (!REPORT_REASONS[targetType]?.has(reason) || !targetId) throw new functions.https.HttpsError('invalid-argument','Invalid report target or reason.');
   const message=String(p.message||'').trim().slice(0,1000), subject=String(p.subject||'Report').slice(0,200);
@@ -1292,7 +1465,7 @@ exports.submitReport = functions.runWith({
 exports.adminResolveReport=functions.https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.reportId||'');if(!id)throw new functions.https.HttpsError('invalid-argument','reportId required');await db.collection('reports').doc(id).update({status:'resolved',resolution:String(data?.resolution||'resolved').slice(0,100),resolved_at:new Date().toISOString(),resolved_by:context.auth.token.email||context.auth.uid});await logAdminAction('resolve_report',context.auth.token.email,{reportId:id});return{success:true}});
 exports.adminDeleteReport=functions.https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.reportId||'');if(!id)throw new functions.https.HttpsError('invalid-argument','reportId required');await db.collection('reports').doc(id).delete();await logAdminAction('delete_report',context.auth.token.email,{reportId:id});return{success:true}});
 exports.adminBlockReporter=functions.https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.reportId||'');const snap=await db.collection('reports').doc(id).get();if(!snap.exists)throw new functions.https.HttpsError('not-found','Report not found');const r=snap.data(), batch=db.batch(), now=new Date().toISOString();for(const [k,v] of [['uid',r.reporter_uid],['ip',r.ip_hash],['device',r.device_hash]])if(v)batch.set(db.collection('report_blocks').doc(`${k}_${v}`),{kind:k,value:v,reason:String(data?.reason||'Report spam').slice(0,200),blocked_at:now,blocked_by:context.auth.token.email||context.auth.uid});await batch.commit();await logAdminAction('block_reporter',context.auth.token.email,{reportId:id,reporter_uid:r.reporter_uid});return{success:true}});
-exports.adminUpdateSpot=functions.https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.spotId||''),src=data?.patch||{},patch={};for(const k of ['title','description','image_url','image_urls','status'])if(Object.prototype.hasOwnProperty.call(src,k))patch[k]=src[k];if(!id||!Object.keys(patch).length)throw new functions.https.HttpsError('invalid-argument','spotId and patch required');await db.collection('spots').doc(id).update(patch);await logAdminAction('update_spot',context.auth.token.email,{spotId:id,fields:Object.keys(patch)});return{success:true}});
+exports.adminUpdateSpot=functions.https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.spotId||''),src=data?.patch||{},patch={};for(const k of ['title','description','image_url','image_urls','status'])if(Object.prototype.hasOwnProperty.call(src,k))patch[k]=src[k];if(!id||!Object.keys(patch).length)throw new functions.https.HttpsError('invalid-argument','spotId and patch required');if(Object.prototype.hasOwnProperty.call(patch,'status'))patch.auto_flag_moderation=FieldValue.delete();await db.collection('spots').doc(id).update(patch);await logAdminAction('update_spot',context.auth.token.email,{spotId:id,fields:Object.keys(src)});return{success:true}});
 exports.adminDeletePOIPhoto=functions.https.onCall(async(data,context)=>{
   assertIsAdmin(context);
   const id=String(data?.photoId||'');

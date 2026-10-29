@@ -1,4 +1,5 @@
 export default {
+  signOutFailed: 'Sign out failed. You are still signed in. Please try again.',
   newSkeleton: { loading: 'Loading content…' },
   newSupport: {
     feedbackIntro: 'Help us improve SpotFinder. Tell us what you like, what is missing, or what could work better.',

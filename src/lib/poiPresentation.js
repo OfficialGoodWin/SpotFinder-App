@@ -1,3 +1,5 @@
+import { firebaseConfig } from '@/api/firebaseConfig';
+
 export function safeWebsite(value) {
   if (typeof value !== 'string' || !value.trim()) return null;
   try {
@@ -15,7 +17,22 @@ export function normalizePoiPhotos(remote = [], community = []) {
   const seen = new Set();
   return [
     ...remote.map(photo => ({ ...photo, kind: 'remote' })),
-    ...community.map(photo => ({ url: photo.image || photo.photo, thumbnail_url: photo.thumbnail_url,
+    ...community.filter(photo => {
+      try {
+        const url = new URL(photo.image || photo.photo);
+        const prefix = `/v0/b/${encodeURIComponent(firebaseConfig.storageBucket)}/o/`;
+        if (url.origin !== 'https://firebasestorage.googleapis.com' || !url.pathname.startsWith(prefix)
+            || url.hash || url.searchParams.get('alt') !== 'media' || !url.searchParams.get('token')
+            || [...url.searchParams].length !== 2) return false;
+        const encodedPath = url.pathname.slice(prefix.length);
+        const path = decodeURIComponent(encodedPath);
+        if (encodeURIComponent(path) !== encodedPath) return false;
+        return path === `poi-enrichment/${photo.id}.jpg`
+          || (typeof photo.created_by_uid === 'string'
+            && /^[A-Za-z0-9-]+\.jpg$/.test(path.slice(`community/${photo.created_by_uid}/`.length))
+            && path.startsWith(`community/${photo.created_by_uid}/`));
+      } catch { return false; }
+    }).map(photo => ({ url: photo.image || photo.photo,
       kind: 'sf', photoId: photo.id, credit: photo.attribution || null })),
   ].filter(photo => {
     if (typeof photo.url !== 'string') return false;
@@ -27,3 +44,4 @@ export function normalizePoiPhotos(remote = [], community = []) {
     } catch { return false; }
   });
 }
+

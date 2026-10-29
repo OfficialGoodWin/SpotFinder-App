@@ -45,6 +45,14 @@ export default function AccountSecuritySection() {
     }
   };
 
+  const handleSignOut = async () => {
+    if (busy) return;
+    setBusy('signOut'); setError(''); setMessage('');
+    try { await logout(); }
+    catch { setError(t('signOutFailed')); }
+    finally { setBusy(''); }
+  };
+
   return (
     <section className="sf-section" aria-labelledby="account-security-title">
       <div className="flex items-center gap-2 text-muted-foreground">
@@ -85,7 +93,7 @@ export default function AccountSecuritySection() {
 
       {message && <p className="sf-status-success mt-3" role="status">{t(`accountSecurity.${message}`)}</p>}
       {error && <p className="sf-status-error mt-3" role="alert">{error}</p>}
-      <button onClick={() => logout()} className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-red-200 text-sm font-semibold text-red-700 hover:bg-red-50 focus-visible:ring-2 focus-visible:ring-red-500 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"><LogOut className="w-4 h-4" />{t('accountSecurity.signOut')}</button>
+      <button onClick={handleSignOut} disabled={Boolean(busy)} className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-red-200 text-sm font-semibold text-red-700 hover:bg-red-50 focus-visible:ring-2 focus-visible:ring-red-500 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30 disabled:opacity-50"><LogOut className="w-4 h-4" />{t('accountSecurity.signOut')}</button>
     </section>
   );
 }

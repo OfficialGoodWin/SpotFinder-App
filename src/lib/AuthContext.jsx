@@ -1,5 +1,5 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import { getFirebaseServices, onAuthChange, handleGoogleRedirectResult, ensureAnonymousSession } from '@/api/firebaseClient';
+import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
+import { getFirebaseServices, onAuthChange, handleGoogleRedirectResult, ensureAnonymousSession, logout as firebaseLogout } from '@/api/firebaseClient';
 
 const AuthContext = createContext();
 
@@ -16,6 +16,8 @@ export const AuthProvider = ({ children }) => {
   const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(true);
   const [authError, setAuthError] = useState(null);
   const [appPublicSettings, setAppPublicSettings] = useState(null);
+  const logoutPromiseRef = useRef(null);
+  const logoutRedirectRef = useRef(false);
 
   useEffect(() => {
     // Set up Firebase auth state listener
@@ -49,7 +51,11 @@ export const AuthProvider = ({ children }) => {
                 emailVerified: firebaseUser.emailVerified
               });
               setIsAuthenticated(true);
-              firebaseUser.getIdTokenResult().then(r => setIsAdmin(r.claims?.admin === true)).catch(() => setIsAdmin(false));
+              firebaseUser.getIdTokenResult().then(r => {
+                if (auth.currentUser?.uid === firebaseUser.uid) setIsAdmin(r.claims?.admin === true);
+              }).catch(() => {
+                if (auth.currentUser?.uid === firebaseUser.uid) setIsAdmin(false);
+              });
             }
           } else {
             setUser(null);
@@ -96,6 +102,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const { auth } = getFirebaseServices();
       const firebaseUser = auth.currentUser;
+      setAuthUid(firebaseUser?.uid || null);
       if (firebaseUser && !firebaseUser.isAnonymous) {
         setIsAnonymous(false);
         setUser({
@@ -109,10 +116,12 @@ export const AuthProvider = ({ children }) => {
       } else if (firebaseUser?.isAnonymous) {
         setUser(null);
         setIsAuthenticated(false);
+        setIsAdmin(false);
         setIsAnonymous(true);
       } else {
         setUser(null);
         setIsAuthenticated(false);
+        setIsAdmin(false);
         setIsAnonymous(false);
       }
     } catch (error) {
@@ -134,6 +143,7 @@ export const AuthProvider = ({ children }) => {
       await firebaseUser.reload();
       await firebaseUser.getIdToken(true);
       const tokenResult = await firebaseUser.getIdTokenResult();
+      if (auth.currentUser?.uid !== firebaseUser.uid) return;
       setIsAdmin(tokenResult.claims?.admin === true);
       if (firebaseUser.isAnonymous) {
         setUser(null);
@@ -165,20 +175,23 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const logout = async (shouldRedirect = true) => {
+    logoutRedirectRef.current ||= shouldRedirect;
+    if (logoutPromiseRef.current) return logoutPromiseRef.current;
+    const operation = (async () => {
+      await firebaseLogout();
+      // Read Firebase's current user after a successful sign-out; the auth
+      // listener remains the source of truth for subsequent guest/sign-in changes.
+      await checkUserAuth();
+      if (logoutRedirectRef.current) window.location.reload();
+    })();
+    logoutPromiseRef.current = operation;
     try {
-      const { logout } = await import('@/api/firebaseClient');
-      await logout();
-      setUser(null);
-      setIsAuthenticated(false);
-      
-      if (shouldRedirect) {
-        window.location.href = window.location.href;
+      return await operation;
+    } finally {
+      if (logoutPromiseRef.current === operation) {
+        logoutPromiseRef.current = null;
+        logoutRedirectRef.current = false;
       }
-    } catch (error) {
-      console.error('Logout error:', error);
-      // Still clear local state even if logout fails
-      setUser(null);
-      setIsAuthenticated(false);
     }
   };
 
