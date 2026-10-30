@@ -18,10 +18,10 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
+import { getAppCheck } from 'firebase-admin/app-check';
+import { assertSafeAdminTarget } from './adminTargetPolicy.js';
 
 function initAdmin() {
-  if (getApps().length) return getApps()[0];
-
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   // Vercel env vars store newlines as literal "\n" — convert back.
@@ -34,12 +34,22 @@ function initAdmin() {
     );
   }
 
-  return initializeApp({ credential: cert({ projectId, clientEmail, privateKey }) });
+  assertSafeAdminTarget({ deployment: process.env.VERCEL_ENV, projectId, clientEmail,
+    stagingProjectId: process.env.VITE_FIREBASE_STAGING_PROJECT_ID });
+  if (getApps().length) {
+    const existing = getApps()[0];
+    if (existing.options.projectId !== projectId) throw new Error('Firebase Admin project mismatch.');
+    return existing;
+  }
+
+  return initializeApp({ credential: cert({ projectId, clientEmail, privateKey }), projectId });
 }
 
 const app = initAdmin();
+export const adminApp = app;
 export const adminDb = getFirestore(app);
 export const adminAuth = getAuth(app);
+export const adminAppCheck = getAppCheck(app);
 
 /**
  * Verify a Firebase ID token sent by the client (Authorization: Bearer <token>)

@@ -36,10 +36,12 @@ export async function createCheckoutSession(planId, userId, customerEmail, retur
   const { auth } = getFirebaseServices();
   const idToken = await auth.currentUser?.getIdToken();
   if (!idToken) throw new Error('Please sign in again to subscribe');
+  const appCheckToken = await import('./firebaseClient').then(module => module.getVercelAppCheckToken()).catch(() => '');
 
   const response = await fetch('/api/create-checkout-session', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}`,
+      ...(appCheckToken ? { 'X-Firebase-AppCheck': appCheckToken } : {}) },
     // userId travels as Stripe Checkout `metadata` (set server-side in
     // create-checkout-session.js) so the webhook can attribute the paid
     // subscription back to the right Firestore user document.
@@ -64,9 +66,11 @@ export async function getSubscriptionStatus(userId) {
   const { auth } = getFirebaseServices();
   const idToken = await auth.currentUser?.getIdToken();
   if (!idToken) return null;
+  const appCheckToken = await import('./firebaseClient').then(module => module.getVercelAppCheckToken()).catch(() => '');
 
   const response = await fetch(`/api/subscription-status?userId=${userId}`, {
-    headers: { Authorization: `Bearer ${idToken}` },
+    headers: { Authorization: `Bearer ${idToken}`,
+      ...(appCheckToken ? { 'X-Firebase-AppCheck': appCheckToken } : {}) },
   });
   if (!response.ok) return null;
   return await response.json();

@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { X, MapPin, AlertTriangle, Navigation, Trash2, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
 import OfficialPoiEditor from './OfficialPoiEditor';
 import { useLanguage } from '@/lib/LanguageContext';
+import { flagPriorityCounts, sortForManualReview } from '@/lib/manualReviewPriority';
 import {
   getAdminPOIs, addAdminPOI, updateAdminPOI, deleteAdminPOI,
   getAdminClosures, addAdminClosure, deleteAdminClosure,
@@ -826,13 +827,10 @@ function ERoutesTab({ user, pendingLatLon, onRequestMapClick, onClear }) {
 }
 
 // ─── Moderation tab: flag review queue + status banner control ────────────
-// Previously: getOpenFlagsForAdmin/resolveFlag existed in firebaseClient.js
-// and getMaintenanceStatus/setMaintenanceStatus existed too, but nothing in
-// the UI ever called any of them — there was no report button to generate
-// flags in the first place, and no admin screen to review them. Both are
-// wired up now (see SpotDetailModal.jsx for the report button).
+// Preserve historical flags for administrator review. New reports enter /reports.
 function ModerationTab({ user }) {
   const [flags, setFlags] = useState([]);
+  const reviewCounts = flagPriorityCounts(flags);
   const [loading, setLoading] = useState(true);
   const [statusForm, setStatusForm] = useState({ status: 'ok', message: '', showBanner: true });
   const [savingStatus, setSavingStatus] = useState(false);
@@ -849,7 +847,8 @@ function ModerationTab({ user }) {
         getOpenFlagsForAdmin(100),
         getMaintenanceStatus(),
       ]);
-      setFlags(openFlags || []);
+      const rows = openFlags || [];
+      setFlags(sortForManualReview(rows, flagPriorityCounts(rows), flag => flag.spot_id));
       if (currentStatus) setStatusForm((f) => ({ ...f, ...currentStatus }));
     } catch (err) {
       console.error('Failed to load moderation data:', err);
@@ -981,6 +980,7 @@ function ModerationTab({ user }) {
                 <span className="text-[10px] text-muted-foreground">{flag.reporter_email}</span>
               </div>
               {flag.note && <p className="text-xs text-muted-foreground mb-2">"{flag.note}"</p>}
+              {(reviewCounts.get(flag.spot_id) || 0) >= 3 && <p className="text-xs font-semibold text-amber-700 mb-2">Manual review priority · {reviewCounts.get(flag.spot_id)} distinct flags</p>}
               <p className="text-[10px] text-muted-foreground mb-2">Spot: {flag.spot_id}</p>
               <div className="flex gap-2">
                 <button

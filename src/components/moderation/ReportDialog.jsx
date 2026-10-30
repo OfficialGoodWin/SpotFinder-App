@@ -1,6 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Flag, X } from 'lucide-react';
 import { submitGeneralReport } from '@/api/firebaseClient';
+import { submitReportPilot } from '@/api/reportPilotClient';
+import TurnstileChallenge from '@/new/TurnstileChallenge';
 import { useLanguage } from '@/lib/LanguageContext';
 
 const REASONS = {
@@ -9,6 +11,8 @@ const REASONS = {
   poi_photo: ['wrong_place', 'inappropriate', 'copyright', 'private_info', 'misleading', 'spam', 'other'],
   social_post: ['unrelated', 'inappropriate', 'spam', 'misleading', 'privacy', 'unavailable', 'other'],
 };
+const REPORT_PILOT = import.meta.env.VITE_REPORT_API_PILOT_ENABLED === 'true';
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
 
 function deviceId() {
   try {
@@ -44,6 +48,10 @@ export default function ReportDialog({ open, onClose, user, targetType, targetId
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
+  const [challengeRequired, setChallengeRequired] = useState(false);
+  const [challengeToken, setChallengeToken] = useState('');
+  const [challengeReset, setChallengeReset] = useState(0);
+  const requestId = useRef('');
 
   useEffect(() => {
     if (open) {
@@ -51,6 +59,9 @@ export default function ReportDialog({ open, onClose, user, targetType, targetId
       setNote('');
       setSent(false);
       setError('');
+      setChallengeRequired(false);
+      setChallengeToken('');
+      requestId.current = '';
     }
   }, [open, targetId]);
 
@@ -58,11 +69,11 @@ export default function ReportDialog({ open, onClose, user, targetType, targetId
 
   const verified = Boolean(user && !user.isAnonymous && user.emailVerified === true);
   const submit = async () => {
-    if (!verified || !reason || busy) return;
+    if (!verified || !reason || busy || (REPORT_PILOT && challengeRequired && !challengeToken)) return;
     setBusy(true);
     setError('');
     try {
-      await submitGeneralReport({
+      const payload = {
         category: reason,
         subject: `Report: ${targetLabel || targetType}`,
         message: note.trim(),
@@ -70,11 +81,29 @@ export default function ReportDialog({ open, onClose, user, targetType, targetId
         targetId,
         deviceId: deviceId(),
         targetSnapshot,
-      });
+      };
+      if (REPORT_PILOT) {
+        if (!requestId.current) requestId.current = crypto.randomUUID();
+        await submitReportPilot(payload, requestId.current, challengeToken);
+      } else {
+        await submitGeneralReport(payload);
+      }
       setSent(true);
-    } catch {
-      setError('sendFailed');
+    } catch (caught) {
+      if (REPORT_PILOT && caught?.code === 'CHALLENGE_REQUIRED') setChallengeRequired(true);
+      else if (REPORT_PILOT && caught?.code === 'INVALID_CHALLENGE') {
+        setChallengeToken(''); setChallengeReset(value => value + 1);
+        setError('Challenge expired or failed. Please try again.');
+      } else if (REPORT_PILOT && ['REPORT_HARD_LIMIT', 'REPORT_COOLDOWN'].includes(caught?.code)) {
+        setError(`Too many reports. Please retry in ${caught.retryAfter || 60} seconds.`);
+      } else if (REPORT_PILOT && caught?.code === 'CHALLENGE_UNAVAILABLE') {
+        setError('Verification is temporarily unavailable. Please try again later.');
+      } else setError(REPORT_PILOT ? 'Could not send report. Please try again.' : 'sendFailed');
     } finally {
+      if (REPORT_PILOT && challengeToken) {
+        setChallengeToken('');
+        setChallengeReset(value => value + 1);
+      }
       setBusy(false);
     }
   };
@@ -117,11 +146,12 @@ export default function ReportDialog({ open, onClose, user, targetType, targetId
             </div>
             <textarea value={note} onChange={event => setNote(event.target.value.slice(0, 1000))} placeholder={t('reportUi.notePlaceholder')} className="mt-4 min-h-24 w-full rounded-xl border bg-transparent p-3" />
             <div className="text-right text-xs text-slate-400">{note.length}/1000</div>
-            {error && <p className="mt-2 text-sm text-red-600">{t(`reportUi.${error}`)}</p>}
-            <button type="button" onClick={submit} disabled={!reason || busy} className="mt-3 w-full rounded-lg bg-red-600 py-2.5 text-white disabled:opacity-40">
+            {REPORT_PILOT && challengeRequired && <TurnstileChallenge active siteKey={TURNSTILE_SITE_KEY} action="submit_report" resetKey={challengeReset} onToken={value => setChallengeToken(value || '')} />}
+            {error && <p className="mt-2 text-sm text-red-600" role="alert">{REPORT_PILOT ? error : t(`reportUi.${error}`)}</p>}
+            <button type="button" onClick={submit} disabled={!reason || busy || (REPORT_PILOT && challengeRequired && !challengeToken)} className="mt-3 w-full rounded-lg bg-red-600 py-2.5 text-white disabled:opacity-40">
               {t(busy ? 'reportUi.sending' : 'reportUi.send')}
             </button>
-            <RecaptchaDisclosure />
+            {!REPORT_PILOT && <RecaptchaDisclosure />}
           </>
         )}
       </div>

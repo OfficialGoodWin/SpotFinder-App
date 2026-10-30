@@ -15,6 +15,9 @@
  */
 
 const functions = require('firebase-functions/v1');
+// Functions SDK v1 supports enforceAppCheck in runWith for callable HTTPS
+// functions. Keep this false until a separately approved per-function rollout.
+const callableAppCheckOptions = Object.freeze({ enforceAppCheck: false });
 const { initializeApp } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
@@ -31,6 +34,7 @@ const { poiReference, verifyUploadedPhoto, validatedCommunityPhoto, validLegacyP
 const { validatePoiRatingInput, moderationForRating, upsertPoiRating } = require('./poiRatingPolicy');
 const { reconcileSpotFlags, FlagModerationError } = require('./flagModeration');
 const { isSubmissionBlocked } = require('./submissionBlock');
+const { createLegacyReportWithClaim } = require('./reportClaim');
 initializeApp();
 const db = getFirestore();
 const adminAuth = getAuth();
@@ -41,7 +45,7 @@ const RECENT_AUTH_SECONDS = 5 * 60;
 
 // New official POI drafts are server-owned and deliberately separate from the
 // legacy admin_pois map overlay and community spots. No publication occurs here.
-exports.adminSaveOfficialPoi = functions.https.onCall(async (data, context) => {
+exports.adminSaveOfficialPoi = functions.runWith(callableAppCheckOptions).https.onCall(async (data, context) => {
   if (context.auth?.token?.admin !== true) throw new functions.https.HttpsError('permission-denied', 'Admin only.');
   try {
     return await saveOfficialPoi({ db, serverTimestamp: FieldValue.serverTimestamp,
@@ -56,7 +60,7 @@ exports.adminSaveOfficialPoi = functions.https.onCall(async (data, context) => {
 // Bounded admin reads are served by a trusted backend. This keeps the editor
 // usable even when an older deployed Firestore ruleset lacks Phase 1 paths.
 // The signed claim is checked independently of the React admin state.
-exports.adminReadOfficialPoi = functions.https.onCall(async (data, context) => {
+exports.adminReadOfficialPoi = functions.runWith(callableAppCheckOptions).https.onCall(async (data, context) => {
   if (context.auth?.token?.admin !== true) throw new functions.https.HttpsError('permission-denied', 'Admin only.');
   try {
     return await readOfficialPoi({ db, actor: { uid: context.auth.uid, admin: true }, input: data });
@@ -173,7 +177,7 @@ function validateBirthDate(value) {
   return age >= 16 && age <= 120 ? raw : null;
 }
 
-exports.setAccountDateOfBirth = functions.https.onCall(async (data, context) => {
+exports.setAccountDateOfBirth = functions.runWith(callableAppCheckOptions).https.onCall(async (data, context) => {
   if (!context.auth || context.auth.token.firebase?.sign_in_provider === 'anonymous') {
     throw new functions.https.HttpsError('unauthenticated', 'A registered account is required.');
   }
@@ -198,7 +202,7 @@ exports.cleanupSpotDraftsOnAccountDelete = functions.auth.user().onDelete(async 
   });
 });
 
-exports.requestAccountDeletion = functions.runWith({ timeoutSeconds: 120, memory: '512MB' }).https.onCall(async (_data, context) => {
+exports.requestAccountDeletion = functions.runWith({ ...callableAppCheckOptions, timeoutSeconds: 120, memory: '512MB' }).https.onCall(async (_data, context) => {
   if (!context.auth || context.auth.token.firebase?.sign_in_provider === 'anonymous') {
     throw new functions.https.HttpsError('unauthenticated', 'A registered account is required.');
   }
@@ -498,7 +502,7 @@ async function promoteDraftPhotos(uid, draftId, draftData) {
 
 // Storage rules limit owner, path, size, and declared type. This callable
 // checks the bounded bytes before a new client exposes the URL in a record.
-exports.validateCommunityPhoto = functions.https.onCall(async (data, context) => {
+exports.validateCommunityPhoto = functions.runWith(callableAppCheckOptions).https.onCall(async (data, context) => {
   const uid = context.auth?.uid;
   if (!uid) {
     throw new functions.https.HttpsError('unauthenticated', 'Sign in to upload a photo.');
@@ -529,7 +533,7 @@ exports.validateCommunityPhoto = functions.https.onCall(async (data, context) =>
 // Photo references cannot be trusted in a direct Firestore owner update.
 // This callable verifies new objects in this project's bucket and commits the
 // content/photo edit atomically without accepting publication or location keys.
-exports.updateSpotPhotos = functions.https.onCall(async (data, context) => {
+exports.updateSpotPhotos = functions.runWith(callableAppCheckOptions).https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in to edit a spot.');
   await assertAccountCanSubmit(context.auth.uid);
   const spotId = String(data?.spotId || '');
@@ -584,7 +588,7 @@ exports.updateSpotPhotos = functions.https.onCall(async (data, context) => {
 
 // /new enrichment is opt-in. Numeric tile IDs are resolved against the
 // original PBF identity index; an unresolved feature cannot be persisted.
-exports.resolvePoiEnrichment = functions.https.onCall(async (data) => {
+exports.resolvePoiEnrichment = functions.runWith(callableAppCheckOptions).https.onCall(async (data) => {
   try {
     const identity = poiReference(data);
     const link = await db.collection('poi_enrichments').doc(identity.canonicalId).get();
@@ -595,7 +599,7 @@ exports.resolvePoiEnrichment = functions.https.onCall(async (data) => {
   }
 });
 
-exports.submitPoiEnrichmentPhoto = functions.https.onCall(async (data, context) => {
+exports.submitPoiEnrichmentPhoto = functions.runWith(callableAppCheckOptions).https.onCall(async (data, context) => {
   const uid = context.auth?.uid;
   if (!uid || context.auth.token.email_verified !== true)
     throw new functions.https.HttpsError('permission-denied', 'A verified account is required.');
@@ -640,7 +644,7 @@ exports.submitPoiEnrichmentPhoto = functions.https.onCall(async (data, context) 
 // Legacy coordinate/name POIs use the same upload and review boundary as /new.
 // Their key cannot establish OSM provenance, so an admin must review before
 // publishing the photo to the public collection.
-exports.submitLegacyPoiPhoto = functions.https.onCall(async (data, context) => {
+exports.submitLegacyPoiPhoto = functions.runWith(callableAppCheckOptions).https.onCall(async (data, context) => {
   const uid = context.auth?.uid;
   if (!uid || context.auth.token.email_verified !== true)
     throw new functions.https.HttpsError('permission-denied', 'A verified account is required.');
@@ -678,7 +682,7 @@ exports.submitLegacyPoiPhoto = functions.https.onCall(async (data, context) => {
   return { id: ref.id, status: 'pending_review' };
 });
 
-exports.adminReviewPoiEnrichmentPhoto = functions.https.onCall(async (data, context) => {
+exports.adminReviewPoiEnrichmentPhoto = functions.runWith(callableAppCheckOptions).https.onCall(async (data, context) => {
   assertIsAdmin(context);
   const id = String(data?.submissionId || '');
   const decision = data?.decision;
@@ -723,7 +727,7 @@ exports.adminReviewPoiEnrichmentPhoto = functions.https.onCall(async (data, cont
   return { status: decision === 'approve' ? 'approved' : 'rejected' };
 });
 
-exports.linkPoiCommunitySpot = functions.https.onCall(async (data, context) => {
+exports.linkPoiCommunitySpot = functions.runWith(callableAppCheckOptions).https.onCall(async (data, context) => {
   const uid = context.auth?.uid;
   if (!uid || context.auth.token.email_verified !== true)
     throw new functions.https.HttpsError('permission-denied', 'A verified account is required.');
@@ -819,7 +823,7 @@ function deriveSpotCategory(input, poiMatch) {
 
 // Authoritative spot-creation boundary. Direct Firestore creates are denied,
 // so callers cannot bypass ownership, aggregate, content, or rate checks.
-exports.submitSpot = functions.runWith({ secrets: ['ANTI_SPAM_IP_SALT'] }).https.onCall(async (data, context) => {
+exports.submitSpot = functions.runWith({ ...callableAppCheckOptions, secrets: ['ANTI_SPAM_IP_SALT'] }).https.onCall(async (data, context) => {
   if (data?._capability === 'spot-photo-limit') return { maxPhotoCount: 5 };
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in to add a spot.');
   const input = data || {};
@@ -1061,7 +1065,7 @@ exports.onFlagWritten = functions.firestore
 // One trusted write path covers both new canonical IDs and legacy arbitrary IDs.
 // A bounded transaction prevents concurrent submissions from adding a second
 // active rating for the same verified account and POI.
-exports.submitPoiRating = functions.https.onCall(async (data, context) => {
+exports.submitPoiRating = functions.runWith(callableAppCheckOptions).https.onCall(async (data, context) => {
   const uid = context.auth?.uid;
   if (!uid || context.auth.token.email_verified !== true)
     throw new functions.https.HttpsError('permission-denied', 'A verified account is required.');
@@ -1103,7 +1107,7 @@ exports.onPoiRatingCreated = functions.firestore
 // ─── Feedback: protected public submit endpoint ─────────────────────────────
 // Guest-friendly: Firebase anonymous auth supplies a stable session key while
 // reCAPTCHA + IP limits stop an attacker from creating unlimited sessions.
-exports.submitFeedback = functions.runWith({
+exports.submitFeedback = functions.runWith({ ...callableAppCheckOptions,
   secrets: ['ANTI_SPAM_IP_SALT'],
 }).https.onCall(async (data, context) => {
   const payload = data || {};
@@ -1234,7 +1238,7 @@ function assertIsAdmin(context) {
 
 // ─── Admin actions as callables (so every admin action is logged server-side,
 // instead of trusting the client to also write an audit entry) ─────────────
-exports.adminBlockAccountSubmissions = functions.https.onCall(async (data, context) => {
+exports.adminBlockAccountSubmissions = functions.runWith(callableAppCheckOptions).https.onCall(async (data, context) => {
   assertIsAdmin(context);
   const uid = String(data?.uid || '').trim();
   const hours = Number(data?.hours ?? 24);
@@ -1250,7 +1254,7 @@ exports.adminBlockAccountSubmissions = functions.https.onCall(async (data, conte
   return { success: true, uid, expires_at: expiresAt.toISOString() };
 });
 
-exports.adminUnblockAccountSubmissions = functions.https.onCall(async (data, context) => {
+exports.adminUnblockAccountSubmissions = functions.runWith(callableAppCheckOptions).https.onCall(async (data, context) => {
   assertIsAdmin(context);
   const uid = String(data?.uid || '').trim();
   if (!/^[A-Za-z0-9:_-]{1,128}$/.test(uid))
@@ -1260,12 +1264,12 @@ exports.adminUnblockAccountSubmissions = functions.https.onCall(async (data, con
   return { success: true, uid };
 });
 
-exports.adminBanIP = functions.https.onCall(async (data, context) => {
+exports.adminBanIP = functions.runWith(callableAppCheckOptions).https.onCall(async (data, context) => {
   assertIsAdmin(context);
   throw new functions.https.HttpsError('failed-precondition', 'IP bans are not enforced. Block an account UID instead.');
 });
 
-exports.adminUnbanIP = functions.https.onCall(async (data, context) => {
+exports.adminUnbanIP = functions.runWith(callableAppCheckOptions).https.onCall(async (data, context) => {
   assertIsAdmin(context);
   const { ip } = data || {};
   if (!ip) throw new functions.https.HttpsError('invalid-argument', 'ip is required.');
@@ -1274,7 +1278,7 @@ exports.adminUnbanIP = functions.https.onCall(async (data, context) => {
   return { success: true };
 });
 
-exports.adminResolveFlag = functions.https.onCall(async (data, context) => {
+exports.adminResolveFlag = functions.runWith(callableAppCheckOptions).https.onCall(async (data, context) => {
   assertIsAdmin(context);
   const { flagId, resolution } = data || {};
   if (!flagId || !['upheld', 'dismissed'].includes(resolution)) {
@@ -1295,7 +1299,7 @@ exports.adminResolveFlag = functions.https.onCall(async (data, context) => {
   return { success: true, ...result };
 });
 
-exports.adminDeleteSpot = functions.https.onCall(async (data, context) => {
+exports.adminDeleteSpot = functions.runWith(callableAppCheckOptions).https.onCall(async (data, context) => {
   assertIsAdmin(context);
   const { spotId } = data || {};
   if (!spotId) throw new functions.https.HttpsError('invalid-argument', 'spotId is required.');
@@ -1347,7 +1351,7 @@ function normalizeSocialTarget(data) {
 // Social references are callable-only: clients cannot write social_posts in
 // Firestore. Provider, type, content ID, canonical URL, ownership, status and
 // timestamps are all derived or assigned here.
-exports.addSocialPost = functions.runWith({
+exports.addSocialPost = functions.runWith({ ...callableAppCheckOptions,
   secrets: ['ANTI_SPAM_IP_SALT'],
 }).https.onCall(async (data, context) => {
   assertVerifiedUser(context);
@@ -1414,7 +1418,7 @@ async function refreshSpotSocialIndicator(targetType, targetId) {
   if (spot.exists) await spotRef.update({ has_social: !active.empty });
 }
 
-exports.adminSetSocialPostStatus = functions.https.onCall(async (data, context) => {
+exports.adminSetSocialPostStatus = functions.runWith(callableAppCheckOptions).https.onCall(async (data, context) => {
   assertIsAdmin(context);
   const socialPostId = String(data?.socialPostId || '');
   const status = String(data?.status || '');
@@ -1435,7 +1439,7 @@ exports.adminSetSocialPostStatus = functions.https.onCall(async (data, context) 
   return { success: true };
 });
 
-exports.submitReport = functions.runWith({
+exports.submitReport = functions.runWith({ ...callableAppCheckOptions,
   secrets: ['ANTI_SPAM_IP_SALT'],
 }).https.onCall(async (data, context) => {
   assertVerifiedUser(context);
@@ -1453,20 +1457,17 @@ exports.submitReport = functions.runWith({
   const okUid=await checkServerRateLimit(uid,'content_report',8,60*60*1000);
   const okIp=await checkIpRateLimit(ipHash,'content_report',20,60*60*1000);
   if(!okUid||!okIp) throw new functions.https.HttpsError('resource-exhausted','Too many reports. Try again later.');
-  // One open report from the same account for the same target prevents report flooding.
-  const duplicate=await db.collection('reports').where('reporter_uid','==',uid).where('target_key','==',`${targetType}:${targetId}`).where('status','==','open').limit(1).get();
-  if(!duplicate.empty) return {success:true,alreadyReported:true,id:duplicate.docs[0].id};
   const rawSnap=(p.targetSnapshot&&typeof p.targetSnapshot==='object')?p.targetSnapshot:{};
   const snapshot={}; for(const k of ['name','title','lat','lon','image','created_by']) if(rawSnap[k]!=null) snapshot[k]=String(rawSnap[k]).slice(0,500);
-  const ref=db.collection('reports').doc();
-  await ref.set({category:reason,subject,message,target_type:targetType,target_id:targetId,target_key:`${targetType}:${targetId}`,target_snapshot:snapshot,status:'open',reporter_uid:uid,reporter_email:context.auth.token.email||null,ip_hash:ipHash,device_hash:deviceHash,created_at:new Date().toISOString(),recaptcha_score:captcha.score});
-  return {success:true,id:ref.id};
+  const targetKey=`${targetType}:${targetId}`;
+  return createLegacyReportWithClaim({ db, uid, targetKey,
+    report: {category:reason,subject,message,target_type:targetType,target_id:targetId,target_key:targetKey,target_snapshot:snapshot,status:'open',reporter_uid:uid,reporter_email:context.auth.token.email||null,ip_hash:ipHash,device_hash:deviceHash,created_at:new Date().toISOString(),recaptcha_score:captcha.score} });
 });
-exports.adminResolveReport=functions.https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.reportId||'');if(!id)throw new functions.https.HttpsError('invalid-argument','reportId required');await db.collection('reports').doc(id).update({status:'resolved',resolution:String(data?.resolution||'resolved').slice(0,100),resolved_at:new Date().toISOString(),resolved_by:context.auth.token.email||context.auth.uid});await logAdminAction('resolve_report',context.auth.token.email,{reportId:id});return{success:true}});
-exports.adminDeleteReport=functions.https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.reportId||'');if(!id)throw new functions.https.HttpsError('invalid-argument','reportId required');await db.collection('reports').doc(id).delete();await logAdminAction('delete_report',context.auth.token.email,{reportId:id});return{success:true}});
-exports.adminBlockReporter=functions.https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.reportId||'');const snap=await db.collection('reports').doc(id).get();if(!snap.exists)throw new functions.https.HttpsError('not-found','Report not found');const r=snap.data(), batch=db.batch(), now=new Date().toISOString();for(const [k,v] of [['uid',r.reporter_uid],['ip',r.ip_hash],['device',r.device_hash]])if(v)batch.set(db.collection('report_blocks').doc(`${k}_${v}`),{kind:k,value:v,reason:String(data?.reason||'Report spam').slice(0,200),blocked_at:now,blocked_by:context.auth.token.email||context.auth.uid});await batch.commit();await logAdminAction('block_reporter',context.auth.token.email,{reportId:id,reporter_uid:r.reporter_uid});return{success:true}});
-exports.adminUpdateSpot=functions.https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.spotId||''),src=data?.patch||{},patch={};for(const k of ['title','description','image_url','image_urls','status'])if(Object.prototype.hasOwnProperty.call(src,k))patch[k]=src[k];if(!id||!Object.keys(patch).length)throw new functions.https.HttpsError('invalid-argument','spotId and patch required');if(Object.prototype.hasOwnProperty.call(patch,'status'))patch.auto_flag_moderation=FieldValue.delete();await db.collection('spots').doc(id).update(patch);await logAdminAction('update_spot',context.auth.token.email,{spotId:id,fields:Object.keys(src)});return{success:true}});
-exports.adminDeletePOIPhoto=functions.https.onCall(async(data,context)=>{
+exports.adminResolveReport=functions.runWith(callableAppCheckOptions).https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.reportId||'');if(!id)throw new functions.https.HttpsError('invalid-argument','reportId required');await db.collection('reports').doc(id).update({status:'resolved',resolution:String(data?.resolution||'resolved').slice(0,100),resolved_at:new Date().toISOString(),resolved_by:context.auth.token.email||context.auth.uid});await logAdminAction('resolve_report',context.auth.token.email,{reportId:id});return{success:true}});
+exports.adminDeleteReport=functions.runWith(callableAppCheckOptions).https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.reportId||'');if(!id)throw new functions.https.HttpsError('invalid-argument','reportId required');await db.collection('reports').doc(id).delete();await logAdminAction('delete_report',context.auth.token.email,{reportId:id});return{success:true}});
+exports.adminBlockReporter=functions.runWith(callableAppCheckOptions).https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.reportId||'');const snap=await db.collection('reports').doc(id).get();if(!snap.exists)throw new functions.https.HttpsError('not-found','Report not found');const r=snap.data(), batch=db.batch(), now=new Date().toISOString();for(const [k,v] of [['uid',r.reporter_uid],['ip',r.ip_hash],['device',r.device_hash]])if(v)batch.set(db.collection('report_blocks').doc(`${k}_${v}`),{kind:k,value:v,reason:String(data?.reason||'Report spam').slice(0,200),blocked_at:now,blocked_by:context.auth.token.email||context.auth.uid});await batch.commit();await logAdminAction('block_reporter',context.auth.token.email,{reportId:id,reporter_uid:r.reporter_uid});return{success:true}});
+exports.adminUpdateSpot=functions.runWith(callableAppCheckOptions).https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.spotId||''),src=data?.patch||{},patch={};for(const k of ['title','description','image_url','image_urls','status'])if(Object.prototype.hasOwnProperty.call(src,k))patch[k]=src[k];if(!id||!Object.keys(patch).length)throw new functions.https.HttpsError('invalid-argument','spotId and patch required');if(Object.prototype.hasOwnProperty.call(patch,'status'))patch.auto_flag_moderation=FieldValue.delete();await db.collection('spots').doc(id).update(patch);await logAdminAction('update_spot',context.auth.token.email,{spotId:id,fields:Object.keys(src)});return{success:true}});
+exports.adminDeletePOIPhoto=functions.runWith(callableAppCheckOptions).https.onCall(async(data,context)=>{
   assertIsAdmin(context);
   const id=String(data?.photoId||'');
   if(!id)throw new functions.https.HttpsError('invalid-argument','photoId required');

@@ -24,6 +24,7 @@ import {
   getMultiFactorResolver,
   updateProfile,
   deleteUser as deleteFirebaseUser,
+  connectAuthEmulator,
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -42,15 +43,16 @@ import {
   getDoc,
   documentId,
   arrayUnion,
+  connectFirestoreEmulator,
 } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL, getBlob, getMetadata, listAll, deleteObject } from 'firebase/storage';
+import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
+import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL, getBlob, getMetadata, listAll, deleteObject, connectStorageEmulator } from 'firebase/storage';
 import { validateImageFile } from '@/lib/imageUploadValidation';
 import { isPreparedImage, MAX_UPLOAD_BYTES, prepareImageFile, uploadImageError } from '@/lib/imagePreparation';
 import { waitForUploadTask } from '@/lib/uploadTask';
 import { firebaseConfig } from './firebaseConfig';
 import { signOutOnce } from '@/lib/signOutGate';
-import { initializeSpotFinderAppCheck } from './firebaseAppCheck';
+import { initializeSpotFinderAppCheck, getSpotFinderAppCheckToken } from './firebaseAppCheck';
 import { getRecaptchaToken } from '@/lib/recaptcha';
 import { filterAndSortNearbySpots, nearbyBounds, normalizeLatLng } from '@/lib/spotDiscovery';
 import { applyReviewedLegacyIdentity } from '@/lib/reviewedLegacySpots';
@@ -58,17 +60,43 @@ import { normalizeSpotDraft } from '@/lib/spotDrafts';
 import { isEligibleBirthDate } from '@/lib/ageEligibility';
 import { createPrivateDraftPhotoLoader, draftPhotoLoadMessage } from '@/lib/privateDraftPhotoLoader';
 import { visiblePoiRatings } from '@/lib/poiRatings';
+import { createBoundedPublicRead } from '@/lib/boundedPublicRead';
 
-let app, auth, db, functionsInstance, storage;
+let app, auth, db, functionsInstance, storage, appCheck;
+const emulatorOnly = (import.meta.env.DEV || import.meta.env.VITE_SPOTFINDER_STAGE === 'emulator')
+  && import.meta.env.VITE_FIREBASE_EMULATOR_ONLY === 'true';
 const initializeServices = () => {
+  if (import.meta.env.DEV && !emulatorOnly) {
+    throw new Error('Local Firebase access is disabled. Set VITE_FIREBASE_EMULATOR_ONLY=true and start the local emulators.');
+  }
+  const config = firebaseConfig;
   // The Firebase app and App Check must exist before any protected service
   // starts its first operation. Reuse the default app during hot reload.
-  app = getApps().find(candidate => candidate.name === '[DEFAULT]') || initializeApp(firebaseConfig);
-  initializeSpotFinderAppCheck(app);
+  app = getApps().find(candidate => candidate.name === '[DEFAULT]') || initializeApp(config);
+  if (app.options.projectId !== config.projectId || app.options.appId !== config.appId) {
+    throw new Error('Firebase app identity does not match this build. Reload the page.');
+  }
+  if (emulatorOnly) appCheck = null;
+  else {
+    try { appCheck = initializeSpotFinderAppCheck(app); }
+    catch (error) {
+      // While enforcement is off, a bad public key must not take down Auth or
+      // the public map. Metrics must be healthy before any product enforces.
+      console.warn('Firebase App Check initialization failed', { code: error?.code || 'unknown' });
+      appCheck = null;
+    }
+  }
   auth = getAuth(app);
   db = getFirestore(app);
   functionsInstance = getFunctions(app);
   storage = getStorage(app);
+  if (emulatorOnly && globalThis.__spotfinderEmulatorsConnected !== app) {
+    connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+    connectFirestoreEmulator(db, '127.0.0.1', 8080);
+    connectFunctionsEmulator(functionsInstance, '127.0.0.1', 5001);
+    connectStorageEmulator(storage, '127.0.0.1', 9199);
+    globalThis.__spotfinderEmulatorsConnected = app;
+  }
 };
 try { initializeServices(); }
 catch (error) { console.error('Firebase initialization error:', error); }
@@ -82,8 +110,10 @@ export const getFirebaseServices = () => {
       return null;
     }
   }
-  return { app, auth, db, functions: functionsInstance, storage };
+  return { app, appCheck, auth, db, functions: functionsInstance, storage };
 };
+
+export const getVercelAppCheckToken = async () => getSpotFinderAppCheckToken(getFirebaseServices()?.appCheck);
 
 // Shared callable wrapper. Admin helpers below use the same path so every
 // privileged action stays behind the Cloud Function authorization checks.
@@ -480,12 +510,13 @@ export const submitFeedback = async ({ email = '', message, language = 'en' }) =
 // a "new" badge in the UI per spec — flagged/hidden/rejected are excluded).
 export const getPublicSpots = async (maxCount = 200) => {
   const { db } = getFirebaseServices();
+  const safeCount = Math.min(200, Math.max(1, Math.floor(Number(maxCount) || 200)));
   const q = query(
     collection(db, SPOTS_COLLECTION),
     where('is_public', '==', true),
     where('status', 'in', ['published', 'pending_trust']),
     orderBy('created_date', 'desc'),
-    limit(maxCount)
+    limit(safeCount)
   );
   return (await getDocs(q)).docs.map(spotFromSnapshot);
 };
@@ -512,9 +543,13 @@ export const getFeaturedSpotCandidates = async () => {
 
 // Bounded public discovery pages. The cursor is a Firestore snapshot kept only
 // in memory by the caller; no listener or private collection is involved.
-export const getDiscoverSpotsPage = async (cursor = null, pageSize = 16) => {
-  const { db } = getFirebaseServices();
+const publicRead = createBoundedPublicRead();
+export const getDiscoverSpotsPage = (cursor = null, pageSize = 16) => {
   const safeSize = Math.min(24, Math.max(1, Math.floor(Number(pageSize) || 16)));
+  return publicRead(`discover:${cursor?.id || 'first'}:${safeSize}`, () => readDiscoverSpotsPage(cursor, safeSize));
+};
+const readDiscoverSpotsPage = async (cursor, safeSize) => {
+  const { db } = getFirebaseServices();
   const clauses = [
     where('is_public', '==', true), where('status', 'in', ['published', 'pending_trust']),
     orderBy('created_date', 'desc'),
@@ -533,7 +568,12 @@ export const getDiscoverSpotsPage = async (cursor = null, pageSize = 16) => {
 // Scalable viewport query: only fetch spots currently inside the map bounds.
 // We sort after reading so Firestore does not need to order by a third field
 // while applying multiple latitude/longitude range filters.
-export const getPublicSpotsInBounds = async ({ south, west, north, east }, maxCount = 500) => {
+export const getPublicSpotsInBounds = (bounds, maxCount = 500) => {
+  const safeCount = Math.min(500, Math.max(1, Math.floor(Number(maxCount) || 500)));
+  const key = `bounds:${[bounds.south, bounds.west, bounds.north, bounds.east].map(value => Number(value).toFixed(5)).join(':')}:${safeCount}`;
+  return publicRead(key, () => readPublicSpotsInBounds(bounds, safeCount));
+};
+const readPublicSpotsInBounds = async ({ south, west, north, east }, maxCount) => {
   const { db } = getFirebaseServices();
   const baseClauses = [
     where('is_public', '==', true),
@@ -572,9 +612,14 @@ export const getPublicSpotById = async (spotId) => {
 // Firestore has no native radius query. Read bounded latitude/longitude pages,
 // then apply the exact circle in memory. The result flags when the safety cap
 // prevents a complete count; no arbitrary first batch is presented as total.
-export const getPublicSpotsNear = async (origin, maxDistance = Infinity, { maxCandidates = 1500 } = {}) => {
+export const getPublicSpotsNear = (origin, maxDistance = Infinity, { maxCandidates = 1500 } = {}) => {
   const normalized = normalizeLatLng(origin);
-  if (!normalized) return { spots: [], complete: true, scanned: 0 };
+  if (!normalized) return Promise.resolve({ spots: [], complete: true, scanned: 0 });
+  const safeCandidates = Math.min(1500, Math.max(1, Math.floor(Number(maxCandidates) || 1500)));
+  const key = `near:${normalized.map(value => Number(value).toFixed(5)).join(':')}:${maxDistance}:${safeCandidates}`;
+  return publicRead(key, () => readPublicSpotsNear(normalized, maxDistance, safeCandidates));
+};
+const readPublicSpotsNear = async (normalized, maxDistance, maxCandidates) => {
   const { db } = getFirebaseServices();
   const radii = Number.isFinite(maxDistance) ? [maxDistance] : [25, 100, 400, 1600, 5000];
   const found = new Map();

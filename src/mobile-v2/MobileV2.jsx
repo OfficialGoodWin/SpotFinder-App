@@ -8,6 +8,8 @@ import { useLanguage } from '@/lib/LanguageContext';
 import { LANGUAGES, LANGUAGE_VARIANTS } from '@/locales/translations';
 import { getTextScale, saveTextScale } from '@/lib/textScale';
 import { getPublicSpotsInBounds, getPublicSpotsNear, getPublicSpotById, getDiscoverSpotsPage, getSavedSpots, getLikedSpots, getUserSpots, getCloudSpotDrafts, deleteCloudSpotDraft, getSpotSocialState, toggleSpotSave, createSpot, deleteSpot, updateSpot, addSocialPost, resendVerificationEmail } from '@/api/firebaseClient';
+import { cachedViewport, rememberViewport } from '@/new/viewportCache';
+import { loadFullSnapshotSpot, readPublicSpotSnapshot, readSnapshotOrFirestore } from '@/new/publicSpotSnapshotClient';
 import { getSpotDisplayName, getSpotLocationLabel, resolveSpotTitle, spotMatchesSearch } from '@/lib/spotPresentation';
 import { filterAndSortNearbySpots, getSpotRating, normalizeLatLng } from '@/lib/spotDiscovery';
 import { getConsent, acknowledgeCurrentPrivacyNotice } from '@/lib/consent';
@@ -53,6 +55,8 @@ const EditSpotModal = recoverableLazy(() => import('@/components/spots/EditSpotM
 const NavigationProviderSheet = recoverableLazy(() => import('@/components/navigation/NavigationProviderSheet'));
 
 const LOGO = '/app-icon-v2-192.png?v=3';
+// Prototype is intentionally development-only until moderation invalidation is deployed.
+const PUBLIC_SNAPSHOT_PREVIEW = import.meta.env.DEV && import.meta.env.VITE_PUBLIC_SPOT_SNAPSHOTS === 'true';
 const START = { lat: 50.0755, lng: 14.4378 };
 const TABS = [
   ['map', 'Mapa', MapIcon], ['discover', 'Objevit', Compass], ['add', 'Přidat', Plus],
@@ -198,6 +202,7 @@ export default function MobileV2({ redesigned = false }) {
   const authPage = redesigned && tab === 'auth';
   const unknownPage = !['map', 'discover', 'collection', 'profile', 'settings', 'drafts', 'about', 'search', 'spot', ...(redesigned ? ['auth'] : [])].includes(tab);
   const [spots, setSpots] = useState([]);
+  const [searchSourceSpots, setSearchSourceSpots] = useState([]);
   const [mapActivated, setMapActivated] = useState(activeTab === 'map');
   const [spotsLoading, setSpotsLoading] = useState(true);
   const [spotsError, setSpotsError] = useState(false);
@@ -285,6 +290,7 @@ export default function MobileV2({ redesigned = false }) {
   const requestRef = useRef(0);
   const cacheRef = useRef(null);
   const pendingBoundsRef = useRef(null);
+  const mapRefreshTimerRef = useRef(null);
   useEffect(() => {
     if (!redesigned) return undefined;
     const linked = event => {
@@ -348,34 +354,64 @@ export default function MobileV2({ redesigned = false }) {
     const view = { south: bounds.getSouth(), west: bounds.getWest(), north: bounds.getNorth(), east: bounds.getEast() };
     const key = Object.values(view).map(value => value.toFixed(2)).join(':');
     const request = ++requestRef.current;
-    if (cacheRef.current?.key === key && Date.now() - cacheRef.current.at < 120000) {
-      setSpots(cacheRef.current.rows); setSpotsLoading(false); setSpotsError(false); return;
+    const cachedRows = redesigned
+      ? cachedViewport(cacheRef.current, key)
+      : cacheRef.current?.key === key && Date.now() - cacheRef.current.at < 120000 ? cacheRef.current.rows : null;
+    if (cachedRows) {
+      setSpots(cachedRows); setSpotsLoading(false); setSpotsError(false); return;
     }
     setSpotsLoading(true); setSpotsError(false);
     const pending = pendingBoundsRef.current;
-    const queryPromise = pending?.key === key ? pending.promise : getPublicSpotsInBounds(view, 300);
+    const queryPromise = pending?.key === key ? pending.promise : PUBLIC_SNAPSHOT_PREVIEW && redesigned
+      ? readSnapshotOrFirestore(view, 300, readPublicSpotSnapshot, getPublicSpotsInBounds)
+      : getPublicSpotsInBounds(view, 300);
     if (pending?.key !== key) pendingBoundsRef.current = { key, promise: queryPromise };
     try {
       const rows = await queryPromise;
-      if (request === requestRef.current) { setSpots(rows); cacheRef.current = { key, rows, at: Date.now() }; }
+      if (request === requestRef.current) {
+        setSpots(rows);
+        cacheRef.current = redesigned ? rememberViewport(cacheRef.current, key, rows) : { key, rows, at: Date.now() };
+      }
     } catch { if (request === requestRef.current) setSpotsError(true); }
     finally { if (pendingBoundsRef.current?.promise === queryPromise) pendingBoundsRef.current = null; if (request === requestRef.current) setSpotsLoading(false); }
-  }, []);
+  }, [redesigned]);
+  const scheduleMapRefresh = useCallback(() => {
+    if (mapRefreshTimerRef.current) clearTimeout(mapRefreshTimerRef.current);
+    requestRef.current += 1;
+    mapRefreshTimerRef.current = setTimeout(() => {
+      mapRefreshTimerRef.current = null;
+      void refreshMap();
+    }, 120);
+  }, [refreshMap]);
+  useEffect(() => {
+    if (!PUBLIC_SNAPSHOT_PREVIEW || !redesigned || !searchOpen) return undefined;
+    const map = mapRef.current;
+    if (!map) return undefined;
+    const bounds = map.getBounds();
+    let active = true;
+    getPublicSpotsInBounds({ south: bounds.getSouth(), west: bounds.getWest(), north: bounds.getNorth(), east: bounds.getEast() }, 300)
+      .then(rows => { if (active) setSearchSourceSpots(rows); }).catch(() => {});
+    return () => { active = false; };
+  }, [redesigned, searchOpen, mapInstance]);
   const handleZoomDragStart = useCallback(() => {
     zoomDraggingRef.current = true;
     requestRef.current += 1;
   }, []);
   const handleZoomDragEnd = useCallback(() => {
     zoomDraggingRef.current = false;
-    refreshMap();
-  }, [refreshMap]);
+    scheduleMapRefresh();
+  }, [scheduleMapRefresh]);
   const handleMapReady = useCallback(map => {
-    if (mapRef.current) mapRef.current.off('moveend', refreshMap);
+    if (mapRef.current) mapRef.current.off('moveend', scheduleMapRefresh);
     mapRef.current = map;
     setMapInstance(map);
-    if (map) { map.on('moveend', refreshMap); refreshMap(); }
-  }, [refreshMap]);
-  useEffect(() => () => { requestRef.current += 1; mapRef.current?.off('moveend', refreshMap); }, [refreshMap]);
+    if (map) { map.on('moveend', scheduleMapRefresh); scheduleMapRefresh(); }
+  }, [scheduleMapRefresh]);
+  useEffect(() => () => {
+    requestRef.current += 1;
+    if (mapRefreshTimerRef.current) clearTimeout(mapRefreshTimerRef.current);
+    mapRef.current?.off('moveend', scheduleMapRefresh);
+  }, [scheduleMapRefresh]);
   useEffect(() => { if (activeTab === 'map') { setMapActivated(true); setTimeout(() => mapRef.current?.resize(), 50); } }, [activeTab]);
   useEffect(() => { if (!redesigned || activeTab !== 'map') return undefined; const frame = requestAnimationFrame(() => mapRef.current?.resize()); return () => cancelAnimationFrame(frame); }, [redesigned, activeTab, choosingQuickPosition, Boolean(quickAdd)]);
   useEffect(() => {
@@ -480,7 +516,19 @@ export default function MobileV2({ redesigned = false }) {
     ? [...visibleSpots, previewSpot] : visibleSpots, [redesigned, previewSpot, selectedMapSpotId, visibleSpots]);
   useEffect(() => setNearbyCount(20), [category, nearbyResults, nearbySort]);
   const featuredVisible = useMemo(() => (featured || []).filter(spot => category === 'Vše' || categoryOf(spot) === category), [featured, category]);
-  const openSpot = spot => { setNearbySize('collapsed'); setSelectedPoi(null); setSelectedMapSpotId(spot.id); if (redesigned) setPreviewSpot(spot); selectedSpotRef.current = spot; setSelectedSpot(spot); const coords = normalizeLatLng(spot); if (coords) setFlyTo(coords); navigate(`/new/spot/${encodeURIComponent(spot.id)}`); };
+  const openSpot = async selected => {
+    let spot = selected;
+    if (PUBLIC_SNAPSHOT_PREVIEW && redesigned && spot._public_snapshot) {
+      try { spot = await loadFullSnapshotSpot(spot, getPublicSpotById); }
+      catch { toast.error('Místo se nepodařilo načíst. Zkus to znovu.'); return; }
+      if (!spot) { cacheRef.current = null; setSpots(rows => rows.filter(row => row.id !== selected.id)); setPreviewSpot(null); toast.error('Místo už není veřejně dostupné.'); return; }
+    }
+    setNearbySize('collapsed'); setSelectedPoi(null); setSelectedMapSpotId(spot.id);
+    if (redesigned) setPreviewSpot(spot);
+    selectedSpotRef.current = spot; setSelectedSpot(spot);
+    const coords = normalizeLatLng(spot); if (coords) setFlyTo(coords);
+    navigate(`/new/spot/${encodeURIComponent(spot.id)}`);
+  };
   const selectMapSpot = spot => {
     if (!redesigned || String(selectedMapSpotId) === String(spot.id)) { openSpot(spot); return; }
     setNearbySize('collapsed'); setSelectedPoi(null); setSelectedMapSpotId(spot.id); setPreviewSpot(spot);
@@ -689,7 +737,7 @@ export default function MobileV2({ redesigned = false }) {
     {aboutPage && <section className="v2-page"><header className="v2-page-header v2-subpage-header"><button onClick={() => navigate('/new/profile')} aria-label="Zpět na profil"><ChevronLeft /></button><h1>O aplikaci</h1></header><div className="v2-about"><img src={LOGO} alt="SpotFinder" /><h2>SpotFinder</h2><p>Objevuj skutečná místa sdílená komunitou a ukládej si ta, ke kterým se chceš vrátit.</p><small>Verze {APP_VERSION}</small>{redesigned ? <><button onClick={() => navigate('/new/settings/support/faq')}>Nápověda</button><NewLegalLink document="/PrivacyPolicy">Soukromí</NewLegalLink><NewLegalLink document="/TermsAndConditions">Podmínky používání</NewLegalLink></> : <><a href="/FAQ">Nápověda</a><a href="/PrivacyPolicy">Soukromí</a><a href="/TermsAndConditions">Podmínky používání</a></>}</div></section>}
     {draftsPage && <section className="v2-page"><header className="v2-page-header v2-subpage-header"><button onClick={() => navigate('/new/profile')} aria-label="Zpět na profil"><ChevronLeft /></button><h1>Rozpracovaná místa</h1></header><div className="v2-scroll v2-drafts-list">{draftsError ? <StateMessage retry={loadDrafts}>Rozpracovaná místa se nepodařilo načíst.</StateMessage> : draftRows === null ? (redesigned ? <NewSkeleton kind="nearbyRows" /> : <StateMessage>Načítám rozpracovaná místa…</StateMessage>) : draftRows.length ? draftRows.map(item => <article className="v2-draft-row" key={item.id}><div className="v2-draft-icon"><MapPin size={23} /></div><div className="v2-draft-copy"><strong>{draftTitle(item)}</strong><small>{draftDate(item.updated_at || item.created_at)}</small></div><button className="v2-draft-resume" onClick={() => { const coords = normalizeLatLng(item); if (!coords) { toast.error('Návrh nemá platnou polohu.'); return; } if (redesigned) setQuickAdd({ coords: { lat: coords[0], lng: coords[1] }, draft: item }); else { setDraft(item); setAddAt({ lat: coords[0], lng: coords[1] }); } navigate('/new/map'); }}>Pokračovat</button><button className="v2-draft-delete" aria-label={`Smazat ${draftTitle(item)}`} onClick={() => setDraftToDelete(item)}><X size={18} /></button></article>) : <StateMessage>Nemáš žádná rozpracovaná místa.</StateMessage>}</div></section>}
     {unknownPage && <section className="v2-page v2-not-found"><MapPin size={34} /><h1>Stránka nebyla nalezena</h1><p>Požadovaná stránka není dostupná.</p><button className="v2-primary" onClick={() => navigate('/new')}>Zpět na mapu</button></section>}
-    {searchOpen && <SearchPanel spots={spots} center={center} voiceQuery={voiceQuery} redesigned={redesigned} searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} voiceInput={searchVoice} onClose={() => { searchVoice.stop(); setSearchQuery(''); setVoiceQuery(''); navigate(location.key === 'default' ? '/new' : -1); }} onSpot={openSpot} onPlace={selectSearchPlace} />}
+    {searchOpen && <SearchPanel spots={PUBLIC_SNAPSHOT_PREVIEW && redesigned ? searchSourceSpots : spots} center={center} voiceQuery={voiceQuery} redesigned={redesigned} searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} voiceInput={searchVoice} onClose={() => { searchVoice.stop(); setSearchQuery(''); setVoiceQuery(''); navigate(location.key === 'default' ? '/new' : -1); }} onSpot={openSpot} onPlace={selectSearchPlace} />}
       </motion.div>}
     </AnimatePresence>
     {!online && <div className="v2-offline" role="status">Jsi offline. Některá místa a mapové podklady nemusí být dostupné.</div>}

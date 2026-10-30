@@ -6,6 +6,7 @@ import { createSpotPageHandler } from './api/spot-page.js'
 import { getSpotPageFixture } from './tests/spot-page-fixtures.js'
 
 const appRoutes = new Set(['/','/home','/faq','/status','/statusadmin','/admin','/privacypolicy','/termsandconditions','/cookiepolicy','/refundpolicy','/updates']);
+let spotfinderBuildTarget;
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -18,13 +19,53 @@ export default defineConfig({
   plugins: [
     react(),
     {
+      name: 'spotfinder-firebase-isolation',
+      configResolved(config) {
+        const env = config.env;
+        const stage = env.VITE_SPOTFINDER_STAGE || '';
+        const deployment = process.env.VERCEL_ENV || '';
+        if (config.command !== 'build') return;
+        if (deployment === 'production') {
+          if (stage && stage !== 'production') throw new Error('Production build has a nonproduction Firebase stage.');
+          if (env.VITE_FIREBASE_EMULATOR_ONLY === 'true') throw new Error('Production build cannot use Firebase emulators.');
+        } else if (stage === 'emulator') {
+          if (deployment || env.VITE_FIREBASE_EMULATOR_ONLY !== 'true') throw new Error('Emulator build is local only.');
+        } else if (stage !== 'staging') {
+          throw new Error('Nonproduction build requires an isolated staging or emulator Firebase target.');
+        }
+        if (stage === 'staging') {
+          const required = ['VITE_FIREBASE_STAGING_API_KEY', 'VITE_FIREBASE_STAGING_AUTH_DOMAIN',
+            'VITE_FIREBASE_STAGING_PROJECT_ID', 'VITE_FIREBASE_STAGING_APP_ID',
+            'VITE_FIREBASE_STAGING_MESSAGING_SENDER_ID', 'VITE_FIREBASE_STAGING_STORAGE_BUCKET',
+            'VITE_FIREBASE_APP_CHECK_SITE_KEY'];
+          if (required.some(key => !env[key]?.trim()) || env.VITE_FIREBASE_STAGING_PROJECT_ID === 'spotfinderapp-cdc7b') {
+            throw new Error('Staging Firebase and App Check web configuration is incomplete or points to production.');
+          }
+          if (deployment === 'preview' && process.env.FIREBASE_PROJECT_ID !== env.VITE_FIREBASE_STAGING_PROJECT_ID) {
+            throw new Error('Preview server Firebase project does not match the isolated staging web project.');
+          }
+        }
+        spotfinderBuildTarget = { stage, projectId: stage === 'staging'
+          ? env.VITE_FIREBASE_STAGING_PROJECT_ID : stage === 'emulator' ? 'demo-spotfinder-local' : 'spotfinderapp-cdc7b' };
+      },
+      generateBundle() {
+        if (spotfinderBuildTarget) this.emitFile({ type: 'asset', fileName: 'spotfinder-build-target.json',
+          source: JSON.stringify(spotfinderBuildTarget) });
+      },
+      configurePreviewServer(preview) {
+        const targetPath = path.resolve(__dirname, 'dist/spotfinder-build-target.json');
+        const target = existsSync(targetPath) ? JSON.parse(readFileSync(targetPath, 'utf8')) : null;
+        if (!target || !['staging', 'emulator'].includes(target.stage)
+          || target.projectId === 'spotfinderapp-cdc7b') {
+          throw new Error('Local preview requires an isolated staging or emulator build.');
+        }
+      },
+    },
+    {
       name: 'spotfinder-preview-routes',
       configurePreviewServer(preview) {
-        const spotHandler = createSpotPageHandler({ lookup: process.env.SPOT_PAGE_FIXTURES === '1' ? getSpotPageFixture : async id => {
-          const { adminDb } = await import('./api/_firebaseAdmin.js');
-          const snapshot = await adminDb.collection('spots').doc(id).get();
-          return snapshot.exists ? snapshot.data() : null;
-        } });
+        // Local Vite preview always uses synthetic spot-page fixtures.
+        const spotHandler = createSpotPageHandler({ lookup: getSpotPageFixture });
         preview.middlewares.use((request, response, next) => {
           if (!['GET', 'HEAD'].includes(request.method)) return next();
           const pathname = new URL(request.url, 'http://localhost').pathname.replace(/\/$/, '') || '/';

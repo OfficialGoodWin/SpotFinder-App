@@ -19,7 +19,7 @@ const functions = require('firebase-functions/v1');
 const { getAuth } = require('firebase-admin/auth');
 const { getFirestore } = require('firebase-admin/firestore');
 
-exports.setAdminClaim = functions.https.onCall(async (data, context) => {
+exports.setAdminClaim = functions.runWith({ enforceAppCheck: false }).https.onCall(async (data, context) => {
   const callerEmail = context.auth?.token?.email;
   const callerAlreadyHasClaim = context.auth?.token?.admin === true;
 

@@ -100,12 +100,14 @@ async function redirectToCheckout(priceId, userEmail, userId, planId) {
     alert('Please sign in again before subscribing.');
     return;
   }
+  const appCheckToken = await import('@/api/firebaseClient').then(module => module.getVercelAppCheckToken()).catch(() => '');
 
   // The server validates both the Firebase identity and the selected Stripe
   // price; the client-provided plan label is display-only.
   const res = await fetch('/api/create-checkout-session', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}`,
+      ...(appCheckToken ? { 'X-Firebase-AppCheck': appCheckToken } : {}) },
     body: JSON.stringify({
       priceId,
       customerEmail: userEmail || undefined,

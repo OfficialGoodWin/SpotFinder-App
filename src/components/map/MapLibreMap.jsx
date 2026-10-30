@@ -17,6 +17,7 @@ import { attachMarkerAt, validMarkerLngLat } from '@/lib/mapMarkerCoordinates';
 import { readPoiDetailShard } from '@/lib/poiDetailShard';
 import { ambientPoiNameExpression } from '@/lib/poiLocalization';
 import { poiGroupForCategory } from '@/new/poiLayers';
+import { publicSnapshotThumbnailUrl } from '@/new/publicSpotSnapshotFormat';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { Protocol } from 'pmtiles';
 import { Minus, Plus } from 'lucide-react';
@@ -568,6 +569,7 @@ function removeSpotMarker(marker) {
 // Compact discovery markers for /new. The shared map's original markers remain
 // the default for every other route.
 function compactSpotPhoto(spot) {
+  if (spot._public_snapshot) return publicSnapshotThumbnailUrl(spot, window.location.origin);
   const image = getSpotImageInfo(spot);
   if (!image) return '';
   const thumbnail = spot.photo_metadata?.find?.(item => item?.url === image.url)?.thumbnail_url || spot.thumbnail_url;

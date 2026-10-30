@@ -25,8 +25,8 @@ test('flag reconciliation, moderation decisions, retries and account blocks',
         await reconcile('threshold');
       }
       assert.equal((await spot('threshold')).flag_count, 3);
-      assert.equal((await spot('threshold')).status, 'flagged');
-      assert.equal((await spot('threshold')).auto_flag_moderation.previous_status, 'published');
+      assert.equal((await spot('threshold')).status, 'published');
+      assert.equal((await spot('threshold')).auto_flag_moderation, undefined);
 
       const one = await reconcile('threshold', { flagId: 'threshold_a', resolution: 'dismissed' });
       assert.equal(one.openCount, 2);
@@ -40,6 +40,14 @@ test('flag reconciliation, moderation decisions, retries and account blocks',
       await reconcile('threshold', { flagId: 'threshold_c', resolution: 'dismissed' });
       assert.equal((await spot('threshold')).flag_count, 0);
       assert.equal((await spot('threshold')).status, 'published');
+
+      await db.collection('spots').doc('historically-flagged').set({ status: 'flagged', is_public: true,
+        flag_count: 3, auto_flag_moderation: { previous_status: 'published', threshold: 3 } });
+      for (const id of ['a', 'b', 'c']) await flag(`historically-flagged_${id}`, 'historically-flagged', `${id}@example.test`);
+      await reconcile('historically-flagged');
+      assert.equal((await spot('historically-flagged')).status, 'flagged');
+      await reconcile('historically-flagged', { flagId: 'historically-flagged_a', resolution: 'dismissed' });
+      assert.equal((await spot('historically-flagged')).status, 'published');
 
       await db.collection('spots').doc('rejected').set({ status: 'rejected', is_public: false, flag_count: 3 });
       await flag('rejected_a', 'rejected', 'a@example.test');

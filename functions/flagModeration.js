@@ -1,6 +1,6 @@
 'use strict';
 
-const FLAG_AUTO_HIDE_THRESHOLD = 3;
+const LEGACY_AUTO_HIDE_THRESHOLD = 3;
 const RESTORABLE_STATUSES = new Set(['published', 'pending_trust']);
 
 class FlagModerationError extends Error {
@@ -17,7 +17,7 @@ function countDistinctOpenFlags(snapshot, excludeId = null) {
   return reporters.size;
 }
 
-function spotFlagPatch(spot, openCount, { upheld = false, deleteField }) {
+function spotFlagPatch(spot, openCount, { upheld = false, dismissed = false, deleteField }) {
   const patch = {};
   if (spot.flag_count !== openCount) patch.flag_count = openCount;
   const marker = spot.auto_flag_moderation;
@@ -27,11 +27,9 @@ function spotFlagPatch(spot, openCount, { upheld = false, deleteField }) {
     if (marker) patch.auto_flag_moderation = deleteField();
     return patch;
   }
-  if (openCount >= FLAG_AUTO_HIDE_THRESHOLD && spot.is_public === true
-      && RESTORABLE_STATUSES.has(spot.status)) {
-    patch.status = 'flagged';
-    patch.auto_flag_moderation = { previous_status: spot.status, threshold: FLAG_AUTO_HIDE_THRESHOLD };
-  } else if (openCount < FLAG_AUTO_HIDE_THRESHOLD && marker) {
+  // New reports only update the review count. Historical auto-hidden spots
+  // remain for an administrator to review, and a dismissal can restore them.
+  if (dismissed && openCount < LEGACY_AUTO_HIDE_THRESHOLD && marker) {
     if (spot.status === 'flagged' && spot.is_public === true
         && RESTORABLE_STATUSES.has(marker.previous_status)) patch.status = marker.previous_status;
     patch.auto_flag_moderation = deleteField();
@@ -65,6 +63,7 @@ async function reconcileSpotFlags({ db, spotId, deleteField, resolution = null, 
     if (!spotSnapshot.exists) return { spotId, openCount, spotStatus: null, alreadyResolved };
     const patch = spotFlagPatch(spotSnapshot.data(), openCount, {
       upheld: resolution === 'upheld' && !alreadyResolved, deleteField,
+      dismissed: resolution === 'dismissed' && !alreadyResolved,
     });
     if (Object.keys(patch).length) tx.update(spotRef, patch);
     return { spotId, openCount, spotStatus: patch.status || spotSnapshot.data().status, alreadyResolved };

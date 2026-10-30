@@ -10,7 +10,8 @@
  */
 
 import Stripe from 'stripe';
-import { adminDb, verifyRequestAuth } from './_firebaseAdmin.js';
+import { adminDb, adminApp, adminAppCheck, verifyRequestAuth } from './_firebaseAdmin.js';
+import { requireVercelAppCheck } from './appCheckGuard.js';
 
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2024-06-20',
@@ -67,7 +68,7 @@ export default async function handler(req, res) {
   const responseOrigin = origin || 'https://spotfinder.cz';
   res.setHeader('Access-Control-Allow-Origin', responseOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Firebase-AppCheck');
   res.setHeader('Vary', 'Origin');
 
   if (req.method === 'OPTIONS') {
@@ -83,6 +84,8 @@ export default async function handler(req, res) {
   if (process.env.SUBSCRIPTIONS_ENABLED !== 'true') {
     return res.status(503).json({ message: 'Subscriptions are not currently available for purchase.' });
   }
+  if (!await requireVercelAppCheck(req, res, { adminApp, adminAppCheck,
+    enforceEnv: 'VERCEL_APPCHECK_ENFORCE_CHECKOUT' })) return;
 
   if (!process.env.STRIPE_SECRET_KEY) {
     return res.status(500).json({ message: 'STRIPE_SECRET_KEY is not configured on the server.' });

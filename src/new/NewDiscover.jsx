@@ -13,6 +13,7 @@ import { newMotion, reducedTransition } from './motion';
 const CATEGORIES = [DISCOVER_ALL, ...SPOT_CATEGORY_KEYS];
 const QUERY_SIZE = 24;
 const TARGET_MATCHES = 12;
+const MAX_PAGES_PER_ACTION = 4;
 
 function ratingLabel(spot) {
   const rating = getSpotRating(spot);
@@ -36,8 +37,10 @@ export default function NewDiscover({ language, titleOf, locationOf, savedIds, s
     let hasMore = true;
     const matches = [];
     try {
-      while (hasMore && matches.length < TARGET_MATCHES) {
+      let pages = 0;
+      while (hasMore && matches.length < TARGET_MATCHES && pages < MAX_PAGES_PER_ACTION) {
         const page = await getDiscoverSpotsPage(nextCursor, QUERY_SIZE);
+        pages += 1;
         if (request !== generation.current) return;
         matches.push(...page.spots.filter(spot => isDiscoverEligible(spot) && matchesDiscoverCategory(spot, filter)));
         nextCursor = page.cursor;
