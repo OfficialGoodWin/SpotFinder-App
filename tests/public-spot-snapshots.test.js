@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildPublicSpotSnapshot } from '../scripts/public-spots/export.mjs';
-import { createPublicSpotSnapshotReader, loadFullSnapshotSpot, readSnapshotOrFirestore } from '../src/new/publicSpotSnapshotClient.js';
+import { createPublicSpotSnapshotReader, loadFullSnapshotSpot, readSnapshotSpots } from '../src/new/publicSpotSnapshotClient.js';
 import { publicSnapshotThumbnailUrl, regionForPoint, regionsForBounds } from '../src/new/publicSpotSnapshotFormat.js';
 import { cachedViewport, rememberViewport } from '../src/new/viewportCache.js';
+import { applyTrustedSnapshotChange, currentSnapshotRecords } from '../scripts/public-spots/publicationState.mjs';
 
 const approved = { id: 'approved', is_public: true, status: 'published', lat: 50.1, lng: 14.1, title: 'Castle',
   tags: ['castle'], rating: 4.5, rating_count: 2, created_date: '2026-10-29', description: 'private detail',
@@ -73,7 +74,7 @@ test('reader clips bounds, limits output, reuses region requests and loads full 
   assert.deepEqual(second, first);
   assert.equal(calls.filter(url => url.endsWith('/manifest.json')).length, 1);
   assert.equal(calls.filter(url => url.includes('/v1/')).length, 1);
-  const marked = await readSnapshotOrFirestore(bounds, 1, read, () => { throw new Error('Unexpected Firestore read'); });
+  const marked = await readSnapshotSpots(bounds, 1, read);
   assert.equal(marked[0]._public_snapshot, true);
   let detailReads = 0;
   const full = await loadFullSnapshotSpot(marked[0], async id => { detailReads += 1; return { ...approved, id }; });
@@ -81,14 +82,64 @@ test('reader clips bounds, limits output, reuses region requests and loads full 
   assert.equal(detailReads, 1);
 });
 
-test('missing snapshot falls back to Firestore and existing viewport cache still expires', async () => {
-  let firestoreReads = 0;
-  const rows = await readSnapshotOrFirestore(bounds, 300, async () => { throw new Error('404'); }, async () => {
-    firestoreReads += 1; return [approved];
-  });
-  assert.equal(rows[0]._public_snapshot, undefined);
-  assert.equal(firestoreReads, 1);
+test('missing snapshot fails after bounded retries without a Firestore read', async () => {
+  const snapshot = buildPublicSpotSnapshot([approved]);
+  let requests = 0;
+  const read = createPublicSpotSnapshotReader({ fetchJson: async url => {
+    requests += 1;
+    return { ok: false, status: 503, json: async () => snapshot.manifest };
+  } });
+  await assert.rejects(readSnapshotSpots(bounds, 300, read), /Snapshot HTTP 503/);
+  assert.equal(requests, 2);
+  const rows = [approved];
   const cache = rememberViewport(null, 'view-a', rows, 1000);
   assert.deepEqual(cachedViewport(cache, 'view-a', 2000), rows);
   assert.equal(cachedViewport(cache, 'view-a', 121000), null);
+});
+
+test('manifest switch invalidates edited and removed markers while old version stays immutable', async () => {
+  let snapshot = buildPublicSpotSnapshot([approved]);
+  const oldFile = snapshot.manifest.regions[regionForPoint(approved.lat, approved.lng)];
+  const available = new Map(snapshot.files);
+  const calls = [];
+  const read = createPublicSpotSnapshotReader({ fetchJson: async url => {
+    calls.push(url);
+    const data = url.endsWith('manifest.json') ? snapshot.manifest : available.get(url.split('/').at(-1));
+    return { ok: Boolean(data), json: async () => data };
+  } });
+  assert.equal((await read(bounds))[0].title, 'Castle');
+  snapshot = buildPublicSpotSnapshot([{ ...approved, title: 'Edited' }]);
+  for (const [name, data] of snapshot.files) available.set(name, data);
+  assert.equal((await read(bounds))[0].title, 'Edited');
+  snapshot = buildPublicSpotSnapshot([]);
+  assert.deepEqual(await read(bounds), []);
+  assert.equal(available.get(oldFile).spots[0].title, 'Castle');
+  assert.equal(calls.filter(url => url.endsWith('manifest.json')).length, 3);
+});
+
+test('malicious region payload fails closed and bounded retry recovers a transient failure', async () => {
+  const snapshot = buildPublicSpotSnapshot([approved]);
+  const filename = [...snapshot.files.keys()][0];
+  const file = snapshot.files.get(filename);
+  let attempts = 0;
+  const read = createPublicSpotSnapshotReader({ fetchJson: async url => {
+    if (url.endsWith('manifest.json')) return { ok: true, json: async () => snapshot.manifest };
+    attempts += 1;
+    if (attempts === 1) return { ok: false, status: 503 };
+    return { ok: true, json: async () => file };
+  } });
+  assert.equal((await read(bounds))[0].id, approved.id);
+  assert.equal(attempts, 2);
+  const malicious = createPublicSpotSnapshotReader({ fetchJson: async url => ({ ok: true, json: async () => url.endsWith('manifest.json')
+    ? snapshot.manifest : { ...file, spots: [{ ...file.spots[0], created_by_uid: 'private' }] } }) });
+  await assert.rejects(malicious(bounds), /Invalid snapshot region/);
+});
+
+test('duplicate and out-of-order trusted events cannot resurrect a tombstoned spot', () => {
+  const state = new Map();
+  assert.equal(applyTrustedSnapshotChange(state, { id: approved.id, revision: 1, spot: approved }), true);
+  assert.equal(applyTrustedSnapshotChange(state, { id: approved.id, revision: 3, spot: null }), true);
+  assert.equal(applyTrustedSnapshotChange(state, { id: approved.id, revision: 2, spot: approved }), false);
+  assert.equal(applyTrustedSnapshotChange(state, { id: approved.id, revision: 3, spot: approved }), false);
+  assert.deepEqual(buildPublicSpotSnapshot(currentSnapshotRecords(state)).manifest.regions, {});
 });

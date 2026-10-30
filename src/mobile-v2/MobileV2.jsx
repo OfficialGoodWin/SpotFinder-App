@@ -9,7 +9,7 @@ import { LANGUAGES, LANGUAGE_VARIANTS } from '@/locales/translations';
 import { getTextScale, saveTextScale } from '@/lib/textScale';
 import { getPublicSpotsInBounds, getPublicSpotsNear, getPublicSpotById, getDiscoverSpotsPage, getSavedSpots, getLikedSpots, getUserSpots, getCloudSpotDrafts, deleteCloudSpotDraft, getSpotSocialState, toggleSpotSave, createSpot, deleteSpot, updateSpot, addSocialPost, resendVerificationEmail } from '@/api/firebaseClient';
 import { cachedViewport, rememberViewport } from '@/new/viewportCache';
-import { loadFullSnapshotSpot, readPublicSpotSnapshot, readSnapshotOrFirestore } from '@/new/publicSpotSnapshotClient';
+import { loadFullSnapshotSpot, readSnapshotSpots } from '@/new/publicSpotSnapshotClient';
 import { getSpotDisplayName, getSpotLocationLabel, resolveSpotTitle, spotMatchesSearch } from '@/lib/spotPresentation';
 import { filterAndSortNearbySpots, getSpotRating, normalizeLatLng } from '@/lib/spotDiscovery';
 import { getConsent, acknowledgeCurrentPrivacyNotice } from '@/lib/consent';
@@ -56,7 +56,9 @@ const NavigationProviderSheet = recoverableLazy(() => import('@/components/navig
 
 const LOGO = '/app-icon-v2-192.png?v=3';
 // Prototype is intentionally development-only until moderation invalidation is deployed.
-const PUBLIC_SNAPSHOT_PREVIEW = import.meta.env.DEV && import.meta.env.VITE_PUBLIC_SPOT_SNAPSHOTS === 'true';
+// Explicitly disabled in production until a trusted publisher and takedown process are approved.
+const PUBLIC_SNAPSHOT_PREVIEW = (import.meta.env.DEV || import.meta.env.MODE === 'snapshot-staging')
+  && import.meta.env.VITE_PUBLIC_SPOT_SNAPSHOTS === 'true';
 const START = { lat: 50.0755, lng: 14.4378 };
 const TABS = [
   ['map', 'Mapa', MapIcon], ['discover', 'Objevit', Compass], ['add', 'Přidat', Plus],
@@ -354,7 +356,7 @@ export default function MobileV2({ redesigned = false }) {
     const view = { south: bounds.getSouth(), west: bounds.getWest(), north: bounds.getNorth(), east: bounds.getEast() };
     const key = Object.values(view).map(value => value.toFixed(2)).join(':');
     const request = ++requestRef.current;
-    const cachedRows = redesigned
+    const cachedRows = PUBLIC_SNAPSHOT_PREVIEW && redesigned ? null : redesigned
       ? cachedViewport(cacheRef.current, key)
       : cacheRef.current?.key === key && Date.now() - cacheRef.current.at < 120000 ? cacheRef.current.rows : null;
     if (cachedRows) {
@@ -363,7 +365,7 @@ export default function MobileV2({ redesigned = false }) {
     setSpotsLoading(true); setSpotsError(false);
     const pending = pendingBoundsRef.current;
     const queryPromise = pending?.key === key ? pending.promise : PUBLIC_SNAPSHOT_PREVIEW && redesigned
-      ? readSnapshotOrFirestore(view, 300, readPublicSpotSnapshot, getPublicSpotsInBounds)
+      ? readSnapshotSpots(view, 300)
       : getPublicSpotsInBounds(view, 300);
     if (pending?.key !== key) pendingBoundsRef.current = { key, promise: queryPromise };
     try {
@@ -372,7 +374,7 @@ export default function MobileV2({ redesigned = false }) {
         setSpots(rows);
         cacheRef.current = redesigned ? rememberViewport(cacheRef.current, key, rows) : { key, rows, at: Date.now() };
       }
-    } catch { if (request === requestRef.current) setSpotsError(true); }
+    } catch { if (request === requestRef.current) { setSpotsError(true); if (PUBLIC_SNAPSHOT_PREVIEW && redesigned) { setSpots([]); cacheRef.current = null; } } }
     finally { if (pendingBoundsRef.current?.promise === queryPromise) pendingBoundsRef.current = null; if (request === requestRef.current) setSpotsLoading(false); }
   }, [redesigned]);
   const scheduleMapRefresh = useCallback(() => {
@@ -384,15 +386,8 @@ export default function MobileV2({ redesigned = false }) {
     }, 120);
   }, [refreshMap]);
   useEffect(() => {
-    if (!PUBLIC_SNAPSHOT_PREVIEW || !redesigned || !searchOpen) return undefined;
-    const map = mapRef.current;
-    if (!map) return undefined;
-    const bounds = map.getBounds();
-    let active = true;
-    getPublicSpotsInBounds({ south: bounds.getSouth(), west: bounds.getWest(), north: bounds.getNorth(), east: bounds.getEast() }, 300)
-      .then(rows => { if (active) setSearchSourceSpots(rows); }).catch(() => {});
-    return () => { active = false; };
-  }, [redesigned, searchOpen, mapInstance]);
+    if (PUBLIC_SNAPSHOT_PREVIEW && redesigned) setSearchSourceSpots(spots);
+  }, [redesigned, spots]);
   const handleZoomDragStart = useCallback(() => {
     zoomDraggingRef.current = true;
     requestRef.current += 1;

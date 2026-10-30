@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, access, rename } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { REGION_DEGREES, SNAPSHOT_FORMAT, regionForPoint, toPublicSnapshotSpot } from '../../src/new/publicSpotSnapshotFormat.js';
@@ -36,11 +36,16 @@ export function buildPublicSpotSnapshot(records) {
 
 export async function writePublicSpotSnapshot(records, outputDirectory) {
   const snapshot = buildPublicSpotSnapshot(records);
-  const versionDirectory = join(outputDirectory, 'v1', snapshot.manifest.version);
+  const versionDirectory = join(outputDirectory, 'v1');
   await mkdir(versionDirectory, { recursive: true });
-  for (const [name, data] of snapshot.files) await writeFile(join(versionDirectory, name), `${JSON.stringify(data)}\n`);
+  for (const [name, data] of snapshot.files) {
+    try { await access(join(versionDirectory, name)); }
+    catch { await writeFile(join(versionDirectory, name), `${JSON.stringify(data)}\n`); }
+  }
   // Publish manifest last; immutable region files must be available first.
-  await writeFile(join(outputDirectory, 'manifest.json'), `${JSON.stringify(snapshot.manifest)}\n`);
+  const nextManifest = join(outputDirectory, 'manifest.next.json');
+  await writeFile(nextManifest, `${JSON.stringify(snapshot.manifest)}\n`);
+  await rename(nextManifest, join(outputDirectory, 'manifest.json'));
   return snapshot.manifest;
 }
 

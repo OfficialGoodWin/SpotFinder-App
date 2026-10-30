@@ -61,6 +61,8 @@ import { isEligibleBirthDate } from '@/lib/ageEligibility';
 import { createPrivateDraftPhotoLoader, draftPhotoLoadMessage } from '@/lib/privateDraftPhotoLoader';
 import { visiblePoiRatings } from '@/lib/poiRatings';
 import { createBoundedPublicRead } from '@/lib/boundedPublicRead';
+import { createPublicCoverageCache } from '@/lib/publicCoverageCache';
+import { createInFlightRead } from '@/lib/inFlightRead';
 
 let app, auth, db, functionsInstance, storage, appCheck;
 const emulatorOnly = (import.meta.env.DEV || import.meta.env.VITE_SPOTFINDER_STAGE === 'emulator')
@@ -543,7 +545,10 @@ export const getFeaturedSpotCandidates = async () => {
 
 // Bounded public discovery pages. The cursor is a Firestore snapshot kept only
 // in memory by the caller; no listener or private collection is involved.
-const publicRead = createBoundedPublicRead();
+const publicRead = createBoundedPublicRead({ failureBackoffMs: 250, maxFailureBackoffMs: 2000 });
+const publicCoverage = createPublicCoverageCache();
+const detailRead = createInFlightRead();
+const clearPublicSpotCaches = () => { publicRead.clear(); publicCoverage.clear(); detailRead.clear(); };
 export const getDiscoverSpotsPage = (cursor = null, pageSize = 16) => {
   const safeSize = Math.min(24, Math.max(1, Math.floor(Number(pageSize) || 16)));
   return publicRead(`discover:${cursor?.id || 'first'}:${safeSize}`, () => readDiscoverSpotsPage(cursor, safeSize));
@@ -570,6 +575,8 @@ const readDiscoverSpotsPage = async (cursor, safeSize) => {
 // while applying multiple latitude/longitude range filters.
 export const getPublicSpotsInBounds = (bounds, maxCount = 500) => {
   const safeCount = Math.min(500, Math.max(1, Math.floor(Number(maxCount) || 500)));
+  const covered = publicCoverage.lookup(bounds, safeCount);
+  if (covered) return Promise.resolve(covered);
   const key = `bounds:${[bounds.south, bounds.west, bounds.north, bounds.east].map(value => Number(value).toFixed(5)).join(':')}:${safeCount}`;
   return publicRead(key, () => readPublicSpotsInBounds(bounds, safeCount));
 };
@@ -597,16 +604,21 @@ const readPublicSpotsInBounds = async ({ south, west, north, east }, maxCount) =
   const unique = new Map();
   snapshots.forEach(snapshot => snapshot.docs.forEach(d => unique.set(d.id, spotFromSnapshot(d))));
   const rows = [...unique.values()].slice(0, maxCount);
-  return rows.sort((a, b) => String(b.created_date || '').localeCompare(String(a.created_date || '')));
+  rows.sort((a, b) => String(b.created_date || '').localeCompare(String(a.created_date || '')));
+  publicCoverage.remember({ south: Number(south), west: westNumber, north: Number(north), east: eastNumber }, rows, maxCount);
+  return rows;
 };
 
-export const getPublicSpotById = async (spotId) => {
-  if (!spotId) return null;
-  const { db } = getFirebaseServices();
-  const snapshot = await getDoc(doc(db, SPOTS_COLLECTION, String(spotId)));
-  if (!snapshot.exists()) return null;
-  const spot = spotFromSnapshot(snapshot);
-  return spot.is_public && ['published', 'pending_trust'].includes(spot.status) ? spot : null;
+export const getPublicSpotById = (spotId) => {
+  if (!spotId) return Promise.resolve(null);
+  const id = String(spotId);
+  return detailRead(id, async () => {
+    const { db } = getFirebaseServices();
+    const snapshot = await getDoc(doc(db, SPOTS_COLLECTION, id));
+    if (!snapshot.exists()) return null;
+    const spot = spotFromSnapshot(snapshot);
+    return spot.is_public && ['published', 'pending_trust'].includes(spot.status) ? spot : null;
+  });
 };
 
 // Firestore has no native radius query. Read bounded latitude/longitude pages,
@@ -616,6 +628,13 @@ export const getPublicSpotsNear = (origin, maxDistance = Infinity, { maxCandidat
   const normalized = normalizeLatLng(origin);
   if (!normalized) return Promise.resolve({ spots: [], complete: true, scanned: 0 });
   const safeCandidates = Math.min(1500, Math.max(1, Math.floor(Number(maxCandidates) || 1500)));
+  if (Number.isFinite(maxDistance)) {
+    const covered = publicCoverage.lookup(nearbyBounds(normalized, maxDistance), safeCandidates);
+    if (covered) return Promise.resolve({
+      spots: filterAndSortNearbySpots(covered, { origin: normalized, maxDistance, sort: 'distance' }),
+      complete: true, scanned: covered.length,
+    });
+  }
   const key = `near:${normalized.map(value => Number(value).toFixed(5)).join(':')}:${maxDistance}:${safeCandidates}`;
   return publicRead(key, () => readPublicSpotsNear(normalized, maxDistance, safeCandidates));
 };
@@ -686,7 +705,9 @@ export const getUserSpots = async (userEmail, maxCount = 50, userId = '') => {
 };
  
 export const createSpot = async (spotData) => {
-  return callFn('submitSpot')(spotData);
+  const result = await callFn('submitSpot')(spotData);
+  clearPublicSpotCaches();
+  return result;
 };
 
 // Older deployed submitSpot functions keep their three-photo limit. Only the
@@ -719,21 +740,28 @@ export const updateSpot = async (spotId, data) => {
       const changedDetails = Object.fromEntries(Object.entries(patch)
         .filter(([key, value]) => JSON.stringify(current.data()[key]) !== JSON.stringify(value)));
       await callFn('updateSpotPhotos')({ spotId, patch: { ...changedDetails, image_urls: imageUrls, image_url: imageUrls[0] || null } });
+      clearPublicSpotCaches();
       return;
     }
   }
   if (!Object.keys(patch).length) return;
   await updateDoc(doc(db, SPOTS_COLLECTION, spotId), patch);
+  clearPublicSpotCaches();
 };
  
 export const deleteSpot = async (spotId) => {
   const { db } = getFirebaseServices();
   await deleteDoc(doc(db, SPOTS_COLLECTION, spotId));
+  clearPublicSpotCaches();
 };
  
 // Routed through the audited Cloud Function callable (functions/index.js)
 // so deletion always leaves an admin_audit_log entry.
-export const deleteSpotAsSuperAdmin = (spotId) => callFn('adminDeleteSpot')({ spotId });
+export const deleteSpotAsSuperAdmin = async (spotId) => {
+  const result = await callFn('adminDeleteSpot')({ spotId });
+  clearPublicSpotCaches();
+  return result;
+};
  
 export const rateSpot = async (spotId, rating) => {
   const { db } = getFirebaseServices();
@@ -1375,7 +1403,11 @@ export const getAdminSpots = async (maxCount = 300) => {
   const snap = await getDocs(query(collection(db, 'spots'), orderBy('created_date', 'desc'), limit(maxCount)));
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 };
-export const adminUpdateSpot = (spotId, patch) => callFn('adminUpdateSpot')({ spotId, patch });
+export const adminUpdateSpot = async (spotId, patch) => {
+  const result = await callFn('adminUpdateSpot')({ spotId, patch });
+  clearPublicSpotCaches();
+  return result;
+};
 
 export const getAdminPOIPhotos = async (maxCount = 300) => {
   const { db } = getFirebaseServices();

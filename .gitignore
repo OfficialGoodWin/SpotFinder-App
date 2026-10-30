@@ -42,3 +42,19 @@ scripts/ambient-tiles/.ambient-filter.txt
 
 # Local AI handoff notes; never commit this file.
 AI-README.md
+
+.playwright-cli/*
+android/*
+audit/*
+cloudflare-backend/*
+node-modules/*
+reports/*
+scripts/*
+!scripts/firebase-consumption/
+!scripts/firebase-consumption/harness.mjs
+server/*
+SpotFinder_Codex_Design_References/*
+state/*
+tests/*
+!tests/in-flight-read.test.js
+!tests/public-coverage-cache.test.js

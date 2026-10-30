@@ -74,3 +74,37 @@ test('a stalled active read cannot leave a later read queued forever', async () 
   release(syntheticRows);
   await first;
 });
+
+test('bounded failure backoff suppresses immediate repeat requests and resets on success', async () => {
+  let now = 0;
+  let calls = 0;
+  const read = createBoundedPublicRead({ failureBackoffMs: 250, maxFailureBackoffMs: 1000, now: () => now });
+  const load = () => { calls++; throw new Error('offline'); };
+  await assert.rejects(read('A', load), /offline/);
+  await assert.rejects(read('A', load), /offline/);
+  assert.equal(calls, 1);
+  now = 250;
+  await assert.rejects(read('A', load), /offline/);
+  assert.equal(calls, 2);
+  now = 749;
+  await assert.rejects(read('A', load), /offline/);
+  assert.equal(calls, 2);
+  now = 750;
+  await read('A', () => { calls++; return syntheticRows; });
+  assert.equal(calls, 3);
+  assert.equal(await read('A', load), syntheticRows);
+  assert.equal(calls, 3);
+});
+
+test('invalidation prevents an older in-flight result from filling the new cache', async () => {
+  const read = createBoundedPublicRead({ maxConcurrent: 2 });
+  let release;
+  const old = read('A', () => new Promise(resolve => { release = resolve; }));
+  await tick();
+  read.clear();
+  const freshRows = [{ id: 'fresh' }];
+  const fresh = await read('A', () => freshRows);
+  release([{ id: 'old' }]);
+  await old;
+  assert.equal(await read('A', () => { throw new Error('cache was lost'); }), fresh);
+});

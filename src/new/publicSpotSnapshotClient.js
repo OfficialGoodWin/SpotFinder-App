@@ -2,6 +2,21 @@ import { MAX_VIEW_REGIONS, SNAPSHOT_FORMAT, regionsForBounds, regionForPoint, sp
 
 const VERSION = /^[a-f0-9]{20}$/;
 const FILE = /^r\d+-\d+-[a-f0-9]{20}\.json$/;
+const RETRIES = 1;
+const RETRY_DELAY_MS = 150;
+
+async function requestJson(fetchJson, url, options) {
+  for (let attempt = 0; attempt <= RETRIES; attempt += 1) {
+    try {
+      const response = await fetchJson(url, options);
+      if (!response.ok) throw new Error(`Snapshot HTTP ${response.status || 'error'}`);
+      return await response.json();
+    } catch (error) {
+      if (attempt === RETRIES) throw error;
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+    }
+  }
+}
 
 export function createPublicSpotSnapshotReader({ fetchJson = fetch, basePath = '/spot-snapshots' } = {}) {
   const pending = new Map();
@@ -9,19 +24,17 @@ export function createPublicSpotSnapshotReader({ fetchJson = fetch, basePath = '
   return async function readPublicSpotSnapshot(bounds, maxCount = 300) {
     const keys = regionsForBounds(bounds);
     if (!keys || keys.length > MAX_VIEW_REGIONS) throw new Error('Viewport exceeds snapshot coverage');
-    if (!manifestPending) manifestPending = fetchJson(`${basePath}/manifest.json`, { cache: 'no-store' })
-      .then(async response => { if (!response.ok) throw new Error('Snapshot manifest unavailable'); return response.json(); })
+    if (!manifestPending) manifestPending = requestJson(fetchJson, `${basePath}/manifest.json`, { cache: 'no-store' })
       .finally(() => { manifestPending = null; });
     const manifest = await manifestPending;
     if (manifest.format !== SNAPSHOT_FORMAT || !VERSION.test(manifest.version) || typeof manifest.regions !== 'object' || !manifest.regions) throw new Error('Invalid snapshot manifest');
     const snapshots = await Promise.all(keys.filter(key => manifest.regions[key]).map(async key => {
       const filename = manifest.regions[key];
       if (!FILE.test(filename) || !filename.startsWith(`${key}-`)) throw new Error('Invalid snapshot region name');
-      const url = `${basePath}/v1/${manifest.version}/${filename}`;
+      const url = `${basePath}/v1/${filename}`;
       if (!pending.has(url)) {
-        pending.set(url, fetchJson(url, { cache: 'force-cache' }).then(async response => {
-          if (!response.ok) throw new Error('Snapshot region unavailable');
-          const data = await response.json();
+        if (pending.size >= 128) pending.delete(pending.keys().next().value);
+        pending.set(url, requestJson(fetchJson, url, { cache: 'force-cache' }).then(data => {
           if (data.format !== SNAPSHOT_FORMAT || data.region !== key || !Array.isArray(data.spots)
             || !data.spots.every(spot => validSnapshotSpot(spot) && regionForPoint(spot.lat, spot.lng) === key)) throw new Error('Invalid snapshot region');
           return data.spots;
@@ -39,12 +52,8 @@ export function createPublicSpotSnapshotReader({ fetchJson = fetch, basePath = '
 
 export const readPublicSpotSnapshot = createPublicSpotSnapshotReader();
 
-export async function readSnapshotOrFirestore(bounds, maxCount, readSnapshot, readFirestore) {
-  try {
-    return (await readSnapshot(bounds, maxCount)).map(spot => ({ ...spot, _public_snapshot: true }));
-  } catch {
-    return readFirestore(bounds, maxCount);
-  }
+export async function readSnapshotSpots(bounds, maxCount = 300, readSnapshot = readPublicSpotSnapshot) {
+  return (await readSnapshot(bounds, maxCount)).map(spot => ({ ...spot, _public_snapshot: true }));
 }
 
 export async function loadFullSnapshotSpot(spot, getFullSpot) {

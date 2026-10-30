@@ -312,6 +312,8 @@ export default function Home() {
           toast.error('Spot saved, but the social post could not be attached. You can add it from the spot details.');
         }
       }
+      spotRequestSequence.current += 1;
+      if (spotRefreshTimer.current) clearTimeout(spotRefreshTimer.current);
       setSpots(prev => [spot, ...prev.filter(item => item.id !== spot.id)]);
       viewportCacheRef.current = null;
       nearbyCacheRef.current = null;
@@ -386,6 +388,8 @@ export default function Home() {
  
   const handleDeleteSpot = async (spot) => {
     await deleteSpot(spot.id);
+    spotRequestSequence.current += 1;
+    if (spotRefreshTimer.current) clearTimeout(spotRefreshTimer.current);
     setSpots(prev => prev.filter(s => s.id !== spot.id));
     viewportCacheRef.current = null;
     nearbyCacheRef.current = null;
@@ -396,6 +400,8 @@ export default function Home() {
 
   const handleEditSpot = async (updatedSpot) => {
     await updateSpot(updatedSpot.id, updatedSpot);
+    spotRequestSequence.current += 1;
+    if (spotRefreshTimer.current) clearTimeout(spotRefreshTimer.current);
     setSpots(prev => prev.map(s => s.id === updatedSpot.id ? updatedSpot : s));
     viewportCacheRef.current = null;
     nearbyCacheRef.current = null;
