@@ -17,7 +17,7 @@
       default-src 'self';
       script-src 'self' 'unsafe-inline' https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/
         https://apis.google.com https://maps.googleapis.com https://www.google.com https://www.gstatic.com
-        https://js.stripe.com;
+        https://js.stripe.com https://static.cloudflareinsights.com/beacon.min.js;
       style-src 'self' 'unsafe-inline';
       img-src 'self' data: blob: https:;
       connect-src 'self' data: https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net https://*.run.app https://www.google.com https://www.gstatic.com
@@ -30,7 +30,7 @@
         https://server.arcgisonline.com
         https://tiles.openfreemap.org https://protomaps.github.io
         https://s3.amazonaws.com https://commons.wikimedia.org https://www.wikidata.org https://*.wikipedia.org
-        https://*.google.com;
+        https://*.google.com https://cloudflareinsights.com;
       worker-src 'self' blob:;
       frame-src https://js.stripe.com https://checkout.stripe.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/
         https://*.firebaseapp.com

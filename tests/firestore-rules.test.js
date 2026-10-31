@@ -29,6 +29,7 @@ test('Firestore rules enforce private profiles, ownership, and verified interact
       await setDoc(doc(db, 'spots', 'hidden-place'), { created_by_uid: 'owner', is_public: true, status: 'hidden', lat: 50, lng: 14 });
       await setDoc(doc(db, 'spots', 'private-place'), { created_by_uid: 'owner', is_public: false, status: 'published', lat: 50, lng: 14 });
       await setDoc(doc(db, 'spots', 'legacy-owned'), { title: 'Legacy', description: '', created_by: 'owner@example.test', status: 'published', is_public: false });
+      await setDoc(doc(db, 'spot_snapshot_revocation_feed', 'current'), { format: 1, revoked: ['spot-old'] });
       await setDoc(doc(db, 'spot_ratings', 'spot-one_owner'), {
         spot_id: 'spot-one', user_id: 'owner', overall: 4, access: 4, condition: 4, safety: 4, crowdedness: 4, schema: 2,
       });
@@ -57,6 +58,12 @@ test('Firestore rules enforce private profiles, ownership, and verified interact
       created_by_uid: 'admin', created_date: '2026-01-01',
     }));
     await assertSucceeds(getDoc(doc(anonymous, 'spots', 'public-place')));
+    await assertSucceeds(getDoc(doc(anonymous, 'spot_snapshot_revocation_feed', 'current')));
+    await assertFails(getDoc(doc(anonymous, 'spot_snapshot_revocation_feed', 'other')));
+    await assertFails(getDocs(collection(anonymous, 'spot_snapshot_revocation_feed')));
+    await assertFails(setDoc(doc(anonymous, 'spot_snapshot_revocation_feed', 'current'), { format: 1, revoked: [] }));
+    await assertFails(updateDoc(doc(admin, 'spot_snapshot_revocation_feed', 'current'), { revoked: [] }));
+    await assertFails(getDoc(doc(anonymous, 'spot_snapshot_changes', 'spot-one')));
     await assertFails(getDoc(doc(anonymous, 'spots', 'hidden-place')));
     await assertFails(getDoc(doc(anonymous, 'spots', 'private-place')));
     await assertFails(getDoc(doc(other, 'users', 'owner')));

@@ -32,6 +32,17 @@ import { selectFeaturedSpots } from '@/lib/featuredDiscovery';
 import { spotIdFromLocation, validSpotId } from '@/lib/spotLinks';
 import { getGuestDraftOwnerKey, listGuestDrafts } from '@/lib/spotDrafts';
 import { getMapExploreEnabled, setMapExploreEnabled as persistMapExploreEnabled } from '@/lib/mapExplorePreference';
+import { readSnapshotSpots, loadFullSnapshotSpot } from '@/new/publicSpotSnapshotClient';
+import { subscribePublicSpotRevocations } from '@/new/publicSpotRevocationListener';
+import { originalMapSnapshotFeatureEnabled } from '@/new/snapshotFeatureFlag';
+
+const ORIGINAL_SNAPSHOT_PREVIEW = originalMapSnapshotFeatureEnabled({
+  dev: import.meta.env.DEV, mode: import.meta.env.MODE,
+  stage: import.meta.env.VITE_SPOTFINDER_STAGE,
+  emulatorOnly: import.meta.env.VITE_FIREBASE_EMULATOR_ONLY,
+  flag: import.meta.env.VITE_PUBLIC_SPOT_SNAPSHOTS,
+  originalFlag: import.meta.env.VITE_ORIGINAL_MAP_SNAPSHOTS,
+});
 
 const SubscriptionModal = recoverableLazy(() => import('../components/SubscriptionModal'));
 const SuperAdminEditor = recoverableLazy(() => import('../components/map/SuperAdminEditor'));
@@ -67,9 +78,18 @@ export default function Home() {
   const [pendingLatlng, setPendingLatlng] = useState(null);
   const [resumingDraft, setResumingDraft] = useState(null);
   const [selectedSpot, setSelectedSpot] = useState(null);
+  const selectedSpotRef = useRef(null);
+  selectedSpotRef.current = selectedSpot;
   const { closeSpot, openSpot, spotFocus } = useSpotOpenFocus({ selectedSpot, setSelectedSpot });
-  const openMarkerSpot = useCallback((spot) => {
-    if (openSpot(spot, { source: 'marker' })) navigate(`/spot/${encodeURIComponent(spot.id)}`);
+  const openMarkerSpot = useCallback(async (spot) => {
+    try {
+      const full = ORIGINAL_SNAPSHOT_PREVIEW
+        ? await loadFullSnapshotSpot(spot, getPublicSpotById) : spot;
+      const selected = full && spot._public_snapshot ? { ...full, _public_snapshot: true } : full;
+      if (selected && openSpot(selected, { source: 'marker' })) navigate(`/spot/${encodeURIComponent(selected.id)}`);
+    } catch (error) {
+      console.error('Spot detail unavailable', { code: error?.code || error?.name || 'unknown' });
+    }
   }, [navigate, openSpot]);
   const [editingSpot, setEditingSpot] = useState(null);
   const [navigationDestination, setNavigationDestination] = useState(null);
@@ -195,7 +215,7 @@ export default function Home() {
     spotRefreshTimer.current = setTimeout(async () => {
       const b = map.getBounds();
       const view = { south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() };
-      const cachedRows = cachedViewportRows(viewportCacheRef.current, view);
+      const cachedRows = ORIGINAL_SNAPSHOT_PREVIEW ? null : cachedViewportRows(viewportCacheRef.current, view);
       if (cachedRows) {
         setSpots(cachedRows);
         setSpotsLoading(false);
@@ -203,6 +223,11 @@ export default function Home() {
       }
       setSpotsLoading(true);
       try {
+        if (ORIGINAL_SNAPSHOT_PREVIEW) {
+          const rows = await readSnapshotSpots(view, 500);
+          if (sequence === spotRequestSequence.current) setSpots(rows);
+          return;
+        }
         const latPad = Math.min(10, (view.north - view.south) * 0.25);
         const lngPad = Math.min(10, (view.east - view.west) * 0.25);
         const bounds = { south: Math.max(-90, view.south - latPad), north: Math.min(90, view.north + latPad), west: view.west - lngPad, east: view.east + lngPad };
@@ -218,11 +243,43 @@ export default function Home() {
         }
       } catch (err) {
         console.error('Failed to load visible spots:', err);
+        if (ORIGINAL_SNAPSHOT_PREVIEW && sequence === spotRequestSequence.current) setSpots([]);
       } finally {
         if (sequence === spotRequestSequence.current) setSpotsLoading(false);
       }
     }, 120);
   }, []);
+
+  useEffect(() => {
+    if (!ORIGINAL_SNAPSHOT_PREVIEW) return undefined;
+    return subscribePublicSpotRevocations(({ healthy, revoked }) => {
+      if (!healthy) {
+        spotRequestSequence.current += 1;
+        setSpots([]);
+        viewportCacheRef.current = null;
+        if (selectedSpotRef.current?._public_snapshot) closeSpot();
+        return;
+      }
+      if (revoked.size) {
+        setSpots(rows => rows.filter(row => !revoked.has(row.id)));
+        if (selectedSpotRef.current && revoked.has(selectedSpotRef.current.id)) closeSpot();
+      }
+      void refreshSpotsInViewport();
+    });
+  }, [refreshSpotsInViewport, closeSpot]);
+
+  useEffect(() => {
+    if (!ORIGINAL_SNAPSHOT_PREVIEW) return undefined;
+    const refresh = () => {
+      if (document.visibilityState === 'visible') void refreshSpotsInViewport();
+    };
+    const timer = setInterval(refresh, 30000);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [refreshSpotsInViewport]);
 
   const handleMapReady = useCallback((map) => {
     if (moveEndMapRef.current && moveEndMapRef.current !== map) {
@@ -345,7 +402,9 @@ export default function Home() {
       return () => { active = false; };
     }
     const cached = spots.find(item => String(item.id) === linkedSpot.id);
-    const request = cached ? Promise.resolve(cached) : getPublicSpotById(linkedSpot.id);
+    const request = cached?._public_snapshot
+      ? loadFullSnapshotSpot(cached, getPublicSpotById)
+      : cached ? Promise.resolve(cached) : getPublicSpotById(linkedSpot.id);
     request.then(found => {
       if (!active) return;
       if (!found) { setSharedSpotError(true); closeSpot(); return; }

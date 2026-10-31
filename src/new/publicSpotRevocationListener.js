@@ -1,0 +1,42 @@
+import { doc, onSnapshot } from 'firebase/firestore';
+import { getFirebaseServices } from '../api/firebaseClient.js';
+import { createPublicSpotRevocationState } from './publicSpotRevocationState.js';
+
+let singleton;
+let subscribers = 0;
+const offline = () => singleton?.invalidate();
+const online = () => singleton?.restart();
+const foreground = () => {
+  if (document.visibilityState === 'visible') singleton?.restart();
+};
+export function getPublicSpotRevocationListener() {
+  if (!singleton) singleton = createPublicSpotRevocationState({ listen: (accept, fail) => {
+    const services = getFirebaseServices();
+    if (!services?.db) throw new Error('Staging Firestore unavailable');
+    return onSnapshot(doc(services.db, 'spot_snapshot_revocation_feed', 'current'),
+      { includeMetadataChanges: true }, snapshot => accept({ exists: snapshot.exists(),
+        fromCache: snapshot.metadata.fromCache, data: snapshot.data() }), fail);
+  } });
+  return singleton;
+}
+
+export function subscribePublicSpotRevocations(callback) {
+  const source = getPublicSpotRevocationListener();
+  const unsubscribe = source.subscribe(callback);
+  subscribers += 1;
+  if (subscribers === 1) {
+    window.addEventListener('offline', offline);
+    window.addEventListener('online', online);
+    document.addEventListener('visibilitychange', foreground);
+  }
+  return () => {
+    unsubscribe();
+    subscribers -= 1;
+    if (subscribers === 0) {
+      window.removeEventListener('offline', offline);
+      window.removeEventListener('online', online);
+      document.removeEventListener('visibilitychange', foreground);
+      source.stop();
+    }
+  };
+}

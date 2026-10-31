@@ -35,8 +35,36 @@ const { validatePoiRatingInput, moderationForRating, upsertPoiRating } = require
 const { reconcileSpotFlags, FlagModerationError } = require('./flagModeration');
 const { isSubmissionBlocked } = require('./submissionBlock');
 const { createLegacyReportWithClaim } = require('./reportClaim');
+const { recordSpotChange, mutateSpotWithPublication, fingerprint, publishable, initialJournal } = require('./publicSpotPublication');
+const { validOwnerSpotPatch, ownerCanEditSpot, ownerCanDeleteSpot } = require('./ownerSpotPolicy');
+const { processSnapshotEvent } = require('./snapshotEventRetry');
 initializeApp();
 const db = getFirestore();
+
+// These triggers are staging candidates only until deployment is approved.
+// Two in-process attempts are bounded; a failed event is recorded and logged.
+// Platform retry is intentionally not enabled because it can repeat indefinitely.
+exports.journalPublicSpotChange = functions.firestore.document('spots/{spotId}')
+  .onWrite(async (change, context) => processSnapshotEvent(db, 'spot', context.eventId,
+    () => recordSpotChange(db, context.params.spotId,
+      { wasPublic: change.before.exists && publishable(change.before.data()) })));
+exports.journalPublicSpotFlag = functions.firestore.document('flags/{flagId}')
+  .onWrite(async (change, context) => processSnapshotEvent(db, 'flag', context.eventId, async () => {
+    const before = change.before.exists ? change.before.data() : null;
+    const after = change.after.exists ? change.after.data() : null;
+    for (const id of new Set([before?.spot_id, after?.spot_id].filter(Boolean))) {
+      await recordSpotChange(db, id, { forceRevoke: before?.status === 'open' || after?.status === 'open' });
+    }
+  }));
+exports.journalPublicSpotReport = functions.firestore.document('reports/{reportId}')
+  .onWrite(async (change, context) => processSnapshotEvent(db, 'report', context.eventId, async () => {
+    const before = change.before.exists ? change.before.data() : null;
+    const after = change.after.exists ? change.after.data() : null;
+    for (const id of new Set([before, after].filter(row => row?.target_type === 'spot')
+      .map(row => row.target_id).filter(Boolean))) {
+      await recordSpotChange(db, id, { forceRevoke: before?.status === 'open' || after?.status === 'open' });
+    }
+  }));
 const adminAuth = getAuth();
 const RECAPTCHA_SITE_KEY = defineString('RECAPTCHA_SITE_KEY');
 const googleAuth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
@@ -569,7 +597,8 @@ exports.updateSpotPhotos = functions.runWith(callableAppCheckOptions).https.onCa
     }
   }
   await db.runTransaction(async transaction => {
-    const current = await transaction.get(ref);
+    const journalRef = db.collection('spot_snapshot_changes').doc(spotId);
+    const [current, journal] = await Promise.all([transaction.get(ref), transaction.get(journalRef)]);
     if (!current.exists || !ownsSpotRecord(current.data(), context.auth))
       throw new functions.https.HttpsError('permission-denied', 'Only the owner can edit this spot.');
     // The photos and edit state used for validation must still be current.
@@ -582,6 +611,12 @@ exports.updateSpotPhotos = functions.runWith(callableAppCheckOptions).https.onCa
       location_match_confidence: 'user_placed',
     }));
     transaction.update(ref, { ...details, image_urls: urls, image_url: urls[0] || null, photo_metadata: photoMetadata });
+    const after = { ...current.data(), ...details, image_urls: urls, image_url: urls[0] || null };
+    const hash = fingerprint(after);
+    if (!journal.exists || journal.data().fingerprint !== hash)
+      transaction.set(journalRef, { fingerprint: hash, version: (journal.data()?.version || 0) + 1,
+        ever_public: publishable(after) || journal.data()?.ever_public === true,
+        dirty: true, updated_at: new Date().toISOString() }, { merge: true });
   });
   return { success: true };
 });
@@ -956,6 +991,7 @@ exports.submitSpot = functions.runWith({ ...callableAppCheckOptions, secrets: ['
         throw new functions.https.HttpsError('permission-denied', 'This draft belongs to another account.');
       }
       transaction.set(spotRef, spot);
+      transaction.set(db.collection('spot_snapshot_changes').doc(spotRef.id), initialJournal(spot));
       transaction.set(publicationRef, { owner_uid: uid, draft_id: draftId, spot_id: spotRef.id, created_at: new Date().toISOString() });
       if (draftSnapshot.exists) transaction.update(draftRef, { published_spot_id: spotRef.id, published_at: new Date().toISOString() });
       return { existingSpotId: null };
@@ -965,7 +1001,10 @@ exports.submitSpot = functions.runWith({ ...callableAppCheckOptions, secrets: ['
       if (existing.exists) return { id: existing.id, ...existing.data(), already_published: true };
     }
   } else {
-    await spotRef.set(spot);
+    const batch = db.batch();
+    batch.set(spotRef, spot);
+    batch.set(db.collection('spot_snapshot_changes').doc(spotRef.id), initialJournal(spot));
+    await batch.commit();
   }
   return { id: spotRef.id, ...spot };
 });
@@ -1311,8 +1350,30 @@ exports.adminDeleteSpot = functions.runWith(callableAppCheckOptions).https.onCal
     ? spotData.image_urls
     : [spotData.image_url].filter(Boolean);
   await Promise.all(imageUrls.map(deleteManagedUpload));
-  await ref.delete();
+  await mutateSpotWithPublication(db, spotId, { remove: true });
   await logAdminAction('delete_spot', context.auth.token.email, { spotId });
+  return { success: true };
+});
+
+exports.ownerUpdateSpot = functions.runWith(callableAppCheckOptions).https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required');
+  const spotId = String(data?.spotId || '');
+  if (!spotId || !validOwnerSpotPatch(data?.patch))
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid spot edit');
+  const result = await mutateSpotWithPublication(db, spotId, { patch: data.patch,
+    authorize: spot => ownerCanEditSpot(spot, context.auth.uid, context.auth.token?.email) });
+  if (!result.found) throw new functions.https.HttpsError('not-found', 'Spot not found');
+  if (!result.authorized) throw new functions.https.HttpsError('permission-denied', 'Not the spot owner');
+  return { success: true };
+});
+exports.ownerDeleteSpot = functions.runWith(callableAppCheckOptions).https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Sign in required');
+  const spotId = String(data?.spotId || '');
+  if (!spotId) throw new functions.https.HttpsError('invalid-argument', 'Spot ID required');
+  const result = await mutateSpotWithPublication(db, spotId, { remove: true,
+    authorize: spot => ownerCanDeleteSpot(spot, context.auth.uid, context.auth.token?.email) });
+  if (!result.found) throw new functions.https.HttpsError('not-found', 'Spot not found');
+  if (!result.authorized) throw new functions.https.HttpsError('permission-denied', 'Not the spot owner');
   return { success: true };
 });
 
@@ -1403,7 +1464,7 @@ exports.addSocialPost = functions.runWith({ ...callableAppCheckOptions,
     throw error;
   }
   if (target.targetType === 'spot') {
-    await db.collection('spots').doc(target.targetId).update({ has_social: true });
+    await mutateSpotWithPublication(db, target.targetId, { patch: { has_social: true } });
   }
   return { id: ref.id, ...record };
 });
@@ -1413,9 +1474,7 @@ async function refreshSpotSocialIndicator(targetType, targetId) {
   const active = await db.collection('social_posts')
     .where('target_key', '==', `spot:${targetId}`)
     .where('status', '==', 'active').limit(1).get();
-  const spotRef = db.collection('spots').doc(targetId);
-  const spot = await spotRef.get();
-  if (spot.exists) await spotRef.update({ has_social: !active.empty });
+  await mutateSpotWithPublication(db, targetId, { patch: { has_social: !active.empty } });
 }
 
 exports.adminSetSocialPostStatus = functions.runWith(callableAppCheckOptions).https.onCall(async (data, context) => {
@@ -1466,7 +1525,7 @@ exports.submitReport = functions.runWith({ ...callableAppCheckOptions,
 exports.adminResolveReport=functions.runWith(callableAppCheckOptions).https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.reportId||'');if(!id)throw new functions.https.HttpsError('invalid-argument','reportId required');await db.collection('reports').doc(id).update({status:'resolved',resolution:String(data?.resolution||'resolved').slice(0,100),resolved_at:new Date().toISOString(),resolved_by:context.auth.token.email||context.auth.uid});await logAdminAction('resolve_report',context.auth.token.email,{reportId:id});return{success:true}});
 exports.adminDeleteReport=functions.runWith(callableAppCheckOptions).https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.reportId||'');if(!id)throw new functions.https.HttpsError('invalid-argument','reportId required');await db.collection('reports').doc(id).delete();await logAdminAction('delete_report',context.auth.token.email,{reportId:id});return{success:true}});
 exports.adminBlockReporter=functions.runWith(callableAppCheckOptions).https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.reportId||'');const snap=await db.collection('reports').doc(id).get();if(!snap.exists)throw new functions.https.HttpsError('not-found','Report not found');const r=snap.data(), batch=db.batch(), now=new Date().toISOString();for(const [k,v] of [['uid',r.reporter_uid],['ip',r.ip_hash],['device',r.device_hash]])if(v)batch.set(db.collection('report_blocks').doc(`${k}_${v}`),{kind:k,value:v,reason:String(data?.reason||'Report spam').slice(0,200),blocked_at:now,blocked_by:context.auth.token.email||context.auth.uid});await batch.commit();await logAdminAction('block_reporter',context.auth.token.email,{reportId:id,reporter_uid:r.reporter_uid});return{success:true}});
-exports.adminUpdateSpot=functions.runWith(callableAppCheckOptions).https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.spotId||''),src=data?.patch||{},patch={};for(const k of ['title','description','image_url','image_urls','status'])if(Object.prototype.hasOwnProperty.call(src,k))patch[k]=src[k];if(!id||!Object.keys(patch).length)throw new functions.https.HttpsError('invalid-argument','spotId and patch required');if(Object.prototype.hasOwnProperty.call(patch,'status'))patch.auto_flag_moderation=FieldValue.delete();await db.collection('spots').doc(id).update(patch);await logAdminAction('update_spot',context.auth.token.email,{spotId:id,fields:Object.keys(src)});return{success:true}});
+exports.adminUpdateSpot=functions.runWith(callableAppCheckOptions).https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.spotId||''),src=data?.patch||{},patch={};for(const k of ['title','description','image_url','image_urls','status'])if(Object.prototype.hasOwnProperty.call(src,k))patch[k]=src[k];if(!id||!Object.keys(patch).length)throw new functions.https.HttpsError('invalid-argument','spotId and patch required');if(Object.prototype.hasOwnProperty.call(patch,'status'))patch.auto_flag_moderation=FieldValue.delete();const result=await mutateSpotWithPublication(db,id,{patch});if(!result.found)throw new functions.https.HttpsError('not-found','Spot not found');await logAdminAction('update_spot',context.auth.token.email,{spotId:id,fields:Object.keys(src)});return{success:true}});
 exports.adminDeletePOIPhoto=functions.runWith(callableAppCheckOptions).https.onCall(async(data,context)=>{
   assertIsAdmin(context);
   const id=String(data?.photoId||'');

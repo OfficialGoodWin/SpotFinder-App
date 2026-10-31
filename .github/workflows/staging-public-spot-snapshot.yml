@@ -1,0 +1,71 @@
+name: Build staged public spot snapshot candidate
+
+# Manual, review-gated reconciliation. This workflow never deploys to Vercel.
+on:
+  workflow_dispatch:
+    inputs:
+      previous_candidate_run_id:
+        description: 'Optional prior approved candidate run ID for incremental regeneration'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+  actions: read
+
+concurrency:
+  group: spotfinder-staging-public-snapshot
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: spotfinder-snapshot-staging
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.SNAPSHOT_STAGING_WIF_PROVIDER }}
+          service_account: ${{ vars.SNAPSHOT_STAGING_READER_SERVICE_ACCOUNT }}
+      - name: Restore prior candidate for incremental publication
+        if: ${{ inputs.previous_candidate_run_id != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: spotfinder-staging-public-snapshot-candidate
+          run-id: ${{ inputs.previous_candidate_run_id }}
+          github-token: ${{ github.token }}
+          path: snapshot-candidate
+      - name: Require reviewed previous candidate
+        if: ${{ inputs.previous_candidate_run_id != '' }}
+        run: test -f snapshot-candidate/spot-snapshots/manifest.json
+      - name: Reconcile staging data and validate candidate
+        env:
+          STAGING_FIREBASE_PROJECT_ID: ${{ vars.SNAPSHOT_STAGING_FIREBASE_PROJECT_ID }}
+          PREVIOUS_CANDIDATE_RUN_ID: ${{ inputs.previous_candidate_run_id }}
+        run: |
+          test -n "$STAGING_FIREBASE_PROJECT_ID"
+          if [ -n "$PREVIOUS_CANDIDATE_RUN_ID" ]; then
+            node scripts/public-spots/publish.mjs --mode staging --project "$STAGING_FIREBASE_PROJECT_ID" --out snapshot-candidate/spot-snapshots --read-approved --incremental
+          else
+            node scripts/public-spots/publish.mjs --mode staging --project "$STAGING_FIREBASE_PROJECT_ID" --out snapshot-candidate/spot-snapshots --read-approved
+          fi
+      - name: Check staging snapshot health before review
+        env:
+          STAGING_FIREBASE_PROJECT_ID: ${{ vars.SNAPSHOT_STAGING_FIREBASE_PROJECT_ID }}
+        run: node scripts/public-spots/health.mjs --mode staging --project "$STAGING_FIREBASE_PROJECT_ID" --candidate snapshot-candidate/spot-snapshots --read-approved
+      - name: Retain candidate for separate deployment approval
+        uses: actions/upload-artifact@v4
+        with:
+          name: spotfinder-staging-public-snapshot-candidate
+          path: snapshot-candidate/
+          if-no-files-found: error
+          retention-days: 7

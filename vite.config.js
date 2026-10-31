@@ -4,9 +4,12 @@ import { appendFileSync, existsSync, readFileSync } from 'node:fs'
 import { defineConfig } from 'vite'
 import { createSpotPageHandler } from './api/spot-page.js'
 import { getSpotPageFixture } from './tests/spot-page-fixtures.js'
+import { validateSnapshotArtifacts } from './scripts/public-spots/export.mjs'
 
 const appRoutes = new Set(['/','/home','/faq','/status','/statusadmin','/admin','/privacypolicy','/termsandconditions','/cookiepolicy','/refundpolicy','/updates']);
 let spotfinderBuildTarget;
+let snapshotFixtureRoot;
+let snapshotCandidateRoot;
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -19,6 +22,71 @@ export default defineConfig({
   plugins: [
     react(),
     {
+      name: 'spotfinder-local-snapshot-fixtures',
+      configResolved(config) {
+        snapshotFixtureRoot = config.command === 'serve' && config.env.VITE_SPOTFINDER_STAGE === 'emulator'
+          && config.env.VITE_FIREBASE_EMULATOR_ONLY === 'true'
+          && process.env.SPOTFINDER_SNAPSHOT_FIXTURE_DIR
+          ? path.resolve(process.env.SPOTFINDER_SNAPSHOT_FIXTURE_DIR) : null
+      },
+      configureServer(server) {
+        if (!snapshotFixtureRoot) return
+        server.middlewares.use((request, response, next) => {
+          const pathname = new URL(request.url, 'http://localhost').pathname
+          if (pathname === '/api/spot-snapshot-revocations') {
+            const feedPath = `${snapshotFixtureRoot}.revocations.json`
+            response.setHeader('Content-Type', 'application/json; charset=utf-8')
+            response.setHeader('Cache-Control', 'no-store')
+            if (!existsSync(feedPath)) { response.statusCode = 503; return response.end('{"error":"revocation-unavailable"}') }
+            return response.end(readFileSync(feedPath))
+          }
+          if (!/^\/spot-snapshots\/(?:manifest\.json|v2\/r\d+-\d+-[a-f0-9]{20}\.json)$/.test(pathname)) return next()
+          const file = path.resolve(snapshotFixtureRoot, `.${pathname.slice('/spot-snapshots'.length)}`)
+          if (!file.startsWith(snapshotFixtureRoot + path.sep) || !existsSync(file)) {
+            response.statusCode = 404
+            return response.end('Snapshot file unavailable')
+          }
+          response.setHeader('Content-Type', 'application/json; charset=utf-8')
+          response.setHeader('Cache-Control', pathname.endsWith('manifest.json')
+            ? 'no-store' : 'public, max-age=31536000, immutable')
+          response.end(readFileSync(file))
+        })
+      },
+      transformIndexHtml(html) {
+        if (!snapshotFixtureRoot) return html
+        // Only the isolated emulator dev server may contact loopback Firebase.
+        return html.replace("connect-src 'self'", "connect-src 'self' http://127.0.0.1:8080 http://127.0.0.1:9099")
+      },
+    },
+    {
+      name: 'spotfinder-staging-snapshot-candidate',
+      configResolved(config) {
+        snapshotCandidateRoot = null
+        if (config.command !== 'build' || config.mode !== 'snapshot-staging') return
+        if (config.env.VITE_SPOTFINDER_STAGE !== 'staging' || process.env.VERCEL_ENV === 'production') {
+          throw new Error('Snapshot candidate builds require an isolated staging target')
+        }
+        if (!process.env.SPOTFINDER_SNAPSHOT_CANDIDATE_DIRECTORY) {
+          throw new Error('Explicit staging snapshot candidate directory required')
+        }
+        snapshotCandidateRoot = path.resolve(process.env.SPOTFINDER_SNAPSHOT_CANDIDATE_DIRECTORY)
+      },
+      generateBundle() {
+        if (!snapshotCandidateRoot) return
+        const manifest = JSON.parse(readFileSync(path.join(snapshotCandidateRoot, 'manifest.json'), 'utf8'))
+        const names = Object.values(manifest.regions || {})
+        if (names.some(name => typeof name !== 'string' || !/^r\d+-\d+-[a-f0-9]{20}\.json$/.test(name))) {
+          throw new Error('Unsafe snapshot candidate reference')
+        }
+        const files = new Map(names.map(name => [name,
+          JSON.parse(readFileSync(path.join(snapshotCandidateRoot, 'v2', name), 'utf8'))]))
+        validateSnapshotArtifacts({ manifest, files })
+        this.emitFile({ type: 'asset', fileName: 'spot-snapshots/manifest.json', source: `${JSON.stringify(manifest)}\n` })
+        for (const [name, data] of files) this.emitFile({ type: 'asset',
+          fileName: `spot-snapshots/v2/${name}`, source: `${JSON.stringify(data)}\n` })
+      },
+    },
+    {
       name: 'spotfinder-firebase-isolation',
       configResolved(config) {
         const env = config.env;
@@ -28,6 +96,7 @@ export default defineConfig({
         if (deployment === 'production') {
           if (stage && stage !== 'production') throw new Error('Production build has a nonproduction Firebase stage.');
           if (env.VITE_FIREBASE_EMULATOR_ONLY === 'true') throw new Error('Production build cannot use Firebase emulators.');
+          if (env.VITE_ORIGINAL_MAP_SNAPSHOTS === 'true') throw new Error('Original map snapshots cannot be enabled in production.');
         } else if (stage === 'emulator') {
           if (deployment || env.VITE_FIREBASE_EMULATOR_ONLY !== 'true') throw new Error('Emulator build is local only.');
         } else if (stage !== 'staging') {

@@ -1,6 +1,14 @@
 {
   "indexes": [
     {
+      "collectionGroup": "spot_snapshot_changes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "dirty", "order": "ASCENDING" },
+        { "fieldPath": "updated_at", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "spots",
       "queryScope": "COLLECTION",
       "fields": [

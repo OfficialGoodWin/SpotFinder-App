@@ -745,13 +745,12 @@ export const updateSpot = async (spotId, data) => {
     }
   }
   if (!Object.keys(patch).length) return;
-  await updateDoc(doc(db, SPOTS_COLLECTION, spotId), patch);
+  await callFn('ownerUpdateSpot')({ spotId, patch });
   clearPublicSpotCaches();
 };
  
 export const deleteSpot = async (spotId) => {
-  const { db } = getFirebaseServices();
-  await deleteDoc(doc(db, SPOTS_COLLECTION, spotId));
+  await callFn('ownerDeleteSpot')({ spotId });
   clearPublicSpotCaches();
 };
  

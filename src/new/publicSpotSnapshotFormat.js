@@ -1,4 +1,4 @@
-export const SNAPSHOT_FORMAT = 1;
+export const SNAPSHOT_FORMAT = 2;
 export const REGION_DEGREES = 2;
 export const MAX_VIEW_REGIONS = 16;
 
@@ -33,6 +33,7 @@ export function regionsForBounds({ south, west, north, east }) {
 export function isPublicSnapshotSpot(spot) {
   return Boolean(spot && spot.is_public === true && spot.status === 'published'
     && spot.needs_review !== true && spot.discovery_state !== 'hidden'
+    && (spot.flag_count == null || spot.flag_count === 0)
     && spot.sensitive_location !== true && typeof spot.id === 'string' && spot.id.length > 0
     && typeof spot.lat === 'number' && typeof spot.lng === 'number'
     && regionForPoint(spot.lat, spot.lng));
@@ -42,11 +43,13 @@ export function toPublicSnapshotSpot(spot) {
   if (!isPublicSnapshotSpot(spot)) return null;
   const thumbnail = typeof spot.public_thumbnail_url === 'string' && /^\/public-thumbnails\/[a-zA-Z0-9_-]+\.(?:jpg|webp)$/.test(spot.public_thumbnail_url)
     ? spot.public_thumbnail_url : null;
+  const presentationSource = { title: spot.title, category: spot.category, spot_type: spot.spot_type,
+    resolved_category: spot.resolved_category, tags: spot.tags };
   const summary = {
-    id: spot.id, lat: Number(spot.lat), lng: Number(spot.lng),
+    id: spot.id, lat: Number(spot.lat.toFixed(6)), lng: Number(spot.lng.toFixed(6)),
     title: String(spot.title || '').slice(0, 100),
-    resolved_title: getSpotDisplayName(spot).slice(0, 100),
-    resolved_category: String(getVerifiedSpotCategory(spot) || '').slice(0, 40),
+    resolved_title: getSpotDisplayName(presentationSource).slice(0, 100),
+    resolved_category: String(getVerifiedSpotCategory(presentationSource) || '').slice(0, 40),
     category: typeof spot.category === 'string' ? spot.category.slice(0, 40) : '',
     locality: typeof spot.locality === 'string' ? spot.locality.slice(0, 100) : '',
     tags: Array.isArray(spot.tags) ? spot.tags.filter(value => typeof value === 'string').slice(0, 10).map(value => value.slice(0, 40)) : [],
@@ -65,7 +68,17 @@ export function validSnapshotSpot(spot) {
   return Boolean(spot && Object.keys(spot).every(key => SUMMARY_KEYS.includes(key))
     && typeof spot.lat === 'number' && typeof spot.lng === 'number'
     && isPublicSnapshotSpot(spot) && typeof spot.title === 'string'
-    && Array.isArray(spot.tags) && spot.tags.every(value => typeof value === 'string')
+    && spot.id.length <= 1500 && spot.title.length <= 100
+    && typeof spot.resolved_title === 'string' && spot.resolved_title.length <= 100
+    && typeof spot.resolved_category === 'string' && spot.resolved_category.length <= 40
+    && typeof spot.category === 'string' && spot.category.length <= 40
+    && typeof spot.locality === 'string' && spot.locality.length <= 100
+    && typeof spot.spot_type === 'string' && spot.spot_type.length <= 40
+    && typeof spot.access_difficulty === 'string' && spot.access_difficulty.length <= 20
+    && typeof spot.created_date === 'string' && spot.created_date.length <= 32
+    && Array.isArray(spot.tags) && spot.tags.length <= 10
+    && spot.tags.every(value => typeof value === 'string' && value.length <= 40)
+    && Number.isFinite(spot.rating) && Number.isInteger(spot.rating_count) && spot.rating_count >= 0
     && (spot.image_url === null || typeof spot.image_url === 'string' && /^\/public-thumbnails\/[a-zA-Z0-9_-]+\.(?:jpg|webp)$/.test(spot.image_url))
     && !EMAIL.test(JSON.stringify(spot)));
 }

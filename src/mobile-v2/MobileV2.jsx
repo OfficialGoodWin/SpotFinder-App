@@ -10,6 +10,8 @@ import { getTextScale, saveTextScale } from '@/lib/textScale';
 import { getPublicSpotsInBounds, getPublicSpotsNear, getPublicSpotById, getDiscoverSpotsPage, getSavedSpots, getLikedSpots, getUserSpots, getCloudSpotDrafts, deleteCloudSpotDraft, getSpotSocialState, toggleSpotSave, createSpot, deleteSpot, updateSpot, addSocialPost, resendVerificationEmail } from '@/api/firebaseClient';
 import { cachedViewport, rememberViewport } from '@/new/viewportCache';
 import { loadFullSnapshotSpot, readSnapshotSpots } from '@/new/publicSpotSnapshotClient';
+import { subscribePublicSpotRevocations } from '@/new/publicSpotRevocationListener';
+import { snapshotFeatureEnabled } from '@/new/snapshotFeatureFlag';
 import { getSpotDisplayName, getSpotLocationLabel, resolveSpotTitle, spotMatchesSearch } from '@/lib/spotPresentation';
 import { filterAndSortNearbySpots, getSpotRating, normalizeLatLng } from '@/lib/spotDiscovery';
 import { getConsent, acknowledgeCurrentPrivacyNotice } from '@/lib/consent';
@@ -57,8 +59,9 @@ const NavigationProviderSheet = recoverableLazy(() => import('@/components/navig
 const LOGO = '/app-icon-v2-192.png?v=3';
 // Prototype is intentionally development-only until moderation invalidation is deployed.
 // Explicitly disabled in production until a trusted publisher and takedown process are approved.
-const PUBLIC_SNAPSHOT_PREVIEW = (import.meta.env.DEV || import.meta.env.MODE === 'snapshot-staging')
-  && import.meta.env.VITE_PUBLIC_SPOT_SNAPSHOTS === 'true';
+const PUBLIC_SNAPSHOT_PREVIEW = snapshotFeatureEnabled({ dev: import.meta.env.DEV, mode: import.meta.env.MODE,
+  stage: import.meta.env.VITE_SPOTFINDER_STAGE, emulatorOnly: import.meta.env.VITE_FIREBASE_EMULATOR_ONLY,
+  flag: import.meta.env.VITE_PUBLIC_SPOT_SNAPSHOTS });
 const START = { lat: 50.0755, lng: 14.4378 };
 const TABS = [
   ['map', 'Mapa', MapIcon], ['discover', 'Objevit', Compass], ['add', 'Přidat', Plus],
@@ -291,6 +294,7 @@ export default function MobileV2({ redesigned = false }) {
   const zoomDraggingRef = useRef(false);
   const requestRef = useRef(0);
   const cacheRef = useRef(null);
+  const snapshotViewRef = useRef({ key: null, ids: new Set() });
   const pendingBoundsRef = useRef(null);
   const mapRefreshTimerRef = useRef(null);
   useEffect(() => {
@@ -372,11 +376,49 @@ export default function MobileV2({ redesigned = false }) {
       const rows = await queryPromise;
       if (request === requestRef.current) {
         setSpots(rows);
+        if (PUBLIC_SNAPSHOT_PREVIEW && redesigned) {
+          const previous = snapshotViewRef.current;
+          if (previous.key === key && selectedSpotRef.current
+            && previous.ids.has(selectedSpotRef.current.id)
+            && !rows.some(row => row.id === selectedSpotRef.current.id)) {
+            selectedSpotRef.current = null;
+            setSelectedSpot(null); setSelectedMapSpotId(null);
+            if (location.pathname.startsWith('/new/spot/')) navigate('/new', { replace: true });
+          }
+          snapshotViewRef.current = { key, ids: new Set(rows.map(row => row.id)) };
+          setPreviewSpot(current => current?._public_snapshot && !rows.some(row => row.id === current.id) ? null : current);
+        }
         cacheRef.current = redesigned ? rememberViewport(cacheRef.current, key, rows) : { key, rows, at: Date.now() };
       }
-    } catch { if (request === requestRef.current) { setSpotsError(true); if (PUBLIC_SNAPSHOT_PREVIEW && redesigned) { setSpots([]); cacheRef.current = null; } } }
+    } catch { if (request === requestRef.current) { setSpotsError(true); if (PUBLIC_SNAPSHOT_PREVIEW && redesigned) { setSpots([]); setPreviewSpot(null); cacheRef.current = null; } } }
     finally { if (pendingBoundsRef.current?.promise === queryPromise) pendingBoundsRef.current = null; if (request === requestRef.current) setSpotsLoading(false); }
-  }, [redesigned]);
+  }, [redesigned, location.pathname, navigate]);
+  useEffect(() => {
+    if (!PUBLIC_SNAPSHOT_PREVIEW || !redesigned || activeTab !== 'map') return undefined;
+    const refreshVisible = () => { if (document.visibilityState === 'visible') void refreshMap(); };
+    const timer = setInterval(refreshVisible, 30000);
+    document.addEventListener('visibilitychange', refreshVisible);
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', refreshVisible); };
+  }, [activeTab, redesigned, refreshMap]);
+  useEffect(() => {
+    if (!PUBLIC_SNAPSHOT_PREVIEW || !redesigned || activeTab !== 'map') return undefined;
+    return subscribePublicSpotRevocations(({ healthy, revoked }) => {
+      if (!healthy) {
+        requestRef.current += 1;
+        setSpots([]); setPreviewSpot(null); setSpotsError(true); cacheRef.current = null;
+        return;
+      }
+      if (revoked.size) {
+        setSpots(rows => rows.filter(row => !revoked.has(row.id)));
+        setPreviewSpot(spot => spot && revoked.has(spot.id) ? null : spot);
+        if (selectedSpotRef.current && revoked.has(selectedSpotRef.current.id)) {
+          selectedSpotRef.current = null; setSelectedSpot(null); setSelectedMapSpotId(null);
+          if (location.pathname.startsWith('/new/spot/')) navigate('/new', { replace: true });
+        }
+      }
+      void refreshMap();
+    });
+  }, [activeTab, redesigned, refreshMap, location.pathname, navigate]);
   const scheduleMapRefresh = useCallback(() => {
     if (mapRefreshTimerRef.current) clearTimeout(mapRefreshTimerRef.current);
     requestRef.current += 1;

@@ -50,11 +50,14 @@ cloudflare-backend/*
 node-modules/*
 reports/*
 scripts/*
+!scripts/public-spots/
+!scripts/public-spots/*.mjs
 !scripts/firebase-consumption/
 !scripts/firebase-consumption/harness.mjs
 server/*
 SpotFinder_Codex_Design_References/*
 state/*
 tests/*
+!tests/public-spot-snapshots.test.js
 !tests/in-flight-read.test.js
 !tests/public-coverage-cache.test.js

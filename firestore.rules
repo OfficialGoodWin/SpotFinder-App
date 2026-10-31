@@ -90,6 +90,17 @@ service cloud.firestore {
       );
     }
 
+    // Server-owned snapshot state. The public overlay is exposed only through
+    // the bounded Preview API, never as a Firestore collection read.
+    match /spot_snapshot_changes/{spotId} { allow read, write: if false; }
+    match /spot_snapshot_revocations/{spotId} { allow read, write: if false; }
+    match /spot_snapshot_revocation_feed/{docId} {
+      allow get: if docId == 'current';
+      allow list, write: if false;
+    }
+    match /spot_snapshot_publication/{docId} { allow read, write: if false; }
+    match /spot_snapshot_failures/{docId} { allow read, write: if false; }
+
     // Unpublished drafts are stored outside /spots and are private to the
     // registered Firebase account that created them. Ownership can never be
     // reassigned by a client update.
