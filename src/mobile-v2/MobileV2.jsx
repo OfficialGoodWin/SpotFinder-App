@@ -61,7 +61,8 @@ const LOGO = '/app-icon-v2-192.png?v=3';
 // Explicitly disabled in production until a trusted publisher and takedown process are approved.
 const PUBLIC_SNAPSHOT_PREVIEW = snapshotFeatureEnabled({ dev: import.meta.env.DEV, mode: import.meta.env.MODE,
   stage: import.meta.env.VITE_SPOTFINDER_STAGE, emulatorOnly: import.meta.env.VITE_FIREBASE_EMULATOR_ONLY,
-  flag: import.meta.env.VITE_PUBLIC_SPOT_SNAPSHOTS });
+  flag: import.meta.env.VITE_PUBLIC_SPOT_SNAPSHOTS,
+  productionRelease: import.meta.env.VITE_SNAPSHOT_PRODUCTION_RELEASE });
 const START = { lat: 50.0755, lng: 14.4378 };
 const TABS = [
   ['map', 'Mapa', MapIcon], ['discover', 'Objevit', Compass], ['add', 'Přidat', Plus],

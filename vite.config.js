@@ -1,11 +1,14 @@
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import { fileURLToPath } from 'node:url'
 import { appendFileSync, existsSync, readFileSync } from 'node:fs'
 import { defineConfig } from 'vite'
 import { createSpotPageHandler } from './api/spot-page.js'
 import { getSpotPageFixture } from './tests/spot-page-fixtures.js'
 import { validateSnapshotArtifacts } from './scripts/public-spots/export.mjs'
 import { snapshotRegionDirectory } from './src/new/publicSpotSnapshotFormat.js'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const appRoutes = new Set(['/','/home','/faq','/status','/statusadmin','/admin','/privacypolicy','/termsandconditions','/cookiepolicy','/refundpolicy','/updates']);
 let spotfinderBuildTarget;
@@ -63,13 +66,21 @@ export default defineConfig({
       name: 'spotfinder-staging-snapshot-candidate',
       configResolved(config) {
         snapshotCandidateRoot = null
-        if (config.command !== 'build' || config.mode !== 'snapshot-staging') return
+        if (config.command === 'build' && existsSync(path.resolve(__dirname, 'public/spot-snapshots')))
+          throw new Error('Snapshot artifacts must only enter through an explicit validated candidate')
+        if (config.command !== 'build' || !['snapshot-staging', 'snapshot-production'].includes(config.mode)) return
         const deployment = process.env.VERCEL_ENV
-        if (config.env.VITE_SPOTFINDER_STAGE !== 'staging' || (deployment && deployment !== 'preview')) {
-          throw new Error('Snapshot candidate builds require an isolated staging target')
-        }
-        if (deployment === 'preview' && process.env.SPOTFINDER_SNAPSHOT_PREVIEW_APPROVED !== 'true') {
-          throw new Error('Snapshot candidate Preview builds require explicit approval')
+        if (config.mode === 'snapshot-production') {
+          if (deployment !== 'production' || config.env.VITE_SPOTFINDER_STAGE !== 'production'
+            || process.env.SPOTFINDER_SNAPSHOT_PRODUCTION_APPROVED !== 'true'
+            || process.env.FIREBASE_PROJECT_ID !== 'spotfinderapp-cdc7b'
+            || config.env.VITE_SNAPSHOT_PRODUCTION_RELEASE !== 'true')
+            throw new Error('Production snapshot candidate target is invalid')
+        } else {
+          if (config.env.VITE_SPOTFINDER_STAGE !== 'staging' || (deployment && deployment !== 'preview'))
+            throw new Error('Snapshot candidate builds require an isolated staging target')
+          if (deployment === 'preview' && process.env.SPOTFINDER_SNAPSHOT_PREVIEW_APPROVED !== 'true')
+            throw new Error('Snapshot candidate Preview builds require explicit approval')
         }
         if (!process.env.SPOTFINDER_SNAPSHOT_CANDIDATE_DIRECTORY) {
           throw new Error('Explicit staging snapshot candidate directory required')
@@ -87,6 +98,15 @@ export default defineConfig({
         const files = new Map(names.map(name => [name,
           JSON.parse(readFileSync(path.join(snapshotCandidateRoot, directory, name), 'utf8'))]))
         validateSnapshotArtifacts({ manifest, files })
+        if (process.env.SPOTFINDER_SNAPSHOT_PRODUCTION_APPROVED === 'true') {
+          const source = JSON.parse(readFileSync(`${snapshotCandidateRoot}.production-source.json`, 'utf8'))
+          if (source.projectId !== 'spotfinderapp-cdc7b' || source.revision !== manifest.revision
+            || source.format !== 3 || !Number.isSafeInteger(source.documentsRead)
+            || source.documentsRead > 3000 || source.included !== [...files.values()].reduce((n, file) => n + file.spots.length, 0))
+            throw new Error('Production candidate provenance or read budget invalid')
+          if (manifest.format !== 3 || [...files.values()].some(file => file.spots.some(spot =>
+            /^(?:smoke|synthetic)-/i.test(spot.id)))) throw new Error('Synthetic or legacy production snapshot candidate')
+        }
         this.emitFile({ type: 'asset', fileName: 'spot-snapshots/manifest.json', source: `${JSON.stringify(manifest)}\n` })
         for (const [name, data] of files) this.emitFile({ type: 'asset',
           fileName: `spot-snapshots/${directory}/${name}`, source: `${JSON.stringify(data)}\n` })
@@ -102,7 +122,11 @@ export default defineConfig({
         if (deployment === 'production') {
           if (stage && stage !== 'production') throw new Error('Production build has a nonproduction Firebase stage.');
           if (env.VITE_FIREBASE_EMULATOR_ONLY === 'true') throw new Error('Production build cannot use Firebase emulators.');
-          if (env.VITE_ORIGINAL_MAP_SNAPSHOTS === 'true') throw new Error('Original map snapshots cannot be enabled in production.');
+          if (env.VITE_PUBLIC_SPOT_SNAPSHOTS === 'true' || env.VITE_ORIGINAL_MAP_SNAPSHOTS === 'true') {
+            if (config.mode !== 'snapshot-production' || process.env.SPOTFINDER_SNAPSHOT_PRODUCTION_APPROVED !== 'true'
+              || env.VITE_SNAPSHOT_PRODUCTION_RELEASE !== 'true' || process.env.FIREBASE_PROJECT_ID !== 'spotfinderapp-cdc7b')
+              throw new Error('Production snapshots require an approved production candidate build.');
+          }
         } else if (stage === 'emulator') {
           if (deployment || env.VITE_FIREBASE_EMULATOR_ONLY !== 'true') throw new Error('Emulator build is local only.');
         } else if (stage !== 'staging') {

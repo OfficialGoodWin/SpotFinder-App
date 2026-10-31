@@ -41,6 +41,7 @@ const ORIGINAL_SNAPSHOT_PREVIEW = originalMapSnapshotFeatureEnabled({
   stage: import.meta.env.VITE_SPOTFINDER_STAGE,
   emulatorOnly: import.meta.env.VITE_FIREBASE_EMULATOR_ONLY,
   flag: import.meta.env.VITE_PUBLIC_SPOT_SNAPSHOTS,
+  productionRelease: import.meta.env.VITE_SNAPSHOT_PRODUCTION_RELEASE,
   originalFlag: import.meta.env.VITE_ORIGINAL_MAP_SNAPSHOTS,
 });
 

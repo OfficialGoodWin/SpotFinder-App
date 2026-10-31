@@ -242,6 +242,8 @@ test('snapshot feature is isolated to emulator development or explicit staging b
   assert.equal(snapshotFeatureEnabled({ dev: false, mode: 'production', stage: 'production', flag: 'true' }), false);
   assert.equal(snapshotFeatureEnabled({ dev: true, stage: 'production', emulatorOnly: 'false', flag: 'true' }), false);
   assert.equal(snapshotFeatureEnabled({ dev: false, mode: 'snapshot-staging', stage: 'production', flag: 'true' }), false);
+  assert.equal(snapshotFeatureEnabled({ dev: false, mode: 'snapshot-production', stage: 'production', flag: 'true' }), false);
+  assert.equal(snapshotFeatureEnabled({ dev: false, mode: 'snapshot-production', stage: 'production', flag: 'true', productionRelease: 'true' }), true);
 });
 
 test('original map requires its separate flag and an isolated snapshot target', () => {
