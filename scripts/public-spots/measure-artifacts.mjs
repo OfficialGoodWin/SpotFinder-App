@@ -5,9 +5,13 @@ import { mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { writePublicSpotSnapshot } from './export.mjs';
+import { SNAPSHOT_FORMAT, snapshotRegionDirectory } from '../../src/new/publicSpotSnapshotFormat.js';
 
 const count = Number(process.argv[2] || 250000);
 if (!Number.isInteger(count) || count < 1 || count > 250000) throw new Error('Count must be 1..250000');
+const formatIndex = process.argv.indexOf('--format');
+const format = formatIndex >= 0 ? Number(process.argv[formatIndex + 1]) : SNAPSHOT_FORMAT;
+if (![2, 3].includes(format)) throw new Error('Format must be 2 or 3');
 const root = await mkdtemp(join(tmpdir(), 'spotfinder-size-'));
 const output = join(root, 'spot-snapshots');
 const cities = [[50.08, 14.42], [52.52, 13.4], [48.21, 16.37], [48.86, 2.35], [51.51, -0.13],
@@ -22,12 +26,13 @@ const records = Array.from({ length: count }, (_, index) => {
 });
 try {
   const started = performance.now();
-  const result = await writePublicSpotSnapshot(records, output);
+  const result = await writePublicSpotSnapshot(records, output, { format });
   const exportMs = Math.round(performance.now() - started);
-  const names = await readdir(join(output, 'v2'));
+  const directory = snapshotRegionDirectory(format);
+  const names = await readdir(join(output, directory));
   let raw = 0, gzip = 0, brotli = 0, largest = 0;
   for (const name of names) {
-    const bytes = await readFile(join(output, 'v2', name));
+    const bytes = await readFile(join(output, directory, name));
     raw += bytes.length;
     gzip += gzipSync(bytes).length;
     brotli += brotliCompressSync(bytes, { params: { [constants.BROTLI_PARAM_QUALITY]: 4 } }).length;
@@ -39,7 +44,7 @@ try {
     const buildDirectory = join(root, 'dist');
     const fakeStage = 'demo-spotfinder-staging';
     const env = { ...process.env, VERCEL_ENV: 'preview', FIREBASE_PROJECT_ID: fakeStage,
-      VITE_SPOTFINDER_STAGE: 'staging', VITE_PUBLIC_SPOT_SNAPSHOTS: 'true',
+      SPOTFINDER_SNAPSHOT_PREVIEW_APPROVED: 'true', VITE_SPOTFINDER_STAGE: 'staging', VITE_PUBLIC_SPOT_SNAPSHOTS: 'true',
       VITE_ORIGINAL_MAP_SNAPSHOTS: 'true',
       SPOTFINDER_SNAPSHOT_CANDIDATE_DIRECTORY: output,
       VITE_FIREBASE_STAGING_API_KEY: 'synthetic', VITE_FIREBASE_STAGING_AUTH_DOMAIN: `${fakeStage}.invalid`,
@@ -63,12 +68,12 @@ try {
   const edited = records.slice();
   edited[0] = { ...edited[0], title: 'Edited synthetic spot' };
   const changedStarted = performance.now();
-  const changed = await writePublicSpotSnapshot(edited, output);
+  const changed = await writePublicSpotSnapshot(edited, output, { format });
   const changedNames = Object.values(changed.manifest.regions).filter(name =>
     !Object.values(result.manifest.regions).includes(name));
   let changedRegionBytes = 0;
-  for (const name of changedNames) changedRegionBytes += (await stat(join(output, 'v2', name))).size;
-  console.log(JSON.stringify({ syntheticSpots: count, regions: names.length, files: names.length + 1,
+  for (const name of changedNames) changedRegionBytes += (await stat(join(output, directory, name))).size;
+  console.log(JSON.stringify({ syntheticSpots: count, format, regions: names.length, files: names.length + 1,
     regionRawBytes: raw, regionGzipBytes: gzip, regionBrotliBytes: brotli,
     manifestBytes, totalRawBytes: raw + manifestBytes, largestRegionBytes: largest,
     exportMs, rssAfterMeasurementBytes: process.memoryUsage().rss,

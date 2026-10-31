@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { toPublicSnapshotSpot } from '../../src/new/publicSpotSnapshotFormat.js';
+import { SNAPSHOT_FORMAT, decodeSnapshotSpot, snapshotRegionDirectory, toPublicSnapshotSpot } from '../../src/new/publicSpotSnapshotFormat.js';
 import { validateSnapshotArtifacts, writePublicSpotSnapshot } from './export.mjs';
 
 const MAX_CHANGES = 100;
@@ -17,11 +17,19 @@ async function currentRevocations(db) {
 
 export async function readPreviousCandidate(outputDirectory) {
   const manifest = JSON.parse(await readFile(join(outputDirectory, 'manifest.json'), 'utf8'));
-  const files = new Map();
+  const directory = snapshotRegionDirectory(manifest.format);
+  const rawFiles = new Map();
   for (const filename of Object.values(manifest.regions)) {
-    files.set(filename, JSON.parse(await readFile(join(outputDirectory, 'v2', filename), 'utf8')));
+    rawFiles.set(filename, JSON.parse(await readFile(join(outputDirectory, directory, filename), 'utf8')));
   }
-  validateSnapshotArtifacts({ manifest, files });
+  validateSnapshotArtifacts({ manifest, files: rawFiles });
+  // Incremental publication compares against runtime summaries. Decode format 3
+  // before mixing it with freshly projected spots.
+  const files = new Map();
+  for (const [filename, file] of rawFiles) {
+    files.set(filename, manifest.format === SNAPSHOT_FORMAT
+      ? { ...file, spots: file.spots.map(decodeSnapshotSpot) } : file);
+  }
   return { manifest, files };
 }
 
@@ -58,7 +66,8 @@ export async function publishIncrementalCandidate(db, outputDirectory) {
     const spot = toPublicSnapshotSpot({ ...current.data(), id });
     if (spot && !(await hasOpenModeration(db, id))) byId.set(id, spot);
   }
-  const result = await writePublicSpotSnapshot([...byId.values()], outputDirectory, { alreadyPublic: true });
+  const result = await writePublicSpotSnapshot([...byId.values()], outputDirectory,
+    { alreadyPublic: true, format: previous.manifest.format });
   const receipt = { format: 1, revision: result.manifest.revision,
     previousRevision: previous.manifest.revision, createdAt: new Date().toISOString(), versions };
   // If this write fails, journal entries remain dirty and the run can retry.

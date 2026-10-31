@@ -51,6 +51,7 @@ try {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
   const snapshotRequests = [];
+  const viewportQueries = [];
   const forbidden = [];
   const pageErrors = [];
   const consoleErrors = [];
@@ -60,6 +61,12 @@ try {
     const url = request.url();
     if (url.includes('/spot-snapshots/')) snapshotRequests.push(url);
     if (/^https:\/\//.test(url) && /firestore\.googleapis\.com|identitytoolkit\.googleapis\.com|firebaseapp-cdc7b/.test(url)) forbidden.push(url);
+  });
+  // Snapshot-backed pages must not open a Firestore spots viewport query.
+  context.on('request', request => {
+    const body = request.postData() || '';
+    if (request.url().includes('/google.firestore.v1.Firestore/Listen/channel')
+      && body.includes('structuredQuery') && body.includes('spots')) viewportQueries.push(request.url());
   });
   await page.route(/^https:\/\//, route => route.abort()); // No real analytics, tiles, or Firebase network.
   const manifestResponse = page.waitForResponse(response => response.url().endsWith('/spot-snapshots/manifest.json'));
@@ -135,10 +142,10 @@ try {
   await page.getByText('Místa se nepodařilo načíst.').first().waitFor({ timeout: 15000 });
   await page.unroute('**/spot-snapshots/manifest.json');
   await writePublicSpotSnapshot([synthetic], artifacts);
-  await page.route('**/spot-snapshots/v2/*.json', route => route.fulfill({ status: 404, body: 'Missing' }));
+  await page.route('**/spot-snapshots/*/*.json', route => route.fulfill({ status: 404, body: 'Missing' }));
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByText('Místa se nepodařilo načíst.').first().waitFor({ timeout: 15000 });
-  await page.unroute('**/spot-snapshots/v2/*.json');
+  await page.unroute('**/spot-snapshots/*/*.json');
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByText('Synthetic Browser Marker').first().waitFor({ timeout: 15000 });
   await context.setOffline(true);
@@ -148,6 +155,11 @@ try {
   await context.setOffline(false);
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByText('Synthetic Browser Marker').first().waitFor({ timeout: 15000 });
+  // Legacy format-2 artifacts must remain readable after the format-3 rollout.
+  await writePublicSpotSnapshot([synthetic], artifacts, { format: 2 });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.getByText('Synthetic Browser Marker').first().waitFor({ timeout: 15000 });
+  await writePublicSpotSnapshot([synthetic], artifacts);
   const revokedIds = [];
   const revocationTrialsMs = [];
   const revocationWriteAckMs = [];
@@ -197,14 +209,28 @@ try {
   await fresh.reload({ waitUntil: 'domcontentloaded' });
   await fresh.getByText('0 míst na mapě').first().waitFor({ timeout: 15000 });
   await fresh.close();
+  const clusterSpots = [
+    { ...synthetic, id: 'synthetic-cluster-a', title: 'Synthetic Cluster A', lat: 50.0756, lng: 14.4379 },
+    { ...synthetic, id: 'synthetic-cluster-b', title: 'Synthetic Cluster B', lat: 50.0754, lng: 14.4377 },
+  ];
+  await writePublicSpotSnapshot(clusterSpots, artifacts);
+  const clusterPage = await context.newPage();
+  await clusterPage.route(/^https:\/\//, route => route.abort());
+  await clusterPage.goto('http://127.0.0.1:5187/new/map', { waitUntil: 'domcontentloaded' });
+  const cluster = clusterPage.locator('.sf-new-map-cluster').first();
+  await cluster.waitFor({ timeout: 15000 });
+  assert.match((await cluster.getAttribute('aria-label')) || '', /^2 míst poblíž/);
+  await clusterPage.close();
   await original.close();
   const lastPerformance = await cdp.send('Performance.getMetrics');
   assert.deepEqual(forbidden, []);
-  console.log(JSON.stringify({ passed: true, scenarios: ['initial', 'original-map-load-and-revocation', 'pan', 'zoom', 'mobile-resize', 'reload', 'edit', 'active-tab-hide', 'corrupt-manifest', 'missing-region', 'offline', 'active-revocation', 'new-session-revocation', 'revocation-outage-and-recovery'],
+  assert.deepEqual(viewportQueries, []);
+  console.log(JSON.stringify({ passed: true, scenarios: ['initial', 'original-map-load-and-revocation', 'pan', 'zoom', 'mobile-resize', 'reload', 'edit', 'active-tab-hide', 'corrupt-manifest', 'missing-region', 'offline', 'legacy-format-2', 'active-revocation', 'new-session-revocation', 'revocation-outage-and-recovery', 'cluster-marker'],
     initialSnapshotRequests: initial, totalSnapshotRequests: snapshotRequests.length,
     initialVisibleMs, warmVisibleMs, originalVisibleMs, originalRevocationMs,
     activeTabTakedownMs, revocationTrialsMs,
     revocationWriteAckMs, revocationClientMs, freshSuppressionMs,
+    firestoreSpotViewportQueries: viewportQueries.length,
     browserJsHeapStartBytes: metricValue(firstPerformance, 'JSHeapUsedSize'),
     browserJsHeapEndBytes: metricValue(lastPerformance, 'JSHeapUsedSize'),
     browserTaskDurationStartSeconds: metricValue(firstPerformance, 'TaskDuration'),

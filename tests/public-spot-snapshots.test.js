@@ -7,7 +7,7 @@ import { mkdtemp, readFile, readdir, rm, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createPublicSpotSnapshotReader, loadFullSnapshotSpot, readSnapshotSpots } from '../src/new/publicSpotSnapshotClient.js';
-import { publicSnapshotThumbnailUrl, regionForPoint, regionsForBounds } from '../src/new/publicSpotSnapshotFormat.js';
+import { SNAPSHOT_FORMAT, decodeSnapshotSpot, encodeSnapshotSpot, publicSnapshotThumbnailUrl, regionForPoint, regionsForBounds, snapshotRegionDirectory, toPublicSnapshotSpot, validSnapshotSpot } from '../src/new/publicSpotSnapshotFormat.js';
 import { cachedViewport, rememberViewport } from '../src/new/viewportCache.js';
 import { applyTrustedSnapshotChange, currentSnapshotRecords } from '../scripts/public-spots/publicationState.mjs';
 
@@ -102,7 +102,7 @@ test('reader clips bounds, limits output, reuses region requests and loads full 
   assert.equal(publicSnapshotThumbnailUrl({ ...first[0], image_url: 'https://other.test/private.jpg', _public_snapshot: true }, 'https://spotfinder.invalid'), '');
   assert.deepEqual(second, first);
   assert.equal(calls.filter(url => url.endsWith('/manifest.json')).length, 1);
-  assert.equal(calls.filter(url => url.includes('/v2/')).length, 1);
+  assert.equal(calls.filter(url => url.includes(`/${snapshotRegionDirectory(SNAPSHOT_FORMAT)}/`)).length, 1);
   const marked = await readSnapshotSpots(bounds, 1, read);
   assert.equal(marked[0]._public_snapshot, true);
   let detailReads = 0;
@@ -264,7 +264,8 @@ test('publisher stages and validates before switching, skips unchanged regions a
     assert.equal(repeat.stats.changedRegions, 0);
     assert.equal(repeat.manifest.publishedAt, original.publishedAt);
     const originalFile = Object.values(original.regions)[0];
-    await unlink(join(output, 'v2', originalFile));
+    const directory = snapshotRegionDirectory(original.format);
+    await unlink(join(output, directory, originalFile));
     const repaired = await writePublicSpotSnapshot([approved], output);
     assert.equal(repaired.stats.changedRegions, 1);
     assert.equal(repaired.manifest.revision, original.revision);
@@ -278,14 +279,101 @@ test('publisher stages and validates before switching, skips unchanged regions a
     assert.equal([a, b].filter(result => result.status === 'rejected').length, 1);
     const published = JSON.parse(await readFile(join(output, 'manifest.json'), 'utf8'));
     const region = published.regions[regionForPoint(approved.lat, approved.lng)];
-    assert.ok((await readdir(join(output, 'v2'))).includes(region));
+    assert.ok((await readdir(join(output, directory))).includes(region));
     assert.equal(validateSnapshotArtifacts({ manifest: published,
-      files: new Map([[region, JSON.parse(await readFile(join(output, 'v2', region), 'utf8'))]]) }), true);
+      files: new Map([[region, JSON.parse(await readFile(join(output, directory, region), 'utf8'))]]) }), true);
     assert.ok(repeat.stats.backup);
   } finally {
     if (!resolve(root).startsWith(resolve(tmpdir(), 'spotfinder-snapshot-test-'))) throw new Error('Unsafe test cleanup');
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test('format 3 omits invariant and default fields but decodes to the same summary', () => {
+  const summary = toPublicSnapshotSpot(approved);
+  const compact = encodeSnapshotSpot(summary);
+  assert.deepEqual(Object.keys(compact).sort(), ['created_date', 'id', 'image_url', 'lat', 'lng', 'rating', 'rating_count', 'tags', 'title'].sort());
+  assert.equal(Object.hasOwn(compact, 'is_public'), false);
+  assert.equal(Object.hasOwn(compact, 'status'), false);
+  assert.equal(Object.hasOwn(compact, 'resolved_title'), false);
+  assert.equal(Object.hasOwn(compact, 'resolved_category'), false);
+  assert.equal(Object.hasOwn(compact, 'locality'), false);
+  assert.equal(Buffer.byteLength(JSON.stringify(compact)) < Buffer.byteLength(JSON.stringify(summary)), true);
+  assert.deepEqual(decodeSnapshotSpot(compact), summary);
+});
+
+test('format 3 keeps title and category fallbacks after rehydration', () => {
+  const fallback = { ...approved, id: 'fallback', title: '', tags: [], category: undefined,
+    spot_type: 'castle', resolved_category: undefined, rating: 0, rating_count: 0 };
+  const summary = toPublicSnapshotSpot(fallback);
+  assert.equal(summary.title, '');
+  assert.equal(summary.resolved_title, 'Castle');
+  assert.equal(summary.resolved_category, 'castle');
+  const compact = encodeSnapshotSpot(summary);
+  const decoded = decodeSnapshotSpot(compact);
+  assert.equal(decoded.title, '');
+  assert.equal(decoded.resolved_title, 'Castle');
+  assert.equal(decoded.resolved_category, 'castle');
+  assert.equal(decoded.is_public, true);
+  assert.equal(decoded.status, 'published');
+  assert.equal(decoded.locality, '');
+  assert.equal(decoded.access_difficulty, '');
+  assert.equal(decoded.has_social, false);
+  assert.deepEqual(decoded.tags, []);
+});
+
+test('format 3 output is deterministic and omits invariant fields from raw artifacts', () => {
+  const first = buildPublicSpotSnapshot([approved]);
+  const second = buildPublicSpotSnapshot([approved]);
+  assert.equal(first.manifest.format, 3);
+  assert.equal(first.manifest.revision, second.manifest.revision);
+  const raw = JSON.stringify(first.files);
+  assert.equal(raw.includes('"is_public"'), false);
+  assert.equal(raw.includes('"status"'), false);
+  assert.equal(raw.includes('"resolved_title"'), false);
+  assert.equal(validateSnapshotArtifacts(first), true);
+});
+
+test('format 2 artifacts remain readable and mixed formats are rejected', async () => {
+  const legacy = buildPublicSpotSnapshot([approved], { format: 2 });
+  assert.equal(legacy.manifest.format, 2);
+  const legacySpot = [...legacy.files.values()][0].spots[0];
+  assert.equal(legacySpot.status, 'published');
+  assert.equal(Object.hasOwn(legacySpot, 'resolved_title'), true);
+  assert.equal(validateSnapshotArtifacts(legacy), true);
+  assert.deepEqual(Object.keys(legacy.manifest.regions), Object.keys(buildPublicSpotSnapshot([approved]).manifest.regions));
+  const read = createPublicSpotSnapshotReader({ fetchJson: fakeFetch(legacy).fetchJson });
+  const rows = await read(bounds);
+  assert.deepEqual(rows.map(spot => spot.id), ['approved']);
+  assert.equal(rows[0].resolved_title, 'Castle');
+
+  const current = buildPublicSpotSnapshot([approved]);
+  const filename = [...current.files.keys()][0];
+  const mixed = new Map([[filename, { ...current.files.get(filename), format: 2 }]]);
+  assert.throws(() => validateSnapshotArtifacts({ manifest: current.manifest, files: mixed }), /Corrupt or oversized region file/);
+  const mixedRead = createPublicSpotSnapshotReader({ fetchJson: async url => {
+    const data = url.endsWith('/spot-snapshot-revocations') ? { format: 1, revoked: [] }
+      : url.endsWith('/manifest.json') ? current.manifest : mixed.get(url.split('/').at(-1));
+    return { ok: Boolean(data), json: async () => data };
+  } });
+  await assert.rejects(mixedRead(bounds), /Invalid snapshot region/);
+});
+
+test('unsupported snapshot versions and unknown compact keys are rejected', async () => {
+  assert.throws(() => buildPublicSpotSnapshot([approved], { format: 4 }), /Unsupported snapshot format/);
+  const current = buildPublicSpotSnapshot([approved]);
+  const filename = [...current.files.keys()][0];
+  const file = current.files.get(filename);
+  const injected = new Map([[filename, { ...file,
+    spots: [{ ...file.spots[0], created_by_uid: 'private-uid' }] }]]);
+  assert.throws(() => validateSnapshotArtifacts({ manifest: current.manifest, files: injected }), /Corrupt or oversized region file/);
+  assert.throws(() => decodeSnapshotSpot({ ...file.spots[0], created_by_uid: 'private-uid' }), /Invalid compact snapshot spot/);
+  const unsupported = createPublicSpotSnapshotReader({ fetchJson: async url => {
+    const data = url.endsWith('/spot-snapshot-revocations') ? { format: 1, revoked: [] }
+      : { ...current.manifest, format: 4 };
+    return { ok: true, json: async () => data };
+  } });
+  await assert.rejects(unsupported(bounds), /Invalid snapshot manifest/);
 });
 
 test('Vite emits validated candidate only for explicit staging snapshot builds', async () => {
@@ -303,7 +391,7 @@ test('Vite emits validated candidate only for explicit staging snapshot builds',
     plugin.generateBundle.call({ emitFile: file => emitted.push(file) });
     assert.deepEqual(emitted.map(file => file.fileName).sort(), [
       'spot-snapshots/manifest.json',
-      `spot-snapshots/v2/${[...buildPublicSpotSnapshot([approved]).files.keys()][0]}`,
+      `spot-snapshots/v3/${[...buildPublicSpotSnapshot([approved]).files.keys()][0]}`,
     ].sort());
     plugin.configResolved({ command: 'build', mode: 'production', env: { VITE_SPOTFINDER_STAGE: 'production' } });
     const productionEmitted = [];

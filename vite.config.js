@@ -5,6 +5,7 @@ import { defineConfig } from 'vite'
 import { createSpotPageHandler } from './api/spot-page.js'
 import { getSpotPageFixture } from './tests/spot-page-fixtures.js'
 import { validateSnapshotArtifacts } from './scripts/public-spots/export.mjs'
+import { snapshotRegionDirectory } from './src/new/publicSpotSnapshotFormat.js'
 
 const appRoutes = new Set(['/','/home','/faq','/status','/statusadmin','/admin','/privacypolicy','/termsandconditions','/cookiepolicy','/refundpolicy','/updates']);
 let spotfinderBuildTarget;
@@ -40,7 +41,7 @@ export default defineConfig({
             if (!existsSync(feedPath)) { response.statusCode = 503; return response.end('{"error":"revocation-unavailable"}') }
             return response.end(readFileSync(feedPath))
           }
-          if (!/^\/spot-snapshots\/(?:manifest\.json|v2\/r\d+-\d+-[a-f0-9]{20}\.json)$/.test(pathname)) return next()
+          if (!/^\/spot-snapshots\/(?:manifest\.json|v[23]\/r\d+-\d+-[a-f0-9]{20}\.json)$/.test(pathname)) return next()
           const file = path.resolve(snapshotFixtureRoot, `.${pathname.slice('/spot-snapshots'.length)}`)
           if (!file.startsWith(snapshotFixtureRoot + path.sep) || !existsSync(file)) {
             response.statusCode = 404
@@ -63,8 +64,12 @@ export default defineConfig({
       configResolved(config) {
         snapshotCandidateRoot = null
         if (config.command !== 'build' || config.mode !== 'snapshot-staging') return
-        if (config.env.VITE_SPOTFINDER_STAGE !== 'staging' || process.env.VERCEL_ENV === 'production') {
+        const deployment = process.env.VERCEL_ENV
+        if (config.env.VITE_SPOTFINDER_STAGE !== 'staging' || (deployment && deployment !== 'preview')) {
           throw new Error('Snapshot candidate builds require an isolated staging target')
+        }
+        if (deployment === 'preview' && process.env.SPOTFINDER_SNAPSHOT_PREVIEW_APPROVED !== 'true') {
+          throw new Error('Snapshot candidate Preview builds require explicit approval')
         }
         if (!process.env.SPOTFINDER_SNAPSHOT_CANDIDATE_DIRECTORY) {
           throw new Error('Explicit staging snapshot candidate directory required')
@@ -74,16 +79,17 @@ export default defineConfig({
       generateBundle() {
         if (!snapshotCandidateRoot) return
         const manifest = JSON.parse(readFileSync(path.join(snapshotCandidateRoot, 'manifest.json'), 'utf8'))
+        const directory = snapshotRegionDirectory(manifest.format)
         const names = Object.values(manifest.regions || {})
         if (names.some(name => typeof name !== 'string' || !/^r\d+-\d+-[a-f0-9]{20}\.json$/.test(name))) {
           throw new Error('Unsafe snapshot candidate reference')
         }
         const files = new Map(names.map(name => [name,
-          JSON.parse(readFileSync(path.join(snapshotCandidateRoot, 'v2', name), 'utf8'))]))
+          JSON.parse(readFileSync(path.join(snapshotCandidateRoot, directory, name), 'utf8'))]))
         validateSnapshotArtifacts({ manifest, files })
         this.emitFile({ type: 'asset', fileName: 'spot-snapshots/manifest.json', source: `${JSON.stringify(manifest)}\n` })
         for (const [name, data] of files) this.emitFile({ type: 'asset',
-          fileName: `spot-snapshots/v2/${name}`, source: `${JSON.stringify(data)}\n` })
+          fileName: `spot-snapshots/${directory}/${name}`, source: `${JSON.stringify(data)}\n` })
       },
     },
     {

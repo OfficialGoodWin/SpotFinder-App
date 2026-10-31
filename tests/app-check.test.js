@@ -119,6 +119,6 @@ test('all callable Functions have prepared v1 App Check runtime options', () => 
   new vm.Script(bootstrap);
   assert.doesNotMatch(index, /functions\.https\.onCall\(/);
   assert.doesNotMatch(bootstrap, /functions\.https\.onCall\(/);
-  assert.equal((index.match(/\.https\.onCall\(/g) || []).length + (bootstrap.match(/\.https\.onCall\(/g) || []).length, 29);
+  assert.equal((index.match(/\.https\.onCall\(/g) || []).length + (bootstrap.match(/\.https\.onCall\(/g) || []).length, 31);
   assert.match(index, /enforceAppCheck: false/);
 });

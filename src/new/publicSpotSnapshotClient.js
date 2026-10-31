@@ -1,4 +1,4 @@
-import { MAX_VIEW_REGIONS, REGION_DEGREES, SNAPSHOT_FORMAT, regionsForBounds, regionForPoint, spotInsideBounds, validSnapshotSpot } from './publicSpotSnapshotFormat.js';
+import { MAX_VIEW_REGIONS, REGION_DEGREES, SNAPSHOT_FORMAT, SUPPORTED_SNAPSHOT_FORMATS, decodeSnapshotSpot, regionsForBounds, regionForPoint, snapshotRegionDirectory, spotInsideBounds, validSnapshotSpot } from './publicSpotSnapshotFormat.js';
 
 const VERSION = /^[a-f0-9]{20}$/;
 const FILE = /^r\d+-\d+-[a-f0-9]{20}\.json$/;
@@ -30,7 +30,7 @@ async function requestJson(fetchJson, url, options) {
 }
 
 async function validateManifest(manifest) {
-  if (!manifest || manifest.format !== SNAPSHOT_FORMAT || manifest.regionDegrees !== REGION_DEGREES
+  if (!manifest || !SUPPORTED_SNAPSHOT_FORMATS.includes(manifest.format) || manifest.regionDegrees !== REGION_DEGREES
     || !VERSION.test(manifest.revision) || manifest.version !== manifest.revision
     || typeof manifest.publishedAt !== 'string' || Number.isNaN(Date.parse(manifest.publishedAt))
     || !manifest.regions || Array.isArray(manifest.regions) || typeof manifest.regions !== 'object'
@@ -98,24 +98,29 @@ export function createPublicSpotSnapshotReader({ fetchJson = fetch, basePath = '
     if (!keys || keys.length > MAX_VIEW_REGIONS) throw new Error('Viewport exceeds snapshot coverage');
     await getRevocations();
     const manifest = await getManifest();
+    const directory = snapshotRegionDirectory(manifest.format);
     const snapshots = await Promise.all(keys.filter(key => manifest.regions[key]).map(async key => {
       const filename = manifest.regions[key];
-      const url = `${basePath}/v2/${filename}`;
+      const url = `${basePath}/${directory}/${filename}`;
       if (!regions.has(url)) {
         const entry = { chars: 0, promise: null };
         entry.promise = requestJson(fetchJson, url, { cache: 'force-cache' }).then(async data => {
           const serializedChars = JSON.stringify(data).length;
-          if (data.format !== SNAPSHOT_FORMAT || data.region !== key || !Array.isArray(data.spots)
+          if (data.format !== manifest.format || data.region !== key || !Array.isArray(data.spots)
             || serializedChars > MAX_REGION_JSON_CHARS || data.spots.length > 10000
-            || data.spots.some(spot => !validSnapshotSpot(spot)
-              || regionForPoint(spot.lat, spot.lng) !== key)
             || await hashJson(data) !== filename.slice(key.length + 1, -5)) throw new Error('Invalid snapshot region');
+          let spots;
+          try {
+            spots = manifest.format === SNAPSHOT_FORMAT ? data.spots.map(decodeSnapshotSpot) : data.spots;
+          } catch { throw new Error('Invalid snapshot region'); }
+          if (spots.some(spot => !validSnapshotSpot(spot)
+            || regionForPoint(spot.lat, spot.lng) !== key)) throw new Error('Invalid snapshot region');
           if (regions.get(url) === entry) {
             entry.chars = serializedChars;
             cachedChars += serializedChars;
             trimRegions();
           }
-          return data.spots;
+          return spots;
         }).catch(error => { if (regions.get(url) === entry) regions.delete(url); throw error; });
         regions.set(url, entry);
         trimRegions();

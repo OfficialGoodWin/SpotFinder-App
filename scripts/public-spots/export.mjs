@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { copyFile, mkdir, mkdtemp, readFile, readdir, rename, rmdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { REGION_DEGREES, SNAPSHOT_FORMAT, regionForPoint, toPublicSnapshotSpot, validSnapshotSpot } from '../../src/new/publicSpotSnapshotFormat.js';
+import { REGION_DEGREES, SNAPSHOT_FORMAT, decodeSnapshotSpot, encodeSnapshotSpot, isSupportedSnapshotFormat, regionForPoint, snapshotRegionDirectory, toPublicSnapshotSpot, validSnapshotSpot } from '../../src/new/publicSpotSnapshotFormat.js';
 
 export const hashSnapshotValue = value => createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 20);
 const FILE = /^r\d+-\d+-[a-f0-9]{20}\.json$/;
@@ -16,9 +16,10 @@ async function renameWithBoundedRetry(from, to) {
   }
 }
 
-export function buildPublicSpotSnapshot(records, { excludedIds = new Set(), publishedAt = new Date().toISOString() } = {}) {
+export function buildPublicSpotSnapshot(records, { excludedIds = new Set(), publishedAt = new Date().toISOString(), format = SNAPSHOT_FORMAT } = {}) {
   if (!Array.isArray(records) || !(excludedIds instanceof Set)) throw new TypeError('Expected complete spot records and an exclusion set');
   if (Number.isNaN(Date.parse(publishedAt))) throw new TypeError('Invalid publication time');
+  if (!isSupportedSnapshotFormat(format)) throw new TypeError('Unsupported snapshot format');
   const regions = new Map();
   const seenIds = new Set();
   let skipped = 0;
@@ -38,21 +39,23 @@ export function buildPublicSpotSnapshot(records, { excludedIds = new Set(), publ
   const entries = {};
   for (const key of [...regions.keys()].sort()) {
     const spots = regions.get(key).sort((a, b) => a.id.localeCompare(b.id));
-    const data = { format: SNAPSHOT_FORMAT, region: key, spots };
+    const encoded = format === SNAPSHOT_FORMAT ? spots.map(encodeSnapshotSpot) : spots;
+    const data = { format, region: key, spots: encoded };
     const filename = `${key}-${hashSnapshotValue(data)}.json`;
     entries[key] = filename;
     files.set(filename, data);
   }
   const revision = hashSnapshotValue(entries);
-  return { manifest: { format: SNAPSHOT_FORMAT, regionDegrees: REGION_DEGREES, revision,
+  return { manifest: { format, regionDegrees: REGION_DEGREES, revision,
     version: revision, publishedAt, regions: entries }, files, stats: { included: seenIds.size, skipped } };
 }
 
 // Incremental input is already the validated public allowlist from a previous
 // candidate plus freshly projected authoritative records. Preserve unchanged
 // summaries byte for byte instead of reconstructing them from a partial row.
-export function buildPublicSpotSnapshotFromSummaries(summaries, publishedAt = new Date().toISOString()) {
+export function buildPublicSpotSnapshotFromSummaries(summaries, publishedAt = new Date().toISOString(), { format = SNAPSHOT_FORMAT } = {}) {
   if (!Array.isArray(summaries) || Number.isNaN(Date.parse(publishedAt))) throw new TypeError('Invalid public summaries');
+  if (!isSupportedSnapshotFormat(format)) throw new TypeError('Unsupported snapshot format');
   const byRegion = new Map();
   const ids = new Set();
   for (const spot of summaries) {
@@ -65,19 +68,20 @@ export function buildPublicSpotSnapshotFromSummaries(summaries, publishedAt = ne
   const files = new Map();
   const entries = {};
   for (const region of [...byRegion.keys()].sort()) {
-    const data = { format: SNAPSHOT_FORMAT, region, spots: byRegion.get(region).sort((a, b) => a.id.localeCompare(b.id)) };
+    const spots = byRegion.get(region).sort((a, b) => a.id.localeCompare(b.id));
+    const data = { format, region, spots: format === SNAPSHOT_FORMAT ? spots.map(encodeSnapshotSpot) : spots };
     const filename = `${region}-${hashSnapshotValue(data)}.json`;
     files.set(filename, data);
     entries[region] = filename;
   }
   const revision = hashSnapshotValue(entries);
-  return { manifest: { format: SNAPSHOT_FORMAT, regionDegrees: REGION_DEGREES,
+  return { manifest: { format, regionDegrees: REGION_DEGREES,
     revision, version: revision, publishedAt, regions: entries }, files,
     stats: { included: ids.size, skipped: 0 } };
 }
 
 export function validateSnapshotArtifacts({ manifest, files }) {
-  if (!manifest || manifest.format !== SNAPSHOT_FORMAT || manifest.regionDegrees !== REGION_DEGREES
+  if (!manifest || !isSupportedSnapshotFormat(manifest.format) || manifest.regionDegrees !== REGION_DEGREES
     || !/^[a-f0-9]{20}$/.test(manifest.revision) || manifest.version !== manifest.revision
     || !manifest.regions || Array.isArray(manifest.regions) || typeof manifest.regions !== 'object'
     || manifest.revision !== hashSnapshotValue(manifest.regions)
@@ -88,10 +92,14 @@ export function validateSnapshotArtifacts({ manifest, files }) {
   for (const [region, filename] of Object.entries(manifest.regions)) {
     if (!FILE.test(filename) || !filename.startsWith(`${region}-`)) throw new Error('Invalid region reference');
     const file = files.get(filename);
-    if (!file || file.format !== SNAPSHOT_FORMAT || file.region !== region
+    if (!file || file.format !== manifest.format || file.region !== region
       || filename !== `${region}-${hashSnapshotValue(file)}.json` || !Array.isArray(file.spots)
       || file.spots.length > 10000 || JSON.stringify(file).length > 5000000) throw new Error('Corrupt or oversized region file');
-    for (const spot of file.spots) {
+    let spots;
+    try {
+      spots = manifest.format === SNAPSHOT_FORMAT ? file.spots.map(decodeSnapshotSpot) : file.spots;
+    } catch { throw new Error('Corrupt or oversized region file'); }
+    for (const spot of spots) {
       if (!validSnapshotSpot(spot) || regionForPoint(spot.lat, spot.lng) !== region || ids.has(spot.id))
         throw new Error('Invalid or duplicate marker');
       ids.add(spot.id);
@@ -111,16 +119,17 @@ export async function writePublicSpotSnapshot(records, outputDirectory, options 
       throw error;
     });
     const built = options.alreadyPublic
-      ? buildPublicSpotSnapshotFromSummaries(records, options.publishedAt)
+      ? buildPublicSpotSnapshotFromSummaries(records, options.publishedAt, { format: options.format })
       : buildPublicSpotSnapshot(records, options);
     if (previous?.revision === built.manifest.revision) built.manifest.publishedAt = previous.publishedAt;
     else if (previous?.publishedAt) built.manifest.publishedAt = new Date(Math.max(
       Date.now(), Date.parse(previous.publishedAt) + 1)).toISOString();
     validateSnapshotArtifacts(built);
     const staged = await mkdtemp(`${target}.candidate-`);
-    const regionDirectory = join(staged, 'v2');
+    const regionDirectoryName = snapshotRegionDirectory(built.manifest.format);
+    const regionDirectory = join(staged, regionDirectoryName);
     await mkdir(regionDirectory);
-    const oldRegionDirectory = join(target, 'v2');
+    const oldRegionDirectory = join(target, regionDirectoryName);
     const oldFiles = await readdir(oldRegionDirectory).catch(error => {
       if (error.code === 'ENOENT') return [];
       throw error;

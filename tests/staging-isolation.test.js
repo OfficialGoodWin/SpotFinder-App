@@ -57,6 +57,35 @@ test('Vercel preview build rejects missing or production Firebase configuration'
   }
 });
 
+test('snapshot candidate builds require an approved Preview target', () => {
+  const plugin = viteConfig.plugins.find(item => item.name === 'spotfinder-staging-snapshot-candidate');
+  assert.ok(plugin);
+  const previous = { deployment: process.env.VERCEL_ENV, approved: process.env.SPOTFINDER_SNAPSHOT_PREVIEW_APPROVED,
+    candidate: process.env.SPOTFINDER_SNAPSHOT_CANDIDATE_DIRECTORY };
+  const config = { command: 'build', mode: 'snapshot-staging', env: { VITE_SPOTFINDER_STAGE: 'staging' } };
+  try {
+    delete process.env.VERCEL_ENV;
+    process.env.SPOTFINDER_SNAPSHOT_CANDIDATE_DIRECTORY = 'candidate';
+    assert.doesNotThrow(() => plugin.configResolved(config));
+    process.env.VERCEL_ENV = 'development';
+    assert.throws(() => plugin.configResolved(config), /isolated staging target/);
+    process.env.VERCEL_ENV = 'preview';
+    delete process.env.SPOTFINDER_SNAPSHOT_PREVIEW_APPROVED;
+    assert.throws(() => plugin.configResolved(config), /explicit approval/);
+    process.env.SPOTFINDER_SNAPSHOT_PREVIEW_APPROVED = 'true';
+    assert.doesNotThrow(() => plugin.configResolved(config));
+    assert.throws(() => plugin.configResolved({ ...config, env: { VITE_SPOTFINDER_STAGE: 'production' } }), /isolated staging target/);
+    delete process.env.SPOTFINDER_SNAPSHOT_CANDIDATE_DIRECTORY;
+    assert.throws(() => plugin.configResolved(config), /candidate directory/);
+  } finally {
+    for (const [key, value] of Object.entries({ VERCEL_ENV: previous.deployment,
+      SPOTFINDER_SNAPSHOT_PREVIEW_APPROVED: previous.approved,
+      SPOTFINDER_SNAPSHOT_CANDIDATE_DIRECTORY: previous.candidate })) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
+});
+
 test('local Vite preview spot page has no Admin SDK lookup', () => {
   const source = readFileSync(new URL('../vite.config.js', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /import\(['"]\.\/api\/_firebaseAdmin\.js['"]\)/);

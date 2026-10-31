@@ -2,7 +2,12 @@ import { performance } from 'node:perf_hooks';
 import { brotliCompressSync, constants as zlibConstants, gzipSync } from 'node:zlib';
 import { buildPublicSpotSnapshot } from './export.mjs';
 import { createPublicSpotSnapshotReader, readSnapshotSpots } from '../../src/new/publicSpotSnapshotClient.js';
-import { spotInsideBounds } from '../../src/new/publicSpotSnapshotFormat.js';
+import { SNAPSHOT_FORMAT, snapshotRegionDirectory, spotInsideBounds } from '../../src/new/publicSpotSnapshotFormat.js';
+
+const formatIndex = process.argv.indexOf('--format');
+const format = formatIndex >= 0 ? Number(process.argv[formatIndex + 1]) : SNAPSHOT_FORMAT;
+if (![2, 3].includes(format)) throw new Error('Format must be 2 or 3');
+const regionDirectory = snapshotRegionDirectory(format);
 
 const views = [
   { south: 49.5, west: 13.5, north: 50.5, east: 14.5 },
@@ -30,7 +35,7 @@ function syntheticSpots(count) {
 for (const count of [100, 1000, 10000, 250000]) {
   const records = syntheticSpots(count);
   const buildStarted = performance.now();
-  let snapshot = buildPublicSpotSnapshot(records);
+  let snapshot = buildPublicSpotSnapshot(records, { format });
   const buildMs = performance.now() - buildStarted;
   const files = new Map(snapshot.files);
   const calls = [];
@@ -60,12 +65,12 @@ for (const count of [100, 1000, 10000, 250000]) {
   const journeyCalls = [...calls];
   const detail = cold.rows.slice(0, 5).map(spot => records.find(record => record.id === spot.id));
   snapshot = buildPublicSpotSnapshot([{ ...records[0], title: 'Edited synthetic spot' }, ...records.slice(1)],
-    { publishedAt: new Date(Date.parse(snapshot.manifest.publishedAt) + 1).toISOString() });
+    { format, publishedAt: new Date(Date.parse(snapshot.manifest.publishedAt) + 1).toISOString() });
   for (const [name, data] of snapshot.files) files.set(name, data);
   time += 5001;
   const beforeEdit = calls.length;
   await measure(views[0]);
-  const changedRegionFetches = calls.slice(beforeEdit).filter(call => call.url.includes('/v2/')).length;
+  const changedRegionFetches = calls.slice(beforeEdit).filter(call => call.url.includes(`/${regionDirectory}/`)).length;
   const allRegionBuffers = [...snapshot.files.values()].map(file => Buffer.from(JSON.stringify(file)));
   const regionBytes = allRegionBuffers.reduce((sum, buffer) => sum + buffer.byteLength, 0);
   const gzipBytes = allRegionBuffers.reduce((sum, buffer) => sum + gzipSync(buffer).byteLength, 0);
@@ -76,7 +81,7 @@ for (const count of [100, 1000, 10000, 250000]) {
     const source = records[Number(spot.id.slice('synthetic-'.length))];
     return { ...spot, lat: source.lat, lng: source.lng };
   }));
-  console.log(JSON.stringify({ spots: count, publicRegions: snapshot.files.size, mapMarkers: cold.rows.length,
+  console.log(JSON.stringify({ spots: count, format, publicRegions: snapshot.files.size, mapMarkers: cold.rows.length,
     modeledFirestoreViewportQueries: baselinePages.length,
     modeledFirestoreReturnedDocs: baselinePages.reduce((sum, page) => sum + page.length, 0),
     modeledFirestoreSerializedBytes: baselinePages.reduce((sum, page) => sum + bytes(page), 0),
@@ -84,7 +89,7 @@ for (const count of [100, 1000, 10000, 250000]) {
     snapshotMapFirestoreQueries: 0,
     cdnHttpRequests: journeyCalls.length,
     cdnManifestRequests: journeyCalls.filter(call => call.url.endsWith('manifest.json')).length,
-    cdnRegionRequests: journeyCalls.filter(call => call.url.includes('/v2/')).length,
+    cdnRegionRequests: journeyCalls.filter(call => call.url.includes(`/${regionDirectory}/`)).length,
     cdnJsonBytes: journeyCalls.reduce((sum, call) => sum + call.bytes, 0),
     cdnGzipBytes: journeyCalls.reduce((sum, call) => sum + call.gzipBytes, 0),
     cdnBrotliBytes: journeyCalls.reduce((sum, call) => sum + call.brotliBytes, 0),

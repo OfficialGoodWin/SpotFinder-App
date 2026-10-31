@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { assertPublisherTarget, publishFromFirestore } from './publish.mjs';
+import { snapshotRegionDirectory } from '../../src/new/publicSpotSnapshotFormat.js';
 
 const projectId = 'demo-spotfinder-snapshots';
 assertPublisherTarget({ mode: 'emulator', projectId, emulatorHost: process.env.FIRESTORE_EMULATOR_HOST });
@@ -23,7 +24,8 @@ try {
   const first = await publishFromFirestore({ mode: 'emulator', projectId, outputDirectory });
   let manifest = JSON.parse(await readFile(join(outputDirectory, 'manifest.json'), 'utf8'));
   let filename = Object.values(manifest.regions)[0];
-  let region = JSON.parse(await readFile(join(outputDirectory, 'v2', filename), 'utf8'));
+  let region = JSON.parse(await readFile(join(outputDirectory, snapshotRegionDirectory(manifest.format), filename), 'utf8'));
+  assert.equal(manifest.format, 3);
   assert.deepEqual(region.spots.map(spot => spot.id), ['synthetic-visible']);
   assert.equal(JSON.stringify(region).includes('private-synthetic-uid'), false);
   assert.equal(first.excludedReportedIds, 1);

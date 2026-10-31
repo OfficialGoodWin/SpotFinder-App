@@ -4,6 +4,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { validateSnapshotArtifacts } from './export.mjs';
 import { acknowledgePublishedCandidate } from './incremental.mjs';
 import { assertPublisherTarget } from './publish.mjs';
+import { snapshotRegionDirectory } from '../../src/new/publicSpotSnapshotFormat.js';
 
 const [projectId, originText, candidateDirectory] = process.argv.slice(2);
 if (process.argv.length !== 5 || !projectId || !originText || !candidateDirectory
@@ -28,9 +29,10 @@ const target = await readJson('/spotfinder-build-target.json');
 if (target.stage !== 'staging' || target.projectId !== projectId) throw new Error('Preview Firebase target mismatch');
 const manifest = await readJson('/spot-snapshots/manifest.json');
 if (manifest.revision !== receipt.revision) throw new Error('Preview revision mismatch');
+const directory = snapshotRegionDirectory(manifest.format);
 const files = new Map();
 for (const filename of Object.values(manifest.regions)) {
-  files.set(filename, await readJson(`/spot-snapshots/v2/${filename}`));
+  files.set(filename, await readJson(`/spot-snapshots/${directory}/${filename}`));
 }
 validateSnapshotArtifacts({ manifest, files });
 const revocationResponse = await fetch(new URL('/api/spot-snapshot-revocations', origin), {
