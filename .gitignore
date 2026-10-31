@@ -66,3 +66,5 @@ smoke/dist/
 smoke/public/spot-snapshots/
 .local-production-cdn/
 
+.vercel
+.env*

@@ -105,7 +105,7 @@ export default defineConfig({
             || source.documentsRead > 3000 || source.included !== [...files.values()].reduce((n, file) => n + file.spots.length, 0))
             throw new Error('Production candidate provenance or read budget invalid')
           if (manifest.format !== 3 || [...files.values()].some(file => file.spots.some(spot =>
-            /^(?:smoke|synthetic)-/i.test(spot.id)))) throw new Error('Synthetic or legacy production snapshot candidate')
+            /^(?:(?:smoke|synthetic)-|cdn_release_test_)/i.test(spot.id)))) throw new Error('Synthetic or legacy production snapshot candidate')
         }
         this.emitFile({ type: 'asset', fileName: 'spot-snapshots/manifest.json', source: `${JSON.stringify(manifest)}\n` })
         for (const [name, data] of files) this.emitFile({ type: 'asset',
