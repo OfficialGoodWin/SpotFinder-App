@@ -31,6 +31,14 @@
       "collectionGroup": "spots",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "is_public", "order": "ASCENDING" },
+        { "fieldPath": "created_date", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "spots",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "created_by", "order": "ASCENDING" },
         { "fieldPath": "created_date", "order": "DESCENDING" }
       ]
