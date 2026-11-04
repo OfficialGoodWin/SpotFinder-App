@@ -37,7 +37,11 @@ export default function NewAdminAccess() {
   const seconds = remainingSeconds(claims, now);
   const beginEnrollment = async () => {
     setBusy(true); setError('');
-    try { setSecret(await startTotpEnrollment(firebaseUser)); }
+    try {
+      await firebaseUser.reload();
+      if (!firebaseUser.emailVerified) throw new Error('Verify your email address, then sign in again.');
+      setSecret(await startTotpEnrollment(firebaseUser));
+    }
     catch (err) { setError(err.message); }
     finally { setBusy(false); }
   };
@@ -50,9 +54,9 @@ export default function NewAdminAccess() {
   return <section className="sf-new-settings-panel" aria-label="Admin verification">
     {seconds > 0 && isAdmin ? <><p role="timer">Admin access: {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')} remaining</p><Admin /></> : <>
       <p>Admin access requires Google sign-in and an authenticator app. Each verified sign-in grants 30 minutes.</p>
-      {!firebaseUser?.emailVerified && <p>Verify your email address before enrolling an authenticator.</p>}
+      {!firebaseUser && <p>Sign in to SpotFinder with your Google account to begin.</p>}
       {firebaseUser?.providerData?.every(provider => provider.providerId !== 'google.com') && <p>Connect your Google account first.</p>}
-      {!enrolled && firebaseUser?.emailVerified && <>
+      {!enrolled && firebaseUser && <>
         {!secret ? <button type="button" disabled={busy} onClick={beginEnrollment}>Set up authenticator app</button> : <form onSubmit={finishEnrollment}>
           <p>Add this key to your authenticator app for SpotFinder:</p>
           <code style={{ overflowWrap: 'anywhere' }}>{secret.secretKey}</code>
