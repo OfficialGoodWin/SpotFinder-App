@@ -7,7 +7,13 @@ service cloud.firestore {
     function isAuth() { return request.auth != null; }
     function authEmail() { return request.auth.token.email; }
     function isSuperAdmin() {
-      return isAuth() && request.auth.token.admin == true;
+      return isAuth() && request.auth.token.admin == true
+        && request.auth.token.email == 'redm3467@gmail.com'
+        && request.auth.token.email_verified == true
+        && request.auth.token.firebase.sign_in_provider == 'google.com'
+        && request.auth.token.firebase.sign_in_second_factor == 'totp'
+        && request.auth.token.auth_time <= request.time.toMillis() / 1000
+        && request.auth.token.auth_time > request.time.toMillis() / 1000 - 1800;
     }
     function canSubmit() {
       return isAuth() && (!exists(/databases/$(database)/documents/submission_blocks/$(request.auth.uid))

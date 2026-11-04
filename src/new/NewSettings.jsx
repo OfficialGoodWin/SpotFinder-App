@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { Accessibility, BadgeCheck, BookOpen, ChevronLeft, ChevronRight, CircleHelp, Cookie, FileText, Globe2, History, Mail, Map, MessageSquare, Moon, Navigation2, ReceiptText, Smartphone, Type, UserRound } from 'lucide-react';
+import { Accessibility, BadgeCheck, BookOpen, ChevronLeft, ChevronRight, CircleHelp, Cookie, FileText, Globe2, History, Mail, Map, MessageSquare, Moon, Navigation2, ReceiptText, ShieldCheck, Smartphone, Type, UserRound } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
 import { useLanguage } from '@/lib/LanguageContext';
@@ -11,6 +11,7 @@ import { APP_VERSION } from '@/config/appVersion';
 import NewAccount from './NewAccount';
 import NewSettingsInfo from './NewSettingsInfo';
 import NewSkeleton from './NewSkeleton';
+import NewAdminAccess from './NewAdminAccess';
 import './new-settings.css';
 
 const NAVIGATION_KEY = 'spotfinder_navigation_provider'; // Used by the existing navigation chooser.
@@ -78,7 +79,7 @@ export default function NewSettings({ onSignIn, mapLayer, onMapLayer, terrain, o
     setNavigationProvider(id);
     try { localStorage.setItem(NAVIGATION_KEY, id); } catch { /* Choice applies for this view only when storage is unavailable. */ }
   };
-  const titles = { language: 'Jazyk', navigation: 'Navigační aplikace', appearance: 'Vzhled', accessibility: 'Možnosti přístupnosti', account: t('newAccount.management'), mfa: t('newAccount.mfa') };
+  const titles = { language: 'Jazyk', navigation: 'Navigační aplikace', appearance: 'Vzhled', accessibility: 'Možnosti přístupnosti', account: t('newAccount.management'), mfa: t('newAccount.mfa'), admin: 'Admin' };
   const infoTitles = { faq: 'Časté dotazy', feedback: 'Zpětná vazba', report: 'Nahlásit problém', contact: 'Kontaktovat podporu', terms: 'Podmínky používání', privacy: 'Ochrana soukromí', cookies: 'Cookies', refunds: 'Vrácení peněz', preferences: 'Nastavení cookies', updates: 'Co je nového', app: 'O aplikaci' };
 
   const accountTitles = { name: t('newAccount.displayName'), methods: t('newAccount.signInMethods'), email: t('newAccount.changeEmail'), mfa: t('newAccount.mfa'), delete: t('newAccount.deleteAccount') };
@@ -104,6 +105,7 @@ export default function NewSettings({ onSignIn, mapLayer, onMapLayer, terrain, o
           </SettingsGroup>
           <SettingsGroup title={t('newAccount.accountGroup')}>
             <SettingsRow icon={UserRound} label={t('newAccount.management')} value={t('newAccount.managementSubtitle')} onClick={() => go('account')} />
+            {user?.email === 'redm3467@gmail.com' && <SettingsRow icon={ShieldCheck} label="Admin" value="Review and publish submitted spots" onClick={() => go('admin')} />}
           </SettingsGroup>
           <SettingsGroup title="Nápověda a podpora">
             <SettingsRow icon={CircleHelp} label="Časté dotazy" onClick={() => go('support/faq')} />
@@ -139,6 +141,7 @@ export default function NewSettings({ onSignIn, mapLayer, onMapLayer, terrain, o
           <button type="button" className="sf-new-settings-reset" onClick={() => setTextScale(saveTextScale(TEXT_SCALE_DEFAULT))}>Obnovit výchozí velikost textu</button>
         </div>}
         {subsection === 'account' && (isLoadingAuth ? <NewSkeleton kind={detail ? 'accountForm' : 'account'} /> : <NewAccount detail={detail} onSignIn={onSignIn} />)}
+        {subsection === 'admin' && <NewAdminAccess />}
         {['support', 'legal', 'about'].includes(subsection) && <NewSettingsInfo area={subsection} page={detail} />}
       </div>
     </div>

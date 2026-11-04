@@ -1,19 +1,9 @@
 /**
- * Grant the `admin` custom claim to an account. The caller must already
- * have a signed `admin: true` claim.
+ * Migrate the admin claim to the verified Google account with TOTP enrolled.
  *
- * HOW TO RUN (once):
- *   1. Deploy this alongside the rest of functions/ (it's exported from
- *      index.js — see the require() at the bottom of this file, or just
- *      add `exports.setAdminClaim = require('./setAdminClaim').setAdminClaim;`
- *      to index.js).
- *   2. Sign in with an existing claimed admin account.
- *   3. Call the callable function:
- *        const fn = firebase.functions().httpsCallable('setAdminClaim');
- *        await fn({ targetEmail: 'new-admin@example.com' });
- *   4. The target signs out and back in so its refreshed token includes the claim.
- *
- * This function only lets an already-claimed admin grant the claim.
+ * The existing claimed admin calls this once after the target has linked
+ * Google, verified email, and enrolled TOTP. The target then signs in again.
+ * Roll out the 30-minute server and rules gate only after this migration.
  */
 const functions = require('firebase-functions/v1');
 const { getAuth } = require('firebase-admin/auth');
@@ -28,20 +18,27 @@ exports.setAdminClaim = functions.runWith({ enforceAppCheck: false }).https.onCa
   }
 
   const targetEmail = data?.targetEmail?.trim()?.toLowerCase();
-  if (!targetEmail) {
-    throw new functions.https.HttpsError('invalid-argument', 'targetEmail is required.');
-  }
+  if (targetEmail !== 'redm3467@gmail.com') throw new functions.https.HttpsError('invalid-argument', 'Target must be the designated admin account.');
 
-  const user = await getAuth().getUserByEmail(targetEmail);
-  await getAuth().setCustomUserClaims(user.uid, {
+  const auth = getAuth();
+  const [user, caller] = await Promise.all([auth.getUserByEmail(targetEmail), auth.getUser(context.auth.uid)]);
+  if (user.uid === caller.uid || !user.emailVerified
+    || !user.providerData.some(provider => provider.providerId === 'google.com')
+    || !user.multiFactor?.enrolledFactors?.some(factor => factor.factorId === 'totp')) {
+    throw new functions.https.HttpsError('failed-precondition', 'Target must be a separate verified Google account with TOTP enrolled.');
+  }
+  await auth.setCustomUserClaims(user.uid, {
     ...(user.customClaims || {}),
     admin: true,
   });
+  await auth.setCustomUserClaims(caller.uid, { ...(caller.customClaims || {}), admin: false });
+  await auth.revokeRefreshTokens(caller.uid);
 
   await getFirestore().collection('admin_audit_log').add({
-    action: 'grant_admin_claim',
+    action: 'migrate_admin_claim',
     target_email: targetEmail,
     performed_by: callerEmail,
+    previous_admin_uid: caller.uid,
     performed_at: new Date().toISOString(),
   });
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import {
   getStatusServices, createStatusService, publishServiceStatus,
@@ -22,7 +23,8 @@ const STATUS_OPTIONS = [
 const UPDATE_TYPES = ['investigating', 'identified', 'monitoring', 'resolved'];
 
 export default function StatusAdmin() {
-  const { isAdmin } = useAuth();
+  const location = useLocation();
+  const { isAdmin, user } = useAuth();
   const isSuperAdmin = isAdmin;
 
   const [services, setServices] = useState([]);
@@ -47,6 +49,8 @@ export default function StatusAdmin() {
   };
 
   useEffect(() => { if (isSuperAdmin) refresh(); }, [isSuperAdmin]);
+
+  if (location.pathname !== '/new/settings/admin' && user?.email === 'redm3467@gmail.com') return <Navigate to="/new/settings/admin" replace />;
 
   if (!isSuperAdmin) {
     return (

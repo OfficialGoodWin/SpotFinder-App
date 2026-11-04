@@ -21,6 +21,7 @@ import {
   multiFactor,
   PhoneAuthProvider,
   PhoneMultiFactorGenerator,
+  TotpMultiFactorGenerator,
   RecaptchaVerifier,
   getMultiFactorResolver,
   updateProfile,
@@ -38,6 +39,7 @@ import {
   query,
   where,
   orderBy,
+  documentId,
   limit,
   startAfter,
   setDoc,
@@ -235,6 +237,13 @@ export const completeMfaEnrollment = async (user, verificationId, code, displayN
 };
 
 export const getEnrolledMfaFactors = (user) => multiFactor(user).enrolledFactors;
+
+export const startTotpEnrollment = async user => TotpMultiFactorGenerator.generateSecret(await multiFactor(user).getSession());
+export const completeTotpEnrollment = async (user, secret, code) => {
+  await multiFactor(user).enroll(TotpMultiFactorGenerator.assertionForEnrollment(secret, code), 'Authenticator app');
+};
+export const completeTotpSignIn = async (resolver, hintIndex, code) =>
+  (await resolver.resolveSignIn(TotpMultiFactorGenerator.assertionForSignIn(resolver.hints[hintIndex].uid, code))).user;
 
 export const unenrollMfaFactor = async (user, factorUid) => {
   await multiFactor(user).unenroll(factorUid);
@@ -1367,6 +1376,18 @@ export const getAdminSpots = async (maxCount = 300) => {
   const { db } = getFirebaseServices();
   const snap = await getDocs(query(collection(db, 'spots'), orderBy('created_date', 'desc'), limit(maxCount)));
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+};
+export const getAdminSpotPage = async (afterId = null, maxCount = 100) => {
+  const { db } = getFirebaseServices();
+  const constraints = [orderBy(documentId()), ...(afterId ? [startAfter(afterId)] : []), limit(maxCount)];
+  const snap = await getDocs(query(collection(db, 'spots'), ...constraints));
+  return { spots: snap.docs.map(d => ({ id: d.id, ...d.data() })),
+    nextCursor: snap.docs.at(-1)?.id || null, hasMore: snap.size === maxCount };
+};
+export const adminPublishSpot = async spotId => {
+  const result = await callFn('adminPublishSpot')({ spotId });
+  clearPublicSpotCaches();
+  return result;
 };
 export const adminUpdateSpot = async (spotId, patch) => {
   const result = await callFn('adminUpdateSpot')({ spotId, patch });

@@ -1,21 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import StatusAdmin from './StatusAdmin';
 import {
-  addSocialPost, adminBlockReporter, adminDeletePOIPhoto, adminDeleteReport,
+  addSocialPost, adminBlockReporter, adminDeletePOIPhoto, adminDeleteReport, adminPublishSpot,
   adminResolveReport, adminSetSocialPostStatus, adminUpdateSpot, deleteSpotAsSuperAdmin,
-  getAdminPOIPhotos, getAdminReports, getAdminSocialPosts, getAdminSpots,
+  getAdminPOIPhotos, getAdminReports, getAdminSocialPosts, getAdminSpotPage,
 } from '@/api/firebaseClient';
 import { INVALID_SOCIAL_URL_MESSAGE, validateSocialPostUrl } from '@/lib/socialUrlPolicy';
 import { reportPriorityCounts, sortForManualReview } from '@/lib/manualReviewPriority';
 
-const tabs = ['Reports', 'Spots', 'Photos', 'Social', 'Status'];
+const tabs = ['Review', 'Reports', 'Spots', 'Photos', 'Social', 'Status'];
 
 export default function Admin() {
   const { user, isAdmin, isLoadingAuth } = useAuth();
-  const [tab, setTab] = useState('Reports');
+  const location = useLocation();
+  const [tab, setTab] = useState('Review');
   const [reports, setReports] = useState([]);
   const [spots, setSpots] = useState([]);
+  const [spotCursor, setSpotCursor] = useState(null);
+  const [hasMoreSpots, setHasMoreSpots] = useState(false);
   const [photos, setPhotos] = useState([]);
   const [socialPosts, setSocialPosts] = useState([]);
   const [filter, setFilter] = useState('all');
@@ -25,12 +29,18 @@ export default function Admin() {
 
   const refresh = async () => {
     if (!isAdmin) return;
-    const [nextReports, nextSpots, nextPhotos, nextSocial] = await Promise.all([
-      getAdminReports(), getAdminSpots(), getAdminPOIPhotos(), getAdminSocialPosts(),
+    const [nextReports, nextPage, nextPhotos, nextSocial] = await Promise.all([
+      getAdminReports(), getAdminSpotPage(), getAdminPOIPhotos(), getAdminSocialPosts(),
     ]);
-    setReports(nextReports); setSpots(nextSpots); setPhotos(nextPhotos); setSocialPosts(nextSocial);
+    setReports(nextReports); setSpots(nextPage.spots); setSpotCursor(nextPage.nextCursor); setHasMoreSpots(nextPage.hasMore); setPhotos(nextPhotos); setSocialPosts(nextSocial);
   };
   useEffect(() => { refresh(); }, [isAdmin]);
+  const loadMoreSpots = async () => {
+    if (!hasMoreSpots || !spotCursor) return;
+    const page = await getAdminSpotPage(spotCursor);
+    setSpots(current => [...current, ...page.spots]);
+    setSpotCursor(page.nextCursor); setHasMoreSpots(page.hasMore);
+  };
 
   const reviewCounts = useMemo(() => reportPriorityCounts(reports), [reports]);
   const visibleReports = useMemo(() => sortForManualReview(reports.filter(report =>
@@ -41,6 +51,7 @@ export default function Admin() {
   ), reviewCounts, report => report.target_type === 'spot' ? report.target_id : null),
   [reports, reviewCounts, filter, typeFilter, reasonFilter, q]);
 
+  if (location.pathname !== '/new/settings/admin' && user?.email === 'redm3467@gmail.com') return <Navigate to="/new/settings/admin" replace />;
   if (isLoadingAuth) return <div className="p-10">Loading…</div>;
   if (!isAdmin) return <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50 dark:bg-slate-950"><div className="w-full max-w-lg bg-white dark:bg-slate-900 border rounded-2xl p-6 shadow-sm"><h1 className="text-xl font-semibold">Admin access required</h1><p className="text-sm text-slate-500 mt-2">This area requires the Firebase <code>admin: true</code> custom claim.</p>{user ? <p className="text-sm mt-4">Signed in as <strong>{user.email}</strong>.</p> : <p className="text-sm text-amber-600 mt-4">Sign in with an authorized admin account first.</p>}</div></div>;
 
@@ -48,7 +59,7 @@ export default function Admin() {
     <h1 className="text-2xl font-bold mb-1">SpotFinder Admin</h1><p className="text-sm text-slate-500 mb-6">Moderation and operations. Privileged writes run through logged Cloud Functions.</p>
     <div className="flex gap-2 flex-wrap mb-6">{tabs.map(name => <button key={name} onClick={() => setTab(name)} className={`px-4 py-2 rounded-lg text-sm ${tab === name ? 'bg-slate-900 text-white' : 'bg-white border dark:bg-slate-900'}`}>{name}</button>)}</div>
     {tab === 'Reports' && <ReportsTab reports={visibleReports} reviewCounts={reviewCounts} q={q} setQ={setQ} filter={filter} setFilter={setFilter} typeFilter={typeFilter} setTypeFilter={setTypeFilter} reasonFilter={reasonFilter} setReasonFilter={setReasonFilter} refresh={refresh} />}
-    {tab === 'Spots' && <section><input value={q} onChange={event => setQ(event.target.value)} placeholder="Filter spots…" className="w-full border rounded-lg px-3 py-2 mb-4 bg-white dark:bg-slate-900" /><div className="space-y-3">{spots.filter(spot => !q || JSON.stringify(spot).toLowerCase().includes(q.toLowerCase())).map(spot => <SpotRow key={spot.id} spot={spot} refresh={refresh} />)}</div></section>}
+    {(tab === 'Review' || tab === 'Spots') && <section><p className="mb-3 text-sm">{tab === 'Review' ? 'All loaded spots awaiting publication, including pending_trust. Load more to continue through the full collection.' : 'All loaded spots.'}</p><input value={q} onChange={event => setQ(event.target.value)} placeholder="Filter spots…" className="w-full border rounded-lg px-3 py-2 mb-4 bg-white dark:bg-slate-900" /><div className="space-y-3">{spots.filter(spot => (tab !== 'Review' || spot.status !== 'published') && (!q || JSON.stringify(spot).toLowerCase().includes(q.toLowerCase()))).map(spot => <SpotRow key={spot.id} spot={spot} refresh={refresh} />)}</div>{hasMoreSpots && <button type="button" onClick={loadMoreSpots} className="mt-4 rounded border px-4 py-2">Load more spots</button>}</section>}
     {tab === 'Photos' && <section><div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">{photos.map(photo => <div key={photo.id} className="bg-white dark:bg-slate-900 border rounded-xl overflow-hidden">{photo.image && <img src={photo.image} alt="POI upload" className="w-full h-40 object-cover" />}<div className="p-3"><p className="text-xs break-all">POI: {photo.poi_id}</p><p className="text-xs text-slate-500">By {photo.created_by}</p><button onClick={async () => { if (confirm('Delete this photo?')) { await adminDeletePOIPhoto(photo.id); refresh(); } }} className="mt-3 text-xs bg-red-600 text-white rounded px-3 py-1.5">Delete image</button></div></div>)}</div></section>}
     {tab === 'Social' && <SocialAdmin posts={socialPosts} onRefresh={refresh} />}
     {tab === 'Status' && <div className="-mx-4 md:-mx-8 -mt-10"><StatusAdmin /></div>}
@@ -67,6 +78,44 @@ function SocialAdmin({ posts, onRefresh }) {
 }
 
 function SpotRow({ spot, refresh }) {
-  const [editing, setEditing] = useState(false); const [title, setTitle] = useState(spot.title || ''); const [description, setDescription] = useState(spot.description || '');
-  return <div className="bg-white dark:bg-slate-900 border rounded-xl p-4"><div className="flex gap-4 justify-between"><div className="flex-1">{editing ? <><input value={title} onChange={event => setTitle(event.target.value)} className="w-full border rounded p-2 mb-2 bg-transparent" /><textarea value={description} onChange={event => setDescription(event.target.value)} className="w-full border rounded p-2 bg-transparent" /></> : <><h3 className="font-semibold">{spot.title || 'Untitled'}</h3><p className="text-sm text-slate-500">{spot.description}</p></>}<p className="text-xs text-slate-400 mt-2">{spot.id} · {spot.status}</p></div><div className="flex gap-2 content-start">{editing ? <button onClick={async () => { await adminUpdateSpot(spot.id, { title, description }); setEditing(false); refresh(); }} className="text-xs border rounded px-2 py-1">Save</button> : <button onClick={() => setEditing(true)} className="text-xs border rounded px-2 py-1">Edit</button>}{(spot.image_url || spot.image_urls?.length > 0) && <button onClick={async () => { if (confirm('Remove all photos from this spot?')) { await adminUpdateSpot(spot.id, { image_url: null, image_urls: [] }); refresh(); } }} className="text-xs border rounded px-2 py-1">Remove photos</button>}<button onClick={async () => { if (confirm('Permanently delete this spot?')) { await deleteSpotAsSuperAdmin(spot.id); refresh(); } }} className="text-xs bg-red-600 text-white rounded px-2 py-1">Delete</button></div></div></div>;
+  const [editing, setEditing] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [title, setTitle] = useState(spot.title || '');
+  const [description, setDescription] = useState(spot.description || '');
+  const images = [...new Set([spot.image_url, ...(spot.image_urls || [])].filter(Boolean))];
+  const blockers = [
+    spot.is_public !== true && 'Private', spot.discovery_state === 'hidden' && 'Hidden',
+    spot.sensitive_location === true && 'Sensitive location',
+    spot.flag_count > 0 && 'Unresolved flags',
+    (!Number.isFinite(spot.lat) || !Number.isFinite(spot.lng)) && 'Invalid coordinates',
+  ].filter(Boolean);
+  const run = async action => {
+    setBusy(true); setError('');
+    try { await action(); await refresh(); }
+    catch (err) { setError(err.message || 'Admin action failed.'); }
+    finally { setBusy(false); }
+  };
+  return <article className="bg-white dark:bg-slate-900 border rounded-xl p-4">
+    <div className="flex flex-wrap gap-4 justify-between"><div className="flex-1 min-w-48">
+      {editing ? <><input value={title} onChange={event => setTitle(event.target.value)} className="w-full border rounded p-2 mb-2 bg-transparent" /><textarea value={description} onChange={event => setDescription(event.target.value)} className="w-full border rounded p-2 bg-transparent" /></> : <><h3 className="font-semibold">{spot.title || 'Untitled'}</h3><p className="text-sm text-slate-500 whitespace-pre-wrap">{spot.description}</p></>}
+      <p className="text-xs text-slate-400 mt-2 break-all">{spot.id} · {spot.status || 'no status'} · {spot.created_date || 'no date'}</p>
+      {blockers.length > 0 && <p className="text-xs text-amber-700 mt-1">Publication blocked: {blockers.join(', ')}</p>}
+    </div><div className="flex gap-2 flex-wrap content-start">
+      <button type="button" onClick={() => setExpanded(value => !value)} className="text-xs border rounded px-2 py-1">{expanded ? 'Hide details' : 'Review details'}</button>
+      {editing ? <button disabled={busy} onClick={() => run(async () => { await adminUpdateSpot(spot.id, { title, description }); setEditing(false); })} className="text-xs border rounded px-2 py-1">Save</button> : <button disabled={busy} onClick={() => setEditing(true)} className="text-xs border rounded px-2 py-1">Edit</button>}
+      {spot.status !== 'published' && <button disabled={busy || !expanded || blockers.length > 0} onClick={() => run(() => adminPublishSpot(spot.id))} className="text-xs bg-green-700 text-white rounded px-2 py-1 disabled:opacity-40">Publish</button>}
+      {images.length > 0 && <button disabled={busy} onClick={() => { if (confirm('Remove all photos from this spot?')) run(() => adminUpdateSpot(spot.id, { image_url: null, image_urls: [] })); }} className="text-xs border rounded px-2 py-1">Remove photos</button>}
+      <button disabled={busy} onClick={() => { if (confirm('Permanently delete this spot?')) run(() => deleteSpotAsSuperAdmin(spot.id)); }} className="text-xs bg-red-600 text-white rounded px-2 py-1">Delete</button>
+    </div></div>
+    {expanded && <div className="mt-4 border-t pt-3 text-sm space-y-2">
+      <p><strong>Owner:</strong> {spot.created_by || spot.created_by_uid || 'unknown'} · <strong>Category:</strong> {spot.category || 'unknown'}</p>
+      <p><strong>Coordinates:</strong> {String(spot.lat)}, {String(spot.lng)} · <strong>Locality:</strong> {spot.locality || 'unknown'}</p>
+      <p><strong>Visibility:</strong> {spot.is_public ? 'public' : 'private'} · <strong>Review:</strong> {spot.needs_review ? 'required' : 'clear'} · <strong>Flags:</strong> {spot.flag_count || 0} · <strong>Discovery:</strong> {spot.discovery_state || 'default'}</p>
+      {images.length > 0 && <div className="flex gap-2 flex-wrap">{images.map(url => <a key={url} href={url} target="_blank" rel="noopener noreferrer"><img src={url} alt="Submitted spot" className="w-32 h-24 object-cover rounded" /></a>)}</div>}
+      <details><summary>Full submitted record</summary><pre className="overflow-auto text-xs whitespace-pre-wrap">{JSON.stringify(spot, null, 2)}</pre></details>
+    </div>}
+    {error && <p role="alert" className="mt-2 text-sm text-red-600">{error}</p>}
+  </article>;
 }

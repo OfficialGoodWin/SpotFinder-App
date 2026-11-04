@@ -28,17 +28,19 @@ function initialJournal(data) {
     dirty: true, updated_at: new Date().toISOString() };
 }
 
-async function mutateSpotWithPublication(db, spotId, { patch = null, remove = false, authorize = () => true } = {}) {
+async function mutateSpotWithPublication(db, spotId, { patch = null, remove = false, authorize = () => true, requireUnrevoked = false } = {}) {
   if (!spotId || spotId.includes('/') || (remove && patch)) throw new TypeError('Invalid spot mutation');
   const spotRef = db.collection('spots').doc(spotId);
   const journalRef = db.collection('spot_snapshot_changes').doc(spotId);
   const feedRef = db.collection('spot_snapshot_revocation_feed').doc('current');
   const revokedRef = db.collection('spot_snapshot_revocations').doc(spotId);
   return db.runTransaction(async tx => {
-    const [spot, journal, feed] = await Promise.all([tx.get(spotRef), tx.get(journalRef), tx.get(feedRef)]);
+    const [spot, journal, feed, revoked] = await Promise.all([tx.get(spotRef), tx.get(journalRef), tx.get(feedRef), requireUnrevoked ? tx.get(revokedRef) : null]);
     if (!spot.exists) return { found: false };
     const before = spot.data();
-    if (!authorize(before)) return { found: true, authorized: false };
+    if ((requireUnrevoked && (!feed.exists || !Array.isArray(feed.data().revoked)
+        || revoked.exists || feed.data().revoked.includes(spotId)))
+        || !(await authorize(before, tx))) return { found: true, authorized: false };
     const after = remove ? null : { ...before, ...patch };
     const wasPublic = publishable(before) || journal.data()?.ever_public === true;
     const nowPublic = publishable(after);

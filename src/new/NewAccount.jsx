@@ -7,7 +7,7 @@ import {
   getFirebaseServices, getMfaRecaptchaVerifier, clearMfaRecaptchaVerifier, startMfaEnrollment,
   completeMfaEnrollment, getEnrolledMfaFactors, unenrollMfaFactor, updateAccountDisplayName,
   resendVerificationEmail, requestAccountDeletion, logout as firebaseLogout,
-  getMfaResolverFromError, startMfaSignIn, completeMfaSignIn,
+  getMfaResolverFromError, startMfaSignIn, completeMfaSignIn, completeTotpSignIn,
 } from '@/api/firebaseClient';
 import { currentAccount, linkedProviders, linkPasswordToCurrentAccount, unlinkGoogleAfterPasswordVerification, requestVerifiedEmailChange, reauthenticateAccount, changeAccountPasswordWithMfa } from './accountAuth';
 import { PHONE_COUNTRIES, defaultPhoneRegion, normalizeAccountPhone } from './accountPhone';
@@ -124,12 +124,12 @@ export default function NewAccount({ detail = '', onSignIn }) {
 
   const requestMfaChallenge = (authError, expectedUid) => {
     const resolver = getMfaResolverFromError(authError);
-    const phoneHints = (resolver.hints || []).map((factor, index) => ({ factor, index })).filter(({ factor }) => factor.factorId === 'phone');
-    if (!phoneHints.length) throw Object.assign(new Error('No SMS factor is available.'), { code: 'auth/unsupported-second-factor' });
+    const factorHints = (resolver.hints || []).map((factor, index) => ({ factor, index })).filter(({ factor }) => ['phone', 'totp'].includes(factor.factorId));
+    if (!factorHints.length) throw Object.assign(new Error('No supported second factor is available.'), { code: 'auth/unsupported-second-factor' });
     return new Promise((resolve, reject) => {
       pendingMfa.current = { resolve, reject };
       setMfaFactorIndex(0); setMfaCode(''); setMfaError('');
-      setMfaChallenge({ resolver, phoneHints, expectedUid, verificationId: '' });
+      setMfaChallenge({ resolver, factorHints, expectedUid, verificationId: '' });
     });
   };
   const cancelMfaChallenge = () => {
@@ -142,7 +142,9 @@ export default function NewAccount({ detail = '', onSignIn }) {
     event.preventDefault(); setMfaBusy(true); setMfaError('');
     try {
       getFirebaseServices().auth.languageCode = language.split('-')[0];
-      const verificationId = await startMfaSignIn(mfaChallenge.resolver, mfaChallenge.phoneHints[mfaFactorIndex].index, getMfaRecaptchaVerifier('sf-new-account-reauth-recaptcha'));
+      const selected = mfaChallenge.factorHints[mfaFactorIndex];
+      const verificationId = selected.factor.factorId === 'totp' ? 'totp'
+        : await startMfaSignIn(mfaChallenge.resolver, selected.index, getMfaRecaptchaVerifier('sf-new-account-reauth-recaptcha'));
       setMfaChallenge(previous => ({ ...previous, verificationId }));
     } catch (caught) { clearMfaRecaptchaVerifier(); setMfaError(accountError(caught, L)); }
     finally { setMfaBusy(false); }
@@ -150,7 +152,10 @@ export default function NewAccount({ detail = '', onSignIn }) {
   const confirmMfaChallenge = async event => {
     event.preventDefault(); setMfaBusy(true); setMfaError('');
     try {
-      const verifiedUser = await completeMfaSignIn(mfaChallenge.resolver, mfaChallenge.verificationId, mfaCode.trim());
+      const selected = mfaChallenge.factorHints[mfaFactorIndex];
+      const verifiedUser = selected.factor.factorId === 'totp'
+        ? await completeTotpSignIn(mfaChallenge.resolver, selected.index, mfaCode.trim())
+        : await completeMfaSignIn(mfaChallenge.resolver, mfaChallenge.verificationId, mfaCode.trim());
       if (verifiedUser.uid !== mfaChallenge.expectedUid) throw Object.assign(new Error('Account identity changed during verification.'), { code: 'auth/user-mismatch' });
       const pending = pendingMfa.current;
       pendingMfa.current = null;
@@ -160,7 +165,7 @@ export default function NewAccount({ detail = '', onSignIn }) {
     finally { setMfaBusy(false); }
   };
 
-  if (mfaChallenge) return <div className="sf-new-account-form sf-new-account-reauth"><p>{L('reauthIntro')}</p><div id="sf-new-account-reauth-recaptcha" />{!mfaChallenge.verificationId ? <form onSubmit={sendMfaChallenge}><h2>{L('choosePhone')}</h2>{mfaChallenge.phoneHints.map(({ factor }, index) => <label className="sf-new-account-factor-choice" key={factor.uid || index}><input type="radio" name="account-mfa-factor" autoFocus={index === 0} disabled={mfaBusy} checked={mfaFactorIndex === index} onChange={() => setMfaFactorIndex(index)} /><span>{factor.phoneNumber || factor.displayName || L('phoneNumber')}</span></label>)}<AccountMessage text={mfaError} error /><AccountButton type="submit" busy={mfaBusy}>{L('sendSms')}</AccountButton></form> : <form onSubmit={confirmMfaChallenge}><h2>{L('enterCode')}</h2><p>{t('authMore.codeSentTo', { phone: mfaChallenge.phoneHints[mfaFactorIndex]?.factor.phoneNumber || '' })}</p><AccountField id="sf-new-account-reauth-code" label={L('smsCode')}><input id="sf-new-account-reauth-code" type="text" inputMode="numeric" autoFocus autoComplete="one-time-code" value={mfaCode} onChange={event => setMfaCode(event.target.value)} required /></AccountField><AccountMessage text={mfaError} error /><AccountButton type="submit" busy={mfaBusy} disabled={!mfaCode.trim()}>{L('confirmReauth')}</AccountButton><button className="sf-new-account-text-button" type="button" disabled={mfaBusy} onClick={() => { clearMfaRecaptchaVerifier(); setMfaCode(''); setMfaChallenge(previous => ({ ...previous, verificationId: '' })); }}>{L('requestNewCode')}</button></form>}<button className="sf-new-account-text-button" type="button" disabled={mfaBusy} onClick={cancelMfaChallenge}>{L('cancel')}</button></div>;
+  if (mfaChallenge) return <div className="sf-new-account-form sf-new-account-reauth"><p>{L('reauthIntro')}</p><div id="sf-new-account-reauth-recaptcha" />{!mfaChallenge.verificationId ? <form onSubmit={sendMfaChallenge}><h2>Choose a verification method</h2>{mfaChallenge.factorHints.map(({ factor }, index) => <label className="sf-new-account-factor-choice" key={factor.uid || index}><input type="radio" name="account-mfa-factor" autoFocus={index === 0} disabled={mfaBusy} checked={mfaFactorIndex === index} onChange={() => setMfaFactorIndex(index)} /><span>{factor.phoneNumber || factor.displayName || (factor.factorId === 'totp' ? 'Authenticator app' : L('phoneNumber'))}</span></label>)}<AccountMessage text={mfaError} error /><AccountButton type="submit" busy={mfaBusy}>{mfaChallenge.factorHints[mfaFactorIndex]?.factor.factorId === 'totp' ? 'Continue' : L('sendSms')}</AccountButton></form> : <form onSubmit={confirmMfaChallenge}><h2>{L('enterCode')}</h2><p>{mfaChallenge.factorHints[mfaFactorIndex]?.factor.factorId === 'totp' ? 'Enter the code from your authenticator app.' : t('authMore.codeSentTo', { phone: mfaChallenge.factorHints[mfaFactorIndex]?.factor.phoneNumber || '' })}</p><AccountField id="sf-new-account-reauth-code" label={mfaChallenge.factorHints[mfaFactorIndex]?.factor.factorId === 'totp' ? 'Authenticator code' : L('smsCode')}><input id="sf-new-account-reauth-code" type="text" inputMode="numeric" autoFocus autoComplete="one-time-code" value={mfaCode} onChange={event => setMfaCode(event.target.value)} required /></AccountField><AccountMessage text={mfaError} error /><AccountButton type="submit" busy={mfaBusy} disabled={!mfaCode.trim()}>{L('confirmReauth')}</AccountButton><button className="sf-new-account-text-button" type="button" disabled={mfaBusy} onClick={() => { clearMfaRecaptchaVerifier(); setMfaCode(''); setMfaChallenge(previous => ({ ...previous, verificationId: '' })); }}>{mfaChallenge.factorHints[mfaFactorIndex]?.factor.factorId === 'totp' ? 'Choose another method' : L('requestNewCode')}</button></form>}<button className="sf-new-account-text-button" type="button" disabled={mfaBusy} onClick={cancelMfaChallenge}>{L('cancel')}</button></div>;
 
   if (!available) return <div className="sf-new-account-empty"><p>{L('signInRequired')}</p><AccountButton type="button" onClick={onSignIn}>{L('signIn')}</AccountButton></div>;
 

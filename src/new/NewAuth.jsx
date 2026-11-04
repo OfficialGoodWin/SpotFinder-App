@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, Eye, EyeOff, LockKeyhole } from 'lucide-react';
-import { loginWithEmail, registerWithEmail, loginWithGoogle, requestPasswordResetEmail, isRestrictedBrowser, getMfaResolverFromError, getMfaRecaptchaVerifier, clearMfaRecaptchaVerifier, startMfaSignIn, completeMfaSignIn } from '@/api/firebaseClient';
+import { loginWithEmail, registerWithEmail, loginWithGoogle, requestPasswordResetEmail, isRestrictedBrowser, getMfaResolverFromError, getMfaRecaptchaVerifier, clearMfaRecaptchaVerifier, startMfaSignIn, completeMfaSignIn, completeTotpSignIn } from '@/api/firebaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useLanguage } from '@/lib/LanguageContext';
 import { accountBirthDateBounds, isEligibleBirthDate } from '@/lib/ageEligibility';
@@ -124,7 +124,7 @@ export default function NewAuth({ initialScreen = 'login', onClose, onSuccess })
     if (restricted) return;
     setBusy(true); setErrors({});
     try { const result = await loginWithGoogle(); if (result) await finish(); }
-    catch (error) { if (error?.code !== 'auth/popup-closed-by-user') setErrors({ form: t('auth.failedGoogle') }); }
+    catch (error) { if (error?.code === 'auth/multi-factor-auth-required') setMfaResolver(getMfaResolverFromError(error)); else if (error?.code !== 'auth/popup-closed-by-user') setErrors({ form: t('auth.failedGoogle') }); }
     finally { setBusy(false); }
   };
   const sendMfa = async () => {
@@ -135,7 +135,7 @@ export default function NewAuth({ initialScreen = 'login', onClose, onSuccess })
   };
   const verifyMfa = async event => {
     event.preventDefault(); setBusy(true); setErrors({});
-    try { await completeMfaSignIn(mfaResolver, verificationId, mfaCode.trim()); clearMfaRecaptchaVerifier(); await finish(); }
+    try { await (mfaResolver.hints[0]?.factorId === 'totp' ? completeTotpSignIn(mfaResolver, 0, mfaCode.trim()) : completeMfaSignIn(mfaResolver, verificationId, mfaCode.trim())); clearMfaRecaptchaVerifier(); await finish(); }
     catch { setErrors({ form: t('auth.somethingWrong') }); }
     finally { setBusy(false); }
   };
@@ -145,7 +145,7 @@ export default function NewAuth({ initialScreen = 'login', onClose, onSuccess })
       <div className="sf-new-auth-body">
         <header className="sf-new-auth-header"><button type="button" className="sf-new-auth-back" aria-label="Zpět" onClick={() => screen === 'reset' ? changeScreen('login') : onClose()}><ChevronLeft size={22} /></button><div className="sf-new-auth-brand"><img src="/app-icon-v2-192.png?v=3" alt="" />SpotFinder</div><span /></header>
         <div className="sf-new-auth-intro"><h1 id="sf-new-auth-title">{mfaResolver ? 'Ověř svůj účet' : screen === 'reset' ? 'Obnovit heslo' : screen === 'register' ? 'Vytvořit účet' : 'Vítej zpět'}<span>.</span></h1><p>{mfaResolver ? 'Dokonči přihlášení bezpečnostním kódem.' : screen === 'reset' ? 'Pošleme ti odkaz pro nastavení nového hesla.' : screen === 'register' ? 'Přidej se a objevuj místa, která stojí za cestu.' : 'Přihlas se a pokračuj tam, kde jsi skončil.'}</p></div>
-        {mfaResolver ? <form className="sf-new-auth-form" onSubmit={verifyMfa}><p className="sf-new-auth-note">{mfaResolver.hints[0]?.phoneNumber ? t('authMore.codeSentTo', { phone: mfaResolver.hints[0].phoneNumber }) : t('authMore.codeRequired')}</p><div id="sf-new-mfa-recaptcha" />{verificationId ? <><AuthField id="sf-new-mfa-code" label="Ověřovací kód" value={mfaCode} onChange={event => setMfaCode(event.target.value)} inputMode="numeric" autoComplete="one-time-code" required /><AuthButton type="submit" busy={busy} disabled={!mfaCode.trim()}>{t('authMore.verifySignIn')}</AuthButton></> : <AuthButton type="button" busy={busy} onClick={sendMfa}>{t('authMore.sendCode')}</AuthButton>}<FormError>{errors.form}</FormError><button type="button" className="sf-new-auth-guest" onClick={() => { clearMfaRecaptchaVerifier(); setMfaResolver(null); setVerificationId(''); }}>Zpět na přihlášení</button></form> : <>
+        {mfaResolver ? <form className="sf-new-auth-form" onSubmit={verifyMfa}><p className="sf-new-auth-note">{mfaResolver.hints[0]?.factorId === 'totp' ? 'Enter the code from your authenticator app.' : mfaResolver.hints[0]?.phoneNumber ? t('authMore.codeSentTo', { phone: mfaResolver.hints[0].phoneNumber }) : t('authMore.codeRequired')}</p><div id="sf-new-mfa-recaptcha" />{verificationId || mfaResolver.hints[0]?.factorId === 'totp' ? <><AuthField id="sf-new-mfa-code" label="Ověřovací kód" value={mfaCode} onChange={event => setMfaCode(event.target.value)} inputMode="numeric" autoComplete="one-time-code" required /><AuthButton type="submit" busy={busy} disabled={!mfaCode.trim()}>{t('authMore.verifySignIn')}</AuthButton></> : <AuthButton type="button" busy={busy} onClick={sendMfa}>{t('authMore.sendCode')}</AuthButton>}<FormError>{errors.form}</FormError><button type="button" className="sf-new-auth-guest" onClick={() => { clearMfaRecaptchaVerifier(); setMfaResolver(null); setVerificationId(''); }}>Zpět na přihlášení</button></form> : <>
           {screen === 'register' && <nav className="sf-new-auth-segments" aria-label="Přihlášení nebo registrace"><button type="button" onClick={() => changeScreen('login')}>Přihlášení</button><span aria-current="page">Registrace</span></nav>}
           {screen !== 'reset' && <><AuthButton type="button" kind="google" onClick={google} disabled={busy || restricted}><GoogleIcon />{screen === 'register' ? 'Pokračovat přes Google' : 'Pokračovat s účtem Google'}</AuthButton>{restricted && <p className="sf-new-auth-note">{t('auth.inAppBrowserBody')} <a href={window.location.href} target="_blank" rel="noopener noreferrer">{t('auth.openInBrowser')}</a></p>}<div className="sf-new-auth-divider"><span /><em>nebo e-mailem</em><span /></div></>}
           <form className="sf-new-auth-form" onSubmit={submit} noValidate>

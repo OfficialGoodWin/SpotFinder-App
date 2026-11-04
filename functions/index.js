@@ -36,6 +36,8 @@ const { reconcileSpotFlags, FlagModerationError } = require('./flagModeration');
 const { isSubmissionBlocked } = require('./submissionBlock');
 const { createLegacyReportWithClaim } = require('./reportClaim');
 const { recordSpotChange, mutateSpotWithPublication, fingerprint, publishable, initialJournal } = require('./publicSpotPublication');
+const { adminSessionSeconds } = require('./adminAccessPolicy');
+const { publicationBlockers } = require('./adminPublishSpotPolicy');
 const { validOwnerSpotPatch, ownerCanEditSpot, ownerCanDeleteSpot } = require('./ownerSpotPolicy');
 const { processSnapshotEvent } = require('./snapshotEventRetry');
 initializeApp();
@@ -74,7 +76,7 @@ const RECENT_AUTH_SECONDS = 5 * 60;
 // New official POI drafts are server-owned and deliberately separate from the
 // legacy admin_pois map overlay and community spots. No publication occurs here.
 exports.adminSaveOfficialPoi = functions.runWith(callableAppCheckOptions).https.onCall(async (data, context) => {
-  if (context.auth?.token?.admin !== true) throw new functions.https.HttpsError('permission-denied', 'Admin only.');
+  assertIsAdmin(context);
   try {
     return await saveOfficialPoi({ db, serverTimestamp: FieldValue.serverTimestamp,
       actor: { uid: context.auth.uid, admin: true }, input: data });
@@ -89,7 +91,7 @@ exports.adminSaveOfficialPoi = functions.runWith(callableAppCheckOptions).https.
 // usable even when an older deployed Firestore ruleset lacks Phase 1 paths.
 // The signed claim is checked independently of the React admin state.
 exports.adminReadOfficialPoi = functions.runWith(callableAppCheckOptions).https.onCall(async (data, context) => {
-  if (context.auth?.token?.admin !== true) throw new functions.https.HttpsError('permission-denied', 'Admin only.');
+  assertIsAdmin(context);
   try {
     return await readOfficialPoi({ db, actor: { uid: context.auth.uid, admin: true }, input: data });
   } catch (error) {
@@ -1269,9 +1271,8 @@ async function deleteManagedUpload(downloadUrl) {
 }
 
 function assertIsAdmin(context) {
-  const isAdmin = context.auth?.token?.admin === true;
-  if (!context.auth || !isAdmin) {
-    throw new functions.https.HttpsError('permission-denied', 'Admin only.');
+  if (!adminSessionSeconds(context.auth?.token)) {
+    throw new functions.https.HttpsError('permission-denied', 'A current Google and authenticator verification is required.');
   }
 }
 
@@ -1525,7 +1526,28 @@ exports.submitReport = functions.runWith({ ...callableAppCheckOptions,
 exports.adminResolveReport=functions.runWith(callableAppCheckOptions).https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.reportId||'');if(!id)throw new functions.https.HttpsError('invalid-argument','reportId required');await db.collection('reports').doc(id).update({status:'resolved',resolution:String(data?.resolution||'resolved').slice(0,100),resolved_at:new Date().toISOString(),resolved_by:context.auth.token.email||context.auth.uid});await logAdminAction('resolve_report',context.auth.token.email,{reportId:id});return{success:true}});
 exports.adminDeleteReport=functions.runWith(callableAppCheckOptions).https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.reportId||'');if(!id)throw new functions.https.HttpsError('invalid-argument','reportId required');await db.collection('reports').doc(id).delete();await logAdminAction('delete_report',context.auth.token.email,{reportId:id});return{success:true}});
 exports.adminBlockReporter=functions.runWith(callableAppCheckOptions).https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.reportId||'');const snap=await db.collection('reports').doc(id).get();if(!snap.exists)throw new functions.https.HttpsError('not-found','Report not found');const r=snap.data(), batch=db.batch(), now=new Date().toISOString();for(const [k,v] of [['uid',r.reporter_uid],['ip',r.ip_hash],['device',r.device_hash]])if(v)batch.set(db.collection('report_blocks').doc(`${k}_${v}`),{kind:k,value:v,reason:String(data?.reason||'Report spam').slice(0,200),blocked_at:now,blocked_by:context.auth.token.email||context.auth.uid});await batch.commit();await logAdminAction('block_reporter',context.auth.token.email,{reportId:id,reporter_uid:r.reporter_uid});return{success:true}});
-exports.adminUpdateSpot=functions.runWith(callableAppCheckOptions).https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.spotId||''),src=data?.patch||{},patch={};for(const k of ['title','description','image_url','image_urls','status'])if(Object.prototype.hasOwnProperty.call(src,k))patch[k]=src[k];if(!id||!Object.keys(patch).length)throw new functions.https.HttpsError('invalid-argument','spotId and patch required');if(Object.prototype.hasOwnProperty.call(patch,'status'))patch.auto_flag_moderation=FieldValue.delete();const result=await mutateSpotWithPublication(db,id,{patch});if(!result.found)throw new functions.https.HttpsError('not-found','Spot not found');await logAdminAction('update_spot',context.auth.token.email,{spotId:id,fields:Object.keys(src)});return{success:true}});
+exports.adminUpdateSpot=functions.runWith(callableAppCheckOptions).https.onCall(async(data,context)=>{assertIsAdmin(context);const id=String(data?.spotId||''),src=data?.patch||{},patch={};for(const k of ['title','description','image_url','image_urls'])if(Object.prototype.hasOwnProperty.call(src,k))patch[k]=src[k];if(!id||!Object.keys(patch).length)throw new functions.https.HttpsError('invalid-argument','spotId and patch required');const result=await mutateSpotWithPublication(db,id,{patch});if(!result.found)throw new functions.https.HttpsError('not-found','Spot not found');await logAdminAction('update_spot',context.auth.token.email,{spotId:id,fields:Object.keys(patch)});return{success:true}});
+exports.adminPublishSpot=functions.runWith(callableAppCheckOptions).https.onCall(async(data,context)=>{
+  assertIsAdmin(context);
+  const id=String(data?.spotId||'');
+  if(!id || id.includes('/')) throw new functions.https.HttpsError('invalid-argument','Valid spotId required');
+  const result=await mutateSpotWithPublication(db,id,{
+    patch:{status:'published',needs_review:false,auto_flag_moderation:FieldValue.delete()},
+    requireUnrevoked:true,
+    authorize:async(spot,tx)=>{
+      if(publicationBlockers(spot).length) return false;
+      const [flags,reports]=await Promise.all([
+        tx.get(db.collection('flags').where('spot_id','==',id).where('status','==','open').limit(1)),
+        tx.get(db.collection('reports').where('target_id','==',id).where('status','==','open').limit(1)),
+      ]);
+      return flags.empty && reports.empty;
+    },
+  });
+  if(!result.found) throw new functions.https.HttpsError('not-found','Spot not found');
+  if(!result.authorized) throw new functions.https.HttpsError('failed-precondition','Spot cannot be published; check visibility, flags, location and revocation.');
+  await logAdminAction('publish_spot',context.auth.token.email,{spotId:id});
+  return{success:true};
+});
 exports.adminDeletePOIPhoto=functions.runWith(callableAppCheckOptions).https.onCall(async(data,context)=>{
   assertIsAdmin(context);
   const id=String(data?.photoId||'');
