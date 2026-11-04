@@ -8,7 +8,7 @@ import { useLanguage } from '@/lib/LanguageContext';
 import { LANGUAGES, LANGUAGE_VARIANTS } from '@/locales/translations';
 import { getTextScale, saveTextScale } from '@/lib/textScale';
 import { getPublicSpotsInBounds, getPublicSpotsNear, getPublicSpotById, getDiscoverSpotsPage, getSavedSpots, getLikedSpots, getUserSpots, getCloudSpotDrafts, deleteCloudSpotDraft, getSpotSocialState, toggleSpotSave, createSpot, deleteSpot, updateSpot, addSocialPost, resendVerificationEmail } from '@/api/firebaseClient';
-import { cachedViewport, rememberViewport } from '@/new/viewportCache';
+import { cachedViewport, createViewportRequestSequence, rememberViewport } from '@/new/viewportCache';
 import { loadFullSnapshotSpot, readSnapshotSpots } from '@/new/publicSpotSnapshotClient';
 import { subscribePublicSpotRevocations } from '@/new/publicSpotRevocationListener';
 import { snapshotFeatureEnabled } from '@/new/snapshotFeatureFlag';
@@ -293,7 +293,8 @@ export default function MobileV2({ redesigned = false }) {
   const layerMenuRef = useRef(null);
   const layerTriggerRef = useRef(null);
   const zoomDraggingRef = useRef(false);
-  const requestRef = useRef(0);
+  const requestRef = useRef(null);
+  if (!requestRef.current) requestRef.current = createViewportRequestSequence();
   const cacheRef = useRef(null);
   const snapshotViewRef = useRef({ key: null, ids: new Set() });
   const pendingBoundsRef = useRef(null);
@@ -360,7 +361,7 @@ export default function MobileV2({ redesigned = false }) {
     const bounds = map.getBounds();
     const view = { south: bounds.getSouth(), west: bounds.getWest(), north: bounds.getNorth(), east: bounds.getEast() };
     const key = Object.values(view).map(value => value.toFixed(2)).join(':');
-    const request = ++requestRef.current;
+    const request = requestRef.current.next();
     const cachedRows = PUBLIC_SNAPSHOT_PREVIEW && redesigned ? null : redesigned
       ? cachedViewport(cacheRef.current, key)
       : cacheRef.current?.key === key && Date.now() - cacheRef.current.at < 120000 ? cacheRef.current.rows : null;
@@ -375,7 +376,7 @@ export default function MobileV2({ redesigned = false }) {
     if (pending?.key !== key) pendingBoundsRef.current = { key, promise: queryPromise };
     try {
       const rows = await queryPromise;
-      if (request === requestRef.current) {
+      if (requestRef.current.isCurrent(request)) {
         setSpots(rows);
         if (PUBLIC_SNAPSHOT_PREVIEW && redesigned) {
           const previous = snapshotViewRef.current;
@@ -391,8 +392,8 @@ export default function MobileV2({ redesigned = false }) {
         }
         cacheRef.current = redesigned ? rememberViewport(cacheRef.current, key, rows) : { key, rows, at: Date.now() };
       }
-    } catch { if (request === requestRef.current) { setSpotsError(true); if (PUBLIC_SNAPSHOT_PREVIEW && redesigned) { setSpots([]); setPreviewSpot(null); cacheRef.current = null; } } }
-    finally { if (pendingBoundsRef.current?.promise === queryPromise) pendingBoundsRef.current = null; if (request === requestRef.current) setSpotsLoading(false); }
+    } catch { if (requestRef.current.isCurrent(request)) { setSpotsError(true); if (PUBLIC_SNAPSHOT_PREVIEW && redesigned) { setSpots([]); setPreviewSpot(null); cacheRef.current = null; } } }
+    finally { if (pendingBoundsRef.current?.promise === queryPromise) pendingBoundsRef.current = null; if (requestRef.current.isCurrent(request)) setSpotsLoading(false); }
   }, [redesigned, location.pathname, navigate]);
   useEffect(() => {
     if (!PUBLIC_SNAPSHOT_PREVIEW || !redesigned || activeTab !== 'map') return undefined;
@@ -405,7 +406,7 @@ export default function MobileV2({ redesigned = false }) {
     if (!PUBLIC_SNAPSHOT_PREVIEW || !redesigned || activeTab !== 'map') return undefined;
     return subscribePublicSpotRevocations(({ healthy, revoked }) => {
       if (!healthy) {
-        requestRef.current += 1;
+        requestRef.current.cancel();
         setSpots([]); setPreviewSpot(null); setSpotsError(true); cacheRef.current = null;
         return;
       }
@@ -422,7 +423,7 @@ export default function MobileV2({ redesigned = false }) {
   }, [activeTab, redesigned, refreshMap, location.pathname, navigate]);
   const scheduleMapRefresh = useCallback(() => {
     if (mapRefreshTimerRef.current) clearTimeout(mapRefreshTimerRef.current);
-    requestRef.current += 1;
+    requestRef.current.cancel();
     mapRefreshTimerRef.current = setTimeout(() => {
       mapRefreshTimerRef.current = null;
       void refreshMap();
@@ -433,7 +434,7 @@ export default function MobileV2({ redesigned = false }) {
   }, [redesigned, spots]);
   const handleZoomDragStart = useCallback(() => {
     zoomDraggingRef.current = true;
-    requestRef.current += 1;
+    requestRef.current.cancel();
   }, []);
   const handleZoomDragEnd = useCallback(() => {
     zoomDraggingRef.current = false;
@@ -446,7 +447,7 @@ export default function MobileV2({ redesigned = false }) {
     if (map) { map.on('moveend', scheduleMapRefresh); scheduleMapRefresh(); }
   }, [scheduleMapRefresh]);
   useEffect(() => () => {
-    requestRef.current += 1;
+    requestRef.current.cancel();
     if (mapRefreshTimerRef.current) clearTimeout(mapRefreshTimerRef.current);
     mapRef.current?.off('moveend', scheduleMapRefresh);
   }, [scheduleMapRefresh]);

@@ -1,6 +1,15 @@
 const MAX_VIEWS = 4;
 const MAX_AGE_MS = 120000;
 
+export function createViewportRequestSequence() {
+  let current = 0;
+  return {
+    next() { current += 1; return current; },
+    isCurrent(token) { return token === current; },
+    cancel() { current += 1; },
+  };
+}
+
 export function cachedViewport(cache, key, now = Date.now()) {
   const entry = cache?.history?.get(key);
   return entry && now - entry.at < MAX_AGE_MS ? entry.rows : null;

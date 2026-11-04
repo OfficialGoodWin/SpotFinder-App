@@ -43,7 +43,6 @@ export function regionsForBounds({ south, west, north, east }) {
   for (let y = firstY; y <= lastY; y += 1) {
     for (let x = Math.floor((west + 180) / REGION_DEGREES); x <= Math.floor((east + 180) / REGION_DEGREES); x += 1) {
       keys.add(`r${y}-${((x % LNG_CELLS) + LNG_CELLS) % LNG_CELLS}`);
-      if (keys.size > MAX_VIEW_REGIONS) return null;
     }
   }
   return [...keys].sort();

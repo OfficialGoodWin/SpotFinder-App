@@ -4,7 +4,7 @@
 
 This prototype is **development-only**, opt-in with `VITE_PUBLIC_SPOT_SNAPSHOTS=true` during local Vite development. The default and every production build continue to query Firestore. No production Firebase data, CDN, or credentials were used. The exporter accepts only a complete local JSON array; it does not access Firebase.
 
-The `/new` map reads a manifest and small regional JSON files. If files are missing, invalid, or a viewport spans more than 16 regions, it uses the existing Firestore viewport query. Search, Nearby, Discover, legacy map, collections, and direct deep links retain their Firestore paths. Opening a snapshot marker's full detail calls `getPublicSpotById`, which checks current public visibility; a removed spot cannot open from a stale marker. The existing four-entry, two-minute viewport cache remains intact.
+The `/new` map reads a manifest and small regional JSON files. If files are missing or invalid, it fails closed with a retryable map error and never falls back to a Firestore viewport query. Viewports spanning more than 16 covered regions load the nearest covered cells; regions absent from the manifest are ignored. Search, Nearby, Discover, legacy map, collections, and direct deep links retain their Firestore paths. Opening a snapshot marker's full detail calls `getPublicSpotById`, which checks current public visibility; a removed spot cannot open from a stale marker. The existing four-entry, two-minute viewport cache remains intact.
 
 ## Format and local use
 

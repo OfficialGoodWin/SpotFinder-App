@@ -1,12 +1,14 @@
 import { getSpotRating, normalizeLatLng } from '../lib/spotDiscovery.js';
 
-const DISCOVERABLE_STATES = new Set(['approved', 'featured', 'public', 'discoverable']);
+const DISCOVERABLE_STATES = new Set(['', 'approved', 'featured', 'public', 'discoverable']);
 
 export function isDiscoverEligible(spot) {
-  if (!spot?.id || spot.is_public !== true || !['published', 'pending_trust'].includes(spot.status)) return false;
+  if (!spot?.id || spot.is_public !== true || spot.status !== 'published') return false;
+  if (spot.needs_review === true || (spot.flag_count != null && spot.flag_count !== 0)) return false;
+  if (!DISCOVERABLE_STATES.has(spot.discovery_state ?? '')) return false;
+  if (spot.sensitive_location === true || spot.location_sensitive === true) return false;
   if (!normalizeLatLng(spot)) return false;
-  if (spot.discovery_state && !DISCOVERABLE_STATES.has(String(spot.discovery_state).toLowerCase())) return false;
-  return spot.sensitive_location !== true && spot.location_sensitive !== true;
+  return true;
 }
 
 export function discoverRatingLabel(spot) {

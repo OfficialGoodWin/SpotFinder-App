@@ -73,6 +73,11 @@ export function createPublicSpotRevocationState({ listen, timeoutMs = INITIAL_TI
     callback({ healthy, revoked: new Set(observed) });
     return () => subscribers.delete(callback);
   };
+  const hold = () => {
+    healthy = false;
+    failure = null;
+    notify();
+  };
   const invalidate = () => {
     generation += 1;
     fail(new Error('Revocation feed connection unavailable'));
@@ -87,6 +92,6 @@ export function createPublicSpotRevocationState({ listen, timeoutMs = INITIAL_TI
     start();
     notify();
   };
-  return { current, subscribe, invalidate, restart, isRevoked: id => observed.has(id),
+  return { current, subscribe, hold, invalidate, restart, isRevoked: id => observed.has(id),
     stop: () => { generation += 1; unsubscribe?.(); unsubscribe = null; started = false; invalidate(); } };
 }

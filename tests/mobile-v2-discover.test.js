@@ -10,7 +10,7 @@ test('Discover includes valid old, current, and unrated public spots without dep
   const rows = [
     { ...base, rating: 4.2, rating_count: 7 },
     { ...base, id: 'current', rating_schema: 2, rating: 3.8, rating_count: 2 },
-    { ...base, id: 'new-unrated', status: 'pending_trust', rating_schema: 2, rating: 0, rating_count: 0 },
+    { ...base, id: 'new-unrated', rating_schema: 2, rating: 0, rating_count: 0 },
     { ...base, id: 'missing-rating' },
     { ...base, id: 'photo', image_url: photo, image_urls: [photo] },
     { ...base, id: 'no-photo', image_url: null, image_urls: [] },
@@ -24,11 +24,13 @@ test('Discover includes valid old, current, and unrated public spots without dep
   assert.deepEqual(getPublicSpotPhotos(rows[5]), []);
 });
 
-test('Discover excludes private, draft, rejected, removed, flagged, and hidden spots', () => {
+test('Discover excludes private, pending, rejected, removed, flagged, and hidden spots', () => {
   const rejected = [
     { ...base, id: 'private', is_public: false },
-    ...['draft', 'removed', 'rejected', 'flagged', 'hidden'].map(status => ({ ...base, id: status, status })),
+    ...['draft', 'pending_trust', 'removed', 'rejected', 'flagged', 'hidden', 'deleted'].map(status => ({ ...base, id: status, status })),
     { ...base, id: 'hidden-state', discovery_state: 'hidden' },
+    { ...base, id: 'needs-review', needs_review: true },
+    { ...base, id: 'open-flags', flag_count: 1 },
     { ...base, id: 'sensitive', sensitive_location: true },
     { ...base, id: 'invalid-location', lat: null },
   ];

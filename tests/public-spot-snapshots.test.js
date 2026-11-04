@@ -7,7 +7,7 @@ import { mkdtemp, readFile, readdir, rm, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createPublicSpotSnapshotReader, loadFullSnapshotSpot, readSnapshotSpots } from '../src/new/publicSpotSnapshotClient.js';
-import { SNAPSHOT_FORMAT, decodeSnapshotSpot, encodeSnapshotSpot, publicSnapshotThumbnailUrl, regionForPoint, regionsForBounds, snapshotRegionDirectory, toPublicSnapshotSpot, validSnapshotSpot } from '../src/new/publicSpotSnapshotFormat.js';
+import { MAX_VIEW_REGIONS, SNAPSHOT_FORMAT, decodeSnapshotSpot, encodeSnapshotSpot, publicSnapshotThumbnailUrl, regionForPoint, regionsForBounds, snapshotRegionDirectory, toPublicSnapshotSpot, validSnapshotSpot } from '../src/new/publicSpotSnapshotFormat.js';
 import { cachedViewport, rememberViewport } from '../src/new/viewportCache.js';
 import { applyTrustedSnapshotChange, currentSnapshotRecords } from '../scripts/public-spots/publicationState.mjs';
 
@@ -16,6 +16,12 @@ const approved = { id: 'approved', is_public: true, status: 'published', lat: 50
   created_by: 'person@example.test', created_by_uid: 'private-uid', moderation_notes: 'internal',
   image_url: 'https://example.test/private.jpg', public_thumbnail_url: '/public-thumbnails/opaque123.webp' };
 const bounds = { south: 49.8, west: 13.8, north: 50.4, east: 14.4 };
+
+function viewportAtZoom(zoom, lat = 50.1, lng = 14.1, width = 1280, height = 800) {
+  const lngSpan = 360 * width / (512 * 2 ** zoom);
+  const latSpan = lngSpan * height / width;
+  return { south: lat - latSpan / 2, north: lat + latSpan / 2, west: lng - lngSpan / 2, east: lng + lngSpan / 2 };
+}
 
 function fakeFetch(snapshot) {
   const calls = [];
@@ -111,6 +117,55 @@ test('reader clips bounds, limits output, reuses region requests and loads full 
   assert.equal(detailReads, 1);
   assert.equal(await loadFullSnapshotSpot(marked[0], async () => { detailReads += 1; }, async () => true), null);
   assert.equal(detailReads, 1);
+});
+
+test('zoom levels 5 through 18 keep approved markers visible', async () => {
+  const snapshot = buildPublicSpotSnapshot([approved]);
+  const { fetchJson } = fakeFetch(snapshot);
+  const read = createPublicSpotSnapshotReader({ fetchJson });
+  for (let zoom = 5; zoom <= 18; zoom += 1) {
+    const view = viewportAtZoom(zoom);
+    if (zoom === 5) assert.ok(regionsForBounds(view).length > MAX_VIEW_REGIONS);
+    assert.deepEqual((await read(view)).map(spot => spot.id), ['approved'], `zoom ${zoom}`);
+  }
+});
+
+test('partial snapshot coverage returns every covered marker in a wide viewport', async () => {
+  const second = { ...approved, id: 'second', lat: 50.1, lng: 16.1 };
+  const snapshot = buildPublicSpotSnapshot([approved, second]);
+  const { fetchJson, calls } = fakeFetch(snapshot);
+  const read = createPublicSpotSnapshotReader({ fetchJson });
+  const view = viewportAtZoom(5, 50.1, 15.1);
+  assert.ok(regionsForBounds(view).length > MAX_VIEW_REGIONS);
+  assert.deepEqual((await read(view)).map(spot => spot.id).sort(), ['approved', 'second']);
+  assert.equal(calls.filter(url => url.includes('/v3/')).length, 2);
+});
+
+test('wide viewports cap covered region requests without failing', async () => {
+  const spots = Array.from({ length: 20 }, (_, index) => ({ ...approved, id: `spot-${index}`,
+    lat: 50.1, lng: -10.5 + index * 2 }));
+  const snapshot = buildPublicSpotSnapshot(spots);
+  const { fetchJson, calls } = fakeFetch(snapshot);
+  const read = createPublicSpotSnapshotReader({ fetchJson });
+  const view = { south: 49, west: -11.5, north: 51, east: 28.5 };
+  const rows = await read(view);
+  assert.equal(rows.length, MAX_VIEW_REGIONS);
+  assert.equal(calls.filter(url => url.includes('/v3/')).length, MAX_VIEW_REGIONS);
+});
+
+test('uncovered wide viewports return no markers without failing or fetching regions', async () => {
+  const snapshot = buildPublicSpotSnapshot([approved]);
+  const { fetchJson, calls } = fakeFetch(snapshot);
+  const read = createPublicSpotSnapshotReader({ fetchJson });
+  const view = viewportAtZoom(5, -20, -60);
+  assert.ok(regionsForBounds(view).length > MAX_VIEW_REGIONS);
+  assert.deepEqual(await read(view), []);
+  assert.equal(calls.some(url => url.includes('/v3/')), false);
+  const closed = createPublicSpotSnapshotReader({ fetchJson: async url => {
+    if (url.endsWith('/spot-snapshot-revocations')) return { ok: false, status: 503 };
+    return { ok: true, json: async () => snapshot.manifest };
+  } });
+  await assert.rejects(closed(view), /Snapshot HTTP 503/);
 });
 
 test('revocation removes cached markers and survives an older snapshot revision', async () => {

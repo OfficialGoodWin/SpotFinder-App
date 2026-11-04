@@ -1,4 +1,5 @@
 import { getApps, initializeApp } from 'firebase/app';
+import { loadRelatedSpots } from '../lib/relatedSpots';
 import { 
   getAuth, 
   signInWithEmailAndPassword, 
@@ -41,7 +42,6 @@ import {
   startAfter,
   setDoc,
   getDoc,
-  documentId,
   arrayUnion,
   connectFirestoreEmulator,
 } from 'firebase/firestore';
@@ -996,41 +996,7 @@ export const toggleSpotSave = async (spotId, user, currentlySaved) => {
 
 async function getSpotsForRelations(collectionName, uid, maxCount = 100) {
   const { db } = getFirebaseServices();
-  if (!uid) return [];
-  const relationDocs = [];
-  let cursor = null;
-  do {
-    const page = await getDocs(query(collection(db, collectionName), where('user_id', '==', uid), ...(cursor ? [startAfter(cursor)] : []), limit(maxCount === Infinity ? 100 : maxCount)));
-    relationDocs.push(...page.docs);
-    cursor = maxCount === Infinity && page.docs.length === 100 ? page.docs.at(-1) : null;
-  } while (cursor);
-  const rels = relationDocs.map(d => d.data()).sort((a,b) => String(b.created_date || '').localeCompare(String(a.created_date || '')));
-  const ids = [...new Set(rels.map(r => r.spot_id).filter(Boolean))];
-  const spotsById = new Map();
-  // Firestore supports up to 30 values for an `in` query. Batching avoids the
-  // previous burst of as many as 100 independent document requests.
-  for (let offset = 0; offset < ids.length; offset += 30) {
-    const batchIds = ids.slice(offset, offset + 30);
-    try {
-      const batch = await getDocs(query(collection(db, SPOTS_COLLECTION), where(documentId(), 'in', batchIds)));
-      batch.docs.forEach(snap => spotsById.set(snap.id, spotFromSnapshot(snap)));
-    } catch (error) {
-      if (maxCount !== Infinity || error?.code !== 'permission-denied') throw error;
-      // A saved or liked relation may outlive access to its spot. Keep the
-      // readable public spots rather than losing the whole collection page.
-      await Promise.all(batchIds.map(async id => {
-        try {
-          const snap = await getDoc(doc(db, SPOTS_COLLECTION, id));
-          if (snap.exists()) spotsById.set(id, spotFromSnapshot(snap));
-        } catch (readError) { if (readError?.code !== 'permission-denied') throw readError; }
-      }));
-    }
-  }
-  const relationDates = new Map(rels.map(relation => [relation.spot_id, relation.created_date || null]));
-  return ids.map(id => {
-    const spot = spotsById.get(id);
-    return spot ? { ...spot, _relation_created_date: relationDates.get(id) } : null;
-  }).filter(Boolean);
+  return loadRelatedSpots(db, collectionName, uid, maxCount, spotFromSnapshot);
 }
 
 export const getSavedSpots = (uid, maxCount = 100) => getSpotsForRelations(SPOT_SAVES_COLLECTION, uid, maxCount);

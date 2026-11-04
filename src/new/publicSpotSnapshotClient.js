@@ -40,6 +40,25 @@ async function validateManifest(manifest) {
   return manifest;
 }
 
+function regionDistanceFromViewport(key, bounds) {
+  const match = /^r(\d+)-(\d+)$/.exec(key);
+  if (!match) return Infinity;
+  const lat = Number(match[1]) * REGION_DEGREES - 90 + REGION_DEGREES / 2;
+  const lng = Number(match[2]) * REGION_DEGREES - 180 + REGION_DEGREES / 2;
+  const centerLng = (bounds.west + bounds.east) / 2;
+  const lngDelta = Math.abs(lng - centerLng);
+  const wrappedLngDelta = Math.min(lngDelta, 360 - lngDelta);
+  const latDelta = Math.abs(lat - (bounds.south + bounds.north) / 2);
+  return wrappedLngDelta * wrappedLngDelta + latDelta * latDelta;
+}
+
+function coveredRegionsForViewport(viewportKeys, bounds, manifestRegions) {
+  const covered = viewportKeys.filter(key => manifestRegions[key]);
+  if (covered.length <= MAX_VIEW_REGIONS) return covered;
+  return covered.sort((a, b) => regionDistanceFromViewport(a, bounds) - regionDistanceFromViewport(b, bounds)
+    || a.localeCompare(b)).slice(0, MAX_VIEW_REGIONS);
+}
+
 export function createPublicSpotSnapshotReader({ fetchJson = fetch, basePath = '/spot-snapshots', now = Date.now,
   revocationSource = null } = {}) {
   const regions = new Map();
@@ -94,12 +113,13 @@ export function createPublicSpotSnapshotReader({ fetchJson = fetch, basePath = '
     return manifestPending;
   };
   const readPublicSpotSnapshot = async (bounds, maxCount = 300) => {
-    const keys = regionsForBounds(bounds);
-    if (!keys || keys.length > MAX_VIEW_REGIONS) throw new Error('Viewport exceeds snapshot coverage');
+    const viewportKeys = regionsForBounds(bounds);
+    if (!viewportKeys) throw new Error('Invalid viewport bounds');
     await getRevocations();
     const manifest = await getManifest();
+    const keys = coveredRegionsForViewport(viewportKeys, bounds, manifest.regions);
     const directory = snapshotRegionDirectory(manifest.format);
-    const snapshots = await Promise.all(keys.filter(key => manifest.regions[key]).map(async key => {
+    const snapshots = await Promise.all(keys.map(async key => {
       const filename = manifest.regions[key];
       const url = `${basePath}/${directory}/${filename}`;
       if (!regions.has(url)) {

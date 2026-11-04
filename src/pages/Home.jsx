@@ -35,6 +35,7 @@ import { getMapExploreEnabled, setMapExploreEnabled as persistMapExploreEnabled 
 import { readSnapshotSpots, loadFullSnapshotSpot } from '@/new/publicSpotSnapshotClient';
 import { subscribePublicSpotRevocations } from '@/new/publicSpotRevocationListener';
 import { originalMapSnapshotFeatureEnabled } from '@/new/snapshotFeatureFlag';
+import { createViewportRequestSequence } from '@/new/viewportCache';
 
 const ORIGINAL_SNAPSHOT_PREVIEW = originalMapSnapshotFeatureEnabled({
   dev: import.meta.env.DEV, mode: import.meta.env.MODE,
@@ -202,7 +203,8 @@ export default function Home() {
   }, []);
   const mapRef = useRef(null);
   const spotRefreshTimer = useRef(null);
-  const spotRequestSequence = useRef(0);
+  const spotRequestSequence = useRef(null);
+  if (!spotRequestSequence.current) spotRequestSequence.current = createViewportRequestSequence();
   const moveEndMapRef = useRef(null);
   const viewportCacheRef = useRef(null);
 
@@ -212,7 +214,7 @@ export default function Home() {
     const center = map.getCenter();
     setViewportCenter({ lat: center.lat, lng: center.lng });
     if (spotRefreshTimer.current) clearTimeout(spotRefreshTimer.current);
-    const sequence = ++spotRequestSequence.current;
+    const sequence = spotRequestSequence.current.next();
     spotRefreshTimer.current = setTimeout(async () => {
       const b = map.getBounds();
       const view = { south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() };
@@ -226,7 +228,7 @@ export default function Home() {
       try {
         if (ORIGINAL_SNAPSHOT_PREVIEW) {
           const rows = await readSnapshotSpots(view, 500);
-          if (sequence === spotRequestSequence.current) setSpots(rows);
+          if (spotRequestSequence.current.isCurrent(sequence)) setSpots(rows);
           return;
         }
         const latPad = Math.min(10, (view.north - view.south) * 0.25);
@@ -238,15 +240,15 @@ export default function Home() {
           rows = await getPublicSpotsInBounds(view, 500);
           Object.assign(bounds, view);
         }
-        if (sequence === spotRequestSequence.current) {
+        if (spotRequestSequence.current.isCurrent(sequence)) {
           viewportCacheRef.current = { bounds, rows, at: Date.now() };
           setSpots(filterViewportRows(rows, view));
         }
       } catch (err) {
         console.error('Failed to load visible spots:', err);
-        if (ORIGINAL_SNAPSHOT_PREVIEW && sequence === spotRequestSequence.current) setSpots([]);
+        if (ORIGINAL_SNAPSHOT_PREVIEW && spotRequestSequence.current.isCurrent(sequence)) setSpots([]);
       } finally {
-        if (sequence === spotRequestSequence.current) setSpotsLoading(false);
+        if (spotRequestSequence.current.isCurrent(sequence)) setSpotsLoading(false);
       }
     }, 120);
   }, []);
@@ -255,7 +257,7 @@ export default function Home() {
     if (!ORIGINAL_SNAPSHOT_PREVIEW) return undefined;
     return subscribePublicSpotRevocations(({ healthy, revoked }) => {
       if (!healthy) {
-        spotRequestSequence.current += 1;
+        spotRequestSequence.current.cancel();
         setSpots([]);
         viewportCacheRef.current = null;
         if (selectedSpotRef.current?._public_snapshot) closeSpot();
@@ -294,7 +296,7 @@ export default function Home() {
   }, [refreshSpotsInViewport]);
 
   useEffect(() => () => {
-    spotRequestSequence.current += 1;
+    spotRequestSequence.current.cancel();
     if (spotRefreshTimer.current) clearTimeout(spotRefreshTimer.current);
     moveEndMapRef.current?.off('moveend', refreshSpotsInViewport);
     moveEndMapRef.current = null;
@@ -370,7 +372,7 @@ export default function Home() {
           toast.error('Spot saved, but the social post could not be attached. You can add it from the spot details.');
         }
       }
-      spotRequestSequence.current += 1;
+      spotRequestSequence.current.cancel();
       if (spotRefreshTimer.current) clearTimeout(spotRefreshTimer.current);
       setSpots(prev => [spot, ...prev.filter(item => item.id !== spot.id)]);
       viewportCacheRef.current = null;
@@ -448,7 +450,7 @@ export default function Home() {
  
   const handleDeleteSpot = async (spot) => {
     await deleteSpot(spot.id);
-    spotRequestSequence.current += 1;
+    spotRequestSequence.current.cancel();
     if (spotRefreshTimer.current) clearTimeout(spotRefreshTimer.current);
     setSpots(prev => prev.filter(s => s.id !== spot.id));
     viewportCacheRef.current = null;
@@ -460,7 +462,7 @@ export default function Home() {
 
   const handleEditSpot = async (updatedSpot) => {
     await updateSpot(updatedSpot.id, updatedSpot);
-    spotRequestSequence.current += 1;
+    spotRequestSequence.current.cancel();
     if (spotRefreshTimer.current) clearTimeout(spotRefreshTimer.current);
     setSpots(prev => prev.map(s => s.id === updatedSpot.id ? updatedSpot : s));
     viewportCacheRef.current = null;
