@@ -261,6 +261,30 @@ html[data-sf-text-scale='large'] .sf-new .sf-new-controls{top:calc(max(11px,env(
 .sf-new :is(button:not(:disabled),a):active{transition:scale .12s ease-out;scale:.97}
 .sf-new :is(.sf-new-detail-scroll,.sf-new-poi-scroll,.sf-new-discover-scroll,.sf-new-vertical-list,.sf-new-category-list){overflow-anchor:auto;-webkit-overflow-scrolling:touch}
 .sf-new :is(.sf-new-categories,.sf-new-discover-page .v2-chips){-webkit-overflow-scrolling:touch;overscroll-behavior-inline:contain}
+
+/* Map sheet geometry follows the same occupied navigation height as the map. */
+.sf-new .sf-new-nearby--collapsed{height:min(210px,calc(100dvh - var(--sf-nav-occupied) - 155px))}
+.sf-new .sf-new-nearby--fullscreen{top:0;bottom:var(--sf-nav-occupied);height:auto;max-height:none;box-sizing:border-box}
+.sf-new .sf-new-nearby--expanded{height:min(56vh,calc(100vh - var(--sf-nav-occupied) - 76px))}
+.sf-new .sf-new-nearby--expanded.is-empty{height:min(270px,calc(100vh - var(--sf-nav-occupied) - 76px))}
+@supports(height:100dvh){
+  .sf-new .sf-new-nearby--expanded{height:min(56dvh,calc(100dvh - var(--sf-nav-occupied) - var(--sf-search-clearance)))}
+  .sf-new .sf-new-nearby--expanded.is-empty{height:min(270px,calc(100dvh - var(--sf-nav-occupied) - var(--sf-search-clearance)))}
+}
+.sf-new .sf-new-nearby--fullscreen.is-empty .sf-new-nearby-empty{flex:1;min-height:0}
+.sf-new .sf-new-card-list{min-height:0}
+.sf-new .sf-new-search img{object-fit:contain;object-position:center;background:var(--sf-cream)}
+.sf-new .sf-new-nearby-heading>button{min-height:44px}
+.sf-new .sf-new-controls{top:calc(max(11px,env(safe-area-inset-top)) + 108px);max-height:calc(100dvh - var(--sf-nav-occupied) - 220px)}
+.sf-new .sf-new-layer-menu{overflow-y:auto;max-height:min(60dvh,420px)}
+.sf-new .mobile-v2:has(.sf-new-nearby--collapsed) .maplibregl-ctrl-bottom-right{bottom:214px}
+.sf-new .mobile-v2:has(.sf-new-nearby--expanded) .maplibregl-ctrl-bottom-right{bottom:calc(min(56dvh,100dvh - var(--sf-nav-occupied) - var(--sf-search-clearance)) + 4px)}
+@media(max-height:500px){
+  .sf-new .sf-new-nearby--collapsed{height:88px}
+  .sf-new .sf-new-nearby--collapsed .sf-new-card-list,.sf-new .sf-new-nearby--collapsed .sf-new-nearby-empty{display:none}
+  .sf-new .mobile-v2:has(.sf-new-nearby--collapsed) .maplibregl-ctrl-bottom-right{bottom:92px}
+  .sf-new .sf-new-controls{top:calc(max(11px,env(safe-area-inset-top)) + 102px)}
+}
 @media(prefers-reduced-motion:reduce){.sf-new :is(button,a):active{transition:none;scale:1}}
 @keyframes sf-new-surface-enter{from{opacity:.65;translate:0 12px}to{opacity:1;translate:0 0}}
 @keyframes sf-new-page-enter{from{opacity:.7;translate:0 6px}to{opacity:1;translate:0 0}}

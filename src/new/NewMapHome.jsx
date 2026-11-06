@@ -51,13 +51,12 @@ export default function NewMapHome({ category, setCategory, spots, language, loa
   const dragStart = useRef(null);
   const swiped = useRef(false);
   const hasResults = spots.length > 0;
-  const sheetSize = nearbySize === 'fullscreen' && !hasResults ? 'expanded' : nearbySize;
+  const sheetSize = nearbySize;
   const expanded = sheetSize !== 'collapsed';
-  useEffect(() => { if (nearbySize === 'fullscreen' && !hasResults) onNearbySize('expanded'); }, [nearbySize, hasResults, onNearbySize]);
   useEffect(() => { setLayersOpen(false); }, [sheetSize]);
   const changeSize = direction => {
     const next = (direction === 'up' ? nextSize : previousSize)[sheetSize];
-    onNearbySize(next === 'fullscreen' && !hasResults ? 'expanded' : next);
+    onNearbySize(next);
   };
   const handlePointerUp = event => {
     if (dragStart.current == null) return;
@@ -65,7 +64,7 @@ export default function NewMapHome({ category, setCategory, spots, language, loa
     dragStart.current = null;
     if (Math.abs(delta) < 35) return;
     swiped.current = true;
-    window.setTimeout(() => { swiped.current = false; }, 100);
+    window.setTimeout(() => { swiped.current = false; }, 400);
     changeSize(delta < 0 ? 'up' : 'down');
   };
   const renderSpot = (spot, index, vertical = false) => {
