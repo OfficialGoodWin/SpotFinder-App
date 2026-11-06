@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Navigation, MapPin, Edit2, Trash2, Share2, Check, Flag, Heart, Bookmark } from 'lucide-react';
 import StarRating from './StarRating';
 import LabeledRatingScale from './LabeledRatingScale';
-import { submitCategoryRatings, getSpotSocialState, toggleSpotLike, toggleSpotSave } from '@/api/firebaseClient';
+import { submitCategoryRatings, getMySpotRating, getSpotSocialState, toggleSpotLike, toggleSpotSave } from '@/api/firebaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import ReportDialog from '@/components/moderation/ReportDialog';
 import { canonicalSpotUrl, shareSpotLink } from '@/lib/spotLinks';
@@ -88,6 +88,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, redesigne
   const [pendingCrowdedness, setPendingCrowdedness] = useState(0);
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const ratingReadRef = useRef(0);
 
   const isOwner = !!user && (spot.created_by === user.email || spot.created_by_uid === (user.id || user.uid));
 
@@ -96,6 +97,23 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, redesigne
       if (localStorage.getItem(RATED_KEY(spot.id, user?.uid || user?.email))) setRatingSubmitted(true);
     } catch (_) {}
   }, [spot.id]);
+  useEffect(() => {
+    const request = ++ratingReadRef.current;
+    const userId = user?.uid || user?.id;
+    if (!userId) { setRatingSubmitted(false); return undefined; }
+    let active = true;
+    getMySpotRating(spot.id, userId).then(mine => {
+      if (!active || request !== ratingReadRef.current) return;
+      const value = key => { const number = Number(mine?.[key]); return Number.isFinite(number) && number >= 1 && number <= 5 ? number : 0; };
+      setPendingOverall(value('overall'));
+      setPendingAccess(value('access'));
+      setPendingCondition(value('condition'));
+      setPendingSafety(value('safety'));
+      setPendingCrowdedness(value('crowdedness'));
+      setRatingSubmitted(value('overall') > 0);
+    }).catch(() => {});
+    return () => { active = false; ratingReadRef.current += 1; };
+  }, [spot.id, user?.uid, user?.id]);
 
   const overallRating = getSpotRating(localSpot);
   const overallCount = overallRating === null ? 0 : Number(localSpot.rating_count);
@@ -131,6 +149,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, redesigne
   const handleSubmitRatings = async () => {
     if (!canSubmit || !user?.emailVerified) return;
     if (!user) { onShowAuth?.(); return; }
+    ratingReadRef.current += 1;
     setSubmitting(true);
     try {
       const updated = await submitCategoryRatings(spot.id, localSpot, {
@@ -139,13 +158,14 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, redesigne
         condition: pendingCondition,
         safety: pendingSafety,
         crowdedness: pendingCrowdedness,
-      }, user.id);
+      }, user.uid || user.id);
       setLocalSpot(updated);
       onSpotUpdate?.(updated);
-      try { localStorage.setItem(RATED_KEY(spot.id, user?.id || user?.email), '1'); } catch (_) {}
+      try { localStorage.setItem(RATED_KEY(spot.id, user?.uid || user?.id || user?.email), '1'); } catch (_) {}
       setRatingSubmitted(true);
     } catch (err) {
       console.error('Rating submit failed:', err);
+      toast.error(t('common.ratingSaveFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -177,7 +197,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, redesigne
 
   return (
     <div className={`fixed inset-0 z-[2000] flex items-end justify-center bg-black/50 backdrop-blur-sm${redesigned ? ' sf-new-spot-detail' : ''}`} role="dialog" aria-modal="true" aria-labelledby="spot-detail-title" onKeyDown={event => { if (event.key === 'Escape') onClose(); }}>
-      {redesigned ? <NewSpotDetailView spot={localSpot} photos={detailPhotos} name={displayName} creatorName={creatorName} user={user} isOwner={isOwner} isAdmin={isAdmin} social={social} socialBusy={socialBusy} onSave={handleSave} onLike={handleLike} onShare={handleShare} shareTooltip={shareTooltip} manualShareUrl={manualShareUrl} onClose={onClose} closeButtonRef={closeButtonRef} onNavigate={onNavigate} onEdit={onEdit} onDelete={() => setShowDeleteConfirm(true)} onReport={() => { if (!user) { onShowAuth?.(); return; } setShowReport(true); }} onShowAuth={onShowAuth} rating={overallRating} ratingCount={overallCount} catRows={catRows} legacyRows={legacyRows} ratingSubmitted={ratingSubmitted} pending={{ overall: pendingOverall, access: pendingAccess, condition: pendingCondition, safety: pendingSafety, crowdedness: pendingCrowdedness }} onPending={{ overall: setPendingOverall, access: setPendingAccess, condition: setPendingCondition, safety: setPendingSafety, crowdedness: setPendingCrowdedness }} submitting={submitting} onSubmit={handleSubmitRatings} t={t} language={language} /> :
+      {redesigned ? <NewSpotDetailView spot={localSpot} photos={detailPhotos} name={displayName} creatorName={creatorName} user={user} isOwner={isOwner} isAdmin={isAdmin} social={social} socialBusy={socialBusy} onSave={handleSave} onLike={handleLike} onShare={handleShare} shareTooltip={shareTooltip} manualShareUrl={manualShareUrl} onClose={onClose} closeButtonRef={closeButtonRef} onNavigate={onNavigate} onEdit={onEdit} onDelete={() => setShowDeleteConfirm(true)} onReport={() => { if (!user) { onShowAuth?.(); return; } setShowReport(true); }} onShowAuth={onShowAuth} rating={overallRating} ratingCount={overallCount} catRows={catRows} legacyRows={legacyRows} ratingSubmitted={ratingSubmitted} onEditRating={() => setRatingSubmitted(false)} pending={{ overall: pendingOverall, access: pendingAccess, condition: pendingCondition, safety: pendingSafety, crowdedness: pendingCrowdedness }} onPending={{ overall: setPendingOverall, access: setPendingAccess, condition: setPendingCondition, safety: setPendingSafety, crowdedness: setPendingCrowdedness }} submitting={submitting} onSubmit={handleSubmitRatings} t={t} language={language} /> :
       <div className={`sf-sheet w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-3xl max-h-[100dvh] sm:max-h-[90dvh] sm:rounded-3xl${redesigned ? ' sf-new-detail-sheet' : ''}`}>
 
         {redesigned && <div className="sf-new-detail-hero"><CommunityPhotoGallery key={localSpot.id} spot={localSpot} photos={detailPhotos} name={displayName} /><button ref={closeButtonRef} type="button" onClick={onClose} aria-label={t('common.close')} className="sf-new-detail-close"><X size={21} /></button><button type="button" onClick={handleSave} disabled={!!socialBusy} aria-pressed={social.saved} aria-label={t(social.saved ? 'spotDetailUi.unsave' : 'spotDetailUi.save')} className={`sf-new-detail-bookmark${social.saved ? ' is-saved' : ''}`}><Bookmark size={21} fill={social.saved ? 'currentColor' : 'none'} /></button></div>}
@@ -387,6 +407,7 @@ export default function SpotDetailModal({ spot, user, isAdmin = false, redesigne
           {ratingSubmitted && (
             <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-2xl text-center text-green-700 dark:text-green-400 text-sm font-semibold">
               ✓ {t('spotDetail.thanksCategoryRating') || t('spotDetail.thanksRating')}
+              {!isOwner && <button type="button" onClick={() => setRatingSubmitted(false)} className="mt-2 block w-full rounded-lg border border-current p-2">{t('editSpotUi.yourRating')}</button>}
             </div>
           )}
 

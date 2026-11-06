@@ -831,6 +831,15 @@ export const submitCategoryRatings = async (spotId, currentSpot, ratings, userId
   return currentSpot;
 };
 
+export const getMySpotRating = async (spotId, userId) => {
+  if (!spotId || !userId) return null;
+  const { db } = getFirebaseServices();
+  const snapshot = await getDoc(doc(db, 'spot_ratings', `${spotId}_${userId}`));
+  if (!snapshot.exists()) return null;
+  const rating = snapshot.data();
+  return rating.user_id === userId ? rating : null;
+};
+
 const CROWDEDNESS_REPORTS = ['quiet', 'moderate', 'crowded'];
 
 export const getMyCrowdednessReport = async (spotId, userId) => {

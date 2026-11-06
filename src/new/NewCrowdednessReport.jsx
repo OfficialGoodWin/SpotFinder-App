@@ -13,13 +13,14 @@ export default function NewCrowdednessReport({ spot, user, isOwner, onShowAuth, 
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
 
-  const canReport = Boolean(user?.id && user.emailVerified && !isOwner);
+  const userId = user?.uid || user?.id;
+  const canReport = Boolean(userId && user.emailVerified && !isOwner);
 
   useEffect(() => {
     if (!canReport) { setMyReport(null); setSelected(null); return undefined; }
     let active = true;
     setLoading(true);
-    getMyCrowdednessReport(spot.id, user.id)
+    getMyCrowdednessReport(spot.id, userId)
       .then(value => {
         if (!active) return;
         setMyReport(value);
@@ -32,7 +33,7 @@ export default function NewCrowdednessReport({ spot, user, isOwner, onShowAuth, 
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [canReport, spot.id, user?.id, language]);
+  }, [canReport, spot.id, userId, language]);
 
   const counts = {
     quiet: Number(spot.crowdedness_quiet_count) || 0,
@@ -61,7 +62,7 @@ export default function NewCrowdednessReport({ spot, user, isOwner, onShowAuth, 
     if (!canReport || !selected || busy || selected === myReport) return;
     setBusy(true); setError(''); setStatus('');
     try {
-      await submitCrowdednessReport(spot.id, selected, user.id);
+      await submitCrowdednessReport(spot.id, selected, userId);
       setMyReport(selected);
       setStatus(L('Zpráva uložena. Souhrn se aktualizuje po zpracování serverem; znovu otevři místo pro nejnovější počet.', 'Report saved. The summary updates after server processing; reopen the spot for the latest count.'));
     } catch (cause) {

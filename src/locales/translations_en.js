@@ -64,6 +64,10 @@ export default {
     "yes": "Yes",
     "no": "No",
     "tryAgain": "Try again",
+    "ratingSaveFailed": "Your rating could not be saved. Please try again.",
+    "reportChallengeFailed": "Verification expired or failed. Please try again.",
+    "reportRateLimited": "Too many reports. Try again in {seconds} seconds.",
+    "reportChallengeUnavailable": "Verification is temporarily unavailable. Please try again later.",
     "goHome": "Go Home"
   },
   "addSpot": {

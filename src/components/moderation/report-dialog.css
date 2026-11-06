@@ -1,0 +1,18 @@
+.sf-report-dialog{padding-top:max(12px,env(safe-area-inset-top));color:#213629}
+.sf-report-panel{max-height:88vh;max-height:min(88dvh,780px);padding-bottom:max(20px,env(safe-area-inset-bottom));border:1px solid #ded9c8;background:#f6f2e9;box-shadow:0 20px 50px #102b1d44;overscroll-behavior:contain}
+.sf-report-panel h2,.sf-report-panel .lucide-flag{color:#1e4d2b}
+.sf-report-panel .text-slate-500,.sf-report-panel .text-slate-400{color:#657466}
+.sf-report-reason{min-height:48px;border-color:#d8d1bf;background:#fffdf8;transition:background .16s ease,border-color .16s ease}
+.sf-report-reason.is-selected{border-color:#1e4d2b;background:#e4ecdf}
+.sf-report-reason input{accent-color:#1e4d2b}
+.sf-report-note{border-color:#d8d1bf;background:#fffdf8;color:#213629}
+.sf-report-submit{min-height:48px;background:#b64b37;font-weight:700}
+.sf-report-submit:not(:disabled):hover{background:#9c3e2e}
+.sf-report-done{min-height:48px;background:#1e4d2b}
+.sf-report-panel :is(button,input,textarea,a):focus-visible{outline:2px solid #1e4d2b;outline-offset:2px}
+.dark .sf-report-panel{border-color:#40574a;background:#1d3025;color:#f6f2e9}
+.dark .sf-report-panel h2,.dark .sf-report-panel .lucide-flag{color:#d9ead5}
+.dark .sf-report-panel .text-slate-500,.dark .sf-report-panel .text-slate-400{color:#b4c6b6}
+.dark .sf-report-reason,.dark .sf-report-note{border-color:#536a5a;background:#283d30;color:#f6f2e9}
+.dark .sf-report-reason.is-selected{border-color:#a4c5a4;background:#34563d}
+@media(prefers-reduced-motion:reduce){.sf-report-reason{transition:none}}

@@ -64,6 +64,10 @@ export default {
     "yes": "Ano",
     "no": "Ne",
     "tryAgain": "Zkusit znovu",
+    "ratingSaveFailed": "Hodnocení se nepodařilo uložit. Zkus to znovu.",
+    "reportChallengeFailed": "Ověření vypršelo nebo se nezdařilo. Zkus to znovu.",
+    "reportRateLimited": "Příliš mnoho nahlášení. Zkus to znovu za {seconds} sekund.",
+    "reportChallengeUnavailable": "Ověření je dočasně nedostupné. Zkus to prosím později.",
     "goHome": "Domů"
   },
   "addSpot": {

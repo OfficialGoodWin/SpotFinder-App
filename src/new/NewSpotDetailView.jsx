@@ -13,7 +13,7 @@ import NewSkeleton from './NewSkeleton';
 
 const SocialPostsSection = recoverableLazy(() => import('@/components/social/SocialPostsSection'));
 
-export default function NewSpotDetailView({ spot, photos, name, creatorName, user, isOwner, isAdmin, social, socialBusy, onSave, onLike, onShare, shareTooltip, manualShareUrl, onClose, closeButtonRef, onNavigate, onEdit, onDelete, onReport, onShowAuth, rating, ratingCount, catRows, legacyRows, ratingSubmitted, pending, onPending, submitting, onSubmit, t, language }) {
+export default function NewSpotDetailView({ spot, photos, name, creatorName, user, isOwner, isAdmin, social, socialBusy, onSave, onLike, onShare, shareTooltip, manualShareUrl, onClose, closeButtonRef, onNavigate, onEdit, onDelete, onReport, onShowAuth, rating, ratingCount, catRows, legacyRows, ratingSubmitted, onEditRating, pending, onPending, submitting, onSubmit, t, language }) {
   const [descriptionOpen, setDescriptionOpen] = useState(false);
   const [ratingsOpen, setRatingsOpen] = useState(false);
   const [socialOpen, setSocialOpen] = useState(false);
@@ -66,7 +66,7 @@ export default function NewSpotDetailView({ spot, photos, name, creatorName, use
           {!ratingSubmitted && !isOwner && !user && <button className="sf-new-detail-action" type="button" onClick={onShowAuth}>Přihlásit se a ohodnotit</button>}
           {!ratingSubmitted && !isOwner && user && !user.emailVerified && <p>Pro hodnocení nejprve ověř svůj e-mail.</p>}
           {!ratingSubmitted && !isOwner && user?.emailVerified && <div className="sf-new-detail-rate-form"><strong>Ohodnoť místo</strong><label>Celkový dojem *</label><StarRating value={pending.overall} onChange={onPending.overall} size="lg" />{visibleCatRows.map(row => <div key={row.key}><label>{row.label}</label><LabeledRatingScale value={pending[row.key]} onChange={onPending[row.key]} labels={row.labels} /></div>)}<button type="button" className="sf-new-detail-action" disabled={!pending.overall || submitting} onClick={onSubmit}>{submitting ? 'Ukládám…' : 'Odeslat hodnocení'}</button></div>}
-          {ratingSubmitted && <p>Děkujeme za hodnocení.</p>}
+          {ratingSubmitted && !isOwner && <button className="sf-new-detail-action" type="button" onClick={onEditRating}>{t('editSpotUi.yourRating')}</button>}
         </div></details>
         {(practical.length > 3 || spot.directions || poi || spot.tags?.length > 1) && <details className="sf-new-detail-section"><summary>Další informace</summary><div className="sf-new-detail-section-content">{practical.length > 0 && <div className="sf-new-detail-chips">{practical.map((label, index) => <span key={`${label}-${index}`}>{label}</span>)}</div>}{spot.directions && <p>{spot.directions}</p>}{spot.tags?.length > 1 && <p>{spot.tags.slice(1).map(tag => t(`spotTags.${tag}`, tag)).join(' · ')}</p>}{poi && <p>{t('spotDetailUi.alsoKnownAs', { name: poi.name })}{poi.address ? ` · ${poi.address}` : ''}</p>}{website && <a href={website} target="_blank" rel="noopener noreferrer">Web místa</a>}</div></details>}
         <details className="sf-new-detail-section" open={socialOpen} onToggle={event => setSocialOpen(event.currentTarget.open)}><summary>Příspěvky Instagram / TikTok</summary>{socialOpen && <div className="sf-new-detail-section-content"><Suspense fallback={<NewSkeleton kind="detailSection" />}><SocialPostsSection targetType="spot" targetId={String(spot.id)} targetName={name} user={user} /></Suspense></div>}</details>

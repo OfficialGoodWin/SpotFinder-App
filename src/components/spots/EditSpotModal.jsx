@@ -121,7 +121,7 @@ export default function EditSpotModal({ spot, user, onClose, onSave }) {
       directions,
     });
     if (rating.overall > 0 && user?.emailVerified && !isOwner) {
-      try { await submitCategoryRatings(spot.id, spot, rating, user.id || user.uid); }
+      try { await submitCategoryRatings(spot.id, spot, rating, user.uid || user.id); }
       catch (ratingError) {
         console.error('Spot rating failed:', ratingError);
         toast.error(t('editSpotUi.ratingFailed'));
