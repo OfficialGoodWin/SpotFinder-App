@@ -1,6 +1,7 @@
 import React from 'react';
 import MobileV2 from '@/mobile-v2/MobileV2.jsx';
 import './new.css';
+import './new-dark.css';
 
 // Keep preview presentation in one route module. Existing providers and data
 // services stay shared with the main application.

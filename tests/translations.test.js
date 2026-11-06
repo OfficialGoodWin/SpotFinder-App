@@ -29,7 +29,8 @@ test('locale files have valid values; existing translations retain their origina
     'offlineMaps', 'statusBanner', 'notFound', 'authMore', 'routeUi',
     'reportUi', 'reportAnythingUi', 'discoveryUi', 'editSpotUi', 'poiDetailUi', 'collection', 'legal',
     'updates', 'statusPage', 'refundDraft', 'faqPage', 'faqGraphic', 'cookieDraft',
-    'termsDraft', 'privacyDraft',
+    'termsDraft', 'privacyDraft', 'newAbout', 'newAccount', 'newSupport', 'newMobile', 'newCookiePreferences', 'newAdmin',
+    'newSkeleton', 'imagePrep', 'signOutFailed', 'officialEditor', 'addSpot', 'common', 'newMap', 'newDiscover', 'newVoice',
   ]);
   const originalKeys = [...english.keys()].filter(key => {
     const [namespace, item] = key.split('.');

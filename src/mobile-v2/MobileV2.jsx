@@ -98,7 +98,8 @@ function SpotRow({ spot, onOpen, onMap, trailing }) {
 
 
 function StateMessage({ children, retry }) {
-  return <div className="v2-state"><p>{children}</p>{retry && <button className="v2-secondary" onClick={retry}>Zkusit znovu</button>}</div>;
+  const { t } = useLanguage();
+  return <div className="v2-state"><p>{children}</p>{retry && <button className="v2-secondary" onClick={retry}>{t('newMobile.tryAgain')}</button>}</div>;
 }
 
 function draftDate(value) {
@@ -108,6 +109,7 @@ function draftDate(value) {
 const draftTitle = item => item?.title?.trim() || 'Nepojmenované místo';
 
 function SearchPanel({ spots, center, voiceQuery, onClose, onSpot, onPlace, language = 'cs', redesigned = false, searchQuery = '', onSearchQueryChange, voiceInput }) {
+  const { t } = useLanguage();
   const [localQuery, setLocalQuery] = useState('');
   const query = redesigned ? searchQuery : localQuery;
   const setQuery = redesigned ? onSearchQueryChange : setLocalQuery;
@@ -130,27 +132,28 @@ function SearchPanel({ spots, center, voiceQuery, onClose, onSpot, onPlace, lang
   const matches = useMemo(() => spots.filter(spot => isDiscoverEligible(spot) && spotMatchesSearch(spot, query, language)).slice(0, 8), [spots, query, language]);
   const voice = () => {
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!Recognition) { setVoiceError('Hlasové vyhledávání není v tomto prohlížeči dostupné.'); return; }
-    const recognition = new Recognition(); recognition.lang = 'cs-CZ';
+    if (!Recognition) { setVoiceError(t('newMobile.voiceUnavailable')); return; }
+    const recognition = new Recognition(); recognition.lang = language?.startsWith('cs') ? 'cs-CZ' : 'en-US';
     recognition.onresult = event => setQuery(event.results[0][0].transcript);
-    recognition.onerror = () => setVoiceError('Mikrofon není dostupný. Zadejte místo ručně.');
+    recognition.onerror = () => setVoiceError(t('newMobile.microphoneUnavailable'));
     recognition.start();
   };
-  return <section className="v2-page v2-search" aria-label="Hledání míst">
-    <div className="v2-search-field"><button aria-label="Zavřít hledání" onClick={onClose}><ChevronLeft /></button><Search size={19} /><input ref={inputRef} aria-label="Hledat místa" value={query} onChange={event => setQuery(event.target.value)} placeholder="Hledat místa…" />{query && <button type="button" aria-label="Vymazat hledání" onClick={() => { setQuery(''); inputRef.current?.focus(); }}><X size={17} /></button>}{redesigned ? <NewVoiceButton voice={voiceInput} field="search" label="Hledat hlasem" /> : <button onClick={voice} aria-label="Hledat hlasem"><Mic size={19} /></button>}</div>
+  return <section className="v2-page v2-search" aria-label={t('newMobile.searchPanel')}>
+    <div className="v2-search-field"><button aria-label={t('newMobile.closeSearch')} onClick={onClose}><ChevronLeft /></button><Search size={19} /><input ref={inputRef} aria-label={t('newMobile.searchPlaces')} value={query} onChange={event => setQuery(event.target.value)} placeholder={t('newMobile.searchPlaceholder')} />{query && <button type="button" aria-label={t('newMobile.clearSearch')} onClick={() => { setQuery(''); inputRef.current?.focus(); }}><X size={17} /></button>}{redesigned ? <NewVoiceButton voice={voiceInput} field="search" label={t('newMobile.voiceSearch')} /> : <button onClick={voice} aria-label={t('newMobile.voiceSearch')}><Mic size={19} /></button>}</div>
     {redesigned ? <NewVoiceStatus voice={voiceInput} field="search" /> : voiceError && <p className="v2-inline-error">{voiceError}</p>}
-    {!query.trim() && <StateMessage>Hledejte místo, oblast nebo komunitní spot.</StateMessage>}
+    {!query.trim() && <StateMessage>{t('newMobile.searchHint')}</StateMessage>}
     {query.trim() && <div className="v2-scroll">
-      {matches.length > 0 && <><h2 className="v2-section-title">Komunitní místa na mapě</h2>{matches.map(spot => <SpotRow key={spot.id} spot={spot} onOpen={onSpot} onMap={onSpot} />)}</>}
-      {status === 'loading' && <StateMessage>Hledám místa…</StateMessage>}
-      {status === 'error' && <StateMessage retry={() => setAttempt(value => value + 1)}>Vyhledávání nyní není dostupné.</StateMessage>}
-      {status === 'done' && results.length > 0 && <><h2 className="v2-section-title">Další výsledky</h2>{results.map((place, index) => <button className="v2-result-row" key={`${place.name || place.label}-${index}`} onClick={() => onPlace(place)}><MapPin size={19} /><span>{place.name || place.label}</span><ChevronRight size={17} /></button>)}</>}
-      {status === 'done' && !matches.length && !results.length && <StateMessage>Pro „{query}“ jsme nic nenašli.</StateMessage>}
+      {matches.length > 0 && <><h2 className="v2-section-title">{t('newMobile.communityResults')}</h2>{matches.map(spot => <SpotRow key={spot.id} spot={spot} onOpen={onSpot} onMap={onSpot} />)}</>}
+      {status === 'loading' && <StateMessage>{t('newMobile.searching')}</StateMessage>}
+      {status === 'error' && <StateMessage retry={() => setAttempt(value => value + 1)}>{t('newMobile.searchUnavailable')}</StateMessage>}
+      {status === 'done' && results.length > 0 && <><h2 className="v2-section-title">{t('newMobile.moreResults')}</h2>{results.map((place, index) => <button className="v2-result-row" key={`${place.name || place.label}-${index}`} onClick={() => onPlace(place)}><MapPin size={19} /><span>{place.name || place.label}</span><ChevronRight size={17} /></button>)}</>}
+      {status === 'done' && !matches.length && !results.length && <StateMessage>{t('newMobile.searchEmpty', { query })}</StateMessage>}
     </div>}
   </section>;
 }
 
-function NewBottomNav({ selectedNav, language, chooseTab }) {
+function NewBottomNav({ selectedNav, chooseTab }) {
+  const { t } = useLanguage();
   const reduced = useReducedMotion();
   const navRef = useRef(null);
   const tabRefs = useRef({});
@@ -173,11 +176,11 @@ function NewBottomNav({ selectedNav, language, chooseTab }) {
     window.addEventListener('resize', measure);
     return () => { observer?.disconnect(); window.removeEventListener('resize', measure); };
   }, [selectedNav]);
-  return <nav ref={navRef} className="v2-nav sf-new-motion-nav" aria-label="Hlavní navigace">
+  return <nav ref={navRef} className="v2-nav sf-new-motion-nav" aria-label={t('newMobile.mainNavigation')}>
     {indicator && <motion.span aria-hidden="true" className="sf-new-nav-highlight" initial={false} animate={indicator} transition={reduced ? reducedTransition : newMotion.selection} />}
-    {TABS.map(([id, label, Icon]) => id === 'add'
-    ? <button key={id} type="button" className="v2-add-tab" aria-label={language?.startsWith('cs') ? 'Přidat místo' : 'Add spot'} onClick={() => chooseTab(id)}><span aria-hidden="true"><Icon size={27} strokeWidth={2.2} /></span></button>
-    : <button ref={node => { tabRefs.current[id] = node; }} key={id} type="button" className={selectedNav === id ? 'active' : ''} aria-current={selectedNav === id ? 'page' : undefined} onClick={() => chooseTab(id)}><span><Icon size={19} strokeWidth={1.8} /></span><small>{label}</small></button>)}</nav>;
+    {TABS.map(([id, , Icon]) => id === 'add'
+    ? <button key={id} type="button" className="v2-add-tab" aria-label={t('newMobile.addSpot')} onClick={() => chooseTab(id)}><span aria-hidden="true"><Icon size={27} strokeWidth={2.2} /></span></button>
+    : <button ref={node => { tabRefs.current[id] = node; }} key={id} type="button" className={selectedNav === id ? 'active' : ''} aria-current={selectedNav === id ? 'page' : undefined} onClick={() => chooseTab(id)}><span><Icon size={19} strokeWidth={1.8} /></span><small>{t(`newMobile.${id === 'collection' ? 'saved' : id}`)}</small></button>)}</nav>;
 }
 
 const MAIN_DESTINATIONS = ['map', 'discover', 'collection', 'profile'];
@@ -464,8 +467,8 @@ export default function MobileV2({ redesigned = false }) {
     getPublicSpotById(id).then(spot => {
       if (!alive) return;
       if (spot) { selectedSpotRef.current = spot; setSelectedSpot(spot); setSelectedMapSpotId(spot.id); if (redesigned) setPreviewSpot(spot); const coords = normalizeLatLng(spot); if (coords) setFlyTo(coords); }
-      else { toast.error('Místo nebylo nalezeno.'); navigate('/new', { replace: true }); }
-    }).catch(() => { if (alive) toast.error('Místo se nepodařilo načíst.'); });
+      else { toast.error(t('newMobile.spotMissing')); navigate('/new', { replace: true }); }
+    }).catch(() => { if (alive) toast.error(t('newMobile.spotLoadFailed')); });
     return () => { alive = false; };
   }, [location.pathname, navigate, redesigned]);
 
@@ -560,8 +563,8 @@ export default function MobileV2({ redesigned = false }) {
     let spot = selected;
     if (PUBLIC_SNAPSHOT_PREVIEW && redesigned && spot._public_snapshot) {
       try { spot = await loadFullSnapshotSpot(spot, getPublicSpotById); }
-      catch { toast.error('Místo se nepodařilo načíst. Zkus to znovu.'); return; }
-      if (!spot) { cacheRef.current = null; setSpots(rows => rows.filter(row => row.id !== selected.id)); setPreviewSpot(null); toast.error('Místo už není veřejně dostupné.'); return; }
+      catch { toast.error(t('newMobile.spotLoadFailed')); return; }
+      if (!spot) { cacheRef.current = null; setSpots(rows => rows.filter(row => row.id !== selected.id)); setPreviewSpot(null); toast.error(t('newMobile.spotUnavailable')); return; }
     }
     setNearbySize('collapsed'); setSelectedPoi(null); setSelectedMapSpotId(spot.id);
     if (redesigned) setPreviewSpot(spot);
@@ -585,9 +588,9 @@ export default function MobileV2({ redesigned = false }) {
   const openDiscoverOnMap = async spot => {
     try {
       const current = await getPublicSpotById(spot.id);
-      if (!isDiscoverEligible(current)) { toast.error('Toto místo už není veřejně dostupné.'); return; }
+      if (!isDiscoverEligible(current)) { toast.error(t('newMobile.spotUnavailable')); return; }
       openOnMap(current);
-    } catch { toast.error('Místo se nepodařilo ověřit. Zkus to znovu.'); }
+    } catch { toast.error(t('newMobile.spotVerifyFailed')); }
   };
   const showMySpotsOnMap = async () => {
     if (!redesigned || !user?.id || myMapBusy) return;
@@ -617,16 +620,16 @@ export default function MobileV2({ redesigned = false }) {
   }, [redesigned, activeTab, myMapSpots, mapInstance]);
   const saveDiscoverSpot = async spot => {
     if (!user) { setShowAuth(true); return; }
-    if (!user.emailVerified) { toast.error('Nejdřív ověř e-mailovou adresu.'); return; }
+    if (!user.emailVerified) { toast.error(t('newMobile.verifyEmail')); return; }
     if (savingSpotId) return;
     setSavingSpotId(spot.id);
     try {
       const state = await getSpotSocialState(spot.id, user);
       if (!state.saved) await toggleSpotSave(spot.id, user, false);
       setSavedIds(current => new Set(current).add(spot.id));
-      if (!state.saved) { window.dispatchEvent(new CustomEvent('spotfinder:collection-changed', { detail: { tabs: ['saved'] } })); toast.success('Místo bylo uloženo.'); }
-      else toast.info('Místo už máš uložené.');
-    } catch { toast.error('Místo se nepodařilo uložit.'); }
+      if (!state.saved) { window.dispatchEvent(new CustomEvent('spotfinder:collection-changed', { detail: { tabs: ['saved'] } })); toast.success(t('newMobile.spotSaved')); }
+      else toast.info(t('newMobile.alreadySaved'));
+    } catch { toast.error(t('newMobile.saveFailed')); }
     finally { setSavingSpotId(''); }
   };
   const confirmUnsave = async () => {
@@ -638,8 +641,8 @@ export default function MobileV2({ redesigned = false }) {
       setSavedIds(current => { const next = new Set(current); next.delete(unsaveSpot.id); return next; });
       setUnsaveSpot(null);
       window.dispatchEvent(new CustomEvent('spotfinder:collection-changed', { detail: { tabs: ['saved'] } }));
-      toast.success('Místo bylo odebráno ze sbírky.');
-    } catch { toast.error('Místo se nepodařilo odebrat.'); }
+      toast.success(t('newMobile.spotRemoved'));
+    } catch { toast.error(t('newMobile.removeFailed')); }
     finally { setUnsaveBusy(false); }
   };
   const closeSpot = () => { setSelectedSpot(null); selectedSpotRef.current = null; setNavigationDestination(null); if (location.pathname.startsWith('/new/spot/')) navigate(location.key === 'default' ? '/new' : -1); };
@@ -720,7 +723,7 @@ export default function MobileV2({ redesigned = false }) {
     backPath: swipeBackPath,
     blocked: Boolean(selectedSpot || selectedPoi || editingSpot || quickAdd || choosingQuickPosition || addMode || showAuth || authPage || showSignOut || draftToDelete || unsaveSpot || navigationDestination || showNearbyFilter || showWelcome || !consent),
     onTab: chooseTab,
-    onBack: path => navigate(path, { replace: true }),
+    onBack: path => location.key !== 'default' && (location.state?.settingsParent || location.pathname === '/new/settings' || !settingsPage) ? navigate(-1) : navigate(path, { replace: true }),
   });
 
   useEffect(() => {
@@ -779,7 +782,7 @@ export default function MobileV2({ redesigned = false }) {
       ? <NewDiscover language={language} titleOf={spotTitle} locationOf={spotLocation} savedIds={savedIds} savingSpotId={savingSpotId} onSave={saveDiscoverSpot} onOpen={openSpot} onMap={openDiscoverOnMap} viewRef={discoverViewRef} />
       : <section className="v2-page"><header className="v2-page-header"><h1>Objevit</h1><p>Místa sdílená komunitou</p></header><div className="v2-chips" role="group" aria-label="Kategorie">{CATEGORIES.map(name => <button key={name} className={category === name ? 'active' : ''} onClick={() => setCategory(name)}>{name}</button>)}</div><div className="v2-scroll v2-discover-list">{featuredError && featured === null ? <StateMessage retry={() => loadDiscover()}>Místa se nepodařilo načíst.</StateMessage> : featured === null ? <StateMessage>Načítám místa…</StateMessage> : <>{featuredVisible.length ? featuredVisible.map(spot => <DiscoverCard key={spot.id} spot={spot} title={spotTitle(spot, language)} location={spotLocation(spot)} savingSpotId={savingSpotId} savedIds={savedIds} onSave={saveDiscoverSpot} onOpen={openSpot} onMap={openOnMap} />) : <StateMessage>V načtených místech tato kategorie zatím není.</StateMessage>}{featuredError && <StateMessage retry={() => loadDiscover(true)}>Další místa se nepodařilo načíst.</StateMessage>}{discoverMore && !featuredError && <button className="v2-load-more" disabled={discoverLoading} onClick={() => loadDiscover(true)}>{discoverLoading ? 'Načítám…' : 'Načíst další místa'}</button>}</>}</div></section>)}
     {activeTab === 'collection' && <section className="v2-page"><header className="v2-page-header v2-collection-header"><img src={LOGO} alt="" /><h1>Moje sbírka</h1></header>{!user ? <div className="v2-guest"><Bookmark size={30} /><h2>Ulož si svá oblíbená místa</h2><p>Pro uložená a oblíbená místa se přihlas. Veřejnou mapu můžeš procházet bez účtu.</p><button className="v2-primary" onClick={() => setShowAuth(true)}>Přihlásit se</button><button className="v2-secondary" onClick={() => chooseTab('map')}>Prozkoumat mapu</button></div> : <><div className="v2-segments" role="tablist" aria-label="Moje sbírka">{[['saved','Uložená'],['liked','Líbí se mi'],['created','Vytvořená']].map(([id,label]) => <button role="tab" aria-selected={collectionTab === id} className={collectionTab === id ? 'active' : ''} key={id} onClick={() => setCollectionTab(id)}>{label}{collection[id] && <span> {collection[id].length >= 100 ? '100+' : collection[id].length}</span>}</button>)}</div><div className="v2-collection-tools"><span>{collection[collectionTab] ? `${collection[collectionTab].length >= 100 ? '100+' : collection[collectionTab].length} míst` : 'Načítám…'}</span><button disabled={redesigned && myMapBusy} onClick={redesigned ? showMySpotsOnMap : () => chooseTab('map')}><MapIcon size={16} /> {redesigned && myMapBusy ? 'Načítám místa…' : 'Zobrazit na mapě'}</button></div>{redesigned && myMapError && <p className="sf-new-collection-error" role="alert">{myMapError}</p>}<div className="v2-scroll v2-collection-list">{collectionErrors[collectionTab] ? <StateMessage retry={loadCollection}>{collectionErrors[collectionTab]}</StateMessage> : collectionLoading && !collection[collectionTab] ? (redesigned ? <NewSkeleton kind="nearbyRows" /> : <StateMessage>Načítám sbírku…</StateMessage>) : collection[collectionTab]?.length ? collection[collectionTab].map(spot => <SpotRow key={spot.id} spot={spot} onOpen={openSpot} onMap={openOnMap} trailing={<button className="v2-row-icon" onClick={() => collectionTab === 'saved' ? setUnsaveSpot(spot) : openSpot(spot)} aria-label={`${collectionTab === 'saved' ? 'Odebrat ze sbírky:' : 'Otevřít:'} ${spotTitle(spot)}`}>{collectionTab === 'liked' ? <Heart size={19} fill="currentColor" /> : collectionTab === 'saved' ? <Bookmark size={19} fill="currentColor" /> : <ChevronRight size={19} />}</button>} />) : <StateMessage>{collectionTab === 'saved' ? 'Zatím nemáš uložená místa.' : collectionTab === 'liked' ? 'Zatím se ti nelíbí žádná místa.' : 'Zatím jsi nevytvořil žádné místo.'}</StateMessage>}</div></>}</section>}
-    {activeTab === 'profile' && !settingsPage && !draftsPage && !aboutPage && <section className="v2-page"><header className="v2-page-header"><h1>Profil</h1></header><div className="v2-profile-top">{user?.photoURL ? <img src={user.photoURL} alt="" /> : <UserRound size={28} />}<div><strong>{user?.displayName || 'Objevuj jako host'}</strong><small>{user?.email || 'Přihlas se a ukládej oblíbená místa.'}</small></div></div>{user && !user.emailVerified && <div className="v2-verification"><strong>Ověř e-mailovou adresu</strong><p>Pro hodnocení a ukládání míst je potřeba ověřit e-mail.</p><button disabled={verificationBusy} onClick={async () => { setVerificationBusy(true); try { await resendVerificationEmail(); toast.success('Ověřovací e-mail byl odeslán.'); } catch { toast.error('E-mail se nepodařilo odeslat.'); } finally { setVerificationBusy(false); } }}>{verificationBusy ? 'Odesílám…' : 'Poslat ověřovací e-mail'}</button></div>}{!user && <div className="v2-profile-actions"><button className="v2-primary" onClick={() => setShowAuth(true)}>Přihlásit se / vytvořit účet</button><button className="v2-secondary" onClick={() => chooseTab('map')}>Pokračovat jako host</button></div>}<div className="v2-group">{user && <><button onClick={() => chooseTab('collection')}><Bookmark /> Moje sbírka <ChevronRight /></button><button onClick={() => { setCollectionTab('created'); chooseTab('collection'); }}><MapPin /> Vytvořená místa <ChevronRight /></button></>}<button onClick={() => navigate('/new/drafts')}><List /> Rozpracovaná místa <ChevronRight /></button><button onClick={() => navigate('/new/settings')}><Settings /> Nastavení <ChevronRight /></button>{redesigned ? <button onClick={() => navigate('/new/settings/support/faq')}><Compass /> Nápověda <ChevronRight /></button> : <a href="/FAQ"><Compass /> Nápověda <ChevronRight /></a>}<button onClick={() => navigate('/new/about')}><MapPin /> O aplikaci <ChevronRight /></button>{redesigned ? <NewLegalLink document="/PrivacyPolicy"><Layers /> Soukromí a podmínky <ChevronRight /></NewLegalLink> : <a href="/PrivacyPolicy"><Layers /> Soukromí a podmínky <ChevronRight /></a>}{user && <button onClick={() => setShowSignOut(true)}><UserRound /> Odhlásit se <ChevronRight /></button>}</div></section>}
+    {activeTab === 'profile' && !settingsPage && !draftsPage && !aboutPage && <section className="v2-page"><header className="v2-page-header"><h1>Profil</h1></header><div className="v2-profile-top">{user?.photoURL ? <img src={user.photoURL} alt="" /> : <UserRound size={28} />}<div><strong>{user?.displayName || 'Objevuj jako host'}</strong><small>{user?.email || 'Přihlas se a ukládej oblíbená místa.'}</small></div></div>{user && !user.emailVerified && <div className="v2-verification"><strong>Ověř e-mailovou adresu</strong><p>Pro hodnocení a ukládání míst je potřeba ověřit e-mail.</p><button disabled={verificationBusy} onClick={async () => { setVerificationBusy(true); try { await resendVerificationEmail(); toast.success('Ověřovací e-mail byl odeslán.'); } catch { toast.error('E-mail se nepodařilo odeslat.'); } finally { setVerificationBusy(false); } }}>{verificationBusy ? 'Odesílám…' : 'Poslat ověřovací e-mail'}</button></div>}{!user && <div className="v2-profile-actions"><button className="v2-primary" onClick={() => setShowAuth(true)}>Přihlásit se / vytvořit účet</button><button className="v2-secondary" onClick={() => chooseTab('map')}>Pokračovat jako host</button></div>}<div className="v2-group">{user && <><button onClick={() => chooseTab('collection')}><Bookmark /> Moje sbírka <ChevronRight /></button><button onClick={() => { setCollectionTab('created'); chooseTab('collection'); }}><MapPin /> Vytvořená místa <ChevronRight /></button></>}<button onClick={() => navigate('/new/drafts')}><List /> Rozpracovaná místa <ChevronRight /></button><button onClick={() => navigate('/new/settings')}><Settings /> Nastavení <ChevronRight /></button>{redesigned ? <button onClick={() => navigate('/new/settings/support/faq')}><Compass /> Nápověda <ChevronRight /></button> : <a href="/FAQ"><Compass /> Nápověda <ChevronRight /></a>}<button onClick={() => navigate(redesigned ? '/new/settings/about/app' : '/new/about', redesigned ? { state: { settingsParent: '/new/profile' } } : undefined)}><MapPin /> O aplikaci <ChevronRight /></button>{redesigned ? <NewLegalLink document="/PrivacyPolicy"><Layers /> Soukromí a podmínky <ChevronRight /></NewLegalLink> : <a href="/PrivacyPolicy"><Layers /> Soukromí a podmínky <ChevronRight /></a>}{user && <button onClick={() => setShowSignOut(true)}><UserRound /> Odhlásit se <ChevronRight /></button>}</div></section>}
     {settingsPage && (redesigned ? <NewSettings onSignIn={() => setShowAuth(true)} onSignOut={() => setShowSignOut(true)} mapLayer={mapLayer} onMapLayer={setMapLayer} terrain={terrain} onTerrain={setTerrain} showZoomButtons={showNewZoomButtons} onZoomButtons={changeNewZoomButtons} /> : <section className="v2-page"><header className="v2-page-header v2-subpage-header"><button onClick={() => navigate('/new/profile')} aria-label="Zpět na profil"><ChevronLeft /></button><h1>Nastavení</h1></header><div className="v2-scroll v2-settings-body"><h2>Vzhled a jazyk</h2><label className="v2-setting-row"><span>Tmavý režim<small>Přepnout vzhled aplikace a mapy.</small></span><input type="checkbox" checked={isDark} onChange={toggleTheme} /></label><label className="v2-setting-row"><span>Velikost textu<small>{textScale} %</small></span><input type="range" min="75" max="250" step="5" value={textScale} onChange={event => setTextScale(saveTextScale(event.target.value))} /></label><label className="v2-setting-row"><span>Jazyk</span><select value={language} onChange={event => setLanguage(event.target.value)}>{[...LANGUAGES, ...LANGUAGE_VARIANTS].map(item => <option key={item.code} value={item.code}>{item.nativeName}</option>)}</select></label><h2>Mapa</h2><label className="v2-setting-row"><span>Vzhled mapy</span><select value={mapLayer} onChange={event => setMapLayer(event.target.value)}><option value="basic">Základní</option><option value="outdoor">Turistická</option><option value="aerial">Letecká</option><option value="winter">Zimní</option><option value="traffic">Doprava</option></select></label><label className="v2-setting-row"><span>3D mapa</span><input type="checkbox" checked={terrain} onChange={event => setTerrain(event.target.checked)} /></label><h2>Účet a aplikace</h2><button className="v2-setting-link" onClick={() => setShowSettings(true)}>Účet a zabezpečení <ChevronRight /></button><a className="v2-setting-link" href="/FAQ">Nápověda <ChevronRight /></a><a className="v2-setting-link" href="/updates">Aktualizace <ChevronRight /></a><a className="v2-setting-link" href="/PrivacyPolicy">Soukromí a právní informace <ChevronRight /></a></div></section>)}
     {aboutPage && <section className="v2-page"><header className="v2-page-header v2-subpage-header"><button onClick={() => navigate('/new/profile')} aria-label="Zpět na profil"><ChevronLeft /></button><h1>O aplikaci</h1></header><div className="v2-about"><img src={LOGO} alt="SpotFinder" /><h2>SpotFinder</h2><p>Objevuj skutečná místa sdílená komunitou a ukládej si ta, ke kterým se chceš vrátit.</p><small>Verze {APP_VERSION}</small>{redesigned ? <><button onClick={() => navigate('/new/settings/support/faq')}>Nápověda</button><NewLegalLink document="/PrivacyPolicy">Soukromí</NewLegalLink><NewLegalLink document="/TermsAndConditions">Podmínky používání</NewLegalLink></> : <><a href="/FAQ">Nápověda</a><a href="/PrivacyPolicy">Soukromí</a><a href="/TermsAndConditions">Podmínky používání</a></>}</div></section>}
     {draftsPage && <section className="v2-page"><header className="v2-page-header v2-subpage-header"><button onClick={() => navigate('/new/profile')} aria-label="Zpět na profil"><ChevronLeft /></button><h1>Rozpracovaná místa</h1></header><div className="v2-scroll v2-drafts-list">{draftsError ? <StateMessage retry={loadDrafts}>Rozpracovaná místa se nepodařilo načíst.</StateMessage> : draftRows === null ? (redesigned ? <NewSkeleton kind="nearbyRows" /> : <StateMessage>Načítám rozpracovaná místa…</StateMessage>) : draftRows.length ? draftRows.map(item => <article className="v2-draft-row" key={item.id}><div className="v2-draft-icon"><MapPin size={23} /></div><div className="v2-draft-copy"><strong>{draftTitle(item)}</strong><small>{draftDate(item.updated_at || item.created_at)}</small></div><button className="v2-draft-resume" onClick={() => { const coords = normalizeLatLng(item); if (!coords) { toast.error('Návrh nemá platnou polohu.'); return; } if (redesigned) setQuickAdd({ coords: { lat: coords[0], lng: coords[1] }, draft: item }); else { setDraft(item); setAddAt({ lat: coords[0], lng: coords[1] }); } navigate('/new/map'); }}>Pokračovat</button><button className="v2-draft-delete" aria-label={`Smazat ${draftTitle(item)}`} onClick={() => setDraftToDelete(item)}><X size={18} /></button></article>) : <StateMessage>Nemáš žádná rozpracovaná místa.</StateMessage>}</div></section>}

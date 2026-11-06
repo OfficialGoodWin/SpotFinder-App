@@ -2,9 +2,10 @@ import React, { Suspense, lazy, useState } from 'react';
 import { Cookie, ShieldCheck } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getConsent, rejectNonEssential, acknowledgeCurrentPrivacyNotice } from '@/lib/consent';
-import { APP_VERSION } from '@/config/appVersion';
 import NewSupport from './NewSupport';
+import NewAbout from './NewAbout';
 import NewSkeleton from './NewSkeleton';
+import { useLanguage } from '@/lib/LanguageContext';
 import { newLegalRoute } from './legalRoutes';
 import './new-settings-info.css';
 
@@ -16,26 +17,29 @@ const Refunds = lazy(() => import('@/pages/RefundPolicy'));
 const Updates = lazy(() => import('@/pages/Updates'));
 
 function CookiePreferences() {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const [choice, setChoice] = useState(getConsent);
   const save = action => setChoice(action());
   return <div className="sf-new-info-preferences">
-    <div className="sf-new-info-status"><span><Cookie size={21} /></span><div><strong>Nezbytné úložiště</strong><small>Aktivní pro přihlášení, nastavení a rozpracovaná místa.</small></div></div>
-    <div className="sf-new-info-status"><span><ShieldCheck size={21} /></span><div><strong>Analytika a reklama</strong><small>Nedostupné v této verzi. Dřívější volby je nemohou zapnout.</small></div></div>
-    <p role="status">{choice.decided ? 'Volba soukromí je zaznamenaná.' : 'Volba soukromí zatím není zaznamenaná.'}</p>
-    <button type="button" className="sf-new-info-primary" onClick={() => save(acknowledgeCurrentPrivacyNotice)}>Pokračovat s nezbytnými službami</button>
-    <button type="button" className="sf-new-info-secondary" onClick={() => save(rejectNonEssential)}>Ponechat volitelné služby vypnuté</button>
-    <button type="button" className="sf-new-info-policy-link" onClick={() => navigate('/new/settings/legal/cookies', { state: { settingsParent: location.pathname } })}>Přečíst zásady cookies</button>
+    <div className="sf-new-info-status"><span><Cookie size={21} /></span><div><strong>{t('newCookiePreferences.necessary')}</strong><small>{t('newCookiePreferences.necessaryDetail')}</small></div></div>
+    <div className="sf-new-info-status"><span><ShieldCheck size={21} /></span><div><strong>{t('newCookiePreferences.optional')}</strong><small>{t('newCookiePreferences.optionalDetail')}</small></div></div>
+    <p role="status">{t(choice.decided ? 'newCookiePreferences.decided' : 'newCookiePreferences.undecided')}</p>
+    <button type="button" className="sf-new-info-primary" onClick={() => save(acknowledgeCurrentPrivacyNotice)}>{t('newCookiePreferences.continue')}</button>
+    <button type="button" className="sf-new-info-secondary" onClick={() => save(rejectNonEssential)}>{t('newCookiePreferences.keepOff')}</button>
+    <button type="button" className="sf-new-info-policy-link" onClick={() => navigate('/new/settings/legal/cookies', { state: { settingsParent: location.pathname } })}>{t('newCookiePreferences.readPolicy')}</button>
   </div>;
 }
 
 export default function NewSettingsInfo({ area, page }) {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const support = area === 'support';
   const source = area === 'legal' ? ({ terms: <Terms />, privacy: <Privacy />, cookies: <Cookies />, refunds: <Refunds /> })[page]
-    : (support && page === 'faq') || (area === 'about' && page === 'app') ? <FAQ />
+    : support && page === 'faq' ? <FAQ />
+      : area === 'about' && page === 'app' ? <NewAbout />
       : area === 'about' && page === 'updates' ? <Updates /> : null;
   const mode = support ? 'faq' : area === 'about' && page === 'app' ? 'app' : area === 'about' ? 'updates' : 'legal';
   const onClickCapture = event => {
@@ -54,9 +58,8 @@ export default function NewSettingsInfo({ area, page }) {
 
   if (area === 'legal' && page === 'preferences') return <CookiePreferences />;
   if (support && ['feedback', 'report', 'contact'].includes(page)) return <NewSupport key={page} page={page} />;
-  if (!source) return <p className="sf-new-info-unavailable">Tato stránka není dostupná.</p>;
+  if (!source) return <p className="sf-new-info-unavailable">{t('newCookiePreferences.unavailable')}</p>;
   return <div className={`sf-new-info sf-new-info--${mode}`} onClickCapture={onClickCapture}>
-    {area === 'about' && page === 'app' && <p className="sf-new-info-version">SpotFinder · verze {APP_VERSION}</p>}
     <Suspense fallback={<NewSkeleton kind={mode === 'app' ? 'faq' : mode} />}>{source}</Suspense>
   </div>;
 }

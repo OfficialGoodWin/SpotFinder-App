@@ -1,0 +1,76 @@
+/* Warm dark surfaces for the redesigned /new route. Shared theme state lives in ThemeContext. */
+.sf-new .mobile-v2.v2-dark {
+  --sf-forest:#a4cdb0;
+  --sf-cream:#211f1b;
+  --sf-ink:#f1eee4;
+  --sf-muted:#b5b9aa;
+  --sf-chip:#302f28;
+  --sf-border:#4c4a3e;
+  --sf-shadow:0 5px 20px #0005;
+  --v2-green:var(--sf-forest);
+  --v2-ink:var(--sf-ink);
+  --v2-sub:var(--sf-muted);
+  --v2-surface:var(--sf-cream);
+  --v2-soft:var(--sf-chip);
+  --v2-line:var(--sf-border);
+  background:var(--sf-cream);
+  color:var(--sf-ink);
+  color-scheme:dark;
+}
+.sf-new .v2-dark .sf-new-settings-page {
+  --settings-bg:#211f1b;
+  --settings-surface:#2d2b25;
+  --settings-field:#343128;
+  --settings-forest:#b5d5bc;
+  --settings-deep:#d3e4d3;
+  --settings-ink:#f1eee4;
+  --settings-muted:#babbaa;
+  --settings-border:#504d42;
+}
+.sf-new .v2-dark :is(.sf-new-account,.sf-new-account-form,.sf-new-account-empty) {
+  --account-forest:#b5d5bc;
+  --account-ink:#f1eee4;
+  --account-muted:#babbaa;
+  --account-border:#504d42;
+  --account-surface:#2d2b25;
+  --account-field:#343128;
+  --account-sage:#354437;
+  --account-error:#f3aa91;
+}
+.sf-new .v2-dark .sf-new-support {
+  --support-forest:#b5d5bc;
+  --support-ink:#f1eee4;
+  --support-muted:#babbaa;
+  --support-border:#504d42;
+  --support-field:#343128;
+  --support-sage:#354437;
+}
+.sf-new .v2-dark .sf-new-info {
+  --info-forest:#b5d5bc;
+  --info-ink:#f1eee4;
+  --info-muted:#babbaa;
+  --info-surface:#2d2b25;
+  --info-field:#343128;
+  --info-border:#504d42;
+}
+.sf-new .v2-dark :is(.sf-new-discover-page .v2-discover-card,.sf-new-poi-actions button,.sf-new-poi-rate textarea,.sf-new-poi-link>button,.sf-new-poi-link-choice button,.sf-new-poi-link-choice select,.sf-new-detail-bottom>button:not(.sf-new-detail-go),.sf-new-quick-field>input,.sf-new-quick-input,.sf-new-quick-textarea,.sf-new-quick-location,.sf-new-quick-more) {
+  background:var(--sf-chip);
+  border-color:var(--sf-border);
+  color:var(--sf-ink);
+}
+.sf-new .v2-dark :is(.sf-new-poi-rate,.sf-new-quick-photo-area,.sf-new-discover-media,.sf-new-card-image) { background:#354437; }
+.sf-new .v2-dark :is(.sf-new-poi-section p,.sf-new-quick-location small,.sf-new-quick-more small,.sf-new-card-open small,.sf-new-nearby-heading p) { color:var(--sf-muted); }
+.sf-new .v2-dark .sf-new-map-marker.has-photo { border-color:#d6dfd0; }
+.sf-new .v2-dark .sf-new-map-marker.has-photo::after { background:#d6dfd0; }
+.sf-new .v2-dark .sf-new-map-marker.is-selected { border-color:var(--sf-border); }
+.sf-new .v2-dark :is(.sf-new-skeleton-bar,.sf-new-poi-loading) { background:var(--sf-chip); }
+.sf-new .v2-dark .sf-new-support-field :is(input,textarea,select) { color-scheme:dark; }
+.sf-new .v2-dark :is(.sf-new-settings-icon,.sf-new-settings-row:hover,.sf-new-settings-back:hover) { background:#354437; }
+.sf-new .v2-dark :is(.sf-new-account-message.is-error,.sf-new-support-message.is-error) { background:#472d28; color:#ffd1bb; }
+.sf-new .v2-dark :is(.sf-new-settings-control select,.sf-new-account-field select,.sf-new-poi-link-choice select) { color-scheme:dark; }
+.sf-new .v2-dark .sf-new-chip-highlight { background:#416d4a; }
+.sf-new .v2-dark :is(.sf-new-categories button.is-active,.sf-new-discover-page .v2-chips button.active,.sf-new-quick-chips button.selected,.sf-new-quick-category-option.selected,.sf-new-crowd-options button.selected,.sf-new-support-submit,.sf-new-detail-bottom>.sf-new-detail-go,.sf-new-quick-primary,.sf-new-nearby-heading>button,.sf-new-consent>button,.sf-new-poi-submit,.sf-new-crowd-actions button,.sf-new-crowd-guest button) { background:#416d4a; border-color:#416d4a; color:#fff; }
+.sf-new .v2-dark :is(.sf-new-map-marker,.sf-new-map-cluster) { background:#416d4a; color:#fff; }
+@media (prefers-reduced-motion:reduce) {
+  .sf-new .v2-dark :is(.sf-new-nearby,.sf-new-controls,.sf-new-layer-menu,.sf-new-quick-add,.sf-new-detail-view) { transition:none!important; animation:none!important; }
+}

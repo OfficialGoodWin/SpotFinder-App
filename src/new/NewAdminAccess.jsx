@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { completeTotpEnrollment, getEnrolledMfaFactors, getFirebaseServices, startTotpEnrollment } from '@/api/firebaseClient';
 import Admin from '@/pages/Admin';
+import { useLanguage } from '@/lib/LanguageContext';
 
 const ADMIN_EMAIL = 'redm3467@gmail.com';
 const WINDOW_SECONDS = 1800;
@@ -15,6 +16,7 @@ function remainingSeconds(claims, now = Date.now()) {
 }
 
 export default function NewAdminAccess() {
+  const { t } = useLanguage();
   const { user, isAdmin, logout } = useAuth();
   const [claims, setClaims] = useState(null);
   const [secret, setSecret] = useState(null);
@@ -31,7 +33,7 @@ export default function NewAdminAccess() {
     return () => { active = false; clearInterval(timer); };
   }, [user?.id]);
 
-  if (user?.email !== ADMIN_EMAIL) return <p>Admin access is assigned to {ADMIN_EMAIL}.</p>;
+  if (user?.email !== ADMIN_EMAIL) return <p>{t('newAdmin.assigned', { email: ADMIN_EMAIL })}</p>;
   const firebaseUser = getFirebaseServices().auth.currentUser;
   const enrolled = firebaseUser && getEnrolledMfaFactors(firebaseUser).some(factor => factor.factorId === 'totp');
   const seconds = remainingSeconds(claims, now);
@@ -39,7 +41,7 @@ export default function NewAdminAccess() {
     setBusy(true); setError('');
     try {
       await firebaseUser.reload();
-      if (!firebaseUser.emailVerified) throw new Error('Verify your email address, then sign in again.');
+      if (!firebaseUser.emailVerified) throw new Error(t('newAdmin.verifyEmail'));
       setSecret(await startTotpEnrollment(firebaseUser));
     }
     catch (err) { setError(err.message); }
@@ -51,23 +53,23 @@ export default function NewAdminAccess() {
     catch (err) { setError(err.message); }
     finally { setBusy(false); }
   };
-  return <section className="sf-new-settings-panel" aria-label="Admin verification">
-    {seconds > 0 && isAdmin ? <><p role="timer">Admin access: {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')} remaining</p><Admin /></> : <>
-      <p>Admin access requires Google sign-in and an authenticator app. Each verified sign-in grants 30 minutes.</p>
-      {!firebaseUser && <p>Sign in to SpotFinder with your Google account to begin.</p>}
-      {firebaseUser?.providerData?.every(provider => provider.providerId !== 'google.com') && <p>Connect your Google account first.</p>}
+  return <section className="sf-new-settings-panel" aria-label={t('newAdmin.label')}>
+    {seconds > 0 && isAdmin ? <><p role="timer">{t('newAdmin.remaining', { time: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` })}</p><Admin /></> : <>
+      <p>{t('newAdmin.requirements')}</p>
+      {!firebaseUser && <p>{t('newAdmin.signIn')}</p>}
+      {firebaseUser?.providerData?.every(provider => provider.providerId !== 'google.com') && <p>{t('newAdmin.connectGoogle')}</p>}
       {!enrolled && firebaseUser && <>
-        {!secret ? <button type="button" disabled={busy} onClick={beginEnrollment}>Set up authenticator app</button> : <form onSubmit={finishEnrollment}>
-          <p>Add this key to your authenticator app for SpotFinder:</p>
+        {!secret ? <button type="button" disabled={busy} onClick={beginEnrollment}>{t('newAdmin.setup')}</button> : <form onSubmit={finishEnrollment}>
+          <p>{t('newAdmin.addKey')}</p>
           <code style={{ overflowWrap: 'anywhere' }}>{secret.secretKey}</code>
-          <p><a href={secret.generateQrCodeUrl(user.email, 'SpotFinder')}>Open authenticator setup link</a></p>
-          <label>Authenticator code <input value={code} onChange={event => setCode(event.target.value)} inputMode="numeric" autoComplete="one-time-code" required /></label>
-          <button type="submit" disabled={busy || !code.trim()}>Verify and enable</button>
+          <p><a href={secret.generateQrCodeUrl(user.email, 'SpotFinder')}>{t('newAdmin.setupLink')}</a></p>
+          <label>{t('newAdmin.code')} <input value={code} onChange={event => setCode(event.target.value)} inputMode="numeric" autoComplete="one-time-code" required /></label>
+          <button type="submit" disabled={busy || !code.trim()}>{t('newAdmin.enable')}</button>
         </form>}
       </>}
-      {enrolled && <p>Sign out and sign in with Google, then enter your authenticator code to start a new 30-minute session.</p>}
-      {enrolled && <button type="button" onClick={() => logout()}>Sign out to verify again</button>}
-      {!isAdmin && <p>The admin claim has not been assigned to this account yet.</p>}
+      {enrolled && <p>{t('newAdmin.newSession')}</p>}
+      {enrolled && <button type="button" onClick={() => logout()}>{t('newAdmin.signOut')}</button>}
+      {!isAdmin && <p>{t('newAdmin.noClaim')}</p>}
       {error && <p role="alert">{error}</p>}
     </>}
   </section>;

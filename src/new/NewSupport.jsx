@@ -3,6 +3,7 @@ import { Mail, MessageSquare, Wrench } from 'lucide-react';
 import { submitFeedback } from '@/api/firebaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
 import './new-support.css';
+import { canSubmitSupport } from './supportValidation';
 
 const FEEDBACK_CATEGORIES = ['idea', 'liked', 'improvement', 'other'];
 const ISSUE_TYPES = ['bug', 'map', 'publishing', 'account', 'other'];
@@ -32,7 +33,7 @@ export default function NewSupport({ page }) {
   };
   const submit = async event => {
     event.preventDefault();
-    if (status === 'sending') return;
+    if (!canSubmitSupport({ page, category, area, message, email, status })) return;
     setStatus('sending');
     try {
       const result = await submitFeedback({ email: email.trim(), message: composeMessage(), language });
@@ -48,13 +49,13 @@ export default function NewSupport({ page }) {
     <form onSubmit={submit} data-unsaved-work={category || area.trim() || message.trim() || steps.trim() || email.trim() ? 'true' : undefined}>
       {(isFeedback || isReport) && <Field id="sf-new-support-category" label={L(isReport ? 'issueType' : 'category')}><select id="sf-new-support-category" value={category} onChange={setValue(setCategory)} required><option value="">{L('choose')}</option>{(isReport ? ISSUE_TYPES : FEEDBACK_CATEGORIES).map(key => <option value={key} key={key}>{L(`${isReport ? 'issueCategory' : 'feedbackCategory'}.${key}`)}</option>)}</select></Field>}
       {isReport && <Field id="sf-new-support-area" label={L('issueArea')}><input id="sf-new-support-area" type="text" maxLength={160} value={area} onChange={setValue(setArea)} placeholder={L('issueAreaHint')} required /></Field>}
-      <Field id="sf-new-support-message" label={L(isReport ? 'issueDescription' : isContact ? 'helpMessage' : 'message')}><textarea id="sf-new-support-message" rows={isReport ? 5 : 6} maxLength={isReport ? 2300 : 2500} value={message} onChange={setValue(setMessage)} placeholder={L(isReport ? 'reportMessageHint' : isContact ? 'contactMessageHint' : 'feedbackMessageHint')} required /></Field>
-      {isReport && <Field id="sf-new-support-steps" label={L('reproduction')} optional={L('optional')}><textarea id="sf-new-support-steps" rows={3} maxLength={300} value={steps} onChange={setValue(setSteps)} placeholder={L('reproductionHint')} /></Field>}
+      <Field id="sf-new-support-message" label={L(isReport ? 'issueDescription' : isContact ? 'helpMessage' : 'message')}><textarea id="sf-new-support-message" rows={isReport ? 5 : 6} maxLength={isReport ? 2300 : 2500} value={message} onChange={setValue(setMessage)} placeholder={L(isReport ? 'reportMessageHint' : isContact ? 'contactMessageHint' : 'feedbackMessageHint')} required /><small className="sf-new-support-count">{message.length} / {isReport ? 2300 : 2500}</small></Field>
+      {isReport && <Field id="sf-new-support-steps" label={L('reproduction')} optional={L('optional')}><textarea id="sf-new-support-steps" rows={3} maxLength={300} value={steps} onChange={setValue(setSteps)} placeholder={L('reproductionHint')} /><small className="sf-new-support-count">{steps.length} / 300</small></Field>}
       <Field id="sf-new-support-email" label={L('email')} optional={!isContact && L('optional')}><input id="sf-new-support-email" type="email" autoComplete="email" maxLength={320} value={email} onChange={setValue(setEmail)} placeholder={L('emailHint')} required={isContact} /></Field>
       {!isContact && <p className="sf-new-support-hint">{L('emailOptionalHint')}</p>}
       {status === 'sent' && <p className="sf-new-support-message" role="status">{L(isFeedback ? 'feedbackSent' : isReport ? 'reportSent' : 'contactSent')}</p>}
       {(status === 'error' || status === 'limited') && <p className="sf-new-support-message is-error" role="alert">{L(status === 'limited' ? 'rateLimited' : 'sendFailed')}</p>}
-      <button className="sf-new-support-submit" type="submit" disabled={status === 'sending' || !message.trim() || (isReport && (!category || !area.trim())) || (isFeedback && !category) || (isContact && !email.trim())}>{L(status === 'sending' ? 'sending' : isFeedback ? 'sendFeedback' : isReport ? 'sendReport' : 'sendContact')}</button>
+      <button className="sf-new-support-submit" type="submit" disabled={!canSubmitSupport({ page, category, area, message, email, status })}>{L(status === 'sending' ? 'sending' : isFeedback ? 'sendFeedback' : isReport ? 'sendReport' : 'sendContact')}</button>
     </form>
   </div>;
 }

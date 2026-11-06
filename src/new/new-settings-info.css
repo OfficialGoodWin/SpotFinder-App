@@ -30,9 +30,16 @@
 .sf-new .sf-new-info--updates .sf-page-viewport>main ol article>header,.sf-new .sf-new-info--updates .sf-page-viewport>main ol article>div{padding:17px}
 .sf-new .sf-new-info--updates .sf-page-viewport>main ol article>div{display:grid;grid-template-columns:1fr;gap:18px}
 .sf-new .sf-new-info--updates .sf-page-viewport>main ol article h2{font-size:18px}
-.sf-new .sf-new-info--app .sf-page-viewport>main>*:not(:nth-last-child(2)){display:none}
-.sf-new .sf-new-info--app .sf-page-viewport>main>section:nth-last-child(2){display:block}
-.sf-new .sf-new-info--app .sf-page-viewport>main>section:nth-last-child(2) ul{display:grid;grid-template-columns:1fr}
+.sf-new .sf-new-about{display:grid;gap:13px;color:var(--info-ink)}
+.sf-new .sf-new-about-intro,.sf-new .sf-new-about section{display:flex;align-items:flex-start;gap:14px;padding:17px;border:1px solid var(--info-border);border-radius:16px;background:var(--info-surface)}
+.sf-new .sf-new-about-intro img{flex:none;width:44px;height:44px;object-fit:contain;border-radius:12px}
+.sf-new .sf-new-about section svg{flex:none;color:var(--info-forest)}
+.sf-new .sf-new-about p{margin:0;font-size:14px;line-height:1.6;overflow-wrap:anywhere}
+.sf-new .sf-new-about a{color:var(--info-forest);text-decoration:underline;text-underline-offset:2px}
+.sf-new .sf-new-about-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.sf-new .sf-new-about-links a{display:flex;align-items:center;gap:8px;min-height:48px;padding:11px 13px;border:1px solid var(--info-border);border-radius:13px;background:var(--info-surface);font-size:13px;font-weight:600;text-decoration:none}
+.sf-new .sf-new-about>small{padding:3px 2px;color:var(--info-muted);font-size:12px}
+@media(max-width:350px){.sf-new .sf-new-about-links{grid-template-columns:1fr}}
 .sf-new .sf-new-info-version{display:inline-flex;margin:0 0 15px;padding:7px 12px;border:1px solid var(--info-border);border-radius:999px;background:var(--info-surface);color:var(--info-forest);font-size:12px;font-weight:700}
 .sf-new .sf-new-info-unavailable{color:var(--info-muted);font-size:13px}
 .sf-new .sf-new-info-preferences>.sf-new-info-policy-link{min-height:44px;border:0;background:transparent;color:var(--settings-forest);font-size:13px;font-weight:600;text-decoration:underline}
