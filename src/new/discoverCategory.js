@@ -1,4 +1,4 @@
-import { categoryLabel, spotPrimaryCategory } from '@/lib/spotCategories';
+import { categoryLabel, spotPrimaryCategory } from '../lib/spotCategories.js';
 
 export const DISCOVER_ALL = 'all';
 
@@ -23,5 +23,12 @@ export function appendUniqueDiscoverSpots(previous, next) {
     const id = String(spot.id);
     if (!seen.has(id)) { seen.add(id); result.push(spot); }
   }
-  return result;
+  const created = spot => {
+    const value = spot.created_date;
+    if (value?.seconds != null) return Number(value.seconds) * 1000;
+    if (typeof value === 'number') return value;
+    const time = Date.parse(value);
+    return Number.isFinite(time) ? time : 0;
+  };
+  return result.sort((a, b) => created(b) - created(a) || String(a.id).localeCompare(String(b.id)));
 }

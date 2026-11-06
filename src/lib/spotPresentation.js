@@ -97,12 +97,27 @@ export function getSpotDisplayName(spot = {}, language = 'en') {
 }
 
 export function spotMatchesSearch(spot = {}, query = '', language = 'en') {
-  const needle = cleanText(query).replace(/^#/, '').toLocaleLowerCase();
+  const normalize = value => cleanText(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ');
+  const needle = normalize(cleanText(query).replace(/^#/, ''));
   if (!needle) return true;
   return [
     getSpotDisplayName(spot, language), spot.description, getSpotLocationLabel(spot),
     ...(Array.isArray(spot.tags) ? spot.tags : []),
-  ].some(value => cleanText(value).toLocaleLowerCase().includes(needle));
+  ].some(value => {
+    const haystack = normalize(value);
+    if (haystack.includes(needle)) return true;
+    const words = haystack.split(' ');
+    return needle.split(' ').every(term => words.some(word => word.startsWith(term) || term.length >= 5 && word.length >= 5 && Math.abs(word.length - term.length) <= 1 && (() => {
+      let left = 0; let right = 0; let edits = 0;
+      while (left < term.length && right < word.length) {
+        if (term[left] === word[right]) { left += 1; right += 1; continue; }
+        if (++edits > 1) return false;
+        if (term.length >= word.length) left += 1;
+        if (word.length >= term.length) right += 1;
+      }
+      return true;
+    })()));
+  });
 }
 
 const looksLikeCoordinates = (value) => /^\s*-?\d{1,2}(?:\.\d+)?\s*[,;/]\s*-?\d{1,3}(?:\.\d+)?\s*$/.test(String(value || ''));

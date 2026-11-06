@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { getDiscoverSpotsPage } from '@/api/firebaseClient';
 import { getSpotRating } from '@/lib/spotDiscovery';
@@ -22,12 +22,15 @@ function ratingLabel(spot) {
   return `★ ${rating.toFixed(1).replace('.', ',')}${Number.isFinite(count) && count > 0 ? ` (${count})` : ''}`;
 }
 
-export default function NewDiscover({ language, titleOf, locationOf, savedIds, savingSpotId, onSave, onOpen, onMap }) {
+export default function NewDiscover({ language, titleOf, locationOf, savedIds, savingSpotId, onSave, onOpen, onMap, viewRef }) {
   const reduced = useReducedMotion();
-  const [category, setCategory] = useState(DISCOVER_ALL);
-  const [pageState, setPageState] = useState({ spots: [], cursor: null, hasMore: true, loading: true, error: false, initialized: false });
+  const [category, setCategory] = useState(() => viewRef.current.category || DISCOVER_ALL);
+  const [pageState, setPageState] = useState(() => viewRef.current.pageState || { spots: [], cursor: null, hasMore: true, loading: true, error: false, initialized: false });
   const generation = useRef(0);
   const inFlight = useRef(false);
+  const scrollRef = useRef(null);
+  useEffect(() => { viewRef.current.pageState = pageState; }, [pageState, viewRef]);
+  useLayoutEffect(() => { if (pageState.initialized && scrollRef.current) scrollRef.current.scrollTop = viewRef.current.scrollTop || 0; }, [pageState.initialized, viewRef]);
 
   const fetchNext = useCallback(async ({ filter, cursor, replace, request }) => {
     if (inFlight.current) return;
@@ -67,12 +70,22 @@ export default function NewDiscover({ language, titleOf, locationOf, savedIds, s
   }, []);
 
   useEffect(() => {
+    if (viewRef.current.pageState?.initialized && viewRef.current.category === category) return;
     const request = ++generation.current;
     inFlight.current = false;
     setPageState({ spots: [], cursor: null, hasMore: true, loading: true, error: false, initialized: false });
     void fetchNext({ filter: category, cursor: null, replace: true, request });
     return () => { generation.current += 1; inFlight.current = false; };
-  }, [category, fetchNext]);
+  }, [category, fetchNext, viewRef]);
+
+  const chooseCategory = name => {
+    if (name === category) return;
+    viewRef.current.category = name;
+    viewRef.current.pageState = null;
+    viewRef.current.scrollTop = 0;
+    setPageState({ spots: [], cursor: null, hasMore: true, loading: true, error: false, initialized: false });
+    setCategory(name);
+  };
 
   const loadMore = () => {
     if (inFlight.current || !pageState.hasMore || pageState.loading) return;
@@ -81,8 +94,8 @@ export default function NewDiscover({ language, titleOf, locationOf, savedIds, s
 
   return <section className="v2-page sf-new-discover-page">
     <header className="v2-page-header"><h1>Objevit</h1><p>Místa sdílená komunitou</p></header>
-    <div className="v2-chips" role="group" aria-label="Kategorie míst">{CATEGORIES.map(name => <button type="button" key={name} className={category === name ? 'active' : ''} aria-pressed={category === name} onClick={() => setCategory(name)}>{category === name && <motion.span className="sf-new-chip-highlight" layoutId="sf-new-discover-category-highlight" transition={reduced ? reducedTransition : newMotion.selection} />}{name === DISCOVER_ALL ? (String(language || '').startsWith('cs') ? 'Vše' : 'All') : categoryLabel(name, language, { short: true })}</button>)}</div>
-    <div className="v2-scroll sf-new-discover-scroll">
+    <div className="v2-chips" role="group" aria-label="Kategorie míst">{CATEGORIES.map(name => <button type="button" key={name} className={category === name ? 'active' : ''} aria-pressed={category === name} onClick={() => chooseCategory(name)}>{category === name && <motion.span className="sf-new-chip-highlight" layoutId="sf-new-discover-category-highlight" transition={reduced ? reducedTransition : newMotion.selection} />}{name === DISCOVER_ALL ? (String(language || '').startsWith('cs') ? 'Vše' : 'All') : categoryLabel(name, language, { short: true })}</button>)}</div>
+    <div ref={scrollRef} className="v2-scroll sf-new-discover-scroll" onScroll={event => { viewRef.current.scrollTop = event.currentTarget.scrollTop; }}>
       <div className="sf-new-discover-grid">
         {pageState.spots.map(spot => <DiscoverCard key={String(spot.id)} spot={spot} title={titleOf(spot, language)} location={locationOf(spot)} categoryLabel={discoverCategoryLabel(spot, language)} ratingLabel={ratingLabel(spot)} landscape compact savingSpotId={savingSpotId} savedIds={savedIds} onSave={onSave} onOpen={onOpen} onMap={onMap} />)}
         {pageState.loading && <NewSkeleton kind="discoverCards" />}
